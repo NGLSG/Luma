@@ -39,31 +39,143 @@
 ---
 
 ## 🎯 快速开始
-### 🚀 克隆源码
+
+首先，克隆本仓库到你的本地计算机：
 
 ```bash
 git clone https://github.com/NGLSG/Luma.git
 cd Luma
 ```
 
-由于第三方库未使用子模块管理，自行克隆下方依赖
-astc-encoder
-box2d
-coreclr
-coreclr-linux-x64
-coreclr-win-x64
-entt
-glm
-imgui
-imgui-node-editor
-ImGuizmo
-json
-llama-cpp
-SDL
-skia-linux
-skia-win
-yaml-cpp
-对于CoreCLR和Skia需要自行构建
+### 环境与依赖 (Environment & Dependencies)
+
+在开始构建之前，请确保你的系统环境和所有依赖项都已正确配置。
+
+### 1\. 前置要求 (Prerequisites)
+
+请确保你已安装以下系统级的库和工具：
+
+* **Git**
+* **CMake** (版本 **3.21** 或更高)
+* **Vulkan SDK**
+* **LibCurl**
+* **OpenSSL**
+* **C++ 编译器** (例如: Visual Studio 2022 / GCC 11 / Clang 14)
+
+### 2\. 获取依赖库 (Download Dependencies)
+
+所有第三方库都需要放置在项目根目录下的 `External` 文件夹中。请按照以下步骤操作：
+
+**第一步：创建 `External` 目录**
+
+如果 `External` 目录不存在，请在项目根目录创建它。
+
+```bash
+mkdir External
+cd External
+```
+
+**第二步：克隆源代码库**
+
+将以下所有库克隆到 `External` 目录下。
+
+| 库 (Library) | 克隆地址 (Repository URL) |
+| :--- | :--- |
+| `astc-encoder` | `https://github.com/ARM-software/astc-encoder.git` |
+| `box2d` | `https://github.com/erincatto/box2d.git` |
+| `entt` | `https://github.com/skypjack/entt.git` |
+| `glm` | `https://github.com/g-truc/glm.git` |
+| `imgui` | `https://github.com/ocornut/imgui.git` |
+| `imgui-node-editor` | `https://github.com/thedmd/imgui-node-editor.git` |
+| `ImGuizmo` | `https://github.com/CedricGuillemet/ImGuizmo.git` |
+| `json` | `https://github.com/nlohmann/json.git` |
+| `llama-cpp` | `https://github.com/ggerganov/llama.cpp.git` |
+| `SDL` | `https://github.com/libsdl-org/SDL.git` |
+| `yaml-cpp` | `https://github.com/jbeder/yaml-cpp.git` |
+
+你可以使用以下脚本一次性克隆所有仓库：
+
+```bash
+git clone https://github.com/ARM-software/astc-encoder.git
+git clone https://github.com/erincatto/box2d.git
+git clone https://github.com/skypjack/entt.git
+git clone https://github.com/g-truc/glm.git
+git clone https://github.com/ocornut/imgui.git
+git clone https://github.com/thedmd/imgui-node-editor.git
+git clone https://github.com/CedricGuillemet/ImGuizmo.git
+git clone https://github.com/nlohmann/json.git
+git clone https://github.com/ggerganov/llama.cpp.git
+git clone https://github.com/libsdl-org/SDL.git
+git clone https://github.com/jbeder/yaml-cpp.git
+```
+
+**第三步：下载并解压二进制依赖**
+
+`CoreCLR` 和 `Skia` 作为预编译的二进制包提供。
+
+1.  前往 [Luma-External Releases](https://www.google.com/search?q=https://github.com/NGLSG/Luma-External/releases/tag/Prebuilt) 页面。
+2.  根据你的操作系统，下载对应的 `.zip` 包。例如，Windows 用户需要下载 `skia-win.zip` 和 `coreclr-win-x64.zip`。
+3.  将下载的 `.zip` 文件**解压**到 `External` 目录中。
+
+| 依赖包 (Binary Package) | 操作系统 (OS) | 下载文件 (Download File) |
+| :--- | :--- | :--- |
+| `coreclr` | Linux (x64) | `coreclr-linux-x64.zip` |
+| `coreclr` | Windows (x64) | `coreclr-win-x64.zip` |
+| `skia` | Linux | `skia-linux.zip` |
+| `skia` | Windows | `skia-win.zip` |
+
+**第四步：配置依赖构建文件**
+
+这是非常关键的一步。你需要将项目**根目录**下的 `ExternalCMakeLists.txt` 文件**移动**到 `External` 目录，并将其**重命名**为 `CMakeLists.txt`。
+
+在项目**根目录**下执行以下命令：
+
+```bash
+# 对于 Linux / macOS / Git Bash
+mv ExternalCMakeLists.txt External/CMakeLists.txt
+
+# 对于 Windows CMD
+# move ExternalCMakeLists.txt External\CMakeLists.txt
+```
+
+完成以上步骤后，你的 `External` 目录结构应该如下所示：
+
+```
+Luma/
+├── External/
+│   ├── CMakeLists.txt      <-- 这是从根目录移动并重命名过来的文件
+│   ├── astc-encoder/
+│   ├── box2d/
+│   ├── coreclr-win-x64/    <-- 解压后的目录
+│   ├── entt/
+│   ├── glm/
+│   ├── imgui/
+│   ├── ... (其他克隆的库)
+│   └── skia-win/           <-- 解压后的目录
+└── ... (项目其他文件)
+```
+
+## 🔧 构建 Luma 引擎 (Building Luma Engine)
+
+所有依赖准备就绪后，你可以使用 CMake 来构建项目。
+
+在项目根目录执行以下命令：
+
+```bash
+# 1. 创建一个 build 目录并进入
+mkdir build
+cd build
+
+# 2. 运行 CMake 来配置项目
+cmake ..
+
+# 3. 开始编译
+# 在 Windows (Visual Studio) 上，这会生成 .sln 文件，建议用 VS 打开编译
+# 在 Linux (Makefiles) 上，可以直接运行构建命令
+cmake --build .
+```
+
+编译成功后，可执行文件将位于 `build` 目录下的相应子目录中。
 -----
 
 ### 🖥️ 系统配置要求

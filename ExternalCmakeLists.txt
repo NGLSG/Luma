@@ -1,0 +1,502 @@
+cmake_minimum_required(VERSION 3.21)
+project(Luma3rd)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# --- 设置全局编译选项 ---
+# 为所有目标启用位置无关代码 (PIC)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+option(USE_CUDA "启用 CUDA 进行 GPU 加速" OFF)
+
+# 为 GNU GCC 和 Clang 启用 -fPIC 和符号可见性控制
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+
+    # 针对 Linux 平台的符号可见性设置
+    if (UNIX AND NOT APPLE)
+        # 设置默认符号可见性为默认
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=default")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=default")
+
+        # 添加链接器选项来处理符号重复定义问题
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--allow-multiple-definition")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--allow-multiple-definition")
+
+        # 允许未定义符号
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--allow-shlib-undefined")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--allow-shlib-undefined")
+
+        # 强制导出所有符号
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--export-dynamic")
+
+        # 使用链接时优化来删除重复符号
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections")
+
+        message(STATUS "已为 Linux 平台配置符号可见性和链接器选项")
+    endif ()
+
+    message(STATUS "已为 ${CMAKE_CXX_COMPILER_ID} 编译器启用 -fPIC")
+endif ()
+
+# --- 1. 根据操作系统设置依赖项路径 ---
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif ()
+
+# 检测当前平台并设置对应的SDK路径
+if (WIN32)
+    message(STATUS "Platform: 正在为 Windows 配置...")
+    set(PLATFORM_NAME "win")
+    set(PLATFORM_FULL_NAME "Windows") # <-- 新增此行
+    if (CMAKE_GENERATOR_PLATFORM MATCHES "x64" OR CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(ARCH_NAME "x64")
+    elseif (CMAKE_GENERATOR_PLATFORM MATCHES "ARM64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64")
+        set(ARCH_NAME "arm64")
+    else ()
+        set(ARCH_NAME "x86")
+    endif ()
+elseif (UNIX AND NOT APPLE)
+    message(STATUS "Platform: 正在为 Linux 配置...")
+    set(PLATFORM_NAME "linux")
+    set(PLATFORM_FULL_NAME "Linux") # <-- 新增此行
+    if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+        set(ARCH_NAME "x64")
+    elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64")
+        set(ARCH_NAME "arm64")
+    else ()
+        set(ARCH_NAME "x86")
+    endif ()
+elseif (APPLE)
+    message(STATUS "Platform: 正在为 macOS 配置...")
+    set(PLATFORM_NAME "osx")
+    set(PLATFORM_FULL_NAME "macOS") # <-- 新增此行
+    if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+        set(ARCH_NAME "arm64")
+    else ()
+        set(ARCH_NAME "x64")
+    endif ()
+else ()
+    message(FATAL_ERROR "检测到不支持的平台。")
+endif ()
+
+# 构建平台特定的SDK路径
+set(Skia_DIR "${CMAKE_CURRENT_SOURCE_DIR}/skia-${PLATFORM_NAME}")
+set(DotNetRuntime_DIR "${CMAKE_CURRENT_SOURCE_DIR}/coreclr-${PLATFORM_NAME}-${ARCH_NAME}")
+
+message(STATUS "检测到平台: ${PLATFORM_NAME}-${ARCH_NAME}")
+message(STATUS "使用 Skia SDK 路径: ${Skia_DIR}")
+message(STATUS "使用 .NET Runtime 路径: ${DotNetRuntime_DIR}")
+
+# 检查SDK路径是否存在
+if (NOT EXISTS "${Skia_DIR}")
+    message(WARNING "Skia SDK 路径不存在: ${Skia_DIR}")
+endif ()
+if (NOT EXISTS "${DotNetRuntime_DIR}")
+    message(WARNING ".NET Runtime 路径不存在: ${DotNetRuntime_DIR}")
+endif ()
+
+# --- 2. 查找所需包 (平台特定的查找方式) ---
+find_package(Vulkan REQUIRED)
+find_package(OpenSSL REQUIRED)
+find_package(Skia REQUIRED)
+find_package(DotNetRuntime REQUIRED)
+
+# 平台特定的多媒体库查找
+if (WIN32)
+    # Windows 平台：假设有预编译的 FFmpeg
+    find_package(FFMPEG REQUIRED)
+    find_package(CURL REQUIRED)
+elseif (UNIX AND NOT APPLE)
+    # Linux 平台：使用 PkgConfig 查找 FFmpeg
+    find_package(PkgConfig REQUIRED)
+
+    # 查找 FFmpeg 组件
+    pkg_check_modules(FFMPEG REQUIRED
+            libavformat>=58.0.0
+            libavcodec>=58.0.0
+            libswscale>=5.0.0
+            libavutil>=56.0.0
+            libswresample>=3.0.0
+    )
+
+    if (FFMPEG_FOUND)
+        message(STATUS "找到 FFmpeg 通过 PkgConfig:")
+        message(STATUS "  版本: ${FFMPEG_VERSION}")
+        message(STATUS "  包含目录: ${FFMPEG_INCLUDE_DIRS}")
+        message(STATUS "  库目录: ${FFMPEG_LIBRARY_DIRS}")
+        message(STATUS "  库文件: ${FFMPEG_LIBRARIES}")
+
+        # 创建 FFmpeg 导入目标
+        add_library(FFmpeg::FFmpeg INTERFACE IMPORTED)
+        target_include_directories(FFmpeg::FFmpeg INTERFACE ${FFMPEG_INCLUDE_DIRS})
+        target_link_directories(FFmpeg::FFmpeg INTERFACE ${FFMPEG_LIBRARY_DIRS})
+        target_link_libraries(FFmpeg::FFmpeg INTERFACE ${FFMPEG_LIBRARIES})
+        target_compile_options(FFmpeg::FFmpeg INTERFACE ${FFMPEG_CFLAGS_OTHER})
+    else ()
+        message(FATAL_ERROR "无法找到 FFmpeg 库。请确保已安装 FFmpeg 开发包。")
+    endif ()
+
+    # 查找 CURL
+    find_package(CURL REQUIRED)
+
+elseif (APPLE)
+    # macOS 平台：可以使用 Homebrew 或者 PkgConfig
+    find_package(PkgConfig QUIET)
+    if (PkgConfig_FOUND)
+        pkg_check_modules(FFMPEG QUIET
+                libavformat
+                libavcodec
+                libswscale
+                libavutil
+                libswresample
+        )
+    endif ()
+
+    if (NOT FFMPEG_FOUND)
+        # 回退到手动查找
+        find_package(FFMPEG REQUIRED)
+    else ()
+        # 创建 FFmpeg 导入目标
+        add_library(FFmpeg::FFmpeg INTERFACE IMPORTED)
+        target_include_directories(FFmpeg::FFmpeg INTERFACE ${FFMPEG_INCLUDE_DIRS})
+        target_link_directories(FFmpeg::FFmpeg INTERFACE ${FFMPEG_LIBRARY_DIRS})
+        target_link_libraries(FFmpeg::FFmpeg INTERFACE ${FFMPEG_LIBRARIES})
+    endif ()
+
+    find_package(CURL REQUIRED)
+endif ()
+
+# --- 3. 添加子目录时避免符号冲突 ---
+# 为每个子目录设置独立的编译环境
+add_subdirectory(SDL)
+add_subdirectory(entt)
+add_subdirectory(yaml-cpp)
+add_subdirectory(glm)
+add_subdirectory(box2d)
+add_subdirectory(astc-encoder)
+add_subdirectory(json)
+
+# --- 4. GPU加速检测 ---
+#[[
+if (USE_CUDA)
+    # 仅当 USE_CUDA 选项为 ON 时，才尝试查找和启用 CUDA
+    include(CheckLanguage)
+    check_language(CUDA)
+    if (CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+        message(STATUS "【GPU加速】检测到 CUDA (${CMAKE_CUDA_COMPILER_VERSION})")
+        set(GGML_CUDA ON CACHE BOOL "启用 CUDA 支持" FORCE)
+        if (CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 11.0)
+            set(GGML_CUDA_MMQ_SUPPORT ON CACHE BOOL "启用 CUDA MMQ 支持" FORCE)
+        endif ()
+    else ()
+        message(WARNING "USE_CUDA 为 ON，但未找到 CUDA 编译器。将回退到 Vulkan/CPU。")
+        set(USE_CUDA OFF) # 重置选项，避免后续逻辑混淆
+    endif ()
+endif ()
+]]
+
+#if (NOT USE_CUDA)
+    # 如果不使用 CUDA，则检查 Vulkan
+    if (Vulkan_FOUND)
+        message(STATUS "【GPU加速】使用 Vulkan")
+        set(GGML_VULKAN ON CACHE BOOL "启用 Vulkan 支持" FORCE)
+    else ()
+        message(STATUS "【GPU加速】将使用 CPU 模式")
+    endif ()
+#endif ()
+
+# --- 5. 为 llama 库设置特定 C++ 标准和链接选项 ---
+set(ORIGINAL_CXX_STANDARD ${CMAKE_CXX_STANDARD})
+set(CMAKE_CXX_STANDARD 17)
+message(STATUS "为llama库设置C++17标准")
+
+# 设置 llama 库的特殊链接选项
+if (UNIX AND NOT APPLE)
+    set(ORIGINAL_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS})
+    set(ORIGINAL_SHARED_LINKER_FLAGS ${CMAKE_SHARED_LINKER_FLAGS})
+
+    # 为 llama 库添加额外的链接器选项
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--allow-multiple-definition")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--allow-multiple-definition")
+endif ()
+
+add_subdirectory(llama-cpp)
+
+# 恢复原始链接器标志
+if (UNIX AND NOT APPLE)
+    set(CMAKE_EXE_LINKER_FLAGS ${ORIGINAL_EXE_LINKER_FLAGS})
+    set(CMAKE_SHARED_LINKER_FLAGS ${ORIGINAL_SHARED_LINKER_FLAGS})
+endif ()
+
+set(CMAKE_CXX_STANDARD ${ORIGINAL_CXX_STANDARD})
+message(STATUS "恢复C++${CMAKE_CXX_STANDARD}标准")
+
+if (TARGET llama)
+    set_target_properties(llama PROPERTIES
+            CXX_STANDARD 17
+            CXX_STANDARD_REQUIRED ON
+            POSITION_INDEPENDENT_CODE ON
+    )
+
+    # 为 llama 目标添加特殊的链接选项
+    if (UNIX AND NOT APPLE)
+        target_link_options(llama PRIVATE
+                -Wl,--allow-multiple-definition
+                -Wl,--gc-sections
+        )
+    endif ()
+
+    message(STATUS "已为llama目标设置C++17标准和PIC")
+endif ()
+
+# --- 6. 查找 astc-encoder 静态库 ---
+get_property(astc_source_targets
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/astc-encoder/Source
+        PROPERTY BUILDSYSTEM_TARGETS)
+set(ASTCENC_STATIC_TARGET "")
+foreach (target ${astc_source_targets})
+    if (target MATCHES "-static$")
+        set(ASTCENC_STATIC_TARGET ${target})
+        message(STATUS "Found astc-encoder static target: ${ASTCENC_STATIC_TARGET}")
+        # 确保 astc-encoder 静态库也启用 PIC 和处理符号冲突
+        if (TARGET ${ASTCENC_STATIC_TARGET})
+            set_target_properties(${ASTCENC_STATIC_TARGET} PROPERTIES
+                    POSITION_INDEPENDENT_CODE ON
+            )
+            if (UNIX AND NOT APPLE)
+                target_link_options(${ASTCENC_STATIC_TARGET} PRIVATE
+                        -Wl,--allow-multiple-definition
+                )
+            endif ()
+        endif ()
+        break()
+    endif ()
+endforeach ()
+if (NOT ASTCENC_STATIC_TARGET)
+    message(FATAL_ERROR "Failed to find astc-encoder static library target.")
+endif ()
+
+# --- 7. UI 库目标定义 ---
+# ImGui
+file(GLOB IMGUI_SOURCES CONFIGURE_DEPENDS
+        "imgui/imgui.cpp" "imgui/imgui_draw.cpp" "imgui/imgui_tables.cpp" "imgui/imgui_widgets.cpp"
+        "imgui/backends/imgui_impl_sdl3.cpp" "imgui/backends/imgui_impl_wgpu.cpp" "imgui/misc/cpp/imgui_stdlib.cpp"
+)
+add_library(ImGui_lib STATIC ${IMGUI_SOURCES})
+target_include_directories(ImGui_lib PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/imgui
+        ${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends
+        ${CMAKE_CURRENT_SOURCE_DIR}/imgui/misc/cpp
+)
+target_compile_definitions(ImGui_lib PUBLIC IMGUI_IMPL_WEBGPU_BACKEND_DAWN)
+target_link_libraries(ImGui_lib PUBLIC SDL3::SDL3 Skia::Skia)
+
+# 确保 ImGui 库启用 PIC 和处理符号冲突
+set_target_properties(ImGui_lib PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+)
+if (UNIX AND NOT APPLE)
+    target_link_options(ImGui_lib PRIVATE
+            -Wl,--allow-multiple-definition
+    )
+endif ()
+
+# ImGui Node Editor
+set(IMGUI_NODE_EDITOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/imgui-node-editor)
+add_library(imgui_node_editor STATIC
+        ${IMGUI_NODE_EDITOR_DIR}/crude_json.cpp
+        ${IMGUI_NODE_EDITOR_DIR}/imgui_canvas.cpp
+        ${IMGUI_NODE_EDITOR_DIR}/imgui_node_editor_api.cpp
+        ${IMGUI_NODE_EDITOR_DIR}/imgui_node_editor.cpp
+)
+target_include_directories(imgui_node_editor PUBLIC ${IMGUI_NODE_EDITOR_DIR})
+target_link_libraries(imgui_node_editor PUBLIC ImGui_lib)
+
+# 确保 imgui_node_editor 库启用 PIC 和处理符号冲突
+set_target_properties(imgui_node_editor PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+)
+if (UNIX AND NOT APPLE)
+    target_link_options(imgui_node_editor PRIVATE
+            -Wl,--allow-multiple-definition
+    )
+endif ()
+
+# ImGuizmo
+file(GLOB IMGUIZMO_SOURCES CONFIGURE_DEPENDS "ImGuizmo/ImGuizmo.cpp")
+add_library(ImGuizmo STATIC ${IMGUIZMO_SOURCES})
+target_include_directories(ImGuizmo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo)
+target_link_libraries(ImGuizmo PUBLIC ImGui_lib)
+
+# 确保 ImGuizmo 库启用 PIC 和处理符号冲突
+set_target_properties(ImGuizmo PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+)
+if (UNIX AND NOT APPLE)
+    target_link_options(ImGuizmo PRIVATE
+            -Wl,--allow-multiple-definition
+    )
+endif ()
+
+# --- 8. 核心第三方库聚合器 ---
+add_library(Luma3rd INTERFACE)
+
+# 根据平台链接不同的 FFmpeg 目标
+if (WIN32 OR APPLE)
+    # Windows 和 macOS 使用传统的 find_package 方式
+    set(FFMPEG_TARGET_LIBS ${FFMPEG_LIBRARIES})
+elseif (UNIX AND NOT APPLE)
+    # Linux 使用我们创建的接口目标
+    set(FFMPEG_TARGET_LIBS FFmpeg::FFmpeg)
+endif ()
+
+# 创建静态库组来避免符号冲突
+if (UNIX AND NOT APPLE)
+    # 创建一个组合库来统一管理所有静态库
+    add_library(StaticLibsGroup STATIC)
+    target_sources(StaticLibsGroup PRIVATE
+            "${CMAKE_CURRENT_BINARY_DIR}/static_libs_group_dummy.cpp"
+    )
+
+    # 创建虚拟源文件
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/static_libs_group_dummy.cpp"
+            "// 用于组合静态库的虚拟源文件\n"
+            "extern \"C\" void static_libs_group_dummy() {}\n"
+    )
+
+    # 将所有静态库链接到组合库
+    target_link_libraries(StaticLibsGroup PUBLIC
+            ${ASTCENC_STATIC_TARGET}
+            imgui_node_editor ImGui_lib ImGuizmo
+            llama
+    )
+
+    # 为组合库设置链接选项
+    target_link_options(StaticLibsGroup PRIVATE
+            -Wl,--allow-multiple-definition
+            -Wl,--gc-sections
+    )
+
+    set_target_properties(StaticLibsGroup PROPERTIES
+            POSITION_INDEPENDENT_CODE ON
+    )
+
+    # 使用组合库而不是单独的静态库
+    target_link_libraries(Luma3rd INTERFACE
+            # 核心库
+            Skia::Skia Vulkan::Vulkan SDL3::SDL3 EnTT::EnTT yaml-cpp glm::glm box2d
+            OpenSSL::SSL OpenSSL::Crypto DotNet::Host
+            # 组合的静态库
+            StaticLibsGroup
+            # 多媒体与网络
+            ${FFMPEG_TARGET_LIBS} CURL::libcurl
+            # JSON
+            nlohmann_json
+    )
+else ()
+    # 非Linux平台使用原始方式
+    target_link_libraries(Luma3rd INTERFACE
+            # 核心库
+            Skia::Skia Vulkan::Vulkan SDL3::SDL3 EnTT::EnTT yaml-cpp glm::glm box2d
+            OpenSSL::SSL OpenSSL::Crypto DotNet::Host ${ASTCENC_STATIC_TARGET}
+            # UI 库
+            imgui_node_editor ImGui_lib ImGuizmo nlohmann_json
+            # 多媒体与网络
+            ${FFMPEG_TARGET_LIBS} CURL::libcurl
+            # AI
+            llama
+    )
+endif ()
+
+# 平台特定的链接目录设置
+if (UNIX AND NOT APPLE AND FFMPEG_FOUND)
+    target_link_directories(Luma3rd INTERFACE ${FFMPEG_LIBRARY_DIRS})
+elseif (WIN32 OR APPLE)
+    target_link_directories(Luma3rd INTERFACE ${FFMPEG_LIBRARY_DIRS})
+endif ()
+
+target_include_directories(Luma3rd INTERFACE
+        ${Vulkan_INCLUDE_DIRS}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${FFMPEG_INCLUDE_DIRS}
+)
+
+# --- 9. 平台特定配置 ---
+if (WIN32)
+    # 链接 Windows 系统库
+    target_link_libraries(Luma3rd INTERFACE
+            d3d12 dxgi d3dcompiler user32 gdi32 winmm ole32 oleaut32
+            imm32 version setupapi kernel32 shell32 advapi32
+    )
+    # 定义 Windows 平台宏
+    target_compile_definitions(Luma3rd INTERFACE
+            _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE
+    )
+    message(STATUS "已配置 Windows 特定的链接库和编译定义")
+elseif (UNIX AND NOT APPLE)
+    # 链接 Linux 系统库
+    target_link_libraries(Luma3rd INTERFACE
+            dl pthread fontconfig X11 Xrandr Xinerama Xcursor Xi EGL OpenGL
+    )
+    # 定义 Linux 平台宏
+    target_compile_definitions(Luma3rd INTERFACE
+            LINUX_PLATFORM
+    )
+    message(STATUS "已配置 Linux 特定的链接库和编译定义")
+elseif (APPLE)
+    # 链接 macOS Frameworks
+    target_link_libraries(Luma3rd INTERFACE
+            "-framework Cocoa"
+            "-framework Metal"
+            "-framework IOKit"
+            "-framework CoreFoundation"
+            "-framework CoreVideo"
+            "-framework QuartzCore"
+    )
+    # 定义 macOS 平台宏
+    target_compile_definitions(Luma3rd INTERFACE
+            MACOS_PLATFORM
+    )
+    message(STATUS "已配置 macOS 特定的 Frameworks 和编译定义")
+endif ()
+
+# --- 10. 通用编译定义 ---
+# GPU加速相关
+if (GGML_CUDA)
+    target_compile_definitions(Luma3rd INTERFACE HAVE_CUDA=1)
+    if (CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 12.0)
+        target_compile_definitions(Luma3rd INTERFACE HAVE_CUDA12=1)
+    endif ()
+elseif (GGML_VULKAN)
+    target_compile_definitions(Luma3rd INTERFACE HAVE_VULKAN=1)
+else ()
+    target_compile_definitions(Luma3rd INTERFACE CPU_ONLY=1)
+endif ()
+
+# 构建类型相关
+target_compile_definitions(Luma3rd INTERFACE
+        $<$<CONFIG:Debug>:LDEBUG=1>
+        $<$<CONFIG:Release>:LRELEASE=1>
+)
+
+# 导出平台和架构变量供主项目使用
+set(LUMA_PLATFORM_NAME ${PLATFORM_FULL_NAME} PARENT_SCOPE)
+set(LUMA_ARCH_NAME ${ARCH_NAME} PARENT_SCOPE)
+set(LUMA_DOTNET_RUNTIME_DIR ${DotNetRuntime_DIR} PARENT_SCOPE)
+
+# 输出符号可见性和PIC配置摘要
+message(STATUS "=== 符号可见性和 PIC 配置摘要 ===")
+message(STATUS "全局位置无关代码 (PIC): 已启用")
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    message(STATUS "编译器特定 -fPIC 标志: 已启用")
+    if (UNIX AND NOT APPLE)
+        message(STATUS "符号可见性控制: 设为默认")
+        message(STATUS "链接器选项: --allow-multiple-definition, --allow-shlib-undefined, --export-dynamic")
+        message(STATUS "符号冲突处理: 已启用多重定义允许")
+    endif ()
+endif ()
+message(STATUS "====================================")
