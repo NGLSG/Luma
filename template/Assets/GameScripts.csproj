@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+        <EnableDynamicLoading>true</EnableDynamicLoading>
+    </PropertyGroup>
+
+    <!-- 排除非源码目录 -->
+    <ItemGroup>
+        <Compile Remove="Luma.SDK\**\*.cs"/>
+        <Compile Remove="Luma.SourceGenerator\**\*.cs"/>
+        <Compile Remove="build\**\*.cs"/>
+        <Compile Remove="Library\**\*.cs"/>
+        <Compile Remove="bin\**\*.cs"/>
+        <Compile Remove="obj\**\*.cs"/>
+    </ItemGroup>
+
+    <!-- 隐藏 meta 文件 -->
+    <ItemGroup>
+        <None Include="**\*.meta" Visible="false" />
+        <None Update="**\*.cs.meta">
+            <DependentUpon>$([System.String]::Copy('%(Filename)').Replace('.meta',''))</DependentUpon>
+            <Visible>false</Visible>
+        </None>
+    </ItemGroup>
+
+    <!-- 仅保留源码生成器作为 Analyzer；不再引用 Luma.SDK 项目 -->
+    <ItemGroup>
+        <!-- 源码生成器继续以 Analyzer 方式引用 -->
+        <ProjectReference Include="..\Luma.SourceGenerator\Luma.SourceGenerator.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+    <!-- 直接引用 Library 下的 Luma.SDK.dll；不拷贝到输出，避免覆盖被 Editor 锁定的文件 -->
+    <ItemGroup>
+        <!-- 说明：$(MSBuildThisFileDirectory) 指向当前 csproj 所在目录；你的 Library 与 csproj 同级，故可直接拼接 -->
+        <Reference Include="Luma.SDK">
+            <HintPath>$(MSBuildThisFileDirectory)..\Library\Luma.SDK.dll</HintPath>
+            <Private>false</Private> <!-- 不复制到输出目录 -->
+        </Reference>
+    </ItemGroup>
+
+    <!-- 构建前检查：确保 Library\Luma.SDK.dll 存在；项目创建时应由引擎放入 -->
+    <Target Name="CheckLumaSdkPresence" BeforeTargets="Build">
+        <Error
+                Condition="!Exists('$(MSBuildThisFileDirectory)..\Library\Luma.SDK.dll')"
+                Text="Luma.SDK.dll 未找到：$(MSBuildThisFileDirectory)Library\Luma.SDK.dll。请确保引擎已将 Luma.SDK.* 放置到项目 Library 目录。" />
+    </Target>
+
+</Project>

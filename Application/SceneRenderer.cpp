@@ -1,0 +1,320 @@
+#include "SceneRenderer.h"
+#include "../Renderer/RenderComponent.h"
+#include "../Components/Transform.h"
+#include "../Components/Sprite.h"
+#include "TextComponent.h"
+#include "UIComponents.h"
+#include <algorithm>
+#include <cmath>
+
+#include "Profiler.h"
+#include "SceneManager.h"
+#include "TilemapComponent.h"
+
+void SceneRenderer::Extract(entt::registry& registry, std::vector<RenderPacket>& outQueue)
+{
+    PROFILE_SCOPE("SceneRenderer::Extract - Total");
+
+    outQueue.clear();
+    m_transformArena->Reverse();
+
+
+    m_spriteGroupIndices.clear();
+    m_textGroupIndices.clear();
+    m_spriteBatchGroups.clear();
+    m_textBatchGroups.clear();
+
+
+    m_spriteGroupIndices.reserve(1000);
+    m_textGroupIndices.reserve(100);
+    m_spriteBatchGroups.reserve(1000);
+    m_textBatchGroups.reserve(100);
+
+
+    PROFILE_SCOPE("SceneRenderer::Extract - Optimized Sprite Processing");
+    {
+        auto spriteView = registry.view<const ECS::Transform, const ECS::SpriteComponent>();
+
+
+        size_t estimatedSpriteCount = spriteView.size_hint();
+        if (estimatedSpriteCount > 0)
+        {
+            spriteView.each([&](const ECS::Transform& transform, const ECS::SpriteComponent& sprite)
+            {
+                if (!sprite.image) return;
+
+
+                FastSpriteBatchKey key(
+                    sprite.image->getImage().get(),
+                    sprite.material.get(),
+                    sprite.color,
+                    sprite.image->getImportSettings().filterQuality,
+                    sprite.image->getImportSettings().wrapMode
+                );
+
+                size_t groupIndex;
+                auto it = m_spriteGroupIndices.find(key);
+                if (it == m_spriteGroupIndices.end())
+                {
+                    groupIndex = m_spriteBatchGroups.size();
+                    m_spriteGroupIndices[key] = groupIndex;
+                    m_spriteBatchGroups.emplace_back();
+
+                    auto& group = m_spriteBatchGroups.back();
+                    group.sourceRect = sprite.sourceRect;
+                    group.zIndex = sprite.zIndex;
+                    group.filterQuality = static_cast<int>(sprite.image->getImportSettings().filterQuality);
+                    group.wrapMode = static_cast<int>(sprite.image->getImportSettings().wrapMode);
+
+
+                    const int pPU = sprite.image->getImportSettings().pixelPerUnit;
+                    group.ppuScaleFactor = (pPU > 0) ? 100.0f / static_cast<float>(pPU) : 1.0f;
+
+
+                    group.image = sprite.image->getImage().get();
+                    group.material = sprite.material.get();
+                    group.color = sprite.color;
+
+
+                    group.transforms.reserve(32);
+                }
+                else
+                {
+                    groupIndex = it->second;
+                }
+
+
+                auto& group = m_spriteBatchGroups[groupIndex];
+                group.transforms.emplace_back(RenderableTransform(
+                    transform.position,
+                    transform.scale.x,
+                    transform.scale.y,
+                    sinf(transform.rotation),
+                    cosf(transform.rotation)
+                ));
+            });
+        }
+    }
+
+
+    PROFILE_SCOPE("SceneRenderer::Extract - Optimized Tilemap Processing");
+    {
+        auto tilemapView = registry.view<const ECS::Transform, const ECS::TilemapComponent, const
+                                         ECS::TilemapRendererComponent>();
+
+        for (auto entity : tilemapView)
+        {
+            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                continue;
+
+            const auto& tilemapTransform = tilemapView.get<const ECS::Transform>(entity);
+            const auto& tilemap = tilemapView.get<const ECS::TilemapComponent>(entity);
+            const auto& renderer = tilemapView.get<const ECS::TilemapRendererComponent>(entity);
+
+
+            const float sinR = sinf(tilemapTransform.rotation);
+            const float cosR = cosf(tilemapTransform.rotation);
+
+            auto batchSpriteTile = [&](const ECS::TilemapRendererComponent::HydratedSpriteTile& hydratedTile,
+                                       const ECS::Vector2i& coord)
+            {
+                if (!hydratedTile.image) return;
+
+                FastSpriteBatchKey key(
+                    hydratedTile.image->getImage().get(),
+                    renderer.material.get(),
+                    hydratedTile.color,
+                    hydratedTile.filterQuality,
+                    hydratedTile.wrapMode
+                );
+
+                size_t groupIndex;
+                auto it = m_spriteGroupIndices.find(key);
+                if (it == m_spriteGroupIndices.end())
+                {
+                    groupIndex = m_spriteBatchGroups.size();
+                    m_spriteGroupIndices[key] = groupIndex;
+                    m_spriteBatchGroups.emplace_back();
+
+                    auto& group = m_spriteBatchGroups.back();
+                    group.sourceRect = hydratedTile.sourceRect;
+                    group.zIndex = renderer.zIndex;
+                    group.filterQuality = static_cast<int>(hydratedTile.filterQuality);
+                    group.wrapMode = static_cast<int>(hydratedTile.wrapMode);
+
+                    const int pPU = hydratedTile.image->getImportSettings().pixelPerUnit;
+                    group.ppuScaleFactor = (pPU > 0) ? 100.0f / static_cast<float>(pPU) : 1.0f;
+
+                    group.image = hydratedTile.image->getImage().get();
+                    group.material = renderer.material.get();
+                    group.color = hydratedTile.color;
+                    group.transforms.reserve(32);
+                }
+                else
+                {
+                    groupIndex = it->second;
+                }
+
+                auto& group = m_spriteBatchGroups[groupIndex];
+                group.transforms.emplace_back(RenderableTransform(
+                    {
+                        tilemapTransform.position.x + coord.x * tilemap.cellSize.x,
+                        tilemapTransform.position.y + coord.y * tilemap.cellSize.y
+                    },
+                    tilemapTransform.scale.x,
+                    tilemapTransform.scale.y,
+                    sinR,
+                    cosR
+                ));
+            };
+
+            for (const auto& [coord, resolvedTile] : tilemap.runtimeTileCache)
+            {
+                if (std::holds_alternative<SpriteTileData>(resolvedTile.data))
+                {
+                    const Guid& tileAssetGuid = resolvedTile.sourceTileAsset.assetGuid;
+                    if (tileAssetGuid.Valid() && renderer.hydratedSpriteTiles.contains(tileAssetGuid))
+                    {
+                        batchSpriteTile(renderer.hydratedSpriteTiles.at(tileAssetGuid), coord);
+                    }
+                }
+            }
+        }
+    }
+
+
+    PROFILE_SCOPE("SceneRenderer::Extract - Optimized Text Processing");
+    {
+        auto processTextView = [&](auto& view, auto getTextComponent)
+        {
+            for (auto entity : view)
+            {
+                if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                    continue;
+
+                const auto& transform = view.template get<const ECS::Transform>(entity);
+                const auto& textData = getTextComponent(view, entity);
+
+                if (!textData.typeface || textData.text.empty()) continue;
+
+                FastTextBatchKey key(textData.typeface.get(), textData.fontSize, textData.alignment, textData.color);
+
+                size_t groupIndex;
+                auto it = m_textGroupIndices.find(key);
+                if (it == m_textGroupIndices.end())
+                {
+                    groupIndex = m_textBatchGroups.size();
+                    m_textGroupIndices[key] = groupIndex;
+                    m_textBatchGroups.emplace_back();
+
+                    auto& group = m_textBatchGroups.back();
+                    group.zIndex = textData.zIndex;
+                    group.typeface = textData.typeface.get();
+                    group.fontSize = textData.fontSize;
+                    group.alignment = textData.alignment;
+                    group.color = textData.color;
+                    group.transforms.reserve(16);
+                    group.texts.reserve(16);
+                }
+                else
+                {
+                    groupIndex = it->second;
+                }
+
+                auto& group = m_textBatchGroups[groupIndex];
+                group.transforms.emplace_back(RenderableTransform(
+                    transform.position,
+                    transform.scale.x,
+                    transform.scale.y,
+                    sinf(transform.rotation),
+                    cosf(transform.rotation)
+                ));
+                group.texts.emplace_back(textData.text);
+            }
+        };
+
+
+        auto textView = registry.view<const ECS::Transform, const ECS::TextComponent>();
+        processTextView(textView, [](auto& view, auto entity) -> const ECS::TextComponent&
+        {
+            return view.template get<const ECS::TextComponent>(entity);
+        });
+
+
+        auto inputTextView = registry.view<const ECS::Transform, const ECS::InputTextComponent>();
+        processTextView(inputTextView, [](auto& view, auto entity)
+        {
+            const auto& inputText = view.template get<const ECS::InputTextComponent>(entity);
+            return (inputText.isFocused || !inputText.text.text.empty()) ? inputText.text : inputText.placeholder;
+        });
+    }
+
+
+    PROFILE_SCOPE("SceneRenderer::Extract - Optimized Packing");
+    {
+        outQueue.reserve(m_spriteBatchGroups.size() + m_textBatchGroups.size());
+
+
+        for (const auto& group : m_spriteBatchGroups)
+        {
+            const size_t count = group.transforms.size();
+            if (count == 0) continue;
+
+            RenderableTransform* transformBuffer = m_transformArena->Allocate(count);
+            std::memcpy(transformBuffer, group.transforms.data(), count * sizeof(RenderableTransform));
+
+            outQueue.emplace_back(RenderPacket{
+                .zIndex = group.zIndex,
+                .batchData = SpriteBatch{
+                    .material = group.material,
+                    .image = sk_ref_sp(group.image),
+                    .sourceRect = group.sourceRect,
+                    .color = group.color,
+                    .transforms = transformBuffer,
+                    .filterQuality = group.filterQuality,
+                    .wrapMode = group.wrapMode,
+                    .ppuScaleFactor = group.ppuScaleFactor,
+                    .count = count
+                }
+            });
+        }
+
+
+        for (const auto& group : m_textBatchGroups)
+        {
+            const size_t count = group.transforms.size();
+            if (count == 0) continue;
+
+            RenderableTransform* transformBuffer = m_transformArena->Allocate(count);
+            std::memcpy(transformBuffer, group.transforms.data(), count * sizeof(RenderableTransform));
+
+            std::string* textBuffer = m_textArena->Allocate(count);
+            for (size_t i = 0; i < count; ++i)
+            {
+                new(&textBuffer[i]) std::string(std::move(const_cast<std::string&>(group.texts[i])));
+            }
+
+            outQueue.emplace_back(RenderPacket{
+                .zIndex = group.zIndex,
+                .batchData = TextBatch{
+                    .typeface = sk_ref_sp(group.typeface),
+                    .fontSize = group.fontSize,
+                    .color = group.color,
+                    .texts = textBuffer,
+                    .alignment = static_cast<int>(group.alignment),
+                    .transforms = transformBuffer,
+                    .count = count
+                }
+            });
+        }
+    }
+
+
+    PROFILE_SCOPE("SceneRenderer::Extract - Sorting");
+    {
+        std::ranges::sort(outQueue, [](const RenderPacket& a, const RenderPacket& b)
+        {
+            return a.zIndex < b.zIndex;
+        });
+    }
+}

@@ -1,0 +1,7 @@
+// Game.rc
+// 定义一个唯一的 ID 用于标识图标资源
+#define IDI_APP_ICON 101
+
+// 将 app.ico 文件作为应用程序的主图标
+// "app.ico" 是相对于此 .rc 文件的路径
+IDI_APP_ICON ICON "app.ico"

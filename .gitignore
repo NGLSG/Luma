@@ -1,0 +1,53 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# IDE and build output folders
+.idea/
+build/
+cmake-build-*/
+docs/
+Publish/
+
+# Specific dependency and temporary folders
+skia-win-x64/
+Scripting/binding/Temp/
+Scripting/binding/.idea/
+
+# Archives
+*.zip
+
+# External dependencies rule:
+# Ignore everything inside the External/ directory...
+External/
+# ...but DO NOT ignore the CMakeLists.txt file inside it.
+!External/CMakeLists.txt
