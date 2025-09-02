@@ -99,7 +99,14 @@ std::unordered_map<std::string, AssetMetadata> AssetPacker::Unpack(const std::fi
     std::string chunkFileName;
     while (std::getline(manifestFile, chunkFileName))
     {
-        auto chunkData = Path::ReadAllBytes((packageManifestPath.parent_path() / chunkFileName).string());
+        // 新增代码：移除行尾的回车符 '\r'
+        if (!chunkFileName.empty() && chunkFileName.back() == '\r')
+        {
+            chunkFileName.pop_back();
+        }
+
+        auto chunkData = Path::ReadAllBytes(
+            Path::GetFullPath((packageManifestPath.parent_path() / chunkFileName).string()));
         encryptedPackage.insert(encryptedPackage.end(), chunkData.begin(), chunkData.end());
     }
 
