@@ -126,4 +126,39 @@ internal static class Native
 
     [DllImport(DllName)]
     internal static extern void AnimationController_SetFrameRate(IntPtr scene, uint entity, float frameRate);
+
+    #region SIMD Bindings
+
+    [DllImport(DllName)]
+    internal static extern void SIMDVectorAdd(float[] a, float[] b, float[] result, int count);
+
+    [DllImport(DllName)]
+    internal static extern void SIMDVectorMultiply(float[] a, float[] b, float[] result, int count);
+
+    [DllImport(DllName)]
+    internal static extern float SIMDVectorDotProduct(float[] a, float[] b, int count);
+
+    [DllImport(DllName)]
+    internal static extern void SIMDVectorMultiplyAdd(float[] a, float[] b, float[] c, float[] result, int count);
+
+    [DllImport(DllName)]
+    internal static extern void SIMDVectorSqrt(float[] input, float[] result, int count);
+
+    [DllImport(DllName)]
+    internal static extern void SIMDVectorReciprocal(float[] input, float[] result, int count);
+
+    [DllImport(DllName)]
+    internal static extern float SIMDVectorMax(float[] input, int count);
+
+    [DllImport(DllName)]
+    internal static extern float SIMDVectorMin(float[] input, int count);
+
+    [DllImport(DllName)]
+    internal static extern void SIMDVectorAbs(float[] input, float[] result, int count);
+
+    [DllImport(DllName)]
+    internal static extern void SIMDVectorRotatePoints(float[] points_x, float[] points_y,
+                                                       float[] sin_vals, float[] cos_vals,
+                                                       float[] result_x, float[] result_y, int count);
+    #endregion
 }

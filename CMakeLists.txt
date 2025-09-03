@@ -7,10 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # --- 全局启用 UTF-8 ---
 if (MSVC)
-    # 为 MSVC 编译器设置源文件和执行字符集为 UTF-8
     add_compile_options(/utf-8)
 else ()
-    # 为 GCC/Clang 等其他编译器设置源文件和执行字符集为 UTF-8
     add_compile_options(-finput-charset=UTF-8 -fexec-charset=UTF-8)
 endif ()
 
@@ -20,6 +18,98 @@ endif ()
 
 set(ENGINE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 message(STATUS "引擎根目录: ${ENGINE_ROOT_DIR}")
+
+# --- 检查目标架构 ---
+if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+    if (CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64|arm64)")
+        set(LUMA_ARCH_NAME "arm64")
+        add_compile_definitions(LUMA_ARM64)
+    else ()
+        set(LUMA_ARCH_NAME "x64")
+        add_compile_definitions(LUMA_X64)
+    endif ()
+else ()
+    message(FATAL_ERROR "Unsupported architecture. Only x64 and arm64 are supported.")
+endif ()
+message(STATUS "目标架构: ${LUMA_ARCH_NAME}")
+
+# --- 检查系统 ---
+if (WIN32)
+    set(LUMA_PLATFORM_NAME "Windows")
+    add_compile_definitions(LUMA_PLATFORM_WINDOWS)
+elseif (UNIX AND NOT APPLE)
+    set(LUMA_PLATFORM_NAME "Linux")
+    add_compile_definitions(LUMA_PLATFORM_LINUX)
+elseif (APPLE)
+    set(LUMA_PLATFORM_NAME "MacOS")
+    add_compile_definitions(LUMA_PLATFORM_MACOS)
+else ()
+    message(FATAL_ERROR "Unsupported platform.")
+endif ()
+message(STATUS "目标平台: ${LUMA_PLATFORM_NAME}")
+
+# --- 检查指令集扩展 ---
+include(CheckCXXCompilerFlag)
+
+set(LUMA_SUPPORTED_EXTENSIONS "")
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    check_cxx_compiler_flag("-mavx" HAS_AVX)
+    if (HAS_AVX)
+        add_compile_options(-mavx)
+        add_compile_definitions(LUMA_AVX)
+        list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX")
+        message(STATUS "启用 AVX 支持")
+    endif ()
+
+    check_cxx_compiler_flag("-mavx2" HAS_AVX2)
+    if (HAS_AVX2)
+        add_compile_options(-mavx2)
+        add_compile_definitions(LUMA_AVX2)
+        list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX2")
+        message(STATUS "启用 AVX2 支持")
+    endif ()
+
+    check_cxx_compiler_flag("-mavx512f" HAS_AVX512)
+    if (HAS_AVX512)
+        add_compile_options(-mavx512f)
+        add_compile_definitions(LUMA_AVX512)
+        list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX512")
+        message(STATUS "启用 AVX512 支持")
+    endif ()
+
+    if (CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64|arm64)")
+        check_cxx_compiler_flag("-march=armv8-a+simd" HAS_NENO)
+        if (HAS_NENO)
+            add_compile_options(-march=armv8-a+simd)
+            add_compile_definitions(LUMA_NENO)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "NENO")
+            message(STATUS "启用 NENO 支持")
+        endif ()
+    endif ()
+elseif (MSVC)
+    # MSVC 编译器的指令集检测
+    set(MSVC_ARCH_FLAGS "")
+    foreach(FLAG SSE2 SSE4.2 AVX AVX2 AVX512)
+        string(TOLOWER ${FLAG} LOWERCASE_FLAG)
+        string(REPLACE "." "" SAFE_FLAG ${LOWERCASE_FLAG})
+        set(TEST_FILE ${CMAKE_BINARY_DIR}/test_${SAFE_FLAG}.cpp)
+        file(WRITE ${TEST_FILE} "
+        #include <immintrin.h>
+        int main() {
+            __m256 test = _mm256_setzero_ps();
+            return 0;
+        }")
+        try_compile(HAS_${FLAG} ${CMAKE_BINARY_DIR} ${TEST_FILE} CMAKE_FLAGS "/D_USE_MATH_DEFINES /arch:${FLAG}")
+        if (HAS_${FLAG})
+            add_compile_definitions(LUMA_${FLAG})
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS ${FLAG})
+            message(STATUS "启用 ${FLAG} 支持")
+        endif ()
+    endforeach()
+endif ()
+
+message(STATUS "支持的指令集扩展: ${LUMA_SUPPORTED_EXTENSIONS}")
 
 # --- 添加包含所有第三方库的子目录 ---
 add_subdirectory(External)
@@ -75,6 +165,7 @@ target_compile_definitions(LumaEngine PUBLIC
 
 # 为引擎核心库链接所有第三方依赖
 target_link_libraries(LumaEngine PUBLIC Luma3rd)
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_options(LumaEngine PRIVATE -mavx -mavx2 -mfma)
 endif ()

@@ -1,10 +1,8 @@
-
-
-
 #include "Luma_CAPI.h"
 
 #include "AnimationControllerComponent.h"
 #include "SceneManager.h"
+#include "SIMDWrapper.h"
 #include "Resources/RuntimeAsset/RuntimeScene.h"
 #include "Components/ComponentRegistry.h"
 #include "Event/JobSystem.h"
@@ -24,23 +22,20 @@ static inline RuntimeGameObject AsGameObject(LumaSceneHandle scene, LumaEntityHa
 }
 
 
-
 static inline RuntimeAnimationController* GetController(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     if (!scene) return nullptr;
-    
+
     auto* acc = static_cast<ECS::AnimationControllerComponent*>(Entity_GetComponent(
         scene, entity, "AnimationControllerComponent"));
 
-    
-    
+
     if (!acc || !acc->runtimeController)
     {
         return nullptr;
     }
     return acc->runtimeController.get();
 }
-
 
 
 LUMA_API bool Entity_HasComponent(LumaSceneHandle scene, LumaEntityHandle entity, const char* componentName)
@@ -58,9 +53,9 @@ LUMA_API void* Entity_AddComponent(LumaSceneHandle scene, LumaEntityHandle entit
     auto* registration = ComponentRegistry::GetInstance().Get(componentName);
     if (!registration || !registration->add || !registration->get_raw_ptr) return nullptr;
 
-    
+
     registration->add(AsScene(scene)->GetRegistry(), (entt::entity)entity);
-    
+
     return registration->get_raw_ptr(AsScene(scene)->GetRegistry(), (entt::entity)entity);
 }
 
@@ -68,7 +63,7 @@ LUMA_API void* Entity_GetComponent(LumaSceneHandle scene, LumaEntityHandle entit
 {
     if (!scene) return nullptr;
     auto* registration = ComponentRegistry::GetInstance().Get(componentName);
-    
+
     if (!registration || !registration->has || !registration->get_raw_ptr)
     {
         LogError("Component '{}' not found or not registered.", componentName);
@@ -238,7 +233,6 @@ LUMA_API LumaSceneHandle SceneManager_GetCurrentScene()
 
 LUMA_API const char* SceneManager_GetCurrentSceneGuid()
 {
-    
     thread_local static std::string guidBuffer;
     auto scene = SceneManager::GetInstance().GetCurrentScene();
     if (scene)
@@ -251,15 +245,14 @@ LUMA_API const char* SceneManager_GetCurrentSceneGuid()
 
 LUMA_API const char* GameObject_GetName(LumaSceneHandle scene, LumaEntityHandle entity)
 {
-    
     thread_local static std::string nameBuffer;
 
     if (!scene) return "";
     RuntimeGameObject go = AsScene(scene)->FindGameObjectByEntity((entt::entity)entity);
     if (go.IsValid())
     {
-        nameBuffer = go.GetName(); 
-        return nameBuffer.c_str(); 
+        nameBuffer = go.GetName();
+        return nameBuffer.c_str();
     }
     return "";
 }
@@ -378,7 +371,7 @@ LUMA_API float AnimationController_GetFrameRate(LumaSceneHandle scene, LumaEntit
     {
         return controller->GetFrameRate();
     }
-    return 0.0f; 
+    return 0.0f;
 }
 
 LUMA_API Vector2i_CAPI Cursor_GetPosition()
@@ -427,9 +420,6 @@ LUMA_API Vector2i_CAPI Cursor_GetMiddleClickPosition()
 }
 
 
-
-
-
 static const Key* GetKey(int scancode)
 {
     if (scancode <= SDL_SCANCODE_UNKNOWN || scancode >= SDL_SCANCODE_COUNT)
@@ -462,10 +452,6 @@ LUMA_API bool Keyboard_IsKeyUp(int scancode)
 static ManagedJobCallback s_freeGCHandleCallback = nullptr;
 
 
-
-
-
-
 class ManagedJobAdapter final : public IJob
 {
 public:
@@ -474,26 +460,24 @@ public:
     {
     }
 
-    
+
     ManagedJobAdapter(const ManagedJobAdapter&) = delete;
     ManagedJobAdapter& operator=(const ManagedJobAdapter&) = delete;
 
     void Execute() override
     {
-        
         if (m_callback)
         {
             m_callback(m_context);
         }
 
-        
+
         if (s_freeGCHandleCallback && m_context)
         {
             s_freeGCHandleCallback(m_context);
         }
 
-        
-        
+
         delete this;
     }
 
@@ -515,15 +499,13 @@ LUMA_API JobHandle_CAPI JobSystem_Schedule(ManagedJobCallback callback, void* co
         return nullptr;
     }
 
-    
-    
+
     IJob* jobAdapter = new ManagedJobAdapter(callback, context);
 
-    
+
     JobHandle cppHandle = JobSystem::GetInstance().Schedule(jobAdapter);
 
-    
-    
+
     auto* handlePtr = new JobHandle(std::move(cppHandle));
 
     return reinterpret_cast<JobHandle_CAPI>(handlePtr);
@@ -536,7 +518,7 @@ LUMA_API void JobSystem_Complete(JobHandle_CAPI handle)
     auto* cppHandle = reinterpret_cast<JobHandle*>(handle);
     JobSystem::Complete(*cppHandle);
 
-    
+
     delete cppHandle;
 }
 
@@ -544,7 +526,7 @@ LUMA_API void JobSystem_CompleteAll(JobHandle_CAPI* handles, int count)
 {
     if (!handles || count <= 0) return;
 
-    
+
     std::vector<JobHandle*> cppHandles;
     cppHandles.reserve(count);
     for (int i = 0; i < count; ++i)
@@ -555,13 +537,13 @@ LUMA_API void JobSystem_CompleteAll(JobHandle_CAPI* handles, int count)
         }
     }
 
-    
+
     for (JobHandle* handle : cppHandles)
     {
         JobSystem::Complete(*handle);
     }
 
-    
+
     for (JobHandle* handle : cppHandles)
     {
         delete handle;
@@ -582,4 +564,56 @@ void AnimationController_SetTrigger(LumaSceneHandle scene, LumaEntityHandle enti
             controller->SetTrigger(name);
         }
     }
+}
+
+void SIMDVectorAdd(const float* a, const float* b, float* result, size_t count)
+{
+    SIMD::GetInstance().VectorAdd(a, b, result, count);
+}
+
+void SIMDVectorMultiply(const float* a, const float* b, float* result, size_t count)
+{
+    SIMD::GetInstance().VectorMultiply(a, b, result, count);
+}
+
+float SIMDVectorDotProduct(const float* a, const float* b, size_t count)
+{
+    return SIMD::GetInstance().VectorDotProduct(a, b, count);
+}
+
+void SIMDVectorMultiplyAdd(const float* a, const float* b, const float* c, float* result, size_t count)
+{
+    SIMD::GetInstance().VectorMultiplyAdd(a, b, c, result, count);
+}
+
+
+void SIMDVectorSqrt(const float* input, float* result, size_t count)
+{
+    SIMD::GetInstance().VectorSqrt(input, result, count);
+}
+
+void SIMDVectorReciprocal(const float* input, float* result, size_t count)
+{
+    SIMD::GetInstance().VectorReciprocal(input, result, count);
+}
+
+float SIMDVectorMax(const float* input, size_t count)
+{
+    SIMD::GetInstance().VectorMax(input, count);
+}
+
+float SIMDVectorMin(const float* input, size_t count)
+{
+    SIMD::GetInstance().VectorMin(input, count);
+}
+
+void SIMDVectorAbs(const float* input, float* result, size_t count)
+{
+    SIMD::GetInstance().VectorAbs(input, result, count);
+}
+
+void SIMDVectorRotatePoints(const float* points_x, const float* points_y, const float* sin_vals, const float* cos_vals,
+                            float* result_x, float* result_y, size_t count)
+{
+    SIMD::GetInstance().VectorRotatePoints(points_x, points_y, sin_vals, cos_vals, result_x, result_y, count);
 }

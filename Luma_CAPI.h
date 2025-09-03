@@ -87,11 +87,11 @@ LUMA_API void Entity_SetComponent(LumaSceneHandle scene, LumaEntityHandle entity
  */
 typedef enum
 {
-    LumaLogLevel_Trace,    ///< 跟踪级别日志。
-    LumaLogLevel_Info,     ///< 信息级别日志。
-    LumaLogLevel_Warning,  ///< 警告级别日志。
-    LumaLogLevel_Error,    ///< 错误级别日志。
-    LumaLogLevel_Critical  ///< 严重级别日志。
+    LumaLogLevel_Trace, ///< 跟踪级别日志。
+    LumaLogLevel_Info, ///< 信息级别日志。
+    LumaLogLevel_Warning, ///< 警告级别日志。
+    LumaLogLevel_Error, ///< 错误级别日志。
+    LumaLogLevel_Critical ///< 严重级别日志。
 } LumaLogLevel;
 
 /**
@@ -458,6 +458,19 @@ LUMA_API void JobSystem_CompleteAll(JobHandle_CAPI* handles, int count);
  * @return 作业系统使用的线程数量。
  */
 LUMA_API int JobSystem_GetThreadCount();
+
+LUMA_API void SIMDVectorAdd(const float* a, const float* b, float* result, size_t count);
+LUMA_API void SIMDVectorMultiply(const float* a, const float* b, float* result, size_t count);
+LUMA_API float SIMDVectorDotProduct(const float* a, const float* b, size_t count);
+LUMA_API void SIMDVectorMultiplyAdd(const float* a, const float* b, const float* c, float* result, size_t count);
+LUMA_API void SIMDVectorSqrt(const float* input, float* result, size_t count);
+LUMA_API void SIMDVectorReciprocal(const float* input, float* result, size_t count);
+LUMA_API float SIMDVectorMax(const float* input, size_t count);
+LUMA_API float SIMDVectorMin(const float* input, size_t count);
+LUMA_API void SIMDVectorAbs(const float* input, float* result, size_t count);
+LUMA_API void SIMDVectorRotatePoints(const float* points_x, const float* points_y,
+                                 const float* sin_vals, const float* cos_vals,
+                                 float* result_x, float* result_y, size_t count);
 #ifdef __cplusplus
 }
 #endif

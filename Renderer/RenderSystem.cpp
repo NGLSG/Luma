@@ -21,6 +21,7 @@
 #include "include/core/SkFontMetrics.h"
 #include "Renderer/RenderComponent.h"
 #include <functional>
+#include <SIMDWrapper.h>
 
 static SkFilterMode GetSkFilterMode(int quality)
 {
@@ -298,6 +299,8 @@ void RenderSystem::RenderSystemImpl::DrawAllSpriteBatches(SkCanvas* canvas)
         return;
     }
 
+    auto& simd = SIMD::GetInstance();
+
     SkPaint paint;
     paint.setBlendMode(SkBlendMode::kSrcOver);
 
@@ -308,8 +311,15 @@ void RenderSystem::RenderSystemImpl::DrawAllSpriteBatches(SkCanvas* canvas)
     colors.resize(maxVerticesPerDraw);
     indices.resize(maxIndicesPerDraw);
 
-    alignas(32) float final_x_f[8];
-    alignas(32) float final_y_f[8];
+    constexpr size_t simd_chunk_size = 8;
+    alignas(32) float pos_x_soa[simd_chunk_size], pos_y_soa[simd_chunk_size];
+    alignas(32) float scale_x_soa[simd_chunk_size], scale_y_soa[simd_chunk_size];
+    alignas(32) float sin_r_soa[simd_chunk_size], cos_r_soa[simd_chunk_size];
+
+    alignas(32) float scaled_half_w[simd_chunk_size], scaled_half_h[simd_chunk_size];
+    alignas(32) float scaled_local_x[simd_chunk_size], scaled_local_y[simd_chunk_size];
+    alignas(32) float final_x[simd_chunk_size], final_y[simd_chunk_size];
+
 
     for (const auto& batch : spriteBatches)
     {
@@ -375,60 +385,69 @@ void RenderSystem::RenderSystemImpl::DrawAllSpriteBatches(SkCanvas* canvas)
         const size_t count = batch.count;
 
 
-        const size_t simdCount = count - (count % 8);
-        for (; i < simdCount; i += 8)
+        const size_t simdCount = count - (count % simd_chunk_size);
+        for (; i < simdCount; i += simd_chunk_size)
         {
-            if (currentVertexCount + 32 > maxVerticesPerDraw) [[unlikely]]
+            if (currentVertexCount + (simd_chunk_size * 4) > maxVerticesPerDraw) [[unlikely]]
             {
                 flushDrawCall();
             }
 
             const RenderableTransform* t = batch.transforms + i;
-            const __m256 pos_x = _mm256_set_ps(t[7].position.fX, t[6].position.fX, t[5].position.fX,
-                                               t[4].position.fX, t[3].position.fX, t[2].position.fX,
-                                               t[1].position.fX, t[0].position.fX);
-            const __m256 pos_y = _mm256_set_ps(t[7].position.fY, t[6].position.fY, t[5].position.fY,
-                                               t[4].position.fY, t[3].position.fY, t[2].position.fY,
-                                               t[1].position.fY, t[0].position.fY);
-            const __m256 scale_x = _mm256_set_ps(t[7].scaleX, t[6].scaleX, t[5].scaleX, t[4].scaleX, t[3].scaleX,
-                                                 t[2].scaleX, t[1].scaleX, t[0].scaleX);
-            const __m256 scale_y = _mm256_set_ps(t[7].scaleY, t[6].scaleY, t[5].scaleY, t[4].scaleY, t[3].scaleY,
-                                                 t[2].scaleY, t[1].scaleY, t[0].scaleY);
-            const __m256 sin_r = _mm256_set_ps(t[7].sinR, t[6].sinR, t[5].sinR, t[4].sinR, t[3].sinR, t[2].sinR,
-                                               t[1].sinR, t[0].sinR);
-            const __m256 cos_r = _mm256_set_ps(t[7].cosR, t[6].cosR, t[5].cosR, t[4].cosR, t[3].cosR, t[2].cosR,
-                                               t[1].cosR, t[0].cosR);
+            for (size_t k = 0; k < simd_chunk_size; ++k)
+            {
+                pos_x_soa[k] = t[k].position.fX;
+                pos_y_soa[k] = t[k].position.fY;
+                scale_x_soa[k] = t[k].scaleX;
+                scale_y_soa[k] = t[k].scaleY;
+                sin_r_soa[k] = t[k].sinR;
+                cos_r_soa[k] = t[k].cosR;
+            }
 
+            // 计算缩放后的半宽高
+            for (size_t k = 0; k < simd_chunk_size; ++k)
+            {
+                scaled_half_w[k] = worldHalfWidth * scale_x_soa[k];
+                scaled_half_h[k] = worldHalfHeight * scale_y_soa[k];
+            }
 
-            const __m256 scaled_half_w = _mm256_mul_ps(_mm256_set1_ps(worldHalfWidth), scale_x);
-            const __m256 scaled_half_h = _mm256_mul_ps(_mm256_set1_ps(worldHalfHeight), scale_y);
-
-
-            const SkPoint localCornerFactors[4] = {
+            const SkPoint localCornerFactors[] = {
                 {-1.0f, -1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f}, {-1.0f, 1.0f}
             };
 
             for (int j = 0; j < 4; ++j)
             {
-                const __m256 lc_x = _mm256_mul_ps(scaled_half_w, _mm256_set1_ps(localCornerFactors[j].fX));
-                const __m256 lc_y = _mm256_mul_ps(scaled_half_h, _mm256_set1_ps(localCornerFactors[j].fY));
-
-                const __m256 rot_x = _mm256_fmsub_ps(lc_x, cos_r, _mm256_mul_ps(lc_y, sin_r));
-                const __m256 rot_y = _mm256_fmadd_ps(lc_x, sin_r, _mm256_mul_ps(lc_y, cos_r));
-
-                const __m256 final_x = _mm256_add_ps(pos_x, rot_x);
-                const __m256 final_y = _mm256_add_ps(pos_y, rot_y);
-
-                _mm256_store_ps(final_x_f, final_x);
-                _mm256_store_ps(final_y_f, final_y);
-
-                for (int k = 0; k < 8; ++k)
+                for (size_t k = 0; k < simd_chunk_size; ++k)
                 {
-                    positions[currentVertexCount + k * 4 + j] = {final_x_f[7 - k], final_y_f[7 - k]};
+                    scaled_local_x[k] = scaled_half_w[k] * localCornerFactors[j].fX;
+                    scaled_local_y[k] = scaled_half_h[k] * localCornerFactors[j].fY;
+                }
+
+                simd.VectorRotatePoints(
+                    scaled_local_x, scaled_local_y,
+                    sin_r_soa, cos_r_soa,
+                    final_x, final_y,
+                    simd_chunk_size
+                );
+
+                simd.VectorAdd(
+                    final_x, pos_x_soa,
+                    final_x,
+                    simd_chunk_size
+                );
+                simd.VectorAdd(
+                    final_y, pos_y_soa,
+                    final_y,
+                    simd_chunk_size
+                );
+
+                for (size_t k = 0; k < simd_chunk_size; ++k)
+                {
+                    positions[currentVertexCount + k * 4 + j] = {final_x[k], final_y[k]};
                 }
             }
 
-            for (int k = 0; k < 8; ++k)
+            for (size_t k = 0; k < simd_chunk_size; ++k)
             {
                 const uint16_t baseVertex = static_cast<uint16_t>(currentVertexCount + k * 4);
                 texCoords[baseVertex + 0] = srcCorners[0];
@@ -446,8 +465,8 @@ void RenderSystem::RenderSystemImpl::DrawAllSpriteBatches(SkCanvas* canvas)
                 indices[indexStart + 4] = baseVertex + 2;
                 indices[indexStart + 5] = baseVertex + 3;
             }
-            currentVertexCount += 32;
-            currentIndexCount += 48;
+            currentVertexCount += (simd_chunk_size * 4);
+            currentIndexCount += (simd_chunk_size * 6);
         }
 
 
@@ -495,7 +514,6 @@ void RenderSystem::RenderSystemImpl::DrawAllSpriteBatches(SkCanvas* canvas)
         flushDrawCall();
     }
 }
-
 
 void RenderSystem::RenderSystemImpl::DrawAllTextBatches(SkCanvas* canvas)
 {
