@@ -25,36 +25,36 @@ public:
     RuntimeCSharpScript(const Guid& sourceGuid,
                         std::string className,
                         std::string assemblyName,
-                        ScriptClassMetadata metadata)
-        : m_className(std::move(className)),
-          m_assemblyName(std::move(assemblyName)),
-          m_metadata(std::move(metadata))
-    {
-        m_sourceGuid = sourceGuid;
-    }
+                        ScriptClassMetadata metadata);
+    ~RuntimeCSharpScript() override;
 
     /**
      * @brief 获取C#脚本的类名。
      * @return C#脚本的类名。
      */
-    const std::string& GetScriptClassName() const { return m_className; }
+    const std::string& GetScriptClassName() const;
 
     /**
      * @brief 获取C#脚本所属的程序集名称。
      * @return C#脚本所属的程序集名称。
      */
-    const std::string& GetAssemblyName() const { return m_assemblyName; }
+    const std::string& GetAssemblyName() const;
 
     /**
      * @brief 获取C#脚本的元数据。
      * @return C#脚本的元数据。
      */
-    ScriptClassMetadata& GetMetadata() { return m_metadata; }
+    ScriptClassMetadata& GetMetadata();
+
+    bool NeedsMetadataRefresh() const;
+    void SetNeedsMetadataRefresh(bool value);
 
 private:
-    std::string m_className;        ///< C#脚本的类名。
-    std::string m_assemblyName;     ///< C#脚本所属的程序集名称。
+    std::string m_className; ///< C#脚本的类名。
+    std::string m_assemblyName; ///< C#脚本所属的程序集名称。
     ScriptClassMetadata m_metadata; ///< C#脚本的元数据。
+    ListenerHandle m_onScriptCompliedHandle; ///< 脚本编译完成事件的监听句柄。
+    bool needsMetadataRefresh = false; ///< 指示是否需要刷新元数据。
 };
 
 #endif

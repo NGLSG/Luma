@@ -7,20 +7,21 @@ T& RuntimeGameObject::AddComponent(Args&&... args)
 {
     static_assert(std::is_base_of_v<ECS::IComponent, T>,
                   "T must be derived from ECS::IComponent");
+
+    static_assert(!std::is_same_v<T, ECS::ScriptComponent>,
+                  "Do not add ScriptComponent directly. Use AddComponent<ScriptsComponent>() and then the .AddScript() method instead.")
+        ;
+
+
     auto& registry = m_scene->GetRegistry();
     T& component = registry.emplace<T>(m_entityHandle, std::forward<Args>(args)...);
     component.Enable = true;
+
     std::string name = typeid(T).name();
     EventBus::GetInstance().Publish(ComponentAddedEvent{registry, m_entityHandle, name});
-    if constexpr (std::is_same_v<T, ECS::ScriptComponent>)
-    {
-        std::string scriptName = AssetManager::GetInstance().GetAssetName(component.scriptAsset.assetGuid) +
-            " (ScriptComponent)";
-        m_componentNames.push_back(scriptName);
-    }
 
-    else
-        m_componentNames.push_back(name);
+    m_componentNames.push_back(name);
+
     return component;
 }
 

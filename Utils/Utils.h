@@ -16,6 +16,18 @@ public:
     Utils(const Utils&) = delete; ///< 禁止拷贝构造
     Utils& operator=(const Utils&) = delete; ///< 禁止赋值
 
+    static void trimLeft(std::string& s);
+
+    static void trimRight(std::string& s);
+
+    static void trim(std::string& s);
+    /**
+     * @brief 执行系统命令并获取其输出结果。
+     * @param string 需要执行的命令字符串
+     * @return 命令的输出结果
+     */
+    static std::string ExecuteCommandAndGetOutput(const std::string& command);
+
     /**
      * @brief 在文件资源管理器中打开指定路径。
      * @param path 需要打开的文件或文件夹路径

@@ -404,7 +404,7 @@ void RenderSystem::RenderSystemImpl::DrawAllSpriteBatches(SkCanvas* canvas)
                 cos_r_soa[k] = t[k].cosR;
             }
 
-            // 计算缩放后的半宽高
+            
             for (size_t k = 0; k < simd_chunk_size; ++k)
             {
                 scaled_half_w[k] = worldHalfWidth * scale_x_soa[k];

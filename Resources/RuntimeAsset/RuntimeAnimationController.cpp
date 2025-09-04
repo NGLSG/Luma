@@ -240,18 +240,26 @@ void RuntimeAnimationController::ApplyAnimationFrame(const sk_sp<RuntimeAnimatio
                 EventBus::GetInstance().Publish(ComponentUpdatedEvent{
                     currentScene->GetRegistry(), go.GetEntityHandle()
                 });
-
                 for (const auto& target : frame.eventTargets)
                 {
                     RuntimeGameObject targetGO = currentScene->FindGameObjectByGuid(target.targetEntityGuid);
-                    if (targetGO.IsValid() && targetGO.HasComponent<ECS::ScriptComponent>())
+                    if (targetGO.IsValid() && targetGO.HasComponent<ECS::ScriptsComponent>())
                     {
-                        InteractScriptEvent scriptEvent;
-                        scriptEvent.type = InteractScriptEvent::CommandType::InvokeMethod;
-                        scriptEvent.entityId = static_cast<uint32_t>(targetGO.GetEntityHandle());
-                        scriptEvent.methodName = target.targetMethodName;
+                        auto& scriptsComp = targetGO.GetComponent<ECS::ScriptsComponent>();
+                        for (const auto& script : scriptsComp.scripts)
+                        {
+                            if (script.metadata && script.metadata->name == target.targetComponentName)
+                            {
+                                InteractScriptEvent scriptEvent;
+                                scriptEvent.type = InteractScriptEvent::CommandType::InvokeMethod;
+                                scriptEvent.entityId = static_cast<uint32_t>(targetGO.GetEntityHandle());
+                                scriptEvent.methodName = target.targetMethodName;
 
-                        EventBus::GetInstance().Publish(scriptEvent);
+                                EventBus::GetInstance().Publish(scriptEvent);
+
+                                break;
+                            }
+                        }
                     }
                 }
             }

@@ -69,6 +69,7 @@ private:
     /// 绘制单个游戏对象的所有组件。
     /// @param gameObject 要绘制组件的游戏对象。
     void drawComponents(RuntimeGameObject& gameObject);
+    void drawScriptsComponentUI(RuntimeGameObject& gameObject);
     /// 绘制组件的头部，包含组件名称和折叠/删除按钮等。
     /// @param componentName 组件的名称。
     /// @param compInfo 组件的注册信息。

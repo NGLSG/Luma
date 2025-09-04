@@ -82,15 +82,23 @@ namespace Systems
         for (const auto& target : targets)
         {
             RuntimeGameObject targetGO = scene->FindGameObjectByGuid(target.targetEntityGuid);
-            if (targetGO.IsValid() && targetGO.HasComponent<ECS::ScriptComponent>())
+            if (targetGO.IsValid() && targetGO.HasComponent<ECS::ScriptsComponent>())
             {
-                InteractScriptEvent scriptEvent;
-                scriptEvent.type = InteractScriptEvent::CommandType::InvokeMethod;
-                scriptEvent.entityId = static_cast<uint32_t>(targetGO.GetEntityHandle());
-                scriptEvent.methodName = target.targetMethodName;
-                scriptEvent.methodArgs = "";
+                auto& scriptsComp = targetGO.GetComponent<ECS::ScriptsComponent>();
+                for (const auto& script : scriptsComp.scripts)
+                {
+                    if (script.metadata && script.metadata->name == target.targetComponentName)
+                    {
+                        InteractScriptEvent scriptEvent;
+                        scriptEvent.type = InteractScriptEvent::CommandType::InvokeMethod;
+                        scriptEvent.entityId = static_cast<uint32_t>(targetGO.GetEntityHandle());
+                        scriptEvent.methodName = target.targetMethodName;
+                        scriptEvent.methodArgs = "";
 
-                EventBus::GetInstance().Publish(scriptEvent);
+                        EventBus::GetInstance().Publish(scriptEvent);
+                        break;
+                    }
+                }
             }
         }
     }

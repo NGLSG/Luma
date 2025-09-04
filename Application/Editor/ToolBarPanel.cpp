@@ -53,7 +53,7 @@ namespace platform_native
 #ifdef __linux__
         "xdg-open \"" + path.string() + "\"";
 #else
-        "open \"" + path.string() + "\""; // Assumes macOS or other systems with 'open'
+        "open \"" + path.string() + "\""; 
 #endif
         int res = system(command.c_str());
 #endif
@@ -227,7 +227,7 @@ bool ToolbarPanel::runScriptCompilationLogic(std::string& statusMessage)
     const std::filesystem::path editorRoot = ".";
     const std::filesystem::path libraryDir = projectRoot / "Library";
 
-    // 根据当前宿主平台确定工具目录
+    
     TargetPlatform hostPlatform = ProjectSettings::GetCurrentHostPlatform();
     std::string platformSubDir = ProjectSettings::PlatformToString(hostPlatform);
     const std::filesystem::path toolsDir = editorRoot / "Tools" / platformSubDir;
@@ -257,14 +257,14 @@ bool ToolbarPanel::runScriptCompilationLogic(std::string& statusMessage)
         }
 
         statusMessage = "正在发布 C# 项目...";
-        // 编译时始终为当前宿主平台
+        
         std::string dotnetRid = (hostPlatform == TargetPlatform::Windows) ? "win-x64" : "linux-x64";
 
-        // 使用短路径格式避免中文路径问题
+        
         std::string projectRootStr = projectRoot.string();
         std::string libraryDirStr = libraryDir.string();
 
-        // 在Windows上将路径转换为短路径格式
+        
 #ifdef _WIN32
         char shortProjectPath[MAX_PATH];
         char shortLibraryPath[MAX_PATH];
@@ -289,7 +289,7 @@ bool ToolbarPanel::runScriptCompilationLogic(std::string& statusMessage)
 
         statusMessage = "正在提取脚本元数据...";
 
-        // 根据平台选择正确的工具可执行文件
+        
         std::string toolExecutableName = (hostPlatform == TargetPlatform::Windows)
                                              ? "YamlExtractor.exe"
                                              : "YamlExtractor";
@@ -311,13 +311,13 @@ bool ToolbarPanel::runScriptCompilationLogic(std::string& statusMessage)
             throw std::runtime_error("编译产物 GameScripts.dll 未在 Library 目录中找到: " + gameScriptsDll.string());
         }
 
-        // 构造命令参数，避免使用引号包围路径
+        
         std::string toolsExeStr = absToolsExe.string();
         std::string gameScriptsDllStr = absGameScriptsDll.string();
         std::string metadataYamlStr = absMetadataYaml.string();
 
 #ifdef _WIN32
-        // 在Windows上转换为短路径格式
+        
         char shortToolPath[MAX_PATH];
         char shortDllPath[MAX_PATH];
         char shortYamlPath[MAX_PATH];
@@ -603,7 +603,7 @@ void ToolbarPanel::drawSettingsWindow()
 
     ImGui::Spacing();
 
-    // 目标平台选择
+    
     ImGui::Text("构建目标");
     ImGui::Separator();
     TargetPlatform currentPlatform = settings.GetTargetPlatform();
@@ -828,7 +828,7 @@ void ToolbarPanel::play()
     m_context->activeScene->AddSystem<Systems::ScrollViewSystem>();
     m_context->activeScene->AddSystem<Systems::ScriptingSystem>();
     m_context->activeScene->AddSystem<Systems::AnimationSystem>();
-    //Debug::SceneGenerator::GenerateSpriteTest(m_context->activeScene.get(), 1000000);
+    
     SceneManager::GetInstance().SetCurrentScene(m_context->activeScene);
     m_context->activeScene->Activate(*m_context->engineContext);
     LogInfo("进入播放模式。");
@@ -950,9 +950,9 @@ void ToolbarPanel::startPackagingProcess()
         {
             auto& settings = ProjectSettings::GetInstance();
             const std::filesystem::path projectRoot = settings.GetProjectRoot();
-            const std::filesystem::path outputDir = projectRoot / "build"; // 最终输出目录
+            const std::filesystem::path outputDir = projectRoot / "build"; 
 
-            // 1. 确定目标平台
+            
             TargetPlatform targetPlatform = settings.GetTargetPlatform();
             if (targetPlatform == TargetPlatform::Current)
             {
@@ -961,14 +961,14 @@ void ToolbarPanel::startPackagingProcess()
             std::string targetPlatformStr = ProjectSettings::PlatformToString(targetPlatform);
 
             m_packagingStatus = "正在确定引擎模板包路径...";
-            const std::filesystem::path editorRoot = "."; // 编辑器可执行文件所在目录
+            const std::filesystem::path editorRoot = "."; 
             const std::filesystem::path templateDir = editorRoot / "Publish" / targetPlatformStr;
             if (!std::filesystem::exists(templateDir))
             {
                 throw std::runtime_error("引擎模板包未找到，请先使用CMake构建'publish'目标。\n路径: " + templateDir.string());
             }
 
-            // 2. [前置步骤] 编译 C# 脚本 (如果失败则提前中止)
+            
             m_packagingProgress = 0.0f;
             m_packagingStatus = "正在编译 C# 脚本 (目标: " + targetPlatformStr + ")...";
             std::string compileStatus;
@@ -977,35 +977,35 @@ void ToolbarPanel::startPackagingProcess()
                 throw std::runtime_error("脚本编译失败，打包已中止。详情: " + compileStatus);
             }
 
-            // 3. 清理旧目录并从模板复制基础引擎文件
+            
             m_packagingProgress = 0.1f;
             m_packagingStatus = "正在清理并复制引擎模板...";
             if (std::filesystem::exists(outputDir)) std::filesystem::remove_all(outputDir);
-            // 递归复制整个模板目录，这将包含 Game.exe, LumaEngine.dll, SDL3.dll 等所有C++运行时
+            
             std::filesystem::copy(templateDir, outputDir, std::filesystem::copy_options::recursive);
 
-            // 定义输出目录中的关键子目录
+            
             const std::filesystem::path resourcesDir = outputDir / "Resources";
             const std::filesystem::path gameDataDir = outputDir / "GameData";
             const std::filesystem::path rawDestDir = outputDir / "Raw";
-            // 确保目录存在 (虽然模板复制时应该已经创建，但以防万一)
+            
             std::filesystem::create_directories(resourcesDir);
             std::filesystem::create_directories(gameDataDir);
 
-            // 4. 打包项目特有的资源
+            
             m_packagingProgress = 0.25f;
             m_packagingStatus = "正在打包项目资源...";
             if (!AssetPacker::Pack(AssetManager::GetInstance().GetAssetDatabase(), resourcesDir))
                 throw std::runtime_error("资源打包失败。");
 
-            // 5. 复制 Raw 资产
+            
             m_packagingProgress = 0.4f;
             m_packagingStatus = "正在复制 Raw 资产...";
             const auto rawSourceDir = AssetManager::GetInstance().GetAssetsRootPath() / "Raw";
             if (std::filesystem::exists(rawSourceDir))
                 std::filesystem::copy(rawSourceDir, rawDestDir, std::filesystem::copy_options::recursive);
 
-            // 6. 复制已编译的 C# 程序集
+            
             m_packagingProgress = 0.6f;
             m_packagingStatus = "正在复制 C# 程序集...";
             const std::filesystem::path csharpSourceDir = projectRoot / "Library";
@@ -1019,14 +1019,14 @@ void ToolbarPanel::startPackagingProcess()
                 {
                     if (entry.is_regular_file())
                     {
-                        // 复制到 GameData 目录，与C++库放在一起
+                        
                         std::filesystem::copy(entry.path(), gameDataDir / entry.path().filename(),
                                               std::filesystem::copy_options::overwrite_existing);
                     }
                 }
             }
 
-            // 7. 复制应用图标
+            
             m_packagingProgress = 0.8f;
             m_packagingStatus = "正在复制应用图标...";
             const std::filesystem::path iconSourceRelativePath = settings.GetAppIconPath();
@@ -1046,7 +1046,7 @@ void ToolbarPanel::startPackagingProcess()
                 }
             }
 
-            // 8. 加密并写入项目配置文件
+            
             m_packagingProgress = 0.9f;
             m_packagingStatus = "正在写入项目配置...";
             const auto projectFilePath = settings.GetProjectFilePath();
@@ -1096,7 +1096,7 @@ bool ToolbarPanel::runScriptCompilationLogicForPackaging(std::string& statusMess
     const std::filesystem::path editorRoot = ".";
     const std::filesystem::path libraryDir = projectRoot / "Library";
 
-    // 使用目标平台确定工具目录和RID
+    
     std::string platformSubDir = ProjectSettings::PlatformToString(targetPlatform);
     std::string dotnetRid = (targetPlatform == TargetPlatform::Windows) ? "win-x64" : "linux-x64";
     const std::filesystem::path toolsDir = editorRoot / "Tools" / platformSubDir;
@@ -1124,11 +1124,11 @@ bool ToolbarPanel::runScriptCompilationLogicForPackaging(std::string& statusMess
 
         statusMessage = "正在发布 C# 项目 (目标: " + platformSubDir + ")...";
 
-        // 使用短路径格式避免中文路径问题
+        
         std::string projectRootStr = projectRoot.string();
         std::string libraryDirStr = libraryDir.string();
 
-        // 在Windows上将路径转换为短路径格式
+        
 #ifdef _WIN32
         char shortProjectPath[MAX_PATH];
         char shortLibraryPath[MAX_PATH];
@@ -1152,7 +1152,7 @@ bool ToolbarPanel::runScriptCompilationLogicForPackaging(std::string& statusMess
         }
         statusMessage = "正在提取脚本元数据 (目标: " + platformSubDir + ")...";
 
-        // 使用当前宿主平台的工具来提取元数据
+        
         TargetPlatform hostPlatform = ProjectSettings::GetCurrentHostPlatform();
         std::string hostPlatformSubDir = ProjectSettings::PlatformToString(hostPlatform);
         const std::filesystem::path hostToolsDir = editorRoot / "Tools" / hostPlatformSubDir;
@@ -1178,13 +1178,13 @@ bool ToolbarPanel::runScriptCompilationLogicForPackaging(std::string& statusMess
             throw std::runtime_error("编译产物 GameScripts.dll 未在 Library 目录中找到: " + gameScriptsDll.string());
         }
 
-        // 构造命令参数，避免使用引号包围路径
+        
         std::string toolsExeStr = absToolsExe.string();
         std::string gameScriptsDllStr = absGameScriptsDll.string();
         std::string metadataYamlStr = absMetadataYaml.string();
 
 #ifdef _WIN32
-        // 在Windows上转换为短路径格式
+        
         char shortToolPath[MAX_PATH];
         char shortDllPath[MAX_PATH];
         char shortYamlPath[MAX_PATH];

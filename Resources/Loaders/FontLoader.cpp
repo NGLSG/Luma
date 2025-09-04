@@ -25,10 +25,10 @@ static sk_sp<SkFontMgr> CreatePlatformFontManager()
 
 #elif defined(SK_BUILD_FOR_UNIX)
 
-    // ============================ KEY FIX ============================
-    // Provide nullptr for both arguments to get the default behavior.
+    
+    
     return SkFontMgr_New_FontConfig(nullptr, nullptr);
-    // ===============================================================
+    
 
 #else
 

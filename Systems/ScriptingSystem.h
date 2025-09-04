@@ -1,15 +1,19 @@
 /**
  * @brief 脚本系统，负责管理和执行游戏中的脚本逻辑。
- *        它继承自ISystem，提供了生命周期管理和事件处理功能。
+ * 它继承自ISystem，提供了生命周期管理和事件处理功能。
  */
 #ifndef SCRIPTINGSYSTEM_H
 #define SCRIPTINGSYSTEM_H
 
 #include "ISystem.h"
 #include <string>
-#include <unordered_map>
+#include <list>
+#include <filesystem>
 #include "../Scripting/CoreCLRHost.h"
 #include "Event/Events.h"
+
+// 前向声明
+namespace ECS { struct ScriptComponent; }
 
 namespace Systems
 {
@@ -48,12 +52,21 @@ namespace Systems
          */
         void handleScriptInteractEvent(const InteractScriptEvent& event);
 
+        void setupEventLinks(const ECS::ScriptComponent& scriptComp, uint32_t entityId);
         /**
          * @brief 处理物理接触事件。
          * @param event 物理接触事件。
          * @return 无。
          */
         void handlePhysicsContactEvent(const PhysicsContactEvent& event);
+
+        /**
+         * @brief 根据类型名称查找实体上的脚本组件。
+         * @param entityId 实体ID。
+         * @param typeName 脚本的完整类型名称。
+         * @return 指向找到的ScriptComponent的指针，如果未找到则为nullptr。
+         */
+        ECS::ScriptComponent* findScriptByTypeName(uint32_t entityId, const std::string& typeName);
 
         /**
          * @brief 创建脚本实例的命令。
@@ -67,50 +80,47 @@ namespace Systems
         /**
          * @brief 改变脚本实例活跃状态的命令。
          * @param entityId 实体ID。
+         * @param typeName 目标脚本的类型名称。
          * @param isActive 是否活跃。
          * @return 无。
          */
-        void activityChangeCommand(uint32_t entityId, bool isActive);
+        void activityChangeCommand(uint32_t entityId, const std::string& typeName, bool isActive);
 
         /**
          * @brief 调用脚本实例的OnCreate方法的命令。
          * @param entityId 实体ID。
+         * @param typeName 目标脚本的类型名称。
          * @return 无。
          */
-        void onCreateCommand(uint32_t entityId);
+        void onCreateCommand(uint32_t entityId, const std::string& typeName);
 
         /**
          * @brief 销毁脚本实例的命令。
          * @param entityId 实体ID。
+         * @param typeName 目标脚本的类型名称。
          * @return 无。
          */
-        void destroyInstanceCommand(uint32_t entityId);
-
-        /**
-         * @brief 更新脚本实例的命令。
-         * @param entityId 实体ID。
-         * @param deltaTime 帧之间的时间间隔。
-         * @return 无。
-         */
-        void updateInstanceCommand(uint32_t entityId, float deltaTime);
+        void destroyInstanceCommand(uint32_t entityId, const std::string& typeName);
 
         /**
          * @brief 设置脚本实例属性的命令。
          * @param entityId 实体ID。
+         * @param typeName 目标脚本的类型名称。
          * @param propertyName 属性名称。
          * @param value 属性值。
          * @return 无。
          */
-        void setPropertyCommand(uint32_t entityId, const std::string& propertyName, const std::string& value);
+        void setPropertyCommand(uint32_t entityId, const std::string& typeName, const std::string& propertyName, const std::string& value);
 
         /**
          * @brief 调用脚本实例方法的命令。
          * @param entityId 实体ID。
+         * @param typeName 目标脚本的类型名称。
          * @param methodName 方法名称。
          * @param args 方法参数。
          * @return 无。
          */
-        void invokeMethodCommand(uint32_t entityId, const std::string& methodName, const std::string& args);
+        void invokeMethodCommand(uint32_t entityId, const std::string& typeName, const std::string& methodName, const std::string& args);
 
         /**
          * @brief 销毁所有脚本实例。
@@ -124,7 +134,8 @@ namespace Systems
          */
         CoreCLRHost* getHost() const { return CoreCLRHost::GetInstance(); }
 
-        std::unordered_map<uint32_t, ManagedGCHandle> m_entityHandles; ///< 实体ID到托管GC句柄的映射。
+        // 使用std::list确保指针稳定性
+        std::list<ManagedGCHandle> m_managedHandles; ///< 所有托管GC句柄的存储列表。
 
         ListenerHandle m_scriptEventHandle; ///< 脚本事件监听器句柄。
         ListenerHandle m_physicsContactEventHandle; ///< 物理接触事件监听器句柄。
@@ -136,4 +147,4 @@ namespace Systems
     };
 }
 
-#endif
+#endif //SCRIPTINGSYSTEM_H

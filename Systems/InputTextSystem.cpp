@@ -238,20 +238,27 @@ namespace Systems
         for (const auto& target : targets)
         {
             RuntimeGameObject targetGO = scene->FindGameObjectByGuid(target.targetEntityGuid);
-            if (targetGO.IsValid() && targetGO.HasComponent<ECS::ScriptComponent>())
+            if (targetGO.IsValid() && targetGO.HasComponent<ECS::ScriptsComponent>())
             {
-                YAML::Node args;
-                args["text"] = newText;
-                std::string argsYaml = YAML::Dump(args);
+                auto& scriptsComp = targetGO.GetComponent<ECS::ScriptsComponent>();
+                for (const auto& script : scriptsComp.scripts)
+                {
+                    if (script.metadata && script.metadata->name == target.targetComponentName)
+                    {
+                        YAML::Node args;
+                        args["text"] = newText;
+                        std::string argsYaml = YAML::Dump(args);
 
+                        InteractScriptEvent scriptEvent;
+                        scriptEvent.type = InteractScriptEvent::CommandType::InvokeMethod;
+                        scriptEvent.entityId = static_cast<uint32_t>(targetGO.GetEntityHandle());
+                        scriptEvent.methodName = target.targetMethodName;
+                        scriptEvent.methodArgs = argsYaml;
 
-                InteractScriptEvent scriptEvent;
-                scriptEvent.type = InteractScriptEvent::CommandType::InvokeMethod;
-                scriptEvent.entityId = static_cast<uint32_t>(targetGO.GetEntityHandle());
-                scriptEvent.methodName = target.targetMethodName;
-                scriptEvent.methodArgs = argsYaml;
-
-                EventBus::GetInstance().Publish(scriptEvent);
+                        EventBus::GetInstance().Publish(scriptEvent);
+                        break;
+                    }
+                }
             }
         }
     }
@@ -263,20 +270,27 @@ namespace Systems
         for (const auto& target : targets)
         {
             RuntimeGameObject targetGO = scene->FindGameObjectByGuid(target.targetEntityGuid);
-            if (targetGO.IsValid() && targetGO.HasComponent<ECS::ScriptComponent>())
+            if (targetGO.IsValid() && targetGO.HasComponent<ECS::ScriptsComponent>())
             {
-                YAML::Node args;
-                args["text"] = text;
-                std::string argsYaml = YAML::Dump(args);
+                auto& scriptsComp = targetGO.GetComponent<ECS::ScriptsComponent>();
+                for (const auto& script : scriptsComp.scripts)
+                {
+                    if (script.metadata && script.metadata->name == target.targetComponentName)
+                    {
+                        YAML::Node args;
+                        args["text"] = text;
+                        std::string argsYaml = YAML::Dump(args);
 
+                        InteractScriptEvent scriptEvent;
+                        scriptEvent.type = InteractScriptEvent::CommandType::InvokeMethod;
+                        scriptEvent.entityId = static_cast<uint32_t>(targetGO.GetEntityHandle());
+                        scriptEvent.methodName = target.targetMethodName;
+                        scriptEvent.methodArgs = argsYaml;
 
-                InteractScriptEvent scriptEvent;
-                scriptEvent.type = InteractScriptEvent::CommandType::InvokeMethod;
-                scriptEvent.entityId = static_cast<uint32_t>(targetGO.GetEntityHandle());
-                scriptEvent.methodName = target.targetMethodName;
-                scriptEvent.methodArgs = argsYaml;
-
-                EventBus::GetInstance().Publish(scriptEvent);
+                        EventBus::GetInstance().Publish(scriptEvent);
+                        break;
+                    }
+                }
             }
         }
     }

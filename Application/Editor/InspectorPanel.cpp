@@ -1,6 +1,5 @@
 #include "../Utils/PCH.h"
 #include "InspectorPanel.h"
-
 #include "imgui_internal.h"
 #include "../Resources/RuntimeAsset/RuntimeScene.h"
 #include "../Components/IDComponent.h"
@@ -12,6 +11,7 @@
 #include "InspectorUI.h"
 #include "RelationshipComponent.h"
 #include "Transform.h"
+#include "ScriptComponent.h"
 
 void InspectorPanel::Initialize(EditorContext* context)
 {
@@ -29,10 +29,8 @@ void InspectorPanel::Draw()
 {
     ImGui::Begin(GetPanelName(), &m_isVisible);
 
-
     drawLockButton();
     ImGui::Separator();
-
 
     SelectionType currentSelectionType;
     std::vector<Guid> currentSelectionGuids;
@@ -80,7 +78,6 @@ void InspectorPanel::drawLockButton()
 
     const char* buttonText = m_isLocked ? "解锁检视器" : "固定检视器";
 
-
     float buttonWidth = ImGui::CalcTextSize(buttonText).x + 20.0f;
     float windowWidth = ImGui::GetContentRegionAvail().x;
     ImGui::SetCursorPosX(windowWidth - buttonWidth);
@@ -99,7 +96,6 @@ void InspectorPanel::drawLockButton()
 
     ImGui::PopStyleColor(3);
 
-
     if (ImGui::IsItemHovered())
     {
         if (m_isLocked)
@@ -111,7 +107,6 @@ void InspectorPanel::drawLockButton()
             ImGui::SetTooltip("点击固定检视器，防止拖拽时切换对象");
         }
     }
-
 
     if (m_isLocked)
     {
@@ -173,7 +168,6 @@ void InspectorPanel::drawGameObjectInspectorWithGuids(const std::vector<Guid>& g
         return;
     }
 
-
     std::vector<RuntimeGameObject> selectedObjects;
     for (const auto& guid : guids)
     {
@@ -202,7 +196,6 @@ void InspectorPanel::drawGameObjectInspectorWithGuids(const std::vector<Guid>& g
         }
         return;
     }
-
 
     if (isSelectionLocked() && selectedObjects.size() != m_lockedGuids.size())
     {
@@ -239,16 +232,13 @@ void InspectorPanel::drawSingleObjectInspector(RuntimeGameObject& gameObject)
     drawGameObjectName(gameObject);
     ImGui::Separator();
 
-
     drawComponents(gameObject);
 
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
 
-
     drawAddComponentButton();
-
 
     drawDragDropTarget();
 }
@@ -256,7 +246,6 @@ void InspectorPanel::drawSingleObjectInspector(RuntimeGameObject& gameObject)
 void InspectorPanel::drawMultiObjectInspector(std::vector<RuntimeGameObject>& selectedObjects)
 {
     ImGui::Text("已选择 %d 个对象", static_cast<int>(selectedObjects.size()));
-
 
     if (isSelectionLocked())
     {
@@ -266,17 +255,14 @@ void InspectorPanel::drawMultiObjectInspector(std::vector<RuntimeGameObject>& se
 
     ImGui::Separator();
 
-
     drawBatchGameObjectName(selectedObjects);
     ImGui::Separator();
-
 
     drawCommonComponents(selectedObjects);
 
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
-
 
     drawBatchAddComponentButton();
 }
@@ -327,9 +313,7 @@ void InspectorPanel::drawGameObjectName(RuntimeGameObject& gameObject)
     nameBuffer[sizeof(nameBuffer) - 1] = '\0';
 #endif
 
-
     std::string label = isSelectionLocked() ? " [固定]" : "";
-
 
     ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
     if (ImGui::InputText(("名称" + label).c_str(), nameBuffer, sizeof(nameBuffer)))
@@ -353,7 +337,6 @@ void InspectorPanel::drawBatchGameObjectName(std::vector<RuntimeGameObject>& sel
             break;
         }
     }
-
 
     if (isMixed)
     {
@@ -383,7 +366,6 @@ void InspectorPanel::drawBatchGameObjectName(std::vector<RuntimeGameObject>& sel
     }
     ImGui::SameLine();
 
-
     static char batchNameBuffer[256] = {0};
 
     std::string label = isSelectionLocked() ? "批量重命名 [固定]:" : "批量重命名:";
@@ -394,7 +376,6 @@ void InspectorPanel::drawBatchGameObjectName(std::vector<RuntimeGameObject>& sel
         if (strlen(batchNameBuffer) > 0)
         {
             applyBatchNameChange(selectedObjects, batchNameBuffer);
-
             memset(batchNameBuffer, 0, sizeof(batchNameBuffer));
         }
     }
@@ -414,7 +395,6 @@ void InspectorPanel::drawBatchGameObjectName(std::vector<RuntimeGameObject>& sel
 void InspectorPanel::applyBatchNameChange(const std::vector<RuntimeGameObject>& selectedObjects, const char* newName)
 {
     m_context->uiCallbacks->onValueChanged.Invoke();
-
 
     for (size_t i = 0; i < selectedObjects.size(); ++i)
     {
@@ -438,7 +418,6 @@ void InspectorPanel::drawComponents(RuntimeGameObject& gameObject)
 
     for (const auto& componentName : componentRegistry.GetAllRegisteredNames())
     {
-        const ComponentRegistration* compInfo = componentRegistry.Get(componentName);
         if (componentName == "Transform")
         {
             auto& transform = registry.get<ECS::Transform>(entityHandle);
@@ -470,14 +449,19 @@ void InspectorPanel::drawComponents(RuntimeGameObject& gameObject)
                 {
                     CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("Position", transform.position,
                                                                      *m_context->uiCallbacks);
-                    CustomDrawing::WidgetDrawer<float>::Draw("Rotation", transform.rotation,
-                                                             *m_context->uiCallbacks);
-                    CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("Scale", transform.scale,
-                                                                     *m_context->uiCallbacks);
+                    CustomDrawing::WidgetDrawer<float>::Draw("Rotation", transform.rotation, *m_context->uiCallbacks);
+                    CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("Scale", transform.scale, *m_context->uiCallbacks);
                 }
             }
             continue;
         }
+
+        if (componentName == "ScriptComponent" || componentName == "ScriptsComponent")
+        {
+            continue;
+        }
+
+        const ComponentRegistration* compInfo = componentRegistry.Get(componentName);
         if (!compInfo || !compInfo->isExposedInEditor || !compInfo->has(registry, entityHandle))
         {
             continue;
@@ -485,6 +469,82 @@ void InspectorPanel::drawComponents(RuntimeGameObject& gameObject)
 
         drawComponentHeader(componentName, compInfo, entityHandle);
     }
+
+    if (gameObject.HasComponent<ECS::ScriptsComponent>())
+    {
+        drawScriptsComponentUI(gameObject);
+    }
+}
+
+void InspectorPanel::drawScriptsComponentUI(RuntimeGameObject& gameObject)
+{
+    auto entityHandle = static_cast<entt::entity>(gameObject);
+    const auto& componentRegistry = ComponentRegistry::GetInstance();
+    const ComponentRegistration* compInfo = componentRegistry.Get("ScriptsComponent");
+    if (!compInfo) return;
+
+    auto& scriptsComponent = gameObject.GetComponent<ECS::ScriptsComponent>();
+
+    ImGui::PushID("ScriptsComponent");
+    if (ImGui::Checkbox("##Enabled", &scriptsComponent.Enable))
+    {
+        m_context->uiCallbacks->onValueChanged.Invoke();
+    }
+    ImGui::SameLine();
+
+    std::string headerLabel = "Scripts";
+    if (isSelectionLocked()) headerLabel += " [固定]";
+
+    bool isHeaderOpen = ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+
+    drawComponentContextMenu("ScriptsComponent", compInfo, entityHandle);
+
+    if (isHeaderOpen)
+    {
+        m_context->uiCallbacks->SelectedGuids = getCurrentSelectionGuids();
+        for (size_t i = 0; i < scriptsComponent.scripts.size(); ++i)
+        {
+            auto& script = scriptsComponent.scripts[i];
+            ImGui::PushID(static_cast<int>(i));
+
+            std::string scriptLabel = "Script (Unassigned)";
+            if (script.scriptAsset.Valid())
+            {
+                scriptLabel = AssetManager::GetInstance().GetAssetName(script.scriptAsset.assetGuid);
+            }
+
+            if (CustomDrawing::WidgetDrawer<ECS::ScriptComponent>::Draw(scriptLabel, script, *m_context->uiCallbacks))
+            {
+                m_context->uiCallbacks->onValueChanged.Invoke();
+            }
+
+            if (ImGui::BeginPopupContextItem("SingleScriptContextMenu"))
+            {
+                if (ImGui::MenuItem("移除脚本"))
+                {
+                    m_context->uiCallbacks->onValueChanged.Invoke();
+                    scriptsComponent.scripts.erase(scriptsComponent.scripts.begin() + i);
+                    ImGui::CloseCurrentPopup();
+                    i--;
+                }
+                ImGui::Separator();
+                if (ImGui::MenuItem("复制脚本"))
+                {
+                    m_context->componentClipboard_Type = "ScriptComponent";
+                    m_context->componentClipboard_Data = YAML::convert<ECS::ScriptComponent>::encode(script);
+                }
+                ImGui::EndPopup();
+            }
+
+            ImGui::PopID();
+        }
+
+        ImGui::Spacing();
+        float buttonWidth = 150.0f;
+        float windowWidth = ImGui::GetContentRegionAvail().x;
+        ImGui::SetCursorPosX((windowWidth - buttonWidth) * 0.5f);
+    }
+    ImGui::PopID();
 }
 
 void InspectorPanel::drawCommonComponents(const std::vector<RuntimeGameObject>& selectedObjects)
@@ -494,7 +554,6 @@ void InspectorPanel::drawCommonComponents(const std::vector<RuntimeGameObject>& 
     auto& registry = m_context->activeScene->GetRegistry();
     const auto& componentRegistry = ComponentRegistry::GetInstance();
 
-
     std::vector<std::string> commonComponents;
 
     for (const auto& componentName : componentRegistry.GetAllRegisteredNames())
@@ -502,6 +561,7 @@ void InspectorPanel::drawCommonComponents(const std::vector<RuntimeGameObject>& 
         const ComponentRegistration* compInfo = componentRegistry.Get(componentName);
         if (!compInfo || !compInfo->isExposedInEditor) continue;
 
+        if (componentName == "ScriptComponent") continue;
 
         bool allHaveComponent = true;
         for (const auto& obj : selectedObjects)
@@ -519,7 +579,6 @@ void InspectorPanel::drawCommonComponents(const std::vector<RuntimeGameObject>& 
             commonComponents.push_back(componentName);
         }
     }
-
 
     for (const auto& componentName : commonComponents)
     {
@@ -544,7 +603,6 @@ void InspectorPanel::drawBatchTransformComponent(const std::vector<RuntimeGameOb
 {
     if (!m_context->activeScene) return;
     auto& registry = m_context->activeScene->GetRegistry();
-
 
     bool allHaveParent = true;
     for (const auto& obj : selectedObjects)
@@ -571,20 +629,17 @@ void InspectorPanel::drawBatchTransformComponent(const std::vector<RuntimeGameOb
         ImGui::Separator();
         ImGui::Text("批量设置:");
 
-
         static ECS::Vector2f batchPosition = {0.0f, 0.0f};
         if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("设置位置", batchPosition, *m_context->uiCallbacks))
         {
             applyBatchTransformPosition(selectedObjects, batchPosition, allHaveParent);
         }
 
-
         static float batchRotation = 0.0f;
         if (CustomDrawing::WidgetDrawer<float>::Draw("设置旋转", batchRotation, *m_context->uiCallbacks))
         {
             applyBatchTransformRotation(selectedObjects, batchRotation, allHaveParent);
         }
-
 
         static ECS::Vector2f batchScale = {1.0f, 1.0f};
         if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("设置缩放", batchScale, *m_context->uiCallbacks))
@@ -602,10 +657,8 @@ void InspectorPanel::displayBatchTransformValues(const std::vector<RuntimeGameOb
 
     if (selectedObjects.empty()) return;
 
-
     auto firstEntity = static_cast<entt::entity>(selectedObjects[0]);
     auto& firstTransform = registry.get<ECS::Transform>(firstEntity);
-
 
     bool positionSame = true;
     bool rotationSame = true;
@@ -631,7 +684,6 @@ void InspectorPanel::displayBatchTransformValues(const std::vector<RuntimeGameOb
         if (std::abs(currentScale.x - refScale.x) > 0.001f || std::abs(currentScale.y - refScale.y) > 0.001f)
             scaleSame = false;
     }
-
 
     ImGui::Text("当前值:");
 
@@ -740,12 +792,10 @@ void InspectorPanel::drawBatchComponentHeader(const std::string& componentName, 
 
     std::string headerLabel = componentName + " (批量)";
 
-
-    if (componentName == "ScriptComponent")
+    if (componentName == "ScriptsComponent")
     {
-        headerLabel = "脚本组件 (批量)";
+        headerLabel = "脚本 (批量)";
     }
-
 
     if (isSelectionLocked())
     {
@@ -753,23 +803,39 @@ void InspectorPanel::drawBatchComponentHeader(const std::string& componentName, 
     }
 
     bool isHeaderOpen = ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+    drawBatchComponentContextMenu(componentName, compInfo, selectedObjects);
 
     if (isHeaderOpen)
     {
         ImGui::Text("正在编辑 %d 个对象的 %s", static_cast<int>(selectedObjects.size()), componentName.c_str());
 
-
-        for (const auto& [propName, propInfo] : compInfo->properties)
+        if (componentName == "ScriptsComponent")
         {
-            if (propInfo.draw_ui && propInfo.isExposedInEditor)
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "警告: 任何修改将同步到所有选中对象。");
+
+            auto originalCallback = m_context->uiCallbacks->onValueChanged;
+            m_context->uiCallbacks->onValueChanged.AddListener([this, selectedObjects, compInfo, originalCallback]()
             {
-                drawBatchProperty(propName, propInfo, compInfo, selectedObjects);
+                if (originalCallback) originalCallback();
+                applyPropertyToAllSelected(selectedObjects, compInfo);
+            });
+
+            auto firstObject = selectedObjects[0];
+            drawScriptsComponentUI(firstObject);
+
+            m_context->uiCallbacks->onValueChanged = originalCallback;
+        }
+        else
+        {
+            for (const auto& [propName, propInfo] : compInfo->properties)
+            {
+                if (propInfo.draw_ui && propInfo.isExposedInEditor)
+                {
+                    drawBatchProperty(propName, propInfo, compInfo, selectedObjects);
+                }
             }
         }
     }
-
-
-    drawBatchComponentContextMenu(componentName, compInfo, selectedObjects);
 }
 
 void InspectorPanel::drawBatchProperty(const std::string& propName, const PropertyRegistration& propInfo,
@@ -780,7 +846,6 @@ void InspectorPanel::drawBatchProperty(const std::string& propName, const Proper
     auto& registry = m_context->activeScene->GetRegistry();
 
     if (selectedObjects.empty()) return;
-
 
     ImGui::Text("%s:", propName.c_str());
     ImGui::SameLine();
@@ -802,12 +867,9 @@ void InspectorPanel::drawBatchProperty(const std::string& propName, const Proper
         }
     }
 
-
     auto firstEntityHandle = static_cast<entt::entity>(selectedObjects[0]);
 
-
     auto originalCallback = m_context->uiCallbacks->onValueChanged;
-
 
     m_context->uiCallbacks->onValueChanged.AddListener([this, selectedObjects, compInfo, originalCallback]()
     {
@@ -816,14 +878,11 @@ void InspectorPanel::drawBatchProperty(const std::string& propName, const Proper
             originalCallback();
         }
 
-
         applyPropertyToAllSelected(selectedObjects, compInfo);
     });
 
-
     m_context->uiCallbacks->SelectedGuids = getCurrentSelectionGuids();
     propInfo.draw_ui(propName, registry, firstEntityHandle, *m_context->uiCallbacks);
-
 
     m_context->uiCallbacks->onValueChanged = originalCallback;
 }
@@ -836,9 +895,7 @@ void InspectorPanel::applyPropertyToAllSelected(const std::vector<RuntimeGameObj
     auto& registry = m_context->activeScene->GetRegistry();
     auto firstEntityHandle = static_cast<entt::entity>(selectedObjects[0]);
 
-
     YAML::Node sourceData = compInfo->serialize(registry, firstEntityHandle);
-
 
     for (size_t i = 1; i < selectedObjects.size(); ++i)
     {
@@ -855,7 +912,6 @@ void InspectorPanel::drawBatchComponentContextMenu(const std::string& componentN
     if (ImGui::BeginPopupContextItem())
     {
         auto& registry = m_context->activeScene->GetRegistry();
-
 
         if (compInfo->isRemovable)
         {
@@ -877,7 +933,6 @@ void InspectorPanel::drawBatchComponentContextMenu(const std::string& componentN
 
         ImGui::Separator();
 
-
         if (ImGui::MenuItem("复制第一个对象的组件"))
         {
             if (!selectedObjects.empty())
@@ -887,7 +942,6 @@ void InspectorPanel::drawBatchComponentContextMenu(const std::string& componentN
                 m_context->componentClipboard_Data = compInfo->serialize(registry, firstEntityHandle);
             }
         }
-
 
         bool canPasteValues = !m_context->componentClipboard_Type.empty() &&
             m_context->componentClipboard_Type == componentName;
@@ -913,10 +967,8 @@ void InspectorPanel::drawComponentHeader(const std::string& componentName, const
     if (!m_context->activeScene) return;
     auto& registry = m_context->activeScene->GetRegistry();
 
-
     void* componentRawPtr = compInfo->get_raw_ptr(registry, entityHandle);
     ECS::IComponent* componentBase = static_cast<ECS::IComponent*>(componentRawPtr);
-
 
     ImGui::PushID(componentName.c_str());
     if (ImGui::Checkbox("##Enabled", &componentBase->Enable))
@@ -925,28 +977,14 @@ void InspectorPanel::drawComponentHeader(const std::string& componentName, const
     }
     std::string headerLabel = componentName;
 
-
-    if (componentName == "ScriptComponent")
-    {
-        auto& scriptComp = registry.get<ECS::ScriptComponent>(entityHandle);
-        if (scriptComp.scriptAsset.Valid())
-        {
-            std::string scriptName = AssetManager::GetInstance().GetAssetName(scriptComp.scriptAsset.assetGuid);
-            headerLabel = std::format("{} (脚本)", scriptName);
-        }
-        else
-        {
-            headerLabel = "脚本组件 (无)";
-        }
-    }
-
-
     if (isSelectionLocked())
     {
         headerLabel += " [固定]";
     }
     ImGui::SameLine();
     bool isHeaderOpen = ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+
+    drawComponentContextMenu(componentName, compInfo, entityHandle);
 
     if (isHeaderOpen)
     {
@@ -960,7 +998,6 @@ void InspectorPanel::drawComponentHeader(const std::string& componentName, const
         }
     }
 
-    drawComponentContextMenu(componentName, compInfo, entityHandle);
     ImGui::PopID();
 }
 
@@ -971,7 +1008,6 @@ void InspectorPanel::drawComponentContextMenu(const std::string& componentName, 
     if (ImGui::BeginPopupContextItem())
     {
         auto& registry = m_context->activeScene->GetRegistry();
-
 
         if (compInfo->isRemovable)
         {
@@ -989,13 +1025,11 @@ void InspectorPanel::drawComponentContextMenu(const std::string& componentName, 
 
         ImGui::Separator();
 
-
         if (ImGui::MenuItem("复制组件"))
         {
             m_context->componentClipboard_Type = componentName;
             m_context->componentClipboard_Data = compInfo->serialize(registry, entityHandle);
         }
-
 
         bool canPasteValues = !m_context->componentClipboard_Type.empty() &&
             m_context->componentClipboard_Type == componentName;
@@ -1006,6 +1040,24 @@ void InspectorPanel::drawComponentContextMenu(const std::string& componentName, 
             compInfo->deserialize(registry, entityHandle, m_context->componentClipboard_Data);
         }
         if (!canPasteValues) ImGui::EndDisabled();
+
+        if (componentName == "ScriptsComponent")
+        {
+            bool canPasteScript = !m_context->componentClipboard_Type.empty() && m_context->componentClipboard_Type ==
+                "ScriptComponent";
+            if (!canPasteScript) ImGui::BeginDisabled();
+            if (ImGui::MenuItem("粘贴脚本为新的"))
+            {
+                m_context->uiCallbacks->onValueChanged.Invoke();
+                ECS::ScriptComponent newScript;
+                if (YAML::convert<ECS::ScriptComponent>::decode(m_context->componentClipboard_Data, newScript))
+                {
+                    auto& scriptsComp = registry.get<ECS::ScriptsComponent>(entityHandle);
+                    scriptsComp.scripts.push_back(newScript);
+                }
+            }
+            if (!canPasteScript) ImGui::EndDisabled();
+        }
 
         ImGui::EndPopup();
     }
@@ -1045,34 +1097,25 @@ void InspectorPanel::drawDragDropTarget()
             if (handle.assetType == AssetType::CSharpScript)
             {
                 std::vector<Guid> currentGuids = getCurrentSelectionGuids();
+                bool anyAdded = false;
 
-
-                if (currentGuids.size() == 1)
+                for (const auto& guid : currentGuids)
                 {
-                    auto go = m_context->activeScene->FindGameObjectByGuid(currentGuids[0]);
-                    if (go.IsValid() && !go.HasComponent<ECS::ScriptComponent>())
+                    auto go = m_context->activeScene->FindGameObjectByGuid(guid);
+                    if (go.IsValid())
                     {
-                        m_context->uiCallbacks->onValueChanged.Invoke();
-                        auto& newScript = go.AddComponent<ECS::ScriptComponent>(handle);
+                        auto& scriptsComp = go.HasComponent<ECS::ScriptsComponent>()
+                                                ? go.GetComponent<ECS::ScriptsComponent>()
+                                                : go.AddComponent<ECS::ScriptsComponent>();
+
+                        scriptsComp.AddScript(handle, go.GetEntityHandle());
+                        anyAdded = true;
                     }
                 }
 
-                else if (currentGuids.size() > 1)
+                if (anyAdded)
                 {
-                    bool anyAdded = false;
-                    for (const auto& guid : currentGuids)
-                    {
-                        auto go = m_context->activeScene->FindGameObjectByGuid(guid);
-                        if (go.IsValid() && !go.HasComponent<ECS::ScriptComponent>())
-                        {
-                            auto& newScript = go.AddComponent<ECS::ScriptComponent>(handle);
-                            anyAdded = true;
-                        }
-                    }
-                    if (anyAdded)
-                    {
-                        m_context->uiCallbacks->onValueChanged.Invoke();
-                    }
+                    m_context->uiCallbacks->onValueChanged.Invoke();
                 }
             }
         }

@@ -99,7 +99,7 @@ std::unordered_map<std::string, AssetMetadata> AssetPacker::Unpack(const std::fi
     std::string chunkFileName;
     while (std::getline(manifestFile, chunkFileName))
     {
-        // 新增代码：移除行尾的回车符 '\r'
+        
         if (!chunkFileName.empty() && chunkFileName.back() == '\r')
         {
             chunkFileName.pop_back();

@@ -10,23 +10,14 @@ using System.Linq;
 
 namespace Luma.SDK;
 
-
-
-
-
 public static class Interop
 {
-
     private static readonly Dictionary<IntPtr, Script> s_liveInstances = new();
     private static readonly object s_instanceLock = new object();
     private static IDeserializer? s_yamlDeserializer;
 
     private static IDeserializer YamlDeserializer =>
         s_yamlDeserializer ??= new DeserializerBuilder().Build();
-
-
-
-
 
     [UnmanagedCallersOnly]
     public static void InitializeDomain(IntPtr baseDirPtr)
@@ -49,16 +40,11 @@ public static class Interop
         }
     }
 
-
-
-
-
     [UnmanagedCallersOnly]
     public static void UnloadDomain()
     {
         try
         {
-
             lock (s_instanceLock)
             {
                 if (s_liveInstances.Count > 0)
@@ -68,7 +54,6 @@ public static class Interop
                     {
                         IntPtr handlePtr = kv.Key;
                         Script instance = kv.Value;
-
 
                         try
                         {
@@ -86,7 +71,6 @@ public static class Interop
                         }
                         catch
                         {
-
                         }
 
                         s_liveInstances.Remove(handlePtr);
@@ -94,13 +78,11 @@ public static class Interop
                 }
             }
 
-
             if (DomainManager.IsActive)
             {
                 Debug.Log("[Domain] UnloadDomain: Unloading collectible ALC...");
                 DomainManager.Unload();
             }
-
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -113,10 +95,6 @@ public static class Interop
             Debug.Log($"[EXCEPTION] UnloadDomain failed: {e.Message}");
         }
     }
-
-
-
-
 
     [UnmanagedCallersOnly]
     public static void Debug_ListAllTypesAndMethods(IntPtr assemblyPathPtr)
@@ -131,15 +109,12 @@ public static class Interop
             }
 
             Debug.Log($"\n--- [Reflection] Inspecting Assembly: {assemblyPath} ---");
-
             Assembly? assembly = DomainManager.LoadAssemblyFromPath(assemblyPath);
             assembly ??= Assembly.LoadFrom(assemblyPath);
-
             foreach (Type type in assembly.GetExportedTypes())
             {
                 MethodInfo[] methods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance |
                                                        BindingFlags.Static | BindingFlags.DeclaredOnly);
-
                 if (methods.Length == 0)
                 {
                     Debug.Log($"- Type: {type.AssemblyQualifiedName}");
@@ -151,7 +126,6 @@ public static class Interop
                     var sb = new StringBuilder();
                     sb.Append($"- Type: {type.AssemblyQualifiedName}, ");
                     sb.Append($"Method: {method.ReturnType.Name} {method.Name}(");
-
                     ParameterInfo[] parameters = method.GetParameters();
                     for (int i = 0; i < parameters.Length; i++)
                     {
@@ -175,28 +149,21 @@ public static class Interop
         }
     }
 
-
     private static Type? ResolveType(string assemblyName, string typeName)
     {
         try
         {
-
             Type? type = DomainManager.ResolveType(assemblyName, typeName);
             if (type != null)
             {
-                Debug.Log($"[TypeResolve] Found in ALC: {type.FullName} (asm: {assemblyName})");
                 return type;
             }
-
 
             Assembly? assembly = AppDomain.CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => a.GetName().Name == assemblyName);
 
-
             if (assembly == null)
             {
-                Debug.Log(
-                    $"[TypeResolve] Assembly '{assemblyName}' not found in current AppDomain. Attempting to load into default ALC...");
                 assembly = Assembly.Load(assemblyName);
             }
 
@@ -205,7 +172,6 @@ public static class Interop
                 Type? t = assembly.GetType(typeName, throwOnError: false, ignoreCase: false);
                 if (t != null)
                 {
-                    Debug.Log($"[TypeResolve] Found in default ALC: {t.FullName} (asm: {assemblyName})");
                     return t;
                 }
             }
@@ -219,47 +185,26 @@ public static class Interop
         return null;
     }
 
-
-
-
-
-
-
-
     internal static Script? GetScriptInstance(IntPtr scenePtr, uint entityId, Type scriptType)
     {
         try
         {
-
-            IntPtr scriptCompPtr = Native.Entity_GetComponent(scenePtr, entityId, "ScriptComponent");
-            if (scriptCompPtr == IntPtr.Zero)
+            IntPtr scriptsCompPtr = Native.Entity_GetComponent(scenePtr, entityId, "ScriptsComponent");
+            if (scriptsCompPtr == IntPtr.Zero)
             {
                 return null;
             }
 
-
-            IntPtr handleAddress = Native.ScriptComponent_GetGCHandle(scriptCompPtr);
-            if (handleAddress == IntPtr.Zero)
-            {
-                Debug.LogError(
-                    $"[EXCEPTION] GetScriptInstance: Failed to get handle address pointer for entity {entityId}");
-                return null;
-            }
-
-
-            IntPtr handleValue = Marshal.ReadIntPtr(handleAddress);
+            IntPtr handleValue = Native.ScriptComponent_GetGCHandle(scriptsCompPtr, scriptType.Name);
             if (handleValue == IntPtr.Zero)
             {
-                Debug.LogWarning($"[GetScriptInstance] Handle for entity {entityId} is present but its value is zero.");
                 return null;
             }
-
 
             lock (s_instanceLock)
             {
                 if (s_liveInstances.TryGetValue(handleValue, out Script? instance))
                 {
-
                     if (scriptType.IsAssignableFrom(instance.GetType()))
                     {
                         return instance;
@@ -267,8 +212,6 @@ public static class Interop
                 }
             }
 
-            Debug.LogWarning(
-                $"[GetScriptInstance] No script instance found for entity {entityId} with type {scriptType.FullName}. (Handle value: {handleValue})");
             return null;
         }
         catch (Exception e)
@@ -284,15 +227,12 @@ public static class Interop
         return instance != null;
     }
 
-
     [UnmanagedCallersOnly]
     public static IntPtr CreateScriptInstance(IntPtr scenePtr, uint entityId, IntPtr typeNamePtr,
         IntPtr assemblyNamePtr)
     {
         try
         {
-            Debug.Log($"[CreateScriptInstance] Starting creation for entity {entityId}");
-
             string? typeName = Marshal.PtrToStringUTF8(typeNamePtr);
             string? assemblyName = Marshal.PtrToStringUTF8(assemblyNamePtr);
             if (string.IsNullOrEmpty(typeName) || string.IsNullOrEmpty(assemblyName))
@@ -301,18 +241,13 @@ public static class Interop
                 return IntPtr.Zero;
             }
 
-
             if (scenePtr == IntPtr.Zero)
             {
                 Debug.Log("CreateScriptInstance failed: scenePtr is null.");
                 return IntPtr.Zero;
             }
 
-            Debug.Log($"[CreateScriptInstance] Resolving type {typeName} from assembly {assemblyName}");
-
-
             Type? type = ResolveType(assemblyName, typeName);
-
 
             if (type == null || !typeof(Script).IsAssignableFrom(type))
             {
@@ -320,9 +255,6 @@ public static class Interop
                     $"CreateScriptInstance failed: Type '{typeName}' not found in assembly '{assemblyName}' or does not inherit from Luma.SDK.Script.");
                 return IntPtr.Zero;
             }
-
-            Debug.Log($"[CreateScriptInstance] Creating instance of type {type.FullName}");
-
 
             var inst = Activator.CreateInstance(type);
             if (inst is not Script instance)
@@ -332,18 +264,10 @@ public static class Interop
                 return IntPtr.Zero;
             }
 
-            Debug.Log($"[CreateScriptInstance] Instance created successfully, setting Self property");
-
-
             try
             {
                 var entity = new Entity(entityId, scenePtr);
-
-
-                Debug.Log($"[CreateScriptInstance] Entity created: ID={entity.Id}, ScenePtr={entity.ScenePtr}");
-
                 instance.Self = entity;
-                Debug.Log($"[CreateScriptInstance] Successfully set Self for entity {entityId}");
             }
             catch (Exception ex)
             {
@@ -352,13 +276,10 @@ public static class Interop
                 return IntPtr.Zero;
             }
 
-
             GCHandle handle = GCHandle.Alloc(instance);
             IntPtr handlePtr = GCHandle.ToIntPtr(handle);
-
             lock (s_instanceLock)
             {
-
                 if (s_liveInstances.ContainsKey(handlePtr))
                 {
                     Debug.LogWarning($"CreateScriptInstance: Handle {handlePtr} already exists, freeing new handle.");
@@ -369,8 +290,6 @@ public static class Interop
                 s_liveInstances[handlePtr] = instance;
             }
 
-            Debug.Log(
-                $"CreateScriptInstance: Successfully created instance for type '{typeName}', handle: {handlePtr}");
             return handlePtr;
         }
         catch (Exception e)
@@ -390,7 +309,6 @@ public static class Interop
 
         try
         {
-
             if (s_liveInstances.TryGetValue(handleValue, out Script? instance) && instance != null)
             {
                 instance.OnCreate();
@@ -403,21 +321,16 @@ public static class Interop
         }
         catch (Exception e)
         {
-
             Debug.LogError(
                 $"[Interop.OnCreate] An exception occurred within a script's OnCreate method. Handle: {handleValue}\nException: {e.Message}\nStackTrace: {e.StackTrace}");
         }
     }
-
-
-
 
     [UnmanagedCallersOnly]
     public static void DestroyScriptInstance(IntPtr handlePtr)
     {
         if (handlePtr == IntPtr.Zero)
         {
-            Debug.Log("DestroyScriptInstance failed: handlePtr is null.");
             return;
         }
 
@@ -426,17 +339,13 @@ public static class Interop
         {
             if (!s_liveInstances.Remove(handlePtr, out instance))
             {
-                Debug.Log($"DestroyScriptInstance: Instance not found for handle {handlePtr}.");
                 return;
             }
         }
 
         try
         {
-            if (instance != null)
-            {
-                instance.OnDestroy();
-            }
+            instance?.OnDestroy();
         }
         catch (Exception e)
         {
@@ -449,7 +358,6 @@ public static class Interop
             if (handle.IsAllocated)
             {
                 handle.Free();
-                Debug.Log($"DestroyScriptInstance: Successfully freed handle {handlePtr}");
             }
         }
         catch (Exception ex)
@@ -458,15 +366,11 @@ public static class Interop
         }
     }
 
-
-
-
     [UnmanagedCallersOnly]
     public static void InvokeUpdate(IntPtr handlePtr, float deltaTime)
     {
         if (handlePtr == IntPtr.Zero) return;
-
-        Script? instance = null;
+        Script? instance;
         lock (s_instanceLock)
         {
             if (!s_liveInstances.TryGetValue(handlePtr, out instance))
@@ -494,13 +398,10 @@ public static class Interop
             return;
         }
 
-
         IntPtr scenePtr = Native.SceneManager_GetCurrentScene();
         if (scenePtr == IntPtr.Zero) return;
 
-
         Entity otherEntity = new Entity(otherEntityId, scenePtr);
-
         try
         {
             switch ((PhysicsContactType)contactType)
@@ -522,8 +423,6 @@ public static class Interop
                     break;
                 case PhysicsContactType.TriggerStay:
                     instance.OnTriggerStay(otherEntity);
-                    break;
-                default:
                     break;
             }
         }
@@ -579,9 +478,6 @@ public static class Interop
         }
     }
 
-
-
-
     [UnmanagedCallersOnly]
     public static void SetExportedProperty(IntPtr handlePtr, IntPtr propNamePtr, IntPtr valueAsYamlPtr)
     {
@@ -594,9 +490,15 @@ public static class Interop
         {
             string? propName = Marshal.PtrToStringUTF8(propNamePtr);
             string? valueAsYaml = Marshal.PtrToStringUTF8(valueAsYamlPtr);
-            Debug.Log(
-                $"SetExportedProperty: Set '{propName}' to '{valueAsYaml}' on instance of type '{instance.GetType().Name}'.");
             if (string.IsNullOrEmpty(propName) || valueAsYaml == null) return;
+
+            
+            if (propName.StartsWith("__EventLink_"))
+            {
+                string eventName = propName.Substring("__EventLink_".Length);
+                setupEventTargets(instance, eventName, valueAsYaml);
+                return;
+            }
 
             FieldInfo? field = instance.GetType().GetField(propName);
             PropertyInfo? prop = instance.GetType().GetProperty(propName);
@@ -608,33 +510,16 @@ public static class Interop
             }
 
             Type memberType = field?.FieldType ?? prop!.PropertyType;
-
-            object? finalValue = null;
-
+            object? finalValue;
 
             if (typeof(Script).IsAssignableFrom(memberType))
             {
-
-
                 string? guidStr = YamlDeserializer.Deserialize<string>(valueAsYaml);
-
-
                 uint targetId = Native.Scene_FindGameObjectByGuid(instance.Self.ScenePtr, guidStr);
                 if (targetId != 0)
                 {
                     Entity targetEntity = new Entity(targetId, instance.Self.ScenePtr);
-
                     finalValue = targetEntity.GetScript(memberType);
-                    if (finalValue == null)
-                    {
-                        Debug.LogWarning($"[SetExportedProperty] GetScript for GUID '{guidStr}' returned NULL. " +
-                                         $"The property '{propName}' on '{instance.GetType().Name}' will be set to null.");
-                    }
-                    else
-                    {
-                        Debug.Log($"[SetExportedProperty] GetScript for GUID '{guidStr}' returned a valid instance. " +
-                                  $"Proceeding to set property '{propName}'.");
-                    }
                 }
                 else
                 {
@@ -645,10 +530,8 @@ public static class Interop
             }
             else
             {
-
                 finalValue = YamlDeserializer.Deserialize(valueAsYaml, memberType);
             }
-
 
             field?.SetValue(instance, finalValue);
             prop?.SetValue(instance, finalValue);
@@ -659,20 +542,207 @@ public static class Interop
         }
     }
 
-
-    [UnmanagedCallersOnly]
-    public static int SanityCheck(int a, int b)
+    private static void setupEventTargets(Script instance, string eventName, string targetsYaml)
     {
-        Debug.Log($"[SanityCheck] Method called successfully with parameters: {a}, {b}.");
-        return a + b;
+        try
+        {
+            
+            FieldInfo? eventField = instance.GetType().GetField(eventName);
+            if (eventField == null || !eventField.FieldType.Name.Contains("LumaEvent"))
+            {
+                Debug.LogWarning($"setupEventTargets: 未找到事件字段 '{eventName}' 或类型不匹配");
+                return;
+            }
+
+            
+            object? lumaEvent = eventField.GetValue(instance);
+            if (lumaEvent == null)
+            {
+                Debug.LogWarning($"setupEventTargets: 事件字段 '{eventName}' 为空，尝试创建新实例");
+
+                
+                try
+                {
+                    lumaEvent = Activator.CreateInstance(eventField.FieldType);
+                    eventField.SetValue(instance, lumaEvent);
+                    Debug.Log($"setupEventTargets: 为事件字段 '{eventName}' 创建了新实例");
+                }
+                catch (Exception createEx)
+                {
+                    Debug.LogError($"setupEventTargets: 无法创建 LumaEvent 实例: {createEx.Message}");
+                    return;
+                }
+            }
+
+            
+            var targets = YamlDeserializer.Deserialize<List<Dictionary<string, object>>>(targetsYaml);
+            if (targets == null || targets.Count == 0)
+            {
+                Debug.LogWarning($"setupEventTargets: 事件 '{eventName}' 没有有效的目标");
+                return;
+            }
+
+            
+            Type lumaEventType = lumaEvent.GetType();
+            MethodInfo? clearMethod = lumaEventType.GetMethod("Clear");
+            clearMethod?.Invoke(lumaEvent, null);
+
+            
+            Type? delegateType = getDelegateTypeForLumaEvent(lumaEventType);
+            if (delegateType == null)
+            {
+                Debug.LogError($"setupEventTargets: 无法确定事件 '{eventName}' 的委托类型");
+                return;
+            }
+
+            MethodInfo? addMethod = lumaEventType.GetMethod("Add");
+            if (addMethod == null)
+            {
+                Debug.LogError($"setupEventTargets: 事件类型 '{lumaEventType.Name}' 没有 Add 方法");
+                return;
+            }
+
+            
+            int successCount = 0;
+            foreach (var target in targets)
+            {
+                if (!target.TryGetValue("entityGuid", out object? guidObj) ||
+                    !target.TryGetValue("methodName", out object? methodObj))
+                {
+                    Debug.LogWarning("setupEventTargets: 目标缺少必要的字段 (entityGuid 或 methodName)");
+                    continue;
+                }
+
+                string? guidStr = guidObj?.ToString();
+                string? methodName = methodObj?.ToString();
+
+                if (string.IsNullOrEmpty(guidStr) || string.IsNullOrEmpty(methodName))
+                {
+                    Debug.LogWarning("setupEventTargets: 目标的 entityGuid 或 methodName 为空");
+                    continue;
+                }
+
+                uint targetEntityId = Native.Scene_FindGameObjectByGuid(instance.Self.ScenePtr, guidStr);
+                if (targetEntityId == Int32.MaxValue)
+                {
+                    Debug.LogWarning($"setupEventTargets: 找不到 GUID 为 '{guidStr}' 的实体");
+                    continue;
+                }
+
+                Entity targetEntity = new Entity(targetEntityId, instance.Self.ScenePtr);
+
+                
+                var targetScripts = targetEntity.GetScripts();
+                bool methodFound = false;
+
+                foreach (var targetScript in targetScripts)
+                {
+                    MethodInfo? targetMethod = findCompatibleMethod(targetScript.GetType(), methodName, delegateType);
+                    if (targetMethod != null)
+                    {
+                        try
+                        {
+                            
+                            Delegate? methodDelegate =
+                                Delegate.CreateDelegate(delegateType, targetScript, targetMethod);
+                            addMethod.Invoke(lumaEvent, new object[] { methodDelegate });
+                            successCount++;
+                            methodFound = true;
+                            break;
+                        }
+                        catch (Exception delegateEx)
+                        {
+                            Debug.LogError($"setupEventTargets: 创建委托失败: {delegateEx.Message}");
+                        }
+                    }
+                }
+
+                if (!methodFound)
+                {
+                    Debug.LogWarning($"setupEventTargets: 在实体 '{guidStr}' 上找不到兼容的方法 '{methodName}'");
+                }
+            }
+
+            Debug.Log($"setupEventTargets: 为事件 '{eventName}' 成功设置了 {successCount}/{targets.Count} 个目标");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"setupEventTargets 失败: {e.Message}\n{e.StackTrace}");
+        }
+    }
+
+    
+    
+    
+    private static Type? getDelegateTypeForLumaEvent(Type lumaEventType)
+    {
+        if (lumaEventType == typeof(LumaEvent))
+        {
+            return typeof(Action);
+        }
+
+        if (lumaEventType.IsGenericType)
+        {
+            Type genericTypeDef = lumaEventType.GetGenericTypeDefinition();
+            Type[] genericArgs = lumaEventType.GetGenericArguments();
+
+            if (genericTypeDef == typeof(LumaEvent<>))
+            {
+                return typeof(Action<>).MakeGenericType(genericArgs);
+            }
+
+            if (genericTypeDef == typeof(LumaEvent<,>))
+            {
+                return typeof(Action<,>).MakeGenericType(genericArgs);
+            }
+        }
+
+        return null;
+    }
+
+    
+    
+    
+    private static MethodInfo? findCompatibleMethod(Type scriptType, string methodName, Type delegateType)
+    {
+        MethodInfo[] methods = scriptType.GetMethods(BindingFlags.Public | BindingFlags.Instance);
+
+        foreach (MethodInfo method in methods)
+        {
+            if (method.Name != methodName)
+                continue;
+
+            try
+            {
+                
+                Delegate.CreateDelegate(delegateType, null, method);
+                return method;
+            }
+            catch
+            {
+                
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    public static Script? GetScriptFromHandle(IntPtr handlePtr)
+    {
+        if (handlePtr == IntPtr.Zero) return null;
+
+        lock (s_instanceLock)
+        {
+            return s_liveInstances.TryGetValue(handlePtr, out Script? instance) ? instance : null;
+        }
     }
 
     [UnmanagedCallersOnly]
     public static void InvokeMethod(IntPtr handlePtr, IntPtr methodNamePtr, IntPtr argsAsYamlPtr)
     {
         if (handlePtr == IntPtr.Zero) return;
-
-        Script? instance = null;
+        Script? instance;
         lock (s_instanceLock)
         {
             if (!s_liveInstances.TryGetValue(handlePtr, out instance))
@@ -687,10 +757,8 @@ public static class Interop
             string? argsAsYaml = Marshal.PtrToStringUTF8(argsAsYamlPtr);
             if (string.IsNullOrEmpty(methodName)) return;
 
-
             MethodInfo? method = instance.GetType().GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
             if (method == null) return;
-
 
             object?[]? parameters = null;
             var paramInfos = method.GetParameters();
@@ -706,7 +774,6 @@ public static class Interop
                     }
                 }
             }
-
 
             method.Invoke(instance, parameters);
         }

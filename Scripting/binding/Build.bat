@@ -15,7 +15,7 @@ if exist "Tools" (
 echo =======================================================
 echo Publishing for Windows (win-x64)...
 echo =======================================================
-dotnet publish -c Release "%SOLUTION_NAME%" -r win-x64 -o ./Tools/Win
+dotnet publish -c Release "%SOLUTION_NAME%" -r win-x64 -o ./Tools/Windows
 
 echo.
 echo =======================================================

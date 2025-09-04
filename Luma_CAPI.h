@@ -231,13 +231,15 @@ LUMA_API bool GameObject_IsActive(LumaSceneHandle scene, LumaEntityHandle entity
  * @param active 要设置的激活状态。
  */
 LUMA_API void GameObject_SetActive(LumaSceneHandle scene, LumaEntityHandle entity, bool active);
+
 /**
  * @brief 获取脚本组件的托管垃圾回收句柄。
  * @param componentPtr 指向脚本组件数据的指针。
  * @return 托管垃圾回收句柄的指针。
  */
-LUMA_API intptr_t ScriptComponent_GetGCHandleForScript(void* componentPtr, const char* scriptName);
-
+LUMA_API intptr_t ScriptComponent_GetGCHandle(void* componentPtr, const char* typeName);
+LUMA_API void ScriptComponent_GetAllGCHandles(LumaSceneHandle scene, uint32_t entity, intptr_t* outHandles, int count);
+LUMA_API void ScriptComponent_GetAllGCHandlesCount(LumaSceneHandle scene,uint32_t entity, int* outCount);
 /**
  * @brief 播放指定实体的动画。
  * @param scene 场景句柄。

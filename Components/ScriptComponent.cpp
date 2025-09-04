@@ -5,6 +5,80 @@
 #include <format>
 
 #include "ScriptMetadataRegistry.h"
+#include "Loaders/CSharpScriptLoader.h"
+
+namespace ECS
+{
+    ScriptComponent& ScriptsComponent::AddScript(const AssetHandle& scriptAsset, entt::entity entity)
+    {
+        scripts.emplace_back(scriptAsset);
+        EventBus::GetInstance().Publish(ComponentUpdatedEvent{
+            SceneManager::GetInstance().GetCurrentScene()->GetRegistry(), entity
+        });
+        return scripts.back();
+    }
+
+    ScriptComponent& ScriptsComponent::GetScriptByName(const std::string& scriptName)
+    {
+        for (auto& script : scripts)
+        {
+            std::string currentName = AssetManager::GetInstance().GetAssetName(script.scriptAsset.assetGuid);
+            if (currentName == scriptName)
+            {
+                return script;
+            }
+        }
+        throw std::runtime_error("Script not found: " + scriptName);
+    }
+
+    ScriptComponent& ScriptsComponent::GetScriptByAsset(const AssetHandle& scriptAsset)
+    {
+        for (auto& script : scripts)
+        {
+            if (script.scriptAsset == scriptAsset)
+            {
+                return script;
+            }
+        }
+        throw std::runtime_error("Script not found with given asset handle.");
+    }
+
+    std::vector<AssetHandle> ScriptsComponent::GetAllScriptsByName(const std::string& scriptName)
+    {
+        std::vector<AssetHandle> result;
+        for (const auto& script : scripts)
+        {
+            std::string currentName = AssetManager::GetInstance().GetAssetName(script.scriptAsset.assetGuid);
+            if (currentName == scriptName)
+            {
+                result.push_back(script.scriptAsset);
+            }
+        }
+        return result;
+    }
+
+    void ScriptsComponent::RemoveScriptByAsset(const AssetHandle& scriptAsset)
+    {
+        scripts.erase(std::remove_if(scripts.begin(), scripts.end(),
+                                     [&scriptAsset](const ScriptComponent& script)
+                                     {
+                                         return script.scriptAsset == scriptAsset;
+                                     }),
+                      scripts.end());
+    }
+
+    void ScriptsComponent::RemoveScriptByName(const std::string& scriptName)
+    {
+        scripts.erase(std::remove_if(scripts.begin(), scripts.end(),
+                                     [&scriptName](const ScriptComponent& script)
+                                     {
+                                         std::string currentName = AssetManager::GetInstance().GetAssetName(
+                                             script.scriptAsset.assetGuid);
+                                         return currentName == scriptName;
+                                     }),
+                      scripts.end());
+    }
+}
 
 namespace CustomDrawing
 {
@@ -35,7 +109,6 @@ namespace CustomDrawing
             {
             }
         }
-
 
         if (typeName == "float" || typeName == "System.Single")
         {
@@ -75,7 +148,6 @@ namespace CustomDrawing
     {
         return typeName.find("LumaEvent") != std::string::npos;
     }
-
 
     bool PropertyDrawer::DrawProperty(const std::string& label, const std::string& typeName,
                                       YAML::Node& valueNode, const UIDrawData& drawData)
@@ -148,7 +220,6 @@ namespace CustomDrawing
         return false;
     }
 
-
     bool EventDrawer::DrawEvent(const std::string& eventName, const std::string& eventSignature,
                                 std::vector<ECS::SerializableEventTarget>& targets, const UIDrawData& drawData)
     {
@@ -174,14 +245,14 @@ namespace CustomDrawing
                     if (WidgetDrawer<Guid>::Draw("目标实体", targets[i].targetEntityGuid, drawData))
                     {
                         changed = true;
-                        targets[i].targetComponentName = "ScriptComponent";
+                        targets[i].targetComponentName = "ScriptsComponent";
                         targets[i].targetMethodName.clear();
                         drawData.onValueChanged.Invoke();
                     }
                     ImGui::Text("组件名称:");
                     ImGui::SameLine();
-                    ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "ScriptComponent");
-                    targets[i].targetComponentName = "ScriptComponent";
+                    ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "ScriptsComponent");
+                    targets[i].targetComponentName = "ScriptsComponent";
                     ImGui::Text("方法名称:");
                     ImGui::SameLine();
                     auto availableMethods = ScriptMetadataHelper::GetAvailableMethods(
@@ -256,7 +327,6 @@ namespace CustomDrawing
         return changed;
     }
 
-
     void ScriptMetadataHelper::InitializePropertyOverrides(YAML::Node& propertyOverrides,
                                                            const ScriptClassMetadata* metadata)
     {
@@ -267,7 +337,6 @@ namespace CustomDrawing
         {
             if (PropertyValueFactory::IsLumaEventType(property.type))
                 continue;
-
 
             if (!propertyOverrides[property.name])
             {
@@ -289,7 +358,6 @@ namespace CustomDrawing
             if (!PropertyValueFactory::IsLumaEventType(property.type))
                 continue;
 
-
             if (eventLinks.find(property.name) == eventLinks.end())
             {
                 eventLinks[property.name] = std::vector<ECS::SerializableEventTarget>();
@@ -310,7 +378,6 @@ namespace CustomDrawing
             if (method.returnType != "void")
                 continue;
 
-
             if (eventSignature == "void" && method.signature == "void")
             {
                 matchingMethods.push_back(method.name);
@@ -330,18 +397,20 @@ namespace CustomDrawing
         if (!currentScene)
             return nullptr;
 
-
         RuntimeGameObject targetObject = currentScene->FindGameObjectByGuid(targetEntityGuid);
         if (!targetObject.IsValid())
             return nullptr;
 
-
-        if (!targetObject.HasComponent<ECS::ScriptComponent>())
+        if (!targetObject.HasComponent<ECS::ScriptsComponent>())
             return nullptr;
 
+        auto& scriptsComponent = targetObject.GetComponent<ECS::ScriptsComponent>();
+        if (!scriptsComponent.scripts.empty())
+        {
+            return scriptsComponent.scripts[0].metadata;
+        }
 
-        auto& scriptComponent = targetObject.GetComponent<ECS::ScriptComponent>();
-        return scriptComponent.metadata;
+        return nullptr;
     }
 
     RuntimeGameObject ScriptMetadataHelper::GetGameObjectByGuid(const Guid& targetEntityGuid)
@@ -349,7 +418,6 @@ namespace CustomDrawing
         auto currentScene = SceneManager::GetInstance().GetCurrentScene();
         if (!currentScene)
             return RuntimeGameObject(entt::null, nullptr);
-
 
         return currentScene->FindGameObjectByGuid(targetEntityGuid);
     }
@@ -359,146 +427,78 @@ namespace CustomDrawing
     {
         std::vector<std::pair<std::string, std::string>> availableMethods;
 
-        const ScriptClassMetadata* metadata = GetTargetScriptMetadata(targetEntityGuid);
-        if (metadata == nullptr)
+        auto currentScene = SceneManager::GetInstance().GetCurrentScene();
+        if (!currentScene)
             return availableMethods;
 
-        for (const auto& method : metadata->publicMethods)
+        RuntimeGameObject targetObject = currentScene->FindGameObjectByGuid(targetEntityGuid);
+        if (!targetObject.IsValid())
+            return availableMethods;
+
+        if (!targetObject.HasComponent<ECS::ScriptsComponent>())
+            return availableMethods;
+
+        auto& scriptsComponent = targetObject.GetComponent<ECS::ScriptsComponent>();
+
+        for (const auto& script : scriptsComponent.scripts)
         {
-            if (method.returnType != "void")
+            const ScriptClassMetadata* metadata = script.metadata;
+            if (metadata == nullptr)
                 continue;
 
+            for (const auto& method : metadata->publicMethods)
+            {
+                if (method.returnType != "void")
+                    continue;
 
-            if (!eventSignature.empty())
-            {
-                if (eventSignature == "void" && method.signature == "void")
+                if (!eventSignature.empty())
+                {
+                    if (eventSignature == "void" && method.signature == "void")
+                    {
+                        availableMethods.emplace_back(method.name, method.signature);
+                    }
+                    else if (eventSignature == method.signature)
+                    {
+                        availableMethods.emplace_back(method.name, method.signature);
+                    }
+                }
+                else
                 {
                     availableMethods.emplace_back(method.name, method.signature);
                 }
-                else if (eventSignature == method.signature)
-                {
-                    availableMethods.emplace_back(method.name, method.signature);
-                }
-            }
-            else
-            {
-                availableMethods.emplace_back(method.name, method.signature);
             }
         }
 
         return availableMethods;
     }
 
-
-    const ScriptClassMetadata* getCurrentObjectMetadata(const UIDrawData& drawData)
+    ECS::ScriptsComponent* getCurrentScriptsComponent(const UIDrawData& drawData)
     {
         if (drawData.SelectedGuids.size() != 1)
             return nullptr;
 
-
         const Guid& selectedGuid = drawData.SelectedGuids[0];
-
 
         auto currentScene = SceneManager::GetInstance().GetCurrentScene();
         if (!currentScene)
             return nullptr;
 
-
         RuntimeGameObject targetObject = currentScene->FindGameObjectByGuid(selectedGuid);
         if (!targetObject.IsValid())
             return nullptr;
 
-
-        if (!targetObject.HasComponent<ECS::ScriptComponent>())
+        if (!targetObject.HasComponent<ECS::ScriptsComponent>())
             return nullptr;
 
-
-        auto& scriptComponent = targetObject.GetComponent<ECS::ScriptComponent>();
-        return scriptComponent.metadata;
+        return &targetObject.GetComponent<ECS::ScriptsComponent>();
     }
-
 
     bool WidgetDrawer<YAML::Node>::Draw(const std::string& label, YAML::Node& propertyOverrides,
                                         const UIDrawData& drawData)
     {
-        bool changed = false;
-        const ScriptClassMetadata* metadata = nullptr;
-
-        if (label == "propertyOverrides" && drawData.SelectedGuids.size() == 1)
+        if (label != "propertyOverrides")
         {
-            metadata = getCurrentObjectMetadata(drawData);
-        }
-
-        if (metadata != nullptr && label == "propertyOverrides")
-        {
-            std::unordered_set<std::string> validPropertyNames;
-            for (const auto& prop : metadata->exportedProperties)
-            {
-                if (!PropertyValueFactory::IsLumaEventType(prop.type))
-                {
-                    validPropertyNames.insert(prop.name);
-                }
-            }
-            std::vector<std::string> keysToRemove;
-            for (auto it = propertyOverrides.begin(); it != propertyOverrides.end(); ++it)
-            {
-                const std::string key = it->first.as<std::string>();
-                if (validPropertyNames.find(key) == validPropertyNames.end())
-                {
-                    keysToRemove.push_back(key);
-                }
-            }
-            if (!keysToRemove.empty())
-            {
-                changed = true;
-                for (const auto& key : keysToRemove)
-                {
-                    propertyOverrides.remove(key);
-                }
-            }
-
-            ScriptMetadataHelper::InitializePropertyOverrides(propertyOverrides, metadata);
-
-            if (ImGui::TreeNodeEx("覆盖属性", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                bool hasNonEventProperties = false;
-                for (const auto& property : metadata->exportedProperties)
-                {
-                    if (PropertyValueFactory::IsLumaEventType(property.type)) continue;
-                    hasNonEventProperties = true;
-                    ImGui::PushID(property.name.c_str());
-                    YAML::Node propertyValue = propertyOverrides[property.name];
-                    if (PropertyDrawer::DrawProperty(property.name, property.type, propertyValue, drawData))
-                    {
-                        propertyOverrides[property.name] = propertyValue;
-                        changed = true;
-                        drawData.onValueChanged.Invoke();
-                    }
-                    if (ImGui::IsItemHovered())
-                    {
-                        ImGui::BeginTooltip();
-                        ImGui::Text("类型: %s", property.type.c_str());
-                        if (!property.defaultValue.empty()) { ImGui::Text("默认值: %s", property.defaultValue.c_str()); }
-                        ImGui::Text("访问性: %s", (property.canGet && property.canSet)
-                                                   ? "读/写"
-                                                   : property.canGet
-                                                   ? "只读"
-                                                   : property.canSet
-                                                   ? "只写"
-                                                   : "无访问");
-                        ImGui::EndTooltip();
-                    }
-                    ImGui::PopID();
-                }
-                if (!hasNonEventProperties)
-                {
-                    ImGui::TextDisabled("该脚本没有可覆盖的属性");
-                }
-                ImGui::TreePop();
-            }
-        }
-        else
-        {
+            bool changed = false;
             if (ImGui::TreeNodeEx(label.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
             {
                 if (propertyOverrides.IsDefined() && !propertyOverrides.IsNull())
@@ -541,8 +541,10 @@ namespace CustomDrawing
                 else { ImGui::TextDisabled("空值或未定义"); }
                 ImGui::TreePop();
             }
+            return changed;
         }
-        return changed;
+
+        return false;
     }
 
     void WidgetDrawer<YAML::Node>::drawYamlNodeRecursive(const std::string& key, YAML::Node node)
@@ -585,51 +587,9 @@ namespace CustomDrawing
         std::unordered_map<std::string, std::vector<ECS::SerializableEventTarget>>& eventLinks,
         const UIDrawData& drawData)
     {
-        bool changed = false;
-        const ScriptClassMetadata* metadata = nullptr;
-        if (label == "eventLinks" && drawData.SelectedGuids.size() == 1)
+        if (label != "eventLinks")
         {
-            metadata = getCurrentObjectMetadata(drawData);
-        }
-        if (metadata != nullptr && label == "eventLinks")
-        {
-            bool hasEventProperties = false;
-            for (const auto& property : metadata->exportedProperties)
-            {
-                if (PropertyValueFactory::IsLumaEventType(property.type))
-                {
-                    hasEventProperties = true;
-                    break;
-                }
-            }
-            if (!hasEventProperties)
-            {
-                return false;
-            }
-            ScriptMetadataHelper::InitializeEventLinks(eventLinks, metadata);
-            if (ImGui::TreeNodeEx("事件链接", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                for (const auto& property : metadata->exportedProperties)
-                {
-                    if (!PropertyValueFactory::IsLumaEventType(property.type)) continue;
-                    if (eventLinks.find(property.name) == eventLinks.end())
-                    {
-                        eventLinks[property.name] = std::vector<ECS::SerializableEventTarget>();
-                    }
-                    ImGui::PushID(property.name.c_str());
-                    if (EventDrawer::DrawEvent(property.name, property.eventSignature, eventLinks[property.name],
-                                               drawData))
-                    {
-                        changed = true;
-                    }
-                    ImGui::PopID();
-                    ImGui::Spacing();
-                }
-                ImGui::TreePop();
-            }
-        }
-        else
-        {
+            bool changed = false;
             if (ImGui::TreeNodeEx(label.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
             {
                 if (eventLinks.empty()) { ImGui::TextDisabled("无事件链接"); }
@@ -645,8 +605,10 @@ namespace CustomDrawing
                 }
                 ImGui::TreePop();
             }
+            return changed;
         }
-        return changed;
+
+        return false;
     }
 
     bool WidgetDrawer<ECS::SerializableEventTarget>::Draw(const std::string& label,
@@ -659,14 +621,14 @@ namespace CustomDrawing
             if (WidgetDrawer<Guid>::Draw("目标实体", target.targetEntityGuid, drawData))
             {
                 changed = true;
-                target.targetComponentName = "ScriptComponent";
+                target.targetComponentName = "ScriptsComponent";
                 target.targetMethodName.clear();
                 drawData.onValueChanged.Invoke();
             }
             ImGui::Text("组件名称:");
             ImGui::SameLine();
-            ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "ScriptComponent");
-            target.targetComponentName = "ScriptComponent";
+            ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "ScriptsComponent");
+            target.targetComponentName = "ScriptsComponent";
             ImGui::Text("方法名称:");
             ImGui::SameLine();
             auto availableMethods = ScriptMetadataHelper::GetAvailableMethods(target.targetEntityGuid);
@@ -842,5 +804,255 @@ namespace CustomDrawing
         }
         ScriptClassMetadata metadata = *metadataPtr;
         return WidgetDrawer<ScriptClassMetadata>::Draw(label, metadata, drawData);
+    }
+
+    bool WidgetDrawer<ECS::ScriptComponent>::Draw(const std::string& label, ECS::ScriptComponent& component,
+                                                  const UIDrawData& drawData)
+    {
+        bool changed = false;
+
+        CSharpScriptLoader loader;
+        sk_sp<RuntimeCSharpScript> runtimeScript = nullptr;
+        const ScriptClassMetadata* currentMetadata = nullptr;
+        bool metadataUpdated = false;
+
+        if (component.scriptAsset.Valid())
+        {
+            runtimeScript = loader.LoadAsset(component.scriptAsset.assetGuid);
+            if (runtimeScript)
+            {
+                currentMetadata = &runtimeScript->GetMetadata();
+
+                if (runtimeScript->NeedsMetadataRefresh())
+                {
+                    runtimeScript->SetNeedsMetadataRefresh(false);
+                    metadataUpdated = true;
+                }
+
+                if (component.metadata != currentMetadata)
+                {
+                    component.metadata = currentMetadata;
+                    metadataUpdated = true;
+                }
+            }
+            else
+            {
+                if (component.metadata != nullptr)
+                {
+                    component.metadata = nullptr;
+                    metadataUpdated = true;
+                }
+            }
+        }
+        else
+        {
+            if (component.metadata != nullptr)
+            {
+                component.metadata = nullptr;
+                metadataUpdated = true;
+            }
+        }
+
+        if (metadataUpdated)
+        {
+            if (component.metadata != nullptr)
+            {
+                std::unordered_set<std::string> validPropertyNames;
+                for (const auto& prop : component.metadata->exportedProperties)
+                {
+                    if (!PropertyValueFactory::IsLumaEventType(prop.type))
+                    {
+                        validPropertyNames.insert(prop.name);
+                    }
+                }
+
+                std::vector<std::string> keysToRemove;
+                for (auto it = component.propertyOverrides.begin(); it != component.propertyOverrides.end(); ++it)
+                {
+                    const std::string key = it->first.as<std::string>();
+                    if (validPropertyNames.find(key) == validPropertyNames.end())
+                    {
+                        keysToRemove.push_back(key);
+                    }
+                }
+
+                if (!keysToRemove.empty())
+                {
+                    for (const auto& key : keysToRemove)
+                    {
+                        component.propertyOverrides.remove(key);
+                    }
+                    LogInfo("清理了 {} 个无效的属性覆盖", keysToRemove.size());
+                }
+
+                std::unordered_set<std::string> validEventNames;
+                for (const auto& prop : component.metadata->exportedProperties)
+                {
+                    if (PropertyValueFactory::IsLumaEventType(prop.type))
+                    {
+                        validEventNames.insert(prop.name);
+                    }
+                }
+
+                auto eventIt = component.eventLinks.begin();
+                int removedEventCount = 0;
+                while (eventIt != component.eventLinks.end())
+                {
+                    if (validEventNames.find(eventIt->first) == validEventNames.end())
+                    {
+                        eventIt = component.eventLinks.erase(eventIt);
+                        removedEventCount++;
+                    }
+                    else
+                    {
+                        ++eventIt;
+                    }
+                }
+
+                if (removedEventCount > 0)
+                {
+                    LogInfo("清理了 {} 个无效的事件链接", removedEventCount);
+                }
+            }
+            else
+            {
+                if (!component.propertyOverrides.IsNull())
+                {
+                    component.propertyOverrides = YAML::Node();
+                }
+                if (!component.eventLinks.empty())
+                {
+                    component.eventLinks.clear();
+                }
+            }
+        }
+
+        std::string scriptName = AssetManager::GetInstance().GetAssetName(component.scriptAsset.assetGuid);
+        std::string headerLabel = std::format("{} (脚本)", scriptName.empty() ? "未知脚本" : scriptName);
+
+        if (ImGui::TreeNodeEx(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            if (metadataUpdated)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 1.0f, 0.2f, 1.0f));
+                ImGui::Text("✓ 脚本元数据已更新");
+                ImGui::PopStyleColor();
+                ImGui::Separator();
+            }
+
+            if (WidgetDrawer<AssetHandle>::Draw("脚本资源", component.scriptAsset, drawData))
+            {
+                changed = true;
+                drawData.onValueChanged.Invoke();
+            }
+
+            WidgetDrawer<const ScriptClassMetadata*>::Draw("脚本元数据", component.metadata, drawData);
+
+            ImGui::Separator();
+
+            if (component.metadata != nullptr)
+            {
+                ScriptMetadataHelper::InitializePropertyOverrides(component.propertyOverrides, component.metadata);
+
+                if (ImGui::TreeNodeEx("覆盖属性", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    bool hasNonEventProperties = false;
+                    for (const auto& property : component.metadata->exportedProperties)
+                    {
+                        if (PropertyValueFactory::IsLumaEventType(property.type)) continue;
+                        hasNonEventProperties = true;
+
+                        ImGui::PushID(property.name.c_str());
+                        YAML::Node propertyValue = component.propertyOverrides[property.name];
+                        if (PropertyDrawer::DrawProperty(property.name, property.type, propertyValue, drawData))
+                        {
+                            component.propertyOverrides[property.name] = propertyValue;
+                            changed = true;
+                            drawData.onValueChanged.Invoke();
+                        }
+
+                        if (ImGui::IsItemHovered())
+                        {
+                            ImGui::BeginTooltip();
+                            ImGui::Text("类型: %s", property.type.c_str());
+                            if (!property.defaultValue.empty())
+                            {
+                                ImGui::Text("默认值: %s", property.defaultValue.c_str());
+                            }
+                            ImGui::Text("访问性: %s", (property.canGet && property.canSet)
+                                                       ? "读/写"
+                                                       : property.canGet
+                                                       ? "只读"
+                                                       : property.canSet
+                                                       ? "只写"
+                                                       : "无访问");
+                            ImGui::EndTooltip();
+                        }
+                        ImGui::PopID();
+                    }
+
+                    if (!hasNonEventProperties)
+                    {
+                        ImGui::TextDisabled("该脚本没有可覆盖的属性");
+                    }
+                    ImGui::TreePop();
+                }
+
+                ImGui::Separator();
+
+                
+                bool hasEventProperties = false;
+                for (const auto& property : component.metadata->exportedProperties)
+                {
+                    if (PropertyValueFactory::IsLumaEventType(property.type))
+                    {
+                        hasEventProperties = true;
+                        break;
+                    }
+                }
+
+                if (hasEventProperties)
+                {
+                    
+                    ScriptMetadataHelper::InitializeEventLinks(component.eventLinks, component.metadata);
+
+                    if (ImGui::TreeNodeEx("事件链接", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        for (const auto& property : component.metadata->exportedProperties)
+                        {
+                            if (!PropertyValueFactory::IsLumaEventType(property.type)) continue;
+
+                            if (component.eventLinks.find(property.name) == component.eventLinks.end())
+                            {
+                                component.eventLinks[property.name] = std::vector<ECS::SerializableEventTarget>();
+                            }
+
+                            ImGui::PushID(property.name.c_str());
+                            if (EventDrawer::DrawEvent(property.name, property.eventSignature,
+                                                       component.eventLinks[property.name], drawData))
+                            {
+                                changed = true;
+                            }
+                            ImGui::PopID();
+                            ImGui::Spacing();
+                        }
+                        ImGui::TreePop();
+                    }
+                }
+                else
+                {
+                    ImGui::TextDisabled("该脚本没有可绑定的事件");
+                }
+            }
+            else
+            {
+                ImGui::TextDisabled("无可用的脚本元数据");
+                ImGui::Text("请确保脚本资源已正确加载");
+            }
+
+            ImGui::TreePop();
+        }
+
+        return changed;
     }
 }

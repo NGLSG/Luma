@@ -23,7 +23,6 @@ namespace ECS
         AssetHandle lastScriptAsset = AssetHandle(AssetType::CSharpScript); ///< 上一个脚本资产的句柄。
 
         YAML::Node propertyOverrides; ///< 脚本属性的 YAML 覆盖节点。
-
         std::unordered_map<std::string, std::vector<SerializableEventTarget>> eventLinks; ///< 事件名称到可序列化事件目标的映射。
 
         intptr_t* managedGCHandle = nullptr; ///< 托管垃圾回收句柄的指针（通常用于 C# 脚本）。
@@ -38,6 +37,28 @@ namespace ECS
         {
             propertyOverrides = YAML::Node();
         }
+    };
+
+    /**
+     * @brief 脚本组件集合，用于附加多个脚本到单个实体。
+     * 并非完全数据,而是容器和逻辑
+     */
+    struct ScriptsComponent : public IComponent
+    {
+        std::vector<ScriptComponent> scripts; ///< 脚本组件列表。
+
+        /**
+         * @brief 构造一个新的 ScriptsComponent 实例。
+         */
+        ScriptsComponent() = default;
+
+
+        ScriptComponent& AddScript(const AssetHandle& scriptAsset, entt::entity entity);
+        ScriptComponent& GetScriptByName(const std::string& scriptName);
+        ScriptComponent& GetScriptByAsset(const AssetHandle& scriptAsset);
+        std::vector<AssetHandle> GetAllScriptsByName(const std::string& scriptName);
+        void RemoveScriptByAsset(const AssetHandle& scriptAsset);
+        void RemoveScriptByName(const std::string& scriptName);
     };
 }
 
@@ -125,6 +146,40 @@ namespace YAML
                 }
             }
 
+            return true;
+        }
+    };
+
+    template <>
+    struct convert<ECS::ScriptsComponent>
+    {
+        static Node encode(const ECS::ScriptsComponent& rhs)
+        {
+            Node node;
+            node["Enable"] = rhs.Enable;
+            Node scriptsNode;
+            for (const auto& script : rhs.scripts)
+            {
+                scriptsNode.push_back(script);
+            }
+            node["scripts"] = scriptsNode;
+            return node;
+        }
+
+        static bool decode(const Node& node, ECS::ScriptsComponent& rhs)
+        {
+            if (!node.IsMap() || !node["scripts"])
+                return false;
+            rhs.Enable = node["Enable"].as<bool>(true);
+            const Node& scriptsNode = node["scripts"];
+            if (scriptsNode.IsSequence())
+            {
+                rhs.scripts.clear();
+                for (const auto& scriptNode : scriptsNode)
+                {
+                    rhs.scripts.push_back(scriptNode.as<ECS::ScriptComponent>());
+                }
+            }
             return true;
         }
     };
@@ -357,6 +412,32 @@ namespace CustomDrawing
          */
         static bool Draw(const std::string& label, const ScriptClassMetadata*& metadataPtr, const UIDrawData& drawData);
     };
+
+    template <>
+    struct WidgetDrawer<ECS::ScriptComponent>
+    {
+        /**
+         * @brief 在 UI 中绘制 ScriptComponent 组件。
+         * @param label 组件的显示标签。
+         * @param component 要绘制的 ScriptComponent 组件（输入/输出）。
+         * @param drawData UI 绘制所需的数据。
+         * @return 如果组件被修改则返回 true，否则返回 false。
+         */
+        static bool Draw(const std::string& label, ECS::ScriptComponent& component, const UIDrawData& drawData);
+    };
+
+    template <>
+    struct WidgetDrawer<ECS::ScriptsComponent>
+    {
+        /**
+         * @brief 在 UI 中绘制 ScriptComponent 组件。
+         * @param label 组件的显示标签。
+         * @param component 要绘制的 ScriptComponent 组件（输入/输出）。
+         * @param drawData UI 绘制所需的数据。
+         * @return 如果组件被修改则返回 true，否则返回 false。
+         */
+        static bool Draw(const std::string& label, ECS::ScriptsComponent& component, const UIDrawData& drawData);
+    };
 }
 
 REGISTRY
@@ -371,5 +452,7 @@ REGISTRY
         .property("propertyOverrides", &ECS::ScriptComponent::propertyOverrides)
         .property("eventLinks", &ECS::ScriptComponent::eventLinks)
         .property("metadata", &ECS::ScriptComponent::metadata);
+    Registry_<ECS::ScriptsComponent>("ScriptsComponent")
+        .property("scripts", &ECS::ScriptsComponent::scripts);
 }
 #endif

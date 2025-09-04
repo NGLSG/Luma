@@ -1,54 +1,144 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
 using YamlDotNet.Serialization;
 
 namespace Luma.SDK;
 
+
+
+
 public class LumaEvent
 {
-    protected readonly Entity Entity;
-    protected readonly string EventName;
+    private readonly List<Action> subscribers = new List<Action>();
 
-    public LumaEvent(Entity entity, string eventName)
+    public void Add(Action callback)
     {
-        Entity = entity;
-        EventName = eventName;
+        if (callback != null && !subscribers.Contains(callback))
+        {
+            subscribers.Add(callback);
+        }
+    }
+
+    public void Remove(Action callback)
+    {
+        if (callback != null)
+        {
+            subscribers.Remove(callback);
+        }
+    }
+
+    public void Clear()
+    {
+        subscribers.Clear();
     }
 
     public void Invoke()
     {
-        Entity.InvokeEvent(EventName);
+        foreach (var callback in subscribers)
+        {
+            try
+            {
+                callback?.Invoke();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"LumaEvent 调用失败: {e.Message}");
+            }
+        }
     }
+
+    public int SubscriberCount => subscribers.Count;
 }
 
 
 
 
-public class LumaEvent<T1> : LumaEvent
+public class LumaEvent<T1>
 {
-    public LumaEvent(Entity entity, string eventName) : base(entity, eventName)
+    private readonly List<Action<T1>> subscribers = new List<Action<T1>>();
+
+    public void Add(Action<T1> callback)
     {
+        if (callback != null && !subscribers.Contains(callback))
+        {
+            subscribers.Add(callback);
+        }
+    }
+
+    public void Remove(Action<T1> callback)
+    {
+        if (callback != null)
+        {
+            subscribers.Remove(callback);
+        }
+    }
+
+    public void Clear()
+    {
+        subscribers.Clear();
     }
 
     public void Invoke(T1 arg1)
     {
-        Entity.InvokeEvent(EventName, arg1);
+        foreach (var callback in subscribers)
+        {
+            try
+            {
+                callback?.Invoke(arg1);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"LumaEvent<{typeof(T1).Name}> 调用失败: {e.Message}");
+            }
+        }
     }
-    
+
+    public int SubscriberCount => subscribers.Count;
 }
 
 
 
 
-public class LumaEvent<T1, T2> : LumaEvent
+public class LumaEvent<T1, T2>
 {
-    private static readonly ISerializer s_serializer = new SerializerBuilder().Build();
+    private readonly List<Action<T1, T2>> subscribers = new List<Action<T1, T2>>();
 
-    public LumaEvent(Entity entity, string eventName) : base(entity, eventName)
+    public void Add(Action<T1, T2> callback)
     {
+        if (callback != null && !subscribers.Contains(callback))
+        {
+            subscribers.Add(callback);
+        }
+    }
+
+    public void Remove(Action<T1, T2> callback)
+    {
+        if (callback != null)
+        {
+            subscribers.Remove(callback);
+        }
+    }
+
+    public void Clear()
+    {
+        subscribers.Clear();
     }
 
     public void Invoke(T1 arg1, T2 arg2)
     {
-        Entity.InvokeEvent(EventName, arg1, arg2);
+        foreach (var callback in subscribers)
+        {
+            try
+            {
+                callback?.Invoke(arg1, arg2);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"LumaEvent<{typeof(T1).Name}, {typeof(T2).Name}> 调用失败: {e.Message}");
+            }
+        }
     }
+
+    public int SubscriberCount => subscribers.Count;
 }

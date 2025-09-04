@@ -39,41 +39,94 @@ namespace Systems
         }
 
         auto& registry = scene->GetRegistry();
-        auto view = registry.view<ECS::ScriptComponent>();
+        auto view = registry.view<ECS::ScriptsComponent>();
         CSharpScriptLoader scriptLoader;
 
-
+        
         for (auto entity : view)
         {
-            auto& scriptComp = view.get<ECS::ScriptComponent>(entity);
-            if (!scriptComp.scriptAsset.Valid()) continue;
-
-            sk_sp<RuntimeCSharpScript> scriptAsset = scriptLoader.LoadAsset(scriptComp.scriptAsset.assetGuid);
-            if (scriptAsset)
+            auto& scriptsComp = view.get<ECS::ScriptsComponent>(entity);
+            for (auto& scriptComp : scriptsComp.scripts)
             {
-                scriptComp.metadata = &scriptAsset->GetMetadata();
-                createInstanceCommand(static_cast<uint32_t>(entity), scriptAsset->GetScriptClassName(),
-                                      scriptAsset->GetAssemblyName());
+                if (!scriptComp.scriptAsset.Valid()) continue;
+
+                sk_sp<RuntimeCSharpScript> scriptAsset = scriptLoader.LoadAsset(scriptComp.scriptAsset.assetGuid);
+                if (scriptAsset)
+                {
+                    scriptComp.metadata = &scriptAsset->GetMetadata();
+                }
             }
         }
 
-
+        
         for (auto entity : view)
         {
-            auto& scriptComp = view.get<ECS::ScriptComponent>(entity);
-            if (!scriptComp.scriptAsset.Valid()) continue;
-
-            if (scriptComp.propertyOverrides.IsMap())
+            auto& scriptsComp = view.get<ECS::ScriptsComponent>(entity);
+            for (auto& scriptComp : scriptsComp.scripts)
             {
-                for (const auto& it : scriptComp.propertyOverrides)
+                if (!scriptComp.scriptAsset.Valid() || scriptComp.managedGCHandle) continue;
+
+                sk_sp<RuntimeCSharpScript> scriptAsset = scriptLoader.LoadAsset(scriptComp.scriptAsset.assetGuid);
+                if (!scriptAsset) continue;
+
+                if (!host->GetCreateInstanceFn())
                 {
-                    std::string propName = it.first.as<std::string>();
-                    YAML::Emitter emitter;
-                    emitter << it.second;
-                    setPropertyCommand(static_cast<uint32_t>(entity), propName, emitter.c_str());
+                    LogError("ScriptingSystem: CreateInstanceFn 不可用，跳过实例创建。");
+                    continue;
+                }
+
+                ManagedGCHandle handle = host->GetCreateInstanceFn()(
+                    m_currentScene,
+                    static_cast<uint32_t>(entity),
+                    scriptAsset->GetScriptClassName().c_str(),
+                    scriptAsset->GetAssemblyName().c_str()
+                );
+
+                if (handle != 0)
+                {
+                    m_managedHandles.push_back(handle);
+                    scriptComp.managedGCHandle = &m_managedHandles.back();
+                }
+                else
+                {
+                    LogError("ScriptingSystem: 创建实例失败，实体ID: {}, 类型: {}", static_cast<uint32_t>(entity),
+                             scriptAsset->GetScriptClassName());
                 }
             }
-            onCreateCommand(static_cast<uint32_t>(entity));
+        }
+
+        
+        for (auto entity : view)
+        {
+            auto& scriptsComp = view.get<ECS::ScriptsComponent>(entity);
+            for (auto& scriptComp : scriptsComp.scripts)
+            {
+                if (!scriptComp.managedGCHandle) continue;
+
+                
+                if (scriptComp.propertyOverrides.IsMap())
+                {
+                    if (auto setPropertyFn = host->GetSetPropertyFn())
+                    {
+                        for (const auto& it : scriptComp.propertyOverrides)
+                        {
+                            std::string propName = it.first.as<std::string>();
+                            YAML::Emitter emitter;
+                            emitter << it.second;
+                            setPropertyFn(*scriptComp.managedGCHandle, propName.c_str(), emitter.c_str());
+                        }
+                    }
+                }
+
+                
+                setupEventLinks(scriptComp, static_cast<uint32_t>(entity));
+
+                
+                if (auto onCreateFn = host->GetOnCreateFn())
+                {
+                    onCreateFn(*scriptComp.managedGCHandle);
+                }
+            }
         }
     }
 
@@ -82,18 +135,22 @@ namespace Systems
         CoreCLRHost* host = getHost();
         if (!host || !host->GetUpdateInstanceFn()) return;
 
+        auto updateFn = host->GetUpdateInstanceFn();
         auto& registry = scene->GetRegistry();
-        auto view = registry.view<const ECS::ScriptComponent>();
+        auto view = registry.view<const ECS::ScriptsComponent>();
+
         for (auto entity : view)
         {
             if (!scene->FindGameObjectByEntity(entity).IsActive())
                 continue;
-            const auto& scriptComp = view.get<const ECS::ScriptComponent>(entity);
-            if (!scriptComp.Enable)
-                continue;
-            if (scriptComp.scriptAsset.Valid())
+
+            const auto& scriptsComp = view.get<const ECS::ScriptsComponent>(entity);
+            for (const auto& scriptComp : scriptsComp.scripts)
             {
-                updateInstanceCommand(static_cast<uint32_t>(entity), deltaTime);
+                if (!scriptComp.Enable || !scriptComp.managedGCHandle)
+                    continue;
+
+                updateFn(*scriptComp.managedGCHandle, deltaTime);
             }
         }
     }
@@ -115,6 +172,49 @@ namespace Systems
         LogInfo("ScriptingSystem: 脚本系统已关闭。");
     }
 
+    void ScriptingSystem::setupEventLinks(const ECS::ScriptComponent& scriptComp, uint32_t entityId)
+    {
+        CoreCLRHost* host = getHost();
+        if (!host || !host->GetSetPropertyFn() || !scriptComp.managedGCHandle) return;
+
+        auto setPropertyFn = host->GetSetPropertyFn();
+
+        
+        for (const auto& [eventName, targets] : scriptComp.eventLinks)
+        {
+            if (targets.empty()) continue;
+
+            
+            YAML::Node eventTargetsNode;
+            eventTargetsNode = YAML::Node(YAML::NodeType::Sequence);
+
+            for (const auto& target : targets)
+            {
+                if (!target.targetEntityGuid.Valid()) continue;
+
+                YAML::Node targetNode;
+                targetNode["entityGuid"] = target.targetEntityGuid.ToString();
+                targetNode["componentName"] = target.targetComponentName;
+                targetNode["methodName"] = target.targetMethodName;
+
+                eventTargetsNode.push_back(targetNode);
+            }
+
+            if (eventTargetsNode.size() > 0)
+            {
+                YAML::Emitter emitter;
+                emitter << eventTargetsNode;
+
+                
+                std::string eventLinkPropertyName = "__EventLink_" + eventName;
+                setPropertyFn(*scriptComp.managedGCHandle, eventLinkPropertyName.c_str(), emitter.c_str());
+
+                LogInfo("ScriptingSystem: 为实体 {} 的事件 '{}' 设置了 {} 个目标",
+                       entityId, eventName, targets.size());
+            }
+        }
+    }
+
     void ScriptingSystem::handleScriptInteractEvent(const InteractScriptEvent& event)
     {
         switch (event.type)
@@ -123,22 +223,29 @@ namespace Systems
             createInstanceCommand(event.entityId, event.typeName, event.assemblyName);
             break;
         case InteractScriptEvent::CommandType::OnCreate:
-            onCreateCommand(event.entityId);
+            onCreateCommand(event.entityId, event.typeName);
             break;
         case InteractScriptEvent::CommandType::ActivityChange:
-            activityChangeCommand(event.entityId, event.isActive);
+            activityChangeCommand(event.entityId, event.typeName, event.isActive);
             break;
         case InteractScriptEvent::CommandType::DestroyInstance:
-            destroyInstanceCommand(event.entityId);
+            destroyInstanceCommand(event.entityId, event.typeName);
             break;
         case InteractScriptEvent::CommandType::UpdateInstance:
-            updateInstanceCommand(event.entityId, event.deltaTime);
+            {
+                CoreCLRHost* host = getHost();
+                auto* scriptComp = findScriptByTypeName(event.entityId, event.typeName);
+                if (host && host->GetUpdateInstanceFn() && scriptComp && scriptComp->managedGCHandle)
+                {
+                    host->GetUpdateInstanceFn()(*scriptComp->managedGCHandle, event.deltaTime);
+                }
+            }
             break;
         case InteractScriptEvent::CommandType::SetProperty:
-            setPropertyCommand(event.entityId, event.propertyName, event.propertyValue);
+            setPropertyCommand(event.entityId, event.typeName, event.propertyName, event.propertyValue);
             break;
         case InteractScriptEvent::CommandType::InvokeMethod:
-            invokeMethodCommand(event.entityId, event.methodName, event.methodArgs);
+            invokeMethodCommand(event.entityId, event.typeName, event.methodName, event.methodArgs);
             break;
         }
     }
@@ -147,33 +254,56 @@ namespace Systems
     {
         if (!m_currentScene) return;
         auto host = getHost();
-        auto m_dispatchCollisionFn = host ? host->GetDispatchCollisionEventFn() : nullptr;
-        if (!m_dispatchCollisionFn)
+        auto dispatchCollisionFn = host ? host->GetDispatchCollisionEventFn() : nullptr;
+        if (!dispatchCollisionFn)
         {
             LogError("ScriptingSystem: DispatchCollisionEventFn 不可用，无法派发碰撞事件。");
             return;
         }
+
         auto& registry = m_currentScene->GetRegistry();
-
-
-        if (registry.valid(event.entityA) && registry.all_of<ECS::ScriptComponent>(event.entityA))
+        auto dispatchToEntity = [&](entt::entity entity, entt::entity otherEntity)
         {
-            auto& scriptComp = registry.get<ECS::ScriptComponent>(event.entityA);
-            if (scriptComp.managedGCHandle)
+            if (registry.valid(entity) && registry.all_of<ECS::ScriptsComponent>(entity))
             {
-                m_dispatchCollisionFn(*scriptComp.managedGCHandle, (int)event.type, (uint32_t)event.entityB);
+                auto& scriptsComp = registry.get<ECS::ScriptsComponent>(entity);
+                for (auto& scriptComp : scriptsComp.scripts)
+                {
+                    if (scriptComp.managedGCHandle)
+                    {
+                        dispatchCollisionFn(*scriptComp.managedGCHandle, (int)event.type, (uint32_t)otherEntity);
+                    }
+                }
             }
+        };
+
+        dispatchToEntity(event.entityA, event.entityB);
+        dispatchToEntity(event.entityB, event.entityA);
+    }
+
+    ECS::ScriptComponent* ScriptingSystem::findScriptByTypeName(uint32_t entityId, const std::string& typeName)
+    {
+        if (!m_currentScene) return nullptr;
+        auto& registry = m_currentScene->GetRegistry();
+        if (!registry.valid((entt::entity)entityId) || !registry.all_of<ECS::ScriptsComponent>((entt::entity)entityId))
+        {
+            return nullptr;
         }
 
-
-        if (registry.valid(event.entityB) && registry.all_of<ECS::ScriptComponent>(event.entityB))
+        CSharpScriptLoader loader;
+        auto& scriptsComp = registry.get<ECS::ScriptsComponent>((entt::entity)entityId);
+        for (auto& script : scriptsComp.scripts)
         {
-            auto& scriptComp = registry.get<ECS::ScriptComponent>(event.entityB);
-            if (scriptComp.managedGCHandle)
+            if (!script.scriptAsset.Valid()) continue;
+
+            sk_sp<RuntimeCSharpScript> scriptAsset = loader.LoadAsset(script.scriptAsset.assetGuid);
+            if (scriptAsset && scriptAsset->GetScriptClassName() == typeName)
             {
-                m_dispatchCollisionFn(*scriptComp.managedGCHandle, (int)event.type, (uint32_t)event.entityA);
+                return &script;
             }
         }
+        LogWarn("ScriptingSystem: 无法在实体 {} 上找到类型为 '{}' 的脚本。", entityId, typeName);
+        return nullptr;
     }
 
     void ScriptingSystem::createInstanceCommand(uint32_t entityId, const std::string& typeName,
@@ -186,17 +316,24 @@ namespace Systems
             return;
         }
 
+        auto* scriptComp = findScriptByTypeName(entityId, typeName);
+        if (!scriptComp) return;
+
+        if (scriptComp->managedGCHandle)
+        {
+            LogWarn("ScriptingSystem: 实体 {} 的脚本 '{}' 实例已存在。", entityId, typeName);
+            return;
+        }
+
         ManagedGCHandle handle = host->GetCreateInstanceFn()(m_currentScene, entityId, typeName.c_str(),
                                                              assemblyName.c_str());
         if (handle != 0)
         {
-            m_entityHandles[entityId] = handle;
-            auto& registry = m_currentScene->GetRegistry();
-            if (registry.valid((entt::entity)entityId) && registry.all_of<ECS::ScriptComponent>((entt::entity)entityId))
-            {
-                auto& scriptComp = registry.get<ECS::ScriptComponent>((entt::entity)entityId);
-                scriptComp.managedGCHandle = &m_entityHandles[entityId];
-            }
+            m_managedHandles.push_back(handle);
+            scriptComp->managedGCHandle = &m_managedHandles.back();
+
+            
+            setupEventLinks(*scriptComp, entityId);
         }
         else
         {
@@ -204,111 +341,103 @@ namespace Systems
         }
     }
 
-    void ScriptingSystem::activityChangeCommand(uint32_t entityId, bool isActive)
+    void ScriptingSystem::activityChangeCommand(uint32_t entityId, const std::string& typeName, bool isActive)
     {
         CoreCLRHost* host = getHost();
-        auto it = m_entityHandles.find(entityId);
-        if (!host || it == m_entityHandles.end()) return;
+        auto* scriptComp = findScriptByTypeName(entityId, typeName);
+        if (!host || !scriptComp || !scriptComp->managedGCHandle) return;
+
         if (isActive)
         {
-            auto callOnEnableFn = host->GetCallOnEnableFn();
-            if (callOnEnableFn)
+            if (auto callOnEnableFn = host->GetCallOnEnableFn())
             {
-                callOnEnableFn(it->second);
+                callOnEnableFn(*scriptComp->managedGCHandle);
             }
         }
         else
         {
-            auto callOnDisableFn = host->GetCallOnDisableFn();
-            if (callOnDisableFn)
+            if (auto callOnDisableFn = host->GetCallOnDisableFn())
             {
-                callOnDisableFn(it->second);
+                callOnDisableFn(*scriptComp->managedGCHandle);
             }
         }
     }
 
-    void ScriptingSystem::onCreateCommand(uint32_t entityId)
+    void ScriptingSystem::onCreateCommand(uint32_t entityId, const std::string& typeName)
     {
         CoreCLRHost* host = getHost();
-        auto it = m_entityHandles.find(entityId);
-        if (!host || !host->GetOnCreateFn() || it == m_entityHandles.end()) return;
-        host->GetOnCreateFn()(it->second);
+        auto* scriptComp = findScriptByTypeName(entityId, typeName);
+        if (!host || !host->GetOnCreateFn() || !scriptComp || !scriptComp->managedGCHandle) return;
+
+        host->GetOnCreateFn()(*scriptComp->managedGCHandle);
     }
 
-    void ScriptingSystem::destroyInstanceCommand(uint32_t entityId)
+    void ScriptingSystem::destroyInstanceCommand(uint32_t entityId, const std::string& typeName)
     {
-        auto it = m_entityHandles.find(entityId);
-        if (it == m_entityHandles.end()) return;
+        auto* scriptComp = findScriptByTypeName(entityId, typeName);
+        if (!scriptComp || !scriptComp->managedGCHandle) return;
 
+        ManagedGCHandle handle = *scriptComp->managedGCHandle;
         CoreCLRHost* host = getHost();
-        if (!host || !host->GetDestroyInstanceFn())
+
+        if (host && host->GetDestroyInstanceFn())
         {
-            LogWarn("ScriptingSystem: DestroyInstanceFn 不可用，句柄可能已泄露！实体ID: {}", entityId);
-            m_entityHandles.erase(it);
-            return;
+            host->GetDestroyInstanceFn()(handle);
+        }
+        else
+        {
+            LogWarn("ScriptingSystem: DestroyInstanceFn 不可用，句柄可能已泄露！实体ID: {}，类型: {}", entityId, typeName);
         }
 
-        auto& registry = m_currentScene->GetRegistry();
-        if (registry.valid((entt::entity)entityId) && registry.all_of<ECS::ScriptComponent>((entt::entity)entityId))
-        {
-            registry.get<ECS::ScriptComponent>((entt::entity)entityId).managedGCHandle = nullptr;
-        }
-
-        host->GetDestroyInstanceFn()(it->second);
-        m_entityHandles.erase(it);
+        m_managedHandles.remove(handle);
+        scriptComp->managedGCHandle = nullptr;
     }
 
-    void ScriptingSystem::updateInstanceCommand(uint32_t entityId, float deltaTime)
-    {
-        CoreCLRHost* host = getHost();
-        auto it = m_entityHandles.find(entityId);
-        if (!host || !host->GetUpdateInstanceFn() || it == m_entityHandles.end()) return;
-        host->GetUpdateInstanceFn()(it->second, deltaTime);
-    }
-
-    void ScriptingSystem::setPropertyCommand(uint32_t entityId, const std::string& propertyName,
+    void ScriptingSystem::setPropertyCommand(uint32_t entityId, const std::string& typeName,
+                                             const std::string& propertyName,
                                              const std::string& value)
     {
         CoreCLRHost* host = getHost();
-        auto it = m_entityHandles.find(entityId);
-        if (!host || !host->GetSetPropertyFn() || it == m_entityHandles.end())
+        auto* scriptComp = findScriptByTypeName(entityId, typeName);
+        if (!host || !host->GetSetPropertyFn() || !scriptComp || !scriptComp->managedGCHandle)
         {
-            LogError("ScriptingSystem: SetProperty 失败，实体ID: {}，句柄不存在或委托不可用", entityId);
+            LogError("ScriptingSystem: SetProperty 失败，实体ID: {}，类型: {}，句柄不存在或委托不可用", entityId, typeName);
             return;
         }
-        host->GetSetPropertyFn()(it->second, propertyName.c_str(), value.c_str());
+        host->GetSetPropertyFn()(*scriptComp->managedGCHandle, propertyName.c_str(), value.c_str());
     }
 
-    void ScriptingSystem::invokeMethodCommand(uint32_t entityId, const std::string& methodName, const std::string& args)
+    void ScriptingSystem::invokeMethodCommand(uint32_t entityId, const std::string& typeName,
+                                              const std::string& methodName,
+                                              const std::string& args)
     {
         CoreCLRHost* host = getHost();
-        auto it = m_entityHandles.find(entityId);
-        if (!host || !host->GetInvokeMethodFn() || it == m_entityHandles.end())
+        auto* scriptComp = findScriptByTypeName(entityId, typeName);
+        if (!host || !host->GetInvokeMethodFn() || !scriptComp || !scriptComp->managedGCHandle)
         {
-            LogError("ScriptingSystem: InvokeMethod 失败，实体ID: {}，句柄不存在或委托不可用", entityId);
+            LogError("ScriptingSystem: InvokeMethod 失败，实体ID: {}，类型: {}，句柄不存在或委托不可用", entityId, typeName);
             return;
         }
 
-        host->GetInvokeMethodFn()(it->second, methodName.c_str(), args.c_str());
-        LogInfo("ScriptingSystem: 调用方法成功，实体ID: {}, 方法: {}", entityId, methodName);
+        host->GetInvokeMethodFn()(*scriptComp->managedGCHandle, methodName.c_str(), args.c_str());
+        LogInfo("ScriptingSystem: 调用方法成功，实体ID: {}, 类型: {}, 方法: {}", entityId, typeName, methodName);
     }
 
     void ScriptingSystem::destroyAllInstances()
     {
         CoreCLRHost* host = getHost();
-        auto& registry = m_currentScene->GetRegistry();
-
-        for (auto& [entityId, handle] : m_entityHandles)
+        if (host && host->GetDestroyInstanceFn())
         {
-            if (registry.valid((entt::entity)entityId) && registry.all_of<ECS::ScriptComponent>((entt::entity)entityId))
+            auto destroyFn = host->GetDestroyInstanceFn();
+            for (auto handle : m_managedHandles)
             {
-                registry.get<ECS::ScriptComponent>((entt::entity)entityId).managedGCHandle = nullptr;
-            }
-            if (host && host->GetDestroyInstanceFn() && handle != 0)
-            {
-                host->GetDestroyInstanceFn()(handle);
+                if (handle != 0)
+                {
+                    destroyFn(handle);
+                }
             }
         }
-        m_entityHandles.clear();
+
+        m_managedHandles.clear();
     }
 }

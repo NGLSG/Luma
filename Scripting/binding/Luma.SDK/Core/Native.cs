@@ -12,10 +12,6 @@ internal enum LumaLogLevel
     Critical
 }
 
-
-
-
-
 internal static class Native
 {
     private const string DllName = "LumaEngine";
@@ -59,7 +55,7 @@ internal static class Native
     internal static extern void Event_InvokeWithArgs(IntPtr scenePtr, uint entityId, string eventName,
         string argsAsYaml);
 
-    
+
     [DllImport(DllName, CharSet = CharSet.Ansi)]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static extern bool SceneManager_LoadScene(string sceneGuid);
@@ -73,14 +69,14 @@ internal static class Native
     [DllImport(DllName)]
     internal static extern IntPtr SceneManager_GetCurrentSceneGuid();
 
-    
+
     [DllImport(DllName, CharSet = CharSet.Ansi)]
     internal static extern uint Scene_FindGameObjectByGuid(IntPtr scene, string guid);
 
     [DllImport(DllName, CharSet = CharSet.Ansi)]
     internal static extern uint Scene_CreateGameObject(IntPtr scene, string name);
 
-    
+
     [DllImport(DllName)]
     internal static extern IntPtr GameObject_GetName(IntPtr scene, uint entity);
 
@@ -94,10 +90,7 @@ internal static class Native
     [DllImport(DllName)]
     internal static extern void GameObject_SetActive(IntPtr scene, uint entity, bool active);
 
-    [DllImport(DllName)]
-    internal static extern IntPtr ScriptComponent_GetGCHandle(IntPtr componentPtr);
 
-    
     [DllImport(DllName, CharSet = CharSet.Ansi)]
     internal static extern void AnimationController_Play(IntPtr scene, uint entity, string animationName,
         float speed, float transitionDuration);
@@ -126,6 +119,16 @@ internal static class Native
 
     [DllImport(DllName)]
     internal static extern void AnimationController_SetFrameRate(IntPtr scene, uint entity, float frameRate);
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern IntPtr ScriptComponent_GetGCHandle(IntPtr componentPtr, string typeName);
+
+    [DllImport(DllName)]
+    public static extern void ScriptComponent_GetAllGCHandlesCount(IntPtr scenePtr, uint entityId, ref int outCount);
+
+    [DllImport(DllName)]
+    public static extern void ScriptComponent_GetAllGCHandles(IntPtr scenePtr, uint entityId, IntPtr outHandles,
+        int outCount);
 
     #region SIMD Bindings
 
@@ -158,7 +161,8 @@ internal static class Native
 
     [DllImport(DllName)]
     internal static extern void SIMDVectorRotatePoints(float[] points_x, float[] points_y,
-                                                       float[] sin_vals, float[] cos_vals,
-                                                       float[] result_x, float[] result_y, int count);
+        float[] sin_vals, float[] cos_vals,
+        float[] result_x, float[] result_y, int count);
+
     #endregion
 }

@@ -198,7 +198,8 @@ LUMA_API LumaEntityHandle Scene_FindGameObjectByGuid(LumaSceneHandle scene, cons
         return 0;
     }
     RuntimeGameObject go = AsScene(scene)->FindGameObjectByGuid(Guid::FromString(guid));
-    return go.IsValid() ? (LumaEntityHandle)go.GetEntityHandle() : 0;
+    int i = go.IsValid() ? (LumaEntityHandle)go.GetEntityHandle() : INT_MAX;
+    return i;
 }
 
 LUMA_API LumaEntityHandle Scene_CreateGameObject(LumaSceneHandle scene, const char* name)
@@ -616,4 +617,71 @@ void SIMDVectorRotatePoints(const float* points_x, const float* points_y, const 
                             float* result_x, float* result_y, size_t count)
 {
     SIMD::GetInstance().VectorRotatePoints(points_x, points_y, sin_vals, cos_vals, result_x, result_y, count);
+}
+
+void ScriptComponent_GetAllGCHandles(LumaSceneHandle scene, uint32_t entity, intptr_t* outHandles, int count)
+{
+    if (!scene || !outHandles || count <= 0) return;
+
+    auto* runtimeScene = AsScene(scene);
+    auto& registry = runtimeScene->GetRegistry();
+
+    if (!registry.valid((entt::entity)entity))
+    {
+        return;
+    }
+
+    if (!registry.all_of<ECS::ScriptsComponent>((entt::entity)entity))
+    {
+        return;
+    }
+
+    const auto& scriptsComp = registry.get<const ECS::ScriptsComponent>((entt::entity)entity);
+    int index = 0;
+    for (const auto& scriptComp : scriptsComp.scripts)
+    {
+        if (scriptComp.managedGCHandle && index < count)
+        {
+            outHandles[index] = *scriptComp.managedGCHandle;
+            index++;
+        }
+    }
+
+    for (int i = index; i < count; i++)
+    {
+        outHandles[i] = 0;
+    }
+}
+
+void ScriptComponent_GetAllGCHandlesCount(LumaSceneHandle scene, uint32_t entity, int* outCount)
+{
+    if (!scene || !outCount) return;
+
+    auto* runtimeScene = AsScene(scene);
+    auto& registry = runtimeScene->GetRegistry();
+    if (!registry.valid((entt::entity)entity))
+    {
+        *outCount = 0;
+        return;
+    }
+
+    if (!registry.all_of<ECS::ScriptsComponent>((entt::entity)entity))
+    {
+        *outCount = 0;
+        return;
+    }
+
+    const auto& scriptsComp = registry.get<const ECS::ScriptsComponent>((entt::entity)entity);
+
+    
+    int count = 0;
+    for (const auto& scriptComp : scriptsComp.scripts)
+    {
+        if (scriptComp.managedGCHandle)
+        {
+            count++;
+        }
+    }
+
+    *outCount = count;
 }

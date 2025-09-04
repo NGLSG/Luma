@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Runtime.InteropServices;
 using Luma.SDK.Components;
 
@@ -31,7 +32,7 @@ public readonly struct Entity
         {
             if (!HasComponent<ParentComponent>())
             {
-                return new Entity(InvalidId, ScenePtr); 
+                return new Entity(InvalidId, ScenePtr);
             }
 
             var parentComp = GetComponent<ParentComponent>();
@@ -41,7 +42,7 @@ public readonly struct Entity
         {
             var parentComp = HasComponent<ParentComponent>() ? GetComponent<ParentComponent>() : new ParentComponent();
             parentComp.Parent = value.Id;
-            parentComp.Enable = true; 
+            parentComp.Enable = true;
             SetComponent(parentComp);
         }
     }
@@ -52,7 +53,7 @@ public readonly struct Entity
         {
             if (!HasComponent<ChildrenComponent>())
             {
-                return []; 
+                return [];
             }
 
             var childrenComp = GetComponent<ChildrenComponent>();
@@ -65,7 +66,7 @@ public readonly struct Entity
             }
 
             uint[] childIds = new uint[count];
-            Marshal.Copy(ptr, (int[])(object)childIds, 0, count); 
+            Marshal.Copy(ptr, (int[])(object)childIds, 0, count);
 
             Entity[] children = new Entity[count];
             for (int i = 0; i < count; i++)
@@ -110,10 +111,7 @@ public readonly struct Entity
         return true;
     }
 
-    
-    
-    
-    
+
     public T GetComponent<T>() where T : struct, IComponent
     {
         IntPtr componentPtr = Native.Entity_GetComponent(ScenePtr, Id, typeof(T).Name);
@@ -125,25 +123,18 @@ public readonly struct Entity
         return Marshal.PtrToStructure<T>(componentPtr);
     }
 
-    
-    
-    
-    
+
     public T? GetScript<T>() where T : Script
     {
-        
         return Interop.GetScriptInstance(ScenePtr, Id, typeof(T)) as T;
     }
 
     public object? GetScript(Type scriptType)
     {
-        
         return Interop.GetScriptInstance(ScenePtr, Id, scriptType);
     }
 
-    
-    
-    
+
     public bool HasComponent<T>() where T : struct, IComponent
     {
         return Native.Entity_HasComponent(ScenePtr, Id, typeof(T).Name);
@@ -151,7 +142,6 @@ public readonly struct Entity
 
     public T? AddComponent<T>() where T : struct, IComponent
     {
-        
         IntPtr componentPtr = Native.Entity_AddComponent(ScenePtr, Id, typeof(T).Name);
         if (componentPtr == IntPtr.Zero)
         {
@@ -161,29 +151,20 @@ public readonly struct Entity
         return Marshal.PtrToStructure<T>(componentPtr);
     }
 
-    
-    
-    
+
     public bool HasScript<T>() where T : Script
     {
-        
         return Interop.HasScriptInstance(ScenePtr, Id, typeof(T));
     }
 
     public void RemoveComponent<T>() where T : struct, IComponent
     {
-        
         Native.Entity_RemoveComponent(ScenePtr, Id, typeof(T).Name);
     }
 
-    
-    
-    
+
     public unsafe void SetComponent<T>(in T component) where T : struct, IComponent
     {
-        
-        
-        
         fixed (void* componentPtr = &component)
         {
             Native.Entity_SetComponent(ScenePtr, Id, typeof(T).Name, (IntPtr)componentPtr);
@@ -228,10 +209,57 @@ public readonly struct Entity
             return;
         }
 
-        
+
         var serializer = new YamlDotNet.Serialization.SerializerBuilder().Build();
         string argsAsYaml = serializer.Serialize(args);
 
         Native.Event_InvokeWithArgs(ScenePtr, Id, eventName, argsAsYaml);
+    }
+
+    public List<Script> GetScripts()
+    {
+        var scripts = new List<Script>();
+
+        try
+        {
+            
+            int handleCount = 0;
+            Native.ScriptComponent_GetAllGCHandlesCount(ScenePtr, Id, ref handleCount);
+
+            if (handleCount <= 0)
+            {
+                return scripts;
+            }
+
+            
+            IntPtr[] handles = new IntPtr[handleCount];
+            unsafe
+            {
+                fixed (IntPtr* handlesPtr = handles)
+                {
+                    Native.ScriptComponent_GetAllGCHandles(ScenePtr, Id, (IntPtr)handlesPtr, handleCount);
+
+                    
+                    for (int i = 0; i < handleCount; i++)
+                    {
+                        IntPtr handlePtr = handles[i];
+                        if (handlePtr != IntPtr.Zero)
+                        {
+                            Script? scriptInstance = Interop.GetScriptFromHandle(handlePtr);
+                            if (scriptInstance != null)
+                            {
+                                scripts.Add(scriptInstance);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"获取脚本列表失败，实体ID: {Id}，错误: {e.Message}");
+        }
+
+        return scripts;
     }
 }

@@ -11,7 +11,7 @@ namespace Luma.SourceGenerator
     [Generator]
     public class ScriptYamlGenerator : ISourceGenerator
     {
-        // ✨ 新增: 定义一个统一的、不带 "global::" 前缀的完全限定名格式
+        
         private static readonly SymbolDisplayFormat s_fullyQualifiedFormat =
             new SymbolDisplayFormat(
                 globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
@@ -152,7 +152,7 @@ namespace Luma.Generated
         {
             if (typeSymbol.DeclaredAccessibility == Accessibility.Public && !typeSymbol.IsImplicitlyDeclared && !typeSymbol.IsUnboundGenericType)
             {
-                // ✨ 修正: 使用统一的、不带 "global::" 的格式
+                
                 typeNames.Add(typeSymbol.ToDisplayString(s_fullyQualifiedFormat));
             }
 
@@ -166,7 +166,7 @@ namespace Luma.Generated
             ClassDeclarationSyntax classDeclaration)
         {
             var className = classSymbol.Name;
-            // ✨ 修正: 使用统一的、不带 "global::" 的格式
+            
             var fullName = classSymbol.ToDisplayString(s_fullyQualifiedFormat);
             var namespaceName = classSymbol.ContainingNamespace?.ToDisplayString() ?? "<global namespace>";
 
@@ -218,7 +218,7 @@ namespace Luma.Generated
             ClassDeclarationSyntax classDeclaration)
         {
             var fieldName = field.Name;
-            // ✨ 修正: 使用统一的、不带 "global::" 的格式
+            
             var fieldType = field.Type.ToDisplayString(s_fullyQualifiedFormat);
 
             var defaultValue = GetFieldDefaultValue(field, classDeclaration);
@@ -247,7 +247,7 @@ namespace Luma.Generated
             ClassDeclarationSyntax classDeclaration)
         {
             var propertyName = property.Name;
-            // ✨ 修正: 使用统一的、不带 "global::" 的格式
+            
             var propertyType = property.Type.ToDisplayString(s_fullyQualifiedFormat);
             var defaultValue = GetPropertyDefaultValue(property, classDeclaration);
             var eventSignature = GetEventSignature(property.Type);
@@ -275,7 +275,7 @@ namespace Luma.Generated
         private void GenerateMethodYaml(StringBuilder yamlBuilder, IMethodSymbol method)
         {
             var methodName = method.Name;
-            // ✨ 修正: 使用统一的、不带 "global::" 的格式
+            
             var returnType = method.ReturnType.ToDisplayString(s_fullyQualifiedFormat);
             var signature = GetMethodSignature(method);
 
@@ -289,7 +289,7 @@ namespace Luma.Generated
             if (method.Parameters.Length == 0)
                 return "void";
 
-            // ✨ 修正: 使用统一的、不带 "global::" 的格式
+            
             var parameterTypes = method.Parameters.Select(p => p.Type.ToDisplayString(s_fullyQualifiedFormat));
             return string.Join(",", parameterTypes);
         }
@@ -305,7 +305,7 @@ namespace Luma.Generated
                     var typeArguments = namedType.TypeArguments;
                     if (typeArguments.Length > 0)
                     {
-                        // ✨ 修正: 使用统一的、不带 "global::" 的格式
+                        
                         var argumentTypes = typeArguments.Select(t => t.ToDisplayString(s_fullyQualifiedFormat));
                         return string.Join(",", argumentTypes);
                     }
@@ -319,7 +319,7 @@ namespace Luma.Generated
             return "";
         }
 
-        // --- 以下所有辅助方法保持不变 ---
+        
 
         private string GetFieldDefaultValue(IFieldSymbol field, ClassDeclarationSyntax classDeclaration)
         {

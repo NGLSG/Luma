@@ -51,7 +51,7 @@ std::filesystem::path get_executable_directory()
         return std::filesystem::path(result).parent_path();
     }
 #endif
-    // Fallback or error handling
+    
     return std::filesystem::current_path();
 }
 
@@ -128,10 +128,10 @@ bool CoreCLRHost::Initialize(const std::filesystem::path& mainAssemblyPath, bool
             LogWarn("CoreCLRHost: 更新PATH环境变量失败");
         }
     }
-#else // For Linux
-    std::filesystem::path engineDir = get_executable_directory(); // Use the reliable function!
+#else 
+    std::filesystem::path engineDir = get_executable_directory(); 
     const char* ld_path = getenv("LD_LIBRARY_PATH");
-    std::string new_ld_path = engineDir.string(); // Convert path to string
+    std::string new_ld_path = engineDir.string(); 
     if (ld_path && ld_path[0] != '\0')
     {
         new_ld_path += ":";

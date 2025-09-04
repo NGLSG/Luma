@@ -3,17 +3,13 @@
 #include "Utils/Logger.h"
 #include <imgui_node_editor.h>
 #include "BlueprintData.h"
-#include <sstream> // ✨ 新增: 用于字符串流处理
+#include <sstream> 
 
 namespace ed = ax::NodeEditor;
 
 namespace
 {
-    /**
-     * @brief 去除字符串两端的空白字符。
-     * @param str 输入字符串。
-     * @return 去除空白后的新字符串。
-     */
+    
     std::string Trim(const std::string& str)
     {
         const auto strBegin = str.find_first_not_of(" \t\n\r");
@@ -26,12 +22,7 @@ namespace
         return str.substr(strBegin, strRange);
     }
 
-    /**
-     * @brief 按指定分隔符分割字符串。
-     * @param s 输入字符串。
-     * @param delimiter 分隔符。
-     * @return 分割后的字符串向量。
-     */
+    
     std::vector<std::string> Split(const std::string& s, char delimiter)
     {
         std::vector<std::string> tokens;
@@ -59,7 +50,7 @@ void BlueprintNodeRegistry::RegisterAll()
     RegisterCoreNodes();
     RegisterScriptNodes();
 
-    //测试输出所有注册的节点
+    
     for (const auto& [name, def] : m_definitions)
     {
         LogInfo("Registered Blueprint Node: {} (Category: {})", name, def.Category);
@@ -181,7 +172,7 @@ void BlueprintNodeRegistry::RegisterCoreNodes()
         },
         .OutputPins = {
             {"然后", "Exec", ed::PinKind::Output},
-            {"输出变量", "System.Object", ed::PinKind::Output} // 类型是占位符, 会动态更新
+            {"输出变量", "System.Object", ed::PinKind::Output} 
         }
     });
 

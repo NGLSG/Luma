@@ -9,6 +9,7 @@
 #include "../Resources/RuntimeAsset/RuntimeScene.h"
 #include "../Data/EngineContext.h"
 #include "../Components/Sprite.h"
+#include "../Components/ScriptComponent.h"
 #include "../Resources/Loaders/TextureLoader.h"
 #include "../Resources/Loaders/MaterialLoader.h"
 #include "Event/Events.h"
@@ -33,7 +34,7 @@ namespace Systems
                 {
                     OnSpriteUpdated(event.registry, event.entity);
                 }
-                if (event.registry.all_of<ECS::ScriptComponent>(event.entity))
+                if (event.registry.all_of<ECS::ScriptsComponent>(event.entity))
                 {
                     OnScriptUpdated(event.registry, event.entity);
                 }
@@ -58,7 +59,7 @@ namespace Systems
                 {
                     OnSpriteUpdated(event.registry, event.entity);
                 }
-                if (event.registry.all_of<ECS::ScriptComponent>(event.entity))
+                if (event.registry.all_of<ECS::ScriptsComponent>(event.entity))
                 {
                     OnScriptUpdated(event.registry, event.entity);
                 }
@@ -83,7 +84,7 @@ namespace Systems
                 {
                     OnSpriteUpdated(event.registry, event.entity);
                 }
-                if (event.registry.all_of<ECS::ScriptComponent>(event.entity))
+                if (event.registry.all_of<ECS::ScriptsComponent>(event.entity))
                 {
                     OnScriptUpdated(event.registry, event.entity);
                 }
@@ -104,7 +105,7 @@ namespace Systems
             [this](const CSharpScriptRebuiltEvent& event)
             {
                 auto& registry = SceneManager::GetInstance().GetCurrentScene()->GetRegistry();
-                auto scriptView = registry.view<ECS::ScriptComponent>();
+                auto scriptView = registry.view<ECS::ScriptsComponent>();
                 for (auto entity : scriptView)
                 {
                     OnScriptUpdated(registry, entity);
@@ -117,7 +118,7 @@ namespace Systems
         {
             OnSpriteUpdated(registry, entity);
         }
-        auto scriptView = registry.view<ECS::ScriptComponent>();
+        auto scriptView = registry.view<ECS::ScriptsComponent>();
         for (auto entity : scriptView)
         {
             OnScriptUpdated(registry, entity);
@@ -207,29 +208,33 @@ namespace Systems
 
     void HydrateResources::OnScriptUpdated(entt::registry& registry, entt::entity entity)
     {
-        auto& scriptComp = registry.get<ECS::ScriptComponent>(entity);
+        auto& scriptsComp = registry.get<ECS::ScriptsComponent>(entity);
 
-        if (scriptComp.scriptAsset.Valid())
+        for (auto& script : scriptsComp.scripts)
         {
-            if (!scriptComp.metadata || scriptComp.lastScriptAsset != scriptComp.scriptAsset)
+            if (script.scriptAsset.Valid())
             {
-                CSharpScriptLoader loader;
-                sk_sp<RuntimeCSharpScript> scriptAsset = loader.LoadAsset(scriptComp.scriptAsset.assetGuid);
-                if (scriptAsset)
+                if (!script.metadata || script.lastScriptAsset != script.scriptAsset)
                 {
-                    scriptComp.lastScriptAsset = scriptComp.scriptAsset;
-                    scriptComp.metadata = &scriptAsset->GetMetadata();
-                }
-                else
-                {
-                    LogError("Failed to load script asset with GUID: {}", scriptComp.scriptAsset.assetGuid.ToString());
-                    scriptComp.metadata = nullptr;
+                    CSharpScriptLoader loader;
+                    sk_sp<RuntimeCSharpScript> scriptAsset = loader.LoadAsset(script.scriptAsset.assetGuid);
+                    if (scriptAsset)
+                    {
+                        script.lastScriptAsset = script.scriptAsset;
+                        script.metadata = &scriptAsset->GetMetadata();
+                    }
+                    else
+                    {
+                        LogError("Failed to load script asset with GUID: {}",
+                                 script.scriptAsset.assetGuid.ToString());
+                        script.metadata = nullptr;
+                    }
                 }
             }
-        }
-        else
-        {
-            scriptComp.metadata = nullptr;
+            else
+            {
+                script.metadata = nullptr;
+            }
         }
     }
 

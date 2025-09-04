@@ -621,7 +621,7 @@ public:
         }
         float result = _mm512_reduce_max_ps(maxVec);
 
-        // 处理剩余元素
+        
         for (; i < count; i++)
         {
             if (input[i] > result)
@@ -716,7 +716,7 @@ public:
 #endif
 
 #elif defined(LUMA_ARM64) && defined(LUMA_NEON)
-#include <arm_neon.h> // Header for all NEON intrinsics
+#include <arm_neon.h> 
 #include <cfloat>
 #include <cmath>
 
@@ -726,7 +726,7 @@ public:
     void VectorAdd(const float* a, const float* b, float* result, size_t count) override
     {
         size_t i = 0;
-        // Process 4 floats at a time
+        
         for (; i <= count - 4; i += 4)
         {
             float32x4_t av = vld1q_f32(a + i);
@@ -734,7 +734,7 @@ public:
             float32x4_t rv = vaddq_f32(av, bv);
             vst1q_f32(result + i, rv);
         }
-        // Handle the remainder
+        
         for (; i < count; i++)
         {
             result[i] = a[i] + b[i];
@@ -765,10 +765,10 @@ public:
         {
             float32x4_t av = vld1q_f32(a + i);
             float32x4_t bv = vld1q_f32(b + i);
-            // Use NEON's Fused Multiply-Add: sumVec = sumVec + (av * bv)
+            
             sumVec = vfmaq_f32(sumVec, av, bv);
         }
-        // Efficiently sum the 4 elements in the vector
+        
         float result = vaddvq_f32(sumVec);
 
         for (; i < count; i++)
@@ -799,7 +799,7 @@ public:
         for (; i <= count - 4; i += 4)
         {
             float32x4_t iv = vld1q_f32(input + i);
-            // NEON provides a reciprocal estimate instruction.
+            
             float32x4_t rv = vrecpeq_f32(iv);
             vst1q_f32(result + i, rv);
         }
@@ -820,7 +820,7 @@ public:
             float32x4_t iv = vld1q_f32(input + i);
             maxVec = vmaxq_f32(maxVec, iv);
         }
-        // Efficiently find the max element in the vector
+        
         float result = vmaxvq_f32(maxVec);
 
         for (; i < count; i++)
@@ -842,7 +842,7 @@ public:
             float32x4_t iv = vld1q_f32(input + i);
             minVec = vminq_f32(minVec, iv);
         }
-        // Efficiently find the min element in the vector
+        
         float result = vminvq_f32(minVec);
 
         for (; i < count; i++)
@@ -859,7 +859,7 @@ public:
         for (; i <= count - 4; i += 4)
         {
             float32x4_t iv = vld1q_f32(input + i);
-            // NEON has a dedicated absolute value instruction
+            
             float32x4_t rv = vabsq_f32(iv);
             vst1q_f32(result + i, rv);
         }
@@ -882,7 +882,7 @@ public:
             float32x4_t av = vld1q_f32(a + i);
             float32x4_t bv = vld1q_f32(b + i);
             float32x4_t cv = vld1q_f32(c + i);
-            // Use NEON's Fused Multiply-Add: rv = (av * bv) + cv
+            
             float32x4_t rv = vfmaq_f32(cv, av, bv);
             vst1q_f32(result + i, rv);
         }

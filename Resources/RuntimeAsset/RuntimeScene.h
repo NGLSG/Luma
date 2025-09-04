@@ -402,38 +402,49 @@ T* RuntimeScene::GetSystem()
 template <typename... Args>
 void RuntimeScene::InvokeEvent(entt::entity entity, const std::string& eventName, Args&&... args)
 {
-    if (!m_registry.all_of<ECS::ScriptComponent>(entity)) return;
+    if (!m_registry.all_of<ECS::ScriptsComponent>(entity)) return;
 
-    auto& linkComponent = m_registry.get<ECS::ScriptComponent>(entity);
-    if (!linkComponent.eventLinks.contains(eventName)) return;
-
-
+    auto& sourceScriptsComponent = m_registry.get<ECS::ScriptsComponent>(entity);
     YAML::Node argsNode;
-
     (argsNode.push_back(std::forward<Args>(args)), ...);
     YAML::Emitter emitter;
     emitter << argsNode;
     std::string argsAsYaml = emitter.c_str();
 
-
-    const auto& targets = linkComponent.eventLinks.at(eventName);
-    for (const auto& target : targets)
+    for (const auto& sourceScript : sourceScriptsComponent.scripts)
     {
-        RuntimeGameObject targetGO = FindGameObjectByGuid(target.targetEntityGuid);
-
-        if (targetGO.IsValid() && targetGO.HasComponent<ECS::ScriptComponent>())
+        if (!sourceScript.eventLinks.contains(eventName))
         {
-            InteractScriptEvent scriptEvent;
-            scriptEvent.type = InteractScriptEvent::CommandType::InvokeMethod;
-            scriptEvent.entityId = static_cast<uint32_t>(targetGO.GetEntityHandle());
-            scriptEvent.methodName = target.targetMethodName;
-            scriptEvent.methodArgs = argsAsYaml;
+            continue;
+        }
 
-            EventBus::GetInstance().Publish(scriptEvent);
+        const auto& targets = sourceScript.eventLinks.at(eventName);
+        for (const auto& target : targets)
+        {
+            RuntimeGameObject targetGO = FindGameObjectByGuid(target.targetEntityGuid);
+
+            if (targetGO.IsValid() && targetGO.HasComponent<ECS::ScriptsComponent>())
+            {
+                auto& targetScriptsComponent = targetGO.GetComponent<ECS::ScriptsComponent>();
+                for (const auto& targetScript : targetScriptsComponent.scripts)
+                {
+                    if (targetScript.metadata && targetScript.metadata->name == target.targetComponentName)
+                    {
+                        InteractScriptEvent scriptEvent;
+                        scriptEvent.type = InteractScriptEvent::CommandType::InvokeMethod;
+                        scriptEvent.entityId = static_cast<uint32_t>(targetGO.GetEntityHandle());
+                        scriptEvent.methodName = target.targetMethodName;
+                        scriptEvent.methodArgs = argsAsYaml;
+
+                        EventBus::GetInstance().Publish(scriptEvent);
+
+                        break;
+                    }
+                }
+            }
         }
     }
 }
-
 
 /**
  * @brief 创建一个带有指定组件的新实体（游戏对象）。

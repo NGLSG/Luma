@@ -9,6 +9,19 @@
 #include "Event/EventBus.h"
 #include "Event/Events.h"
 
+#if defined(LUMA_PLATFORM_WINDOWS)
+#define LUMA_PLATFORM_NAME "Windows"
+#define LUMA_PARSER_EXECUTABLE "Luma.Parser.exe"
+#elif defined(LUMA_PLATFORM_LINUX)
+#define LUMA_PLATFORM_NAME "Linux"
+#define LUMA_PARSER_EXECUTABLE "Luma.Parser"
+#elif defined(LUMA_PLATFORM_ANDROID)
+#define LUMA_PLATFORM_NAME "Android"
+#define LUMA_PARSER_EXECUTABLE "Luma.Parser"
+#else
+#error "Unsupported platform!"
+#endif
+
 const std::vector<std::string>& CSharpScriptImporter::GetSupportedExtensions() const
 {
     static const std::vector<std::string> extensions = {".cs"};
@@ -17,37 +30,35 @@ const std::vector<std::string>& CSharpScriptImporter::GetSupportedExtensions() c
 
 void CSharpScriptImporter::ExtractScriptInfo(const std::filesystem::path& assetPath, YAML::Node& settingsNode)
 {
-    std::ifstream file(assetPath);
-    if (!file.is_open()) return;
+    std::filesystem::path executablePath = Directory::GetCurrentExecutablePath();
+    std::filesystem::path executableDir = executablePath.parent_path();
 
-    std::string line;
-    std::string fileContent((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    std::filesystem::path parserPath = executableDir / "Tools" / LUMA_PLATFORM_NAME / LUMA_PARSER_EXECUTABLE;
 
-    std::string nspace;
-    std::string className;
-
-
-    std::smatch namespace_match;
-    std::regex namespace_regex(R"(namespace\s+([a-zA-Z0-9\._]+))");
-    if (std::regex_search(fileContent, namespace_match, namespace_regex) && namespace_match.size() > 1)
+    if (!std::filesystem::exists(parserPath))
     {
-        nspace = namespace_match[1].str();
+        LogError("Script parser tool not found at: {0}", parserPath.string());
+        settingsNode.remove("className");
+        settingsNode.remove("assemblyName");
+        return;
     }
 
+    std::string command = parserPath.string() + " " + assetPath.string();
+    std::string fullClassName = Utils::ExecuteCommandAndGetOutput(command);
 
-    std::smatch class_match;
-    std::regex class_regex(R"(class\s+([a-zA-Z0-9_]+)\s*:\s*Script)");
-    if (std::regex_search(fileContent, class_match, class_regex) && class_match.size() > 1)
+    if (!fullClassName.empty())
     {
-        className = class_match[1].str();
-    }
-
-    if (!className.empty())
-    {
-        settingsNode["className"] = nspace.empty() ? className : nspace + "." + className;
+        settingsNode["className"] = fullClassName;
         settingsNode["assemblyName"] = "GameScripts";
     }
+    else
+    {
+        
+        settingsNode.remove("className");
+        settingsNode.remove("assemblyName");
+    }
 }
+
 
 AssetMetadata CSharpScriptImporter::Import(const std::filesystem::path& assetPath)
 {
@@ -64,10 +75,10 @@ AssetMetadata CSharpScriptImporter::Import(const std::filesystem::path& assetPat
 AssetMetadata CSharpScriptImporter::Reimport(const AssetMetadata& metadata)
 {
     AssetMetadata updatedMeta = metadata;
-    updatedMeta.fileHash = Utils::GetHashFromFile(
-        (AssetManager::GetInstance().GetAssetsRootPath() / metadata.assetPath).string());
-    ExtractScriptInfo((AssetManager::GetInstance().GetAssetsRootPath() / metadata.assetPath).string(),
-                      updatedMeta.importerSettings);
+    auto absolutePath = AssetManager::GetInstance().GetAssetsRootPath() / metadata.assetPath;
+    updatedMeta.fileHash = Utils::GetHashFromFile(absolutePath.string());
+    ExtractScriptInfo(absolutePath, updatedMeta.importerSettings);
+
     EventBus::GetInstance().Publish(CSharpScriptUpdateEvent());
     return updatedMeta;
 }

@@ -98,6 +98,15 @@ struct ComponentUpdatedEvent
 };
 
 /**
+ * @brief 表示脚本元数据被更新的事件。
+ */
+struct ScriptMetadataUpdatedEvent
+{
+    entt::registry& registry; /// < 实体注册表引用。
+    entt::entity entity; /// < 组件被更新的游戏对象实体。
+};
+
+/**
  * @brief 表示 C# 脚本需要更新的事件。
  */
 struct CSharpScriptUpdateEvent

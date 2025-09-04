@@ -1387,18 +1387,24 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
     }
     else if (meta->type == AssetType::CSharpScript)
     {
+        
         if (m_context->selectionType == SelectionType::GameObject && !m_context->selectionList.empty())
         {
             bool anyAdded = false;
             for (const auto& objGuid : m_context->selectionList)
             {
                 RuntimeGameObject selectedGo = m_context->activeScene->FindGameObjectByGuid(objGuid);
-                if (selectedGo.IsValid() && !selectedGo.HasComponent<ECS::ScriptComponent>())
+                if (selectedGo.IsValid())
                 {
-                    auto& scriptComp = selectedGo.AddComponent<ECS::ScriptComponent>();
-                    scriptComp.scriptAsset = handle;
+                    
+                    auto& scriptsComp = selectedGo.HasComponent<ECS::ScriptsComponent>()
+                                            ? selectedGo.GetComponent<ECS::ScriptsComponent>()
+                                            : selectedGo.AddComponent<ECS::ScriptsComponent>();
+
+                    
+                    scriptsComp.AddScript(handle, selectedGo.GetEntityHandle());
                     anyAdded = true;
-                    LogInfo("脚本组件已添加到GameObject: {}", selectedGo.GetName());
+                    LogInfo("脚本已添加到GameObject: {}", selectedGo.GetName());
                 }
             }
 
@@ -1408,9 +1414,10 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
             }
             else
             {
-                LogWarn("选中的GameObject已经有脚本组件或对象无效");
+                LogWarn("没有向任何有效对象添加脚本");
             }
         }
+        
         else
         {
             if (!m_context->activeScene) return;
@@ -1427,10 +1434,10 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
                     newGo.GetComponent<ECS::Transform>().position = worldPosition;
                 }
 
-
-                auto& scriptComp = newGo.AddComponent<ECS::ScriptComponent>();
-                scriptComp.scriptAsset = handle;
-
+                
+                auto& scriptsComp = newGo.AddComponent<ECS::ScriptsComponent>();
+                
+                scriptsComp.AddScript(handle, newGo.GetEntityHandle());
 
                 selectSingleObject(newGo.GetGuid());
                 triggerHierarchyUpdate();

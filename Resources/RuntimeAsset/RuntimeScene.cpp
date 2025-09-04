@@ -469,34 +469,43 @@ RuntimeGameObject RuntimeScene::Instantiate(RuntimePrefab& prefab, RuntimeGameOb
 void RuntimeScene::InvokeEventFromSerializedArgs(entt::entity entity, const std::string& eventName,
                                                  const std::string& argsAsYaml)
 {
-    if (!m_registry.all_of<ECS::ScriptComponent>(entity))
+    if (!m_registry.all_of<ECS::ScriptsComponent>(entity))
     {
-        LogError("实体 {} 没有 ScriptComponent 组件。", (uint64_t)entity);
+        LogError("实体 {} 没有 ScriptsComponent 组件。", (uint64_t)entity);
         return;
     }
 
-    auto& eventLink = m_registry.get<ECS::ScriptComponent>(entity);
+    auto& sourceScriptsComponent = m_registry.get<ECS::ScriptsComponent>(entity);
 
-
-    if (!eventLink.eventLinks.contains(eventName))
+    for (const auto& sourceScript : sourceScriptsComponent.scripts)
     {
-        LogWarn("实体 {} 没有找到事件链接: {}", (uint64_t)entity, eventName);
-        return;
-    }
-
-    const auto& targets = eventLink.eventLinks.at(eventName);
-    for (const auto& target : targets)
-    {
-        RuntimeGameObject targetGO = FindGameObjectByGuid(target.targetEntityGuid);
-        if (targetGO.IsValid() && targetGO.HasComponent<ECS::ScriptComponent>())
+        if (!sourceScript.eventLinks.contains(eventName))
         {
-            InteractScriptEvent scriptEvent;
-            scriptEvent.type = InteractScriptEvent::CommandType::InvokeMethod;
-            scriptEvent.entityId = static_cast<uint32_t>(targetGO.GetEntityHandle());
-            scriptEvent.methodName = target.targetMethodName;
-            scriptEvent.methodArgs = argsAsYaml;
+            continue;
+        }
 
-            EventBus::GetInstance().Publish(scriptEvent);
+        const auto& targets = sourceScript.eventLinks.at(eventName);
+        for (const auto& target : targets)
+        {
+            RuntimeGameObject targetGO = FindGameObjectByGuid(target.targetEntityGuid);
+            if (targetGO.IsValid() && targetGO.HasComponent<ECS::ScriptsComponent>())
+            {
+                auto& targetScriptsComponent = targetGO.GetComponent<ECS::ScriptsComponent>();
+                for (const auto& targetScript : targetScriptsComponent.scripts)
+                {
+                    if (targetScript.metadata && targetScript.metadata->name == target.targetComponentName)
+                    {
+                        InteractScriptEvent scriptEvent;
+                        scriptEvent.type = InteractScriptEvent::CommandType::InvokeMethod;
+                        scriptEvent.entityId = static_cast<uint32_t>(targetGO.GetEntityHandle());
+                        scriptEvent.methodName = target.targetMethodName;
+                        scriptEvent.methodArgs = argsAsYaml;
+
+                        EventBus::GetInstance().Publish(scriptEvent);
+                        break;
+                    }
+                }
+            }
         }
     }
 }

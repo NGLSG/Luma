@@ -1588,17 +1588,28 @@ void AnimationEditorPanel::drawEventEditor()
         ImGui::Text("  GUID: %s", target.targetEntityGuid.ToString().c_str());
 
 
-        if (targetObject.HasComponent<ECS::ScriptComponent>())
+        if (targetObject.HasComponent<ECS::ScriptsComponent>())
         {
-            auto& scriptComp = targetObject.GetComponent<ECS::ScriptComponent>();
-            if (scriptComp.metadata)
+            auto& scriptsComp = targetObject.GetComponent<ECS::ScriptsComponent>();
+
+            if (scriptsComp.scripts.empty())
             {
-                ImGui::Text("  脚本类: %s", scriptComp.metadata->name.c_str());
-                ImGui::Text("  可用方法数: %zu", scriptComp.metadata->publicMethods.size());
+                ImGui::TextDisabled("  (无脚本)");
             }
             else
             {
-                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.6f, 1.0f), "  脚本组件无元数据");
+                for (const auto& script : scriptsComp.scripts)
+                {
+                    if (script.metadata)
+                    {
+                        ImGui::Text("  脚本类: %s", script.metadata->name.c_str());
+                        ImGui::Text("    可用方法数: %zu", script.metadata->publicMethods.size());
+                    }
+                    else
+                    {
+                        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.6f, 1.0f), "  一个脚本组件无元数据");
+                    }
+                }
             }
         }
         else
