@@ -599,12 +599,12 @@ void SIMDVectorReciprocal(const float* input, float* result, size_t count)
 
 float SIMDVectorMax(const float* input, size_t count)
 {
-    SIMD::GetInstance().VectorMax(input, count);
+    return SIMD::GetInstance().VectorMax(input, count);
 }
 
 float SIMDVectorMin(const float* input, size_t count)
 {
-    SIMD::GetInstance().VectorMin(input, count);
+    return SIMD::GetInstance().VectorMin(input, count);
 }
 
 void SIMDVectorAbs(const float* input, float* result, size_t count)

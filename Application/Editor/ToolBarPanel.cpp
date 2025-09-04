@@ -51,7 +51,7 @@ namespace platform_native
 #else
         std::string command =
 #ifdef __linux__
-            "xdg-open \"" + path.string() + "\"";
+        "xdg-open \"" + path.string() + "\"";
 #else
         "open \"" + path.string() + "\""; // Assumes macOS or other systems with 'open'
 #endif
@@ -90,8 +90,8 @@ void ToolbarPanel::Initialize(EditorContext* context)
 {
     m_context = context;
     ProjectSettings::GetInstance().Load();
-    m_CSharpScriptUpdated = EventBus::GetInstance().Subscribe<CSharpScriptUpdate>(
-        [this](const CSharpScriptUpdate&) { this->rebuildScripts(); });
+    m_CSharpScriptUpdated = EventBus::GetInstance().Subscribe<CSharpScriptUpdateEvent>(
+        [this](const CSharpScriptUpdateEvent&) { this->rebuildScripts(); });
 
     PopupManager::GetInstance().Register("PreferencesPopup", [this]() { this->drawPreferencesPopup(); }, true,
                                          ImGuiWindowFlags_AlwaysAutoResize);
@@ -217,7 +217,7 @@ void ToolbarPanel::rebuildScripts()
     {
         m_compilationSuccess = runScriptCompilationLogic(m_compilationStatus);
         m_compilationFinished = true;
-        if (m_compilationSuccess) { EventBus::GetInstance().Publish(CSharpScriptRebuilt()); }
+        if (m_compilationSuccess) { EventBus::GetInstance().Publish(CSharpScriptRebuiltEvent()); }
     });
 }
 
@@ -345,6 +345,7 @@ bool ToolbarPanel::runScriptCompilationLogic(std::string& statusMessage)
 
         ScriptMetadataRegistry::GetInstance().Initialize(metadataYaml.string());
         statusMessage = "脚本编译成功！";
+        EventBus::GetInstance().Publish(CSharpScriptCompiledEvent());
         return true;
     }
     catch (const std::exception& e)

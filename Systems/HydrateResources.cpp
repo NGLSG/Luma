@@ -100,8 +100,8 @@ namespace Systems
                     OnTilemapUpdated(event.registry, event.entity);
                 }
             }));
-        m_listeners.push_back(EventBus::GetInstance().Subscribe<CSharpScriptRebuilt>(
-            [this](const CSharpScriptRebuilt& event)
+        m_listeners.push_back(EventBus::GetInstance().Subscribe<CSharpScriptRebuiltEvent>(
+            [this](const CSharpScriptRebuiltEvent& event)
             {
                 auto& registry = SceneManager::GetInstance().GetCurrentScene()->GetRegistry();
                 auto scriptView = registry.view<ECS::ScriptComponent>();

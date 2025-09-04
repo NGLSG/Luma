@@ -2,6 +2,7 @@
 #include "AssetBrowserPanel.h"
 #include "../Resources/RuntimeAsset/RuntimeScene.h"
 #include "AnimationControllerEditorPanel.h"
+#include "BlueprintData.h"
 #include "ButtonSystem.h"
 #include "Editor.h"
 #include "IDEIntegration.h"
@@ -289,6 +290,21 @@ void AssetBrowserPanel::ProcessDoubleClick(const Item& item)
                 LogError("未找到动画编辑器面板");
             }
             LogInfo("双击打开动画切片: {}", item.name);
+        }
+    case AssetType::Blueprint:
+        {
+            m_context->currentEditingBlueprintGuid = item.guid;
+            auto blueprintEditorPanel = m_context->editor->GetPanelByName("蓝图编辑器");
+            if (blueprintEditorPanel)
+            {
+                blueprintEditorPanel->SetVisible(true);
+                blueprintEditorPanel->Focus();
+            }
+            else
+            {
+                LogError("未找到蓝图编辑器面板");
+            }
+            LogInfo("双击打开蓝图: {}", item.name);
         }
         break;
 
@@ -663,7 +679,7 @@ void AssetBrowserPanel::drawAssetContentView()
                         m_context->itemToRename.clear();
                     }
                 }
-                else { ImGui::TextWrapped("%s",item.name.c_str()); }
+                else { ImGui::TextWrapped("%s", item.name.c_str()); }
 
                 ImGui::EndGroup();
                 ImGui::PopID();
@@ -751,6 +767,7 @@ void AssetBrowserPanel::drawAssetBrowserContextMenu()
         if (ImGui::MenuItem("场景")) { createNewAsset(AssetType::Scene); }
         if (ImGui::MenuItem("材质")) { createNewAsset(AssetType::Material); }
         if (ImGui::MenuItem("物理材质")) { createNewAsset(AssetType::PhysicsMaterial); }
+        if (ImGui::MenuItem("蓝图")) { createNewAsset(AssetType::Blueprint); }
         ImGui::Separator();
         if (ImGui::MenuItem("动画切片")) { createNewAsset(AssetType::AnimationClip); }
         if (ImGui::MenuItem("动画控制器")) { createNewAsset(AssetType::AnimationController); }
@@ -1210,6 +1227,16 @@ void AssetBrowserPanel::createNewAsset(AssetType type)
         baseName = "新建文件夹";
         isDirectory = true;
         break;
+    case AssetType::Blueprint:
+        {
+            Blueprint bp;
+            baseName = "新建蓝图";
+            extension = ".blueprint";
+            bp.Name = baseName;
+            defaultContent = YAML::Dump(YAML::convert<Blueprint>::encode(bp));
+        }
+        break;
+
     case AssetType::CSharpScript:
         baseName = "NewScript";
         extension = ".cs";

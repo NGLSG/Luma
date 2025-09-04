@@ -38,35 +38,39 @@ struct UIDrawData;
 /**
  * @brief 编辑器状态枚举。
  */
-enum class EditorState {
+enum class EditorState
+{
     Editing, ///< 编辑模式
     Playing, ///< 播放模式
-    Paused   ///< 暂停模式
+    Paused ///< 暂停模式
 };
 
 /**
  * @brief 编辑模式枚举。
  */
-enum class EditingMode {
-    Scene,  ///< 场景编辑模式
-    Prefab  ///< 预制体编辑模式
+enum class EditingMode
+{
+    Scene, ///< 场景编辑模式
+    Prefab ///< 预制体编辑模式
 };
 
 /**
  * @brief 选择类型枚举。
  */
-enum class SelectionType {
-    NA,         ///< 无选择
-    GameObject,   ///< 游戏对象选择
-    SceneCamera   ///< 场景相机选择
+enum class SelectionType
+{
+    NA, ///< 无选择
+    GameObject, ///< 游戏对象选择
+    SceneCamera ///< 场景相机选择
 };
 
 /**
  * @brief 资源浏览器视图模式枚举。
  */
-enum class AssetBrowserViewMode {
+enum class AssetBrowserViewMode
+{
     List, ///< 列表视图
-    Grid  ///< 网格视图
+    Grid ///< 网格视图
 };
 
 
@@ -150,6 +154,7 @@ struct EditorContext
     AssetHandle activeTileBrush; ///< 当前激活的瓦片画刷句柄
     sk_sp<RuntimeTexture> activeBrushPreviewImage; ///< 激活画刷的预览图像
     SkRect activeBrushPreviewSourceRect; ///< 激活画刷预览图像的源矩形
+    Guid currentEditingBlueprintGuid; ///< 当前正在编辑的蓝图Guid
 };
 
 #endif

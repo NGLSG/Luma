@@ -4,9 +4,6 @@ using System.Reflection;
 
 namespace Luma.Tools
 {
-    
-    
-    
     class YamlExtractor
     {
         static void Main(string[] args)
@@ -17,17 +14,15 @@ namespace Luma.Tools
                 string outputPath = args.Length > 1 ? args[1] : "ScriptMetadata.yaml";
 
                 Console.WriteLine($"正在加载程序集: {assemblyPath}");
-                
+
                 if (!File.Exists(assemblyPath))
                 {
                     Console.WriteLine($"错误: 找不到程序集文件 {assemblyPath}");
                     return;
                 }
 
-                
                 var assembly = Assembly.LoadFrom(assemblyPath);
-                
-                
+
                 var metadataType = assembly.GetType("Luma.Generated.ScriptMetadata");
                 if (metadataType == null)
                 {
@@ -36,7 +31,6 @@ namespace Luma.Tools
                     return;
                 }
 
-                
                 var writeToFileMethod = metadataType.GetMethod("WriteToFile", BindingFlags.Public | BindingFlags.Static);
                 if (writeToFileMethod != null)
                 {
@@ -45,7 +39,6 @@ namespace Luma.Tools
                 }
                 else
                 {
-                    
                     var yamlContentField = metadataType.GetField("YamlContent", BindingFlags.Public | BindingFlags.Static);
                     if (yamlContentField == null)
                     {
@@ -61,7 +54,6 @@ namespace Luma.Tools
                         return;
                     }
 
-                    
                     File.WriteAllText(outputPath, yamlContent);
                     Console.WriteLine($"成功生成YAML文件: {outputPath}");
                 }

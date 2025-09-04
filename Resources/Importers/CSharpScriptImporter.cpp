@@ -68,6 +68,6 @@ AssetMetadata CSharpScriptImporter::Reimport(const AssetMetadata& metadata)
         (AssetManager::GetInstance().GetAssetsRootPath() / metadata.assetPath).string());
     ExtractScriptInfo((AssetManager::GetInstance().GetAssetsRootPath() / metadata.assetPath).string(),
                       updatedMeta.importerSettings);
-    EventBus::GetInstance().Publish(CSharpScriptUpdate());
+    EventBus::GetInstance().Publish(CSharpScriptUpdateEvent());
     return updatedMeta;
 }

@@ -12,6 +12,7 @@ void ScriptMetadataRegistry::Initialize(const std::filesystem::path& metadataFil
 bool ScriptMetadataRegistry::Refresh()
 {
     m_classMetadata.clear();
+    m_availableTypes.clear();
 
     if (!std::filesystem::exists(m_metadataFilePath))
     {
@@ -20,32 +21,30 @@ bool ScriptMetadataRegistry::Refresh()
         return false;
     }
 
-
     try
     {
         YAML::Node root = YAML::LoadFile(m_metadataFilePath.string());
+        ScriptMetadata metadata = root.as<ScriptMetadata>();
 
-        if (!root["Scripts"] || !root["Scripts"].IsSequence())
+        for (auto&& scriptMeta : metadata.scripts)
         {
-            LogError("ScriptMetadataRegistry: Metadata file is invalid. Missing 'Scripts' sequence root node.");
-            return false;
-        }
-
-        const YAML::Node& scriptsNode = root["Scripts"];
-        for (const auto& scriptNode : scriptsNode)
-        {
-            ScriptClassMetadata metadata = scriptNode.as<ScriptClassMetadata>();
-
-
-            if (!metadata.fullName.empty())
+            if (scriptMeta.Valid())
             {
-                m_classMetadata[metadata.fullName] = std::move(metadata);
+                m_classMetadata[scriptMeta.fullName] = std::move(scriptMeta);
             }
         }
+
+        m_availableTypes = std::move(metadata.availableTypes);
+
+        LogInfo("ScriptMetadataRegistry: Successfully loaded {} script(s) and {} available type(s).",
+                m_classMetadata.size(), m_availableTypes.size());
     }
     catch (const YAML::Exception& e)
     {
-        LogError("ScriptMetadataRegistry: Failed to parse metadata file. Reason: {}", e.what());
+        LogError("ScriptMetadataRegistry: Failed to parse metadata file '{}'. Reason: {}",
+                 m_metadataFilePath.string(), e.what());
+        m_classMetadata.clear();
+        m_availableTypes.clear();
         return false;
     }
 
@@ -54,9 +53,10 @@ bool ScriptMetadataRegistry::Refresh()
 
 ScriptClassMetadata ScriptMetadataRegistry::GetMetadata(const std::string& fullClassName) const
 {
-    if (m_classMetadata.contains(fullClassName))
+    auto it = m_classMetadata.find(fullClassName);
+    if (it != m_classMetadata.end())
     {
-        return m_classMetadata.at(fullClassName);
+        return it->second;
     }
     return ScriptClassMetadata();
 }
@@ -64,4 +64,9 @@ ScriptClassMetadata ScriptMetadataRegistry::GetMetadata(const std::string& fullC
 const std::unordered_map<std::string, ScriptClassMetadata>& ScriptMetadataRegistry::GetAllMetadata() const
 {
     return m_classMetadata;
+}
+
+const std::vector<std::string>& ScriptMetadataRegistry::GetAvailableTypes() const
+{
+    return m_availableTypes;
 }

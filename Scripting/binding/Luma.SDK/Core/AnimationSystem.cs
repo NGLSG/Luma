@@ -12,9 +12,7 @@ namespace Luma.SDK
         
         
         
-        
-        
-        
+
         
         public static AnimationController GetController(Entity entity)
         {

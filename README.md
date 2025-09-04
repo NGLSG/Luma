@@ -691,6 +691,7 @@ public class PlayerController : Script
 - ✅ 基于 EnTT 的 ECS 架构
 - ✅ **工作窃取 JobSystem**
 - ✅ **动画状态机系统**
+- ✅ **可视化蓝图系统动态生成高性能C#代码**
 
 </td>
 <td width="50%">

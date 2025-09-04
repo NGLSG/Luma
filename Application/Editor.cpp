@@ -52,6 +52,7 @@
 #include "Editor/AnimationControllerEditorPanel.h"
 #include "Editor/AnimationEditorPanel.h"
 #include "Editor/AssetInspectorPanel.h"
+#include "Editor/BlueprintPanel.h"
 #include "Editor/TilesetPanel.h"
 #include "Managers/RuntimeAnimationClipManager.h"
 #include "Managers/RuntimeFontManager.h"
@@ -258,6 +259,7 @@ void Editor::initializePanels()
     m_panels.push_back(std::make_unique<TilesetPanel>());
     m_panels.push_back(std::make_unique<AssetInspectorPanel>());
     m_panels.push_back(std::make_unique<AIPanel>());
+    m_panels.push_back(std::make_unique<BlueprintPanel>());
 
     for (auto& panel : m_panels)
     {

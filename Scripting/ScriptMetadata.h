@@ -29,7 +29,7 @@ struct ScriptMethodMetadata
 {
     std::string name; ///< 方法的名称。
     std::string returnType; ///< 方法的返回类型。
-    std::string signature; ///< 方法的完整签名。
+    std::string signature; ///< 方法的参数类型签名。
 };
 
 /**
@@ -44,6 +44,7 @@ struct ScriptClassMetadata
     std::string nspace; ///< 类所在的命名空间。
     std::vector<ScriptPropertyMetadata> exportedProperties; ///< 类导出的属性列表。
     std::vector<ScriptMethodMetadata> publicMethods; ///< 类的公共方法列表。
+    std::vector<ScriptMethodMetadata> publicStaticMethods; ///< 类的公共静态方法列表。
 
     /**
      * @brief 检查脚本类元数据是否有效。
@@ -55,8 +56,48 @@ struct ScriptClassMetadata
     bool Valid() const { return !name.empty() && !fullName.empty(); }
 };
 
+/**
+ * @brief 顶层脚本元数据结构体。
+ *
+ * 包含所有脚本类的元数据以及项目中所有可用的类型列表，代表整个YAML文件的内容。
+ */
+struct ScriptMetadata
+{
+    std::vector<ScriptClassMetadata> scripts; ///< 所有脚本类的元数据列表。
+    std::vector<std::string> availableTypes; ///< 项目中所有可用类型的列表。
+};
+
+
 namespace YAML
 {
+    template <>
+    struct convert<ScriptMetadata>
+    {
+        /**
+         * @brief 从 YAML 节点解码 ScriptMetadata 对象。
+         *
+         * @param node 包含整个脚本元数据的根 YAML 节点。
+         * @param rhs 将解码的数据存储到的 ScriptMetadata 对象。
+         * @return 如果解码成功则返回 true，否则返回 false。
+         */
+        static bool decode(const Node& node, ScriptMetadata& rhs)
+        {
+            if (!node.IsMap()) return false;
+
+            if (node["Scripts"])
+            {
+                rhs.scripts = node["Scripts"].as<std::vector<ScriptClassMetadata>>();
+            }
+
+            if (node["AvailableTypes"])
+            {
+                rhs.availableTypes = node["AvailableTypes"].as<std::vector<std::string>>();
+            }
+
+            return true;
+        }
+    };
+
     /**
      * @brief YAML 转换器特化，用于 ScriptPropertyMetadata 类型。
      *
@@ -106,6 +147,7 @@ namespace YAML
 
             if (node["DefaultValue"])
             {
+                // DefaultValue 可能是数字或字符串，统一作为字符串处理
                 rhs.defaultValue = node["DefaultValue"].as<std::string>();
             }
             else
@@ -203,6 +245,11 @@ namespace YAML
                 node["PublicMethods"] = rhs.publicMethods;
             }
 
+            if (!rhs.publicStaticMethods.empty())
+            {
+                node["PublicStaticMethods"] = rhs.publicStaticMethods;
+            }
+
             return node;
         }
 
@@ -231,9 +278,13 @@ namespace YAML
                 rhs.publicMethods = node["PublicMethods"].as<std::vector<ScriptMethodMetadata>>();
             }
 
+            if (node["PublicStaticMethods"])
+            {
+                rhs.publicStaticMethods = node["PublicStaticMethods"].as<std::vector<ScriptMethodMetadata>>();
+            }
             return true;
         }
     };
 }
 
-#endif
+#endif //SCRIPTMETADATA_H

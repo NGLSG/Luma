@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iostream>
 
+#include "BlueprintData.h"
 #include "Path.h"
 #include "Importers/TextureImporter.h"
 #include "Importers/MaterialImporter.h"
@@ -15,6 +16,7 @@
 #include "Importers/AudioImporter.h"
 #include "Importers/AnimationClipImporter.h"
 #include "Importers/AnimationControllerImporter.h"
+#include "Importers/BlueprintImporter.h"
 #include "Importers/TileImporter.h"
 #include "Importers/TilesetImporter.h"
 #include "Importers/RuleTileImporter.h"
@@ -381,4 +383,5 @@ void EditorAssetManager::RegisterImporters()
     m_importers.push_back(std::make_unique<TileImporter>());
     m_importers.push_back(std::make_unique<TilesetImporter>());
     m_importers.push_back(std::make_unique<RuleTileImporter>());
+    m_importers.push_back(std::make_unique<BlueprintImporter>());
 }

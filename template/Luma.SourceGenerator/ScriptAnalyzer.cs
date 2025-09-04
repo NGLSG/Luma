@@ -1,22 +1,28 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
 namespace Luma.SourceGenerator
 {
-    
-    
-    
     [Generator]
     public class ScriptYamlGenerator : ISourceGenerator
     {
+        // ✨ 新增: 定义一个统一的、不带 "global::" 前缀的完全限定名格式
+        private static readonly SymbolDisplayFormat s_fullyQualifiedFormat =
+            new SymbolDisplayFormat(
+                globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
+                typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+                genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+                miscellaneousOptions:
+                    SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
+                    SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
+
         public void Initialize(GeneratorInitializationContext context)
         {
-            
             context.RegisterForSyntaxNotifications(() => new ScriptSyntaxReceiver());
         }
 
@@ -24,25 +30,29 @@ namespace Luma.SourceGenerator
         {
             try
             {
-                
                 if (!(context.SyntaxReceiver is ScriptSyntaxReceiver receiver))
                     return;
 
-                
                 var compilation = context.Compilation;
+                var yamlBuilder = new StringBuilder();
 
-                
-                var yamlContent = GenerateYamlForScripts(compilation, receiver.CandidateClasses);
+                yamlBuilder.AppendLine("# Luma引擎脚本元数据配置文件");
+                yamlBuilder.AppendLine("# 此文件由Luma.SourceGenerator自动生成，请勿手动修改");
+                yamlBuilder.AppendLine();
+
+                GenerateScriptsSection(compilation, receiver.CandidateClasses, yamlBuilder);
+
+                GenerateAvailableTypesSection(compilation, yamlBuilder);
+
+                var yamlContent = yamlBuilder.ToString();
 
                 if (!string.IsNullOrEmpty(yamlContent))
                 {
-                    
                     context.AddSource("ScriptMetadata.yaml.g.cs", GenerateYamlAsResource(yamlContent));
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                
                 var descriptor = new DiagnosticDescriptor("SG001", "源代码生成器错误",
                     "源代码生成器执行时发生错误: {0}", "SourceGenerator",
                     DiagnosticSeverity.Warning, true);
@@ -50,13 +60,9 @@ namespace Luma.SourceGenerator
             }
         }
 
-        
-        
-        
         private string GenerateYamlAsResource(string yamlContent)
         {
-            
-            var escapedYaml = yamlContent.Replace("\"", "\"\""); 
+            var escapedYaml = yamlContent.Replace("\"", "\"\"");
 
             return $@"// 此文件由Luma.SourceGenerator自动生成，请勿手动修改
 namespace Luma.Generated
@@ -64,7 +70,7 @@ namespace Luma.Generated
     internal static class ScriptMetadata
     {{
         public const string YamlContent = @""{escapedYaml}"";
-        
+
         public static void WriteToFile(string filePath)
         {{
             System.IO.File.WriteAllText(filePath, YamlContent);
@@ -73,15 +79,8 @@ namespace Luma.Generated
 }}";
         }
 
-        
-        
-        
-        private string GenerateYamlForScripts(Compilation compilation, List<ClassDeclarationSyntax> candidateClasses)
+        private void GenerateScriptsSection(Compilation compilation, List<ClassDeclarationSyntax> candidateClasses, StringBuilder yamlBuilder)
         {
-            var yamlBuilder = new StringBuilder();
-            yamlBuilder.AppendLine("# Luma引擎脚本元数据配置文件");
-            yamlBuilder.AppendLine("# 此文件由Luma.SourceGenerator自动生成，请勿手动修改");
-            yamlBuilder.AppendLine();
             yamlBuilder.AppendLine("Scripts:");
 
             var hasValidScripts = false;
@@ -102,32 +101,85 @@ namespace Luma.Generated
             {
                 yamlBuilder.AppendLine("  # 未发现继承自Script的类");
             }
-
-            return yamlBuilder.ToString();
         }
 
-        
-        
-        
+        private void GenerateAvailableTypesSection(Compilation compilation, StringBuilder yamlBuilder)
+        {
+            yamlBuilder.AppendLine();
+            yamlBuilder.AppendLine("AvailableTypes:");
+
+            var allTypeNames = new HashSet<string>();
+
+            CollectTypesFromNamespace(compilation.GlobalNamespace, allTypeNames);
+
+            foreach (var reference in compilation.References)
+            {
+                if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol assemblySymbol)
+                {
+                    CollectTypesFromNamespace(assemblySymbol.GlobalNamespace, allTypeNames);
+                }
+            }
+
+            if (allTypeNames.Count == 0)
+            {
+                yamlBuilder.AppendLine("  # 未发现可用类型");
+                return;
+            }
+
+            var sortedTypeNames = allTypeNames.ToList();
+            sortedTypeNames.Sort(StringComparer.Ordinal);
+
+            foreach (var typeName in sortedTypeNames)
+            {
+                yamlBuilder.AppendLine($"  - \"{typeName}\"");
+            }
+        }
+
+        private void CollectTypesFromNamespace(INamespaceSymbol namespaceSymbol, HashSet<string> typeNames)
+        {
+            foreach (var typeSymbol in namespaceSymbol.GetTypeMembers())
+            {
+                CollectNestedTypes(typeSymbol, typeNames);
+            }
+
+            foreach (var childNamespace in namespaceSymbol.GetNamespaceMembers())
+            {
+                CollectTypesFromNamespace(childNamespace, typeNames);
+            }
+        }
+
+        private void CollectNestedTypes(INamedTypeSymbol typeSymbol, HashSet<string> typeNames)
+        {
+            if (typeSymbol.DeclaredAccessibility == Accessibility.Public && !typeSymbol.IsImplicitlyDeclared && !typeSymbol.IsUnboundGenericType)
+            {
+                // ✨ 修正: 使用统一的、不带 "global::" 的格式
+                typeNames.Add(typeSymbol.ToDisplayString(s_fullyQualifiedFormat));
+            }
+
+            foreach (var nestedType in typeSymbol.GetTypeMembers())
+            {
+                CollectNestedTypes(nestedType, typeNames);
+            }
+        }
+
         private void GenerateClassYaml(StringBuilder yamlBuilder, INamedTypeSymbol classSymbol,
             ClassDeclarationSyntax classDeclaration)
         {
             var className = classSymbol.Name;
-            var fullName = classSymbol.ToDisplayString();
-            var namespaceName = classSymbol.ContainingNamespace?.ToDisplayString() ?? "";
+            // ✨ 修正: 使用统一的、不带 "global::" 的格式
+            var fullName = classSymbol.ToDisplayString(s_fullyQualifiedFormat);
+            var namespaceName = classSymbol.ContainingNamespace?.ToDisplayString() ?? "<global namespace>";
 
             yamlBuilder.AppendLine($"  - Name: \"{className}\"");
             yamlBuilder.AppendLine($"    FullName: \"{fullName}\"");
             yamlBuilder.AppendLine($"    Namespace: \"{namespaceName}\"");
 
-            
             var exportedMembers = GetExportedMembers(classSymbol);
             if (exportedMembers.Count > 0)
             {
                 yamlBuilder.AppendLine("    ExportedProperties:");
                 foreach (var member in exportedMembers)
                 {
-                    
                     if (member is IPropertySymbol property)
                     {
                         GeneratePropertyYaml(yamlBuilder, property, classDeclaration);
@@ -139,12 +191,21 @@ namespace Luma.Generated
                 }
             }
 
-            
             var publicMethods = GetPublicMethods(classSymbol);
             if (publicMethods.Count > 0)
             {
                 yamlBuilder.AppendLine("    PublicMethods:");
                 foreach (var method in publicMethods)
+                {
+                    GenerateMethodYaml(yamlBuilder, method);
+                }
+            }
+
+            var publicStaticMethods = GetPublicStaticMethods(classSymbol);
+            if (publicStaticMethods.Count > 0)
+            {
+                yamlBuilder.AppendLine("    PublicStaticMethods:");
+                foreach (var method in publicStaticMethods)
                 {
                     GenerateMethodYaml(yamlBuilder, method);
                 }
@@ -157,9 +218,9 @@ namespace Luma.Generated
             ClassDeclarationSyntax classDeclaration)
         {
             var fieldName = field.Name;
-            var fieldType = field.Type.ToDisplayString();
+            // ✨ 修正: 使用统一的、不带 "global::" 的格式
+            var fieldType = field.Type.ToDisplayString(s_fullyQualifiedFormat);
 
-            
             var defaultValue = GetFieldDefaultValue(field, classDeclaration);
             var eventSignature = GetEventSignature(field.Type);
 
@@ -171,7 +232,6 @@ namespace Luma.Generated
                 yamlBuilder.AppendLine($"        DefaultValue: {defaultValue}");
             }
 
-            
             yamlBuilder.AppendLine($"        CanGet: true");
             yamlBuilder.AppendLine($"        CanSet: true");
             yamlBuilder.AppendLine(
@@ -183,32 +243,12 @@ namespace Luma.Generated
             }
         }
 
-        
-        
-        
-        private string GetFieldDefaultValue(IFieldSymbol field, ClassDeclarationSyntax classDeclaration)
-        {
-            var fieldDeclaration = classDeclaration.Members
-                .OfType<FieldDeclarationSyntax>()
-                .FirstOrDefault(f => f.Declaration.Variables.Any(v => v.Identifier.ValueText == field.Name));
-
-            if (fieldDeclaration?.Declaration.Variables.FirstOrDefault()?.Initializer?.Value != null)
-            {
-                var initializerText = fieldDeclaration.Declaration.Variables.First().Initializer.Value.ToString();
-                return FormatDefaultValueForYaml(initializerText, field.Type);
-            }
-
-            return GetTypeDefaultValue(field.Type);
-        }
-
-        
-        
-        
         private void GeneratePropertyYaml(StringBuilder yamlBuilder, IPropertySymbol property,
             ClassDeclarationSyntax classDeclaration)
         {
             var propertyName = property.Name;
-            var propertyType = property.Type.ToDisplayString();
+            // ✨ 修正: 使用统一的、不带 "global::" 的格式
+            var propertyType = property.Type.ToDisplayString(s_fullyQualifiedFormat);
             var defaultValue = GetPropertyDefaultValue(property, classDeclaration);
             var eventSignature = GetEventSignature(property.Type);
 
@@ -225,20 +265,18 @@ namespace Luma.Generated
             yamlBuilder.AppendLine(
                 $"        IsPublic: {(property.DeclaredAccessibility == Accessibility.Public).ToString().ToLower()}");
 
-            
+
             if (!string.IsNullOrEmpty(eventSignature))
             {
                 yamlBuilder.AppendLine($"        EventSignature: \"{eventSignature}\"");
             }
         }
 
-        
-        
-        
         private void GenerateMethodYaml(StringBuilder yamlBuilder, IMethodSymbol method)
         {
             var methodName = method.Name;
-            var returnType = method.ReturnType.ToDisplayString();
+            // ✨ 修正: 使用统一的、不带 "global::" 的格式
+            var returnType = method.ReturnType.ToDisplayString(s_fullyQualifiedFormat);
             var signature = GetMethodSignature(method);
 
             yamlBuilder.AppendLine($"      - Name: \"{methodName}\"");
@@ -246,41 +284,34 @@ namespace Luma.Generated
             yamlBuilder.AppendLine($"        Signature: \"{signature}\"");
         }
 
-        
-        
-        
         private string GetMethodSignature(IMethodSymbol method)
         {
             if (method.Parameters.Length == 0)
                 return "void";
 
-            var parameterTypes = method.Parameters.Select(p => p.Type.ToDisplayString());
+            // ✨ 修正: 使用统一的、不带 "global::" 的格式
+            var parameterTypes = method.Parameters.Select(p => p.Type.ToDisplayString(s_fullyQualifiedFormat));
             return string.Join(",", parameterTypes);
         }
 
-        
-        
-        
         private string GetEventSignature(ITypeSymbol type)
         {
             var typeName = type.Name;
 
-            
             if (typeName == "LumaEvent")
             {
-                
                 if (type is INamedTypeSymbol namedType && namedType.IsGenericType)
                 {
                     var typeArguments = namedType.TypeArguments;
                     if (typeArguments.Length > 0)
                     {
-                        var argumentTypes = typeArguments.Select(t => t.ToDisplayString());
+                        // ✨ 修正: 使用统一的、不带 "global::" 的格式
+                        var argumentTypes = typeArguments.Select(t => t.ToDisplayString(s_fullyQualifiedFormat));
                         return string.Join(",", argumentTypes);
                     }
                 }
                 else
                 {
-                    
                     return "void";
                 }
             }
@@ -288,12 +319,25 @@ namespace Luma.Generated
             return "";
         }
 
-        
-        
-        
+        // --- 以下所有辅助方法保持不变 ---
+
+        private string GetFieldDefaultValue(IFieldSymbol field, ClassDeclarationSyntax classDeclaration)
+        {
+            var fieldDeclaration = classDeclaration.Members
+                .OfType<FieldDeclarationSyntax>()
+                .FirstOrDefault(f => f.Declaration.Variables.Any(v => v.Identifier.ValueText == field.Name));
+
+            if (fieldDeclaration?.Declaration.Variables.FirstOrDefault()?.Initializer?.Value != null)
+            {
+                var initializerText = fieldDeclaration.Declaration.Variables.First().Initializer.Value.ToString();
+                return FormatDefaultValueForYaml(initializerText, field.Type);
+            }
+
+            return GetTypeDefaultValue(field.Type);
+        }
+
         private string GetPropertyDefaultValue(IPropertySymbol property, ClassDeclarationSyntax classDeclaration)
         {
-            
             var propertyDeclaration = classDeclaration.Members
                 .OfType<PropertyDeclarationSyntax>()
                 .FirstOrDefault(p => p.Identifier.ValueText == property.Name);
@@ -307,18 +351,13 @@ namespace Luma.Generated
             return GetTypeDefaultValue(property.Type);
         }
 
-        
-        
-        
         private string FormatDefaultValueForYaml(string value, ITypeSymbol type)
         {
             if (string.IsNullOrEmpty(value))
                 return GetTypeDefaultValue(type);
 
-            
             value = value.TrimEnd('f', 'F', 'd', 'D', 'm', 'M');
 
-            
             switch (type.SpecialType)
             {
                 case SpecialType.System_String:
@@ -342,9 +381,6 @@ namespace Luma.Generated
             }
         }
 
-        
-        
-        
         private string GetTypeDefaultValue(ITypeSymbol type)
         {
             switch (type.SpecialType)
@@ -371,22 +407,17 @@ namespace Luma.Generated
             }
         }
 
-        
-        
-        
         private List<ISymbol> GetExportedMembers(INamedTypeSymbol classSymbol)
         {
             var exportedMembers = new List<ISymbol>();
 
             foreach (var member in classSymbol.GetMembers())
             {
-                
                 var hasExportAttribute = member.GetAttributes()
                     .Any(attr => attr.AttributeClass?.Name == "ExportAttribute");
 
                 if (hasExportAttribute)
                 {
-                    
                     if (member is IPropertySymbol || member is IFieldSymbol)
                     {
                         exportedMembers.Add(member);
@@ -397,9 +428,6 @@ namespace Luma.Generated
             return exportedMembers;
         }
 
-        
-        
-        
         private List<IMethodSymbol> GetPublicMethods(INamedTypeSymbol classSymbol)
         {
             var publicMethods = new List<IMethodSymbol>();
@@ -408,9 +436,9 @@ namespace Luma.Generated
             {
                 if (member is IMethodSymbol method &&
                     method.DeclaredAccessibility == Accessibility.Public &&
-                    method.MethodKind == MethodKind.Ordinary && 
-                    !method.IsStatic && 
-                    !IsOverriddenBaseMethod(method)) 
+                    method.MethodKind == MethodKind.Ordinary &&
+                    !method.IsStatic &&
+                    !IsOverriddenBaseMethod(method))
                 {
                     publicMethods.Add(method);
                 }
@@ -419,19 +447,30 @@ namespace Luma.Generated
             return publicMethods;
         }
 
-        
-        
-        
+        private List<IMethodSymbol> GetPublicStaticMethods(INamedTypeSymbol classSymbol)
+        {
+            var publicStaticMethods = new List<IMethodSymbol>();
+
+            foreach (var member in classSymbol.GetMembers())
+            {
+                if (member is IMethodSymbol method &&
+                    method.DeclaredAccessibility == Accessibility.Public &&
+                    method.MethodKind == MethodKind.Ordinary &&
+                    method.IsStatic)
+                {
+                    publicStaticMethods.Add(method);
+                }
+            }
+
+            return publicStaticMethods;
+        }
+
         private bool IsOverriddenBaseMethod(IMethodSymbol method)
         {
-            
             var baseMethodNames = new[] { "OnCreate", "OnUpdate", "OnDestroy", "OnEnable", "OnDisable" };
             return baseMethodNames.Contains(method.Name) && method.IsOverride;
         }
 
-        
-        
-        
         private bool IsScriptClass(INamedTypeSymbol classSymbol)
         {
             var baseType = classSymbol.BaseType;
@@ -449,16 +488,12 @@ namespace Luma.Generated
         }
     }
 
-    
-    
-    
     internal class ScriptSyntaxReceiver : ISyntaxReceiver
     {
         public List<ClassDeclarationSyntax> CandidateClasses { get; } = new List<ClassDeclarationSyntax>();
 
         public void OnVisitSyntaxNode(SyntaxNode syntaxNode)
         {
-            
             if (syntaxNode is ClassDeclarationSyntax classDeclaration &&
                 classDeclaration.BaseList != null)
             {

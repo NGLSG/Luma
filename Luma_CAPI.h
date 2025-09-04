@@ -236,7 +236,7 @@ LUMA_API void GameObject_SetActive(LumaSceneHandle scene, LumaEntityHandle entit
  * @param componentPtr 指向脚本组件数据的指针。
  * @return 托管垃圾回收句柄的指针。
  */
-LUMA_API intptr_t* ScriptComponent_GetGCHandle(void* componentPtr);
+LUMA_API intptr_t ScriptComponent_GetGCHandleForScript(void* componentPtr, const char* scriptName);
 
 /**
  * @brief 播放指定实体的动画。
@@ -469,8 +469,8 @@ LUMA_API float SIMDVectorMax(const float* input, size_t count);
 LUMA_API float SIMDVectorMin(const float* input, size_t count);
 LUMA_API void SIMDVectorAbs(const float* input, float* result, size_t count);
 LUMA_API void SIMDVectorRotatePoints(const float* points_x, const float* points_y,
-                                 const float* sin_vals, const float* cos_vals,
-                                 float* result_x, float* result_y, size_t count);
+                                     const float* sin_vals, const float* cos_vals,
+                                     float* result_x, float* result_y, size_t count);
 #ifdef __cplusplus
 }
 #endif
