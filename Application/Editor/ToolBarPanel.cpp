@@ -828,6 +828,7 @@ void ToolbarPanel::play()
     m_context->activeScene->AddSystem<Systems::ScrollViewSystem>();
     m_context->activeScene->AddSystem<Systems::ScriptingSystem>();
     m_context->activeScene->AddSystem<Systems::AnimationSystem>();
+    //Debug::SceneGenerator::GenerateSpriteTest(m_context->activeScene.get(), 1000000);
     SceneManager::GetInstance().SetCurrentScene(m_context->activeScene);
     m_context->activeScene->Activate(*m_context->engineContext);
     LogInfo("进入播放模式。");

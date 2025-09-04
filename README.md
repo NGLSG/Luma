@@ -2,41 +2,123 @@
 
 # 🎮 Luma 引擎
 
-## 现代化 2D 游戏引擎架构设计文档
+[引擎架构](ARCHITECTURE.md)
+[English Version](README_EN.md)
 
-![版本](https://img.shields.io/badge/版本-1.1-blue.svg)
-![语言](https://img.shields.io/badge/语言-C++20%20%7C%20C%23-orange.svg)
-![许可证](https://img.shields.io/badge/许可证-License-green.svg)
-![构建状态](https://img.shields.io/badge/构建-通过-brightgreen.svg)
-
-*基于 C++20 的现代化、模块化、数据驱动的实时 2D 游戏引擎*
+**一款基于 C++20 和 C# 的现代化、模块化、数据驱动的高性能实时 2D 游戏引擎，旨在成为 Unity 2D 的强大替代品。**
 
 </div>
 
----
+-----
 
-## 📚 目录
+## 目录
 
-- [🎯 快速开始](#-快速开始)
-- [📖 概述](#-概述)
-    - [🎨 核心设计哲学](#-核心设计哲学)
+- [✨ 核心特性 & 性能亮点](#-核心特性--性能亮点)
+    - [🚀 性能对比：Luma vs. Unity DOTS](#-性能对比luma-vs-unity-dots)
+    - [🌟 关键功能一览](#-关键功能一览)
+- [📖 概述与设计哲学](#-概述与设计哲学)
     - [🛠️ 技术栈](#️-技术栈)
-- [🏗️ 整体架构](#️-整体架构)
-- [⚙️ 核心系统](#️-核心系统)
-    - [📦 资产管线工作流](#-资产管线工作流)
-    - [💾 运行时资源加载](#-运行时资源加载)
-    - [🎭 场景实例化](#-场景实例化)
-    - [🔗 脚本系统互操作](#-脚本系统互操作)
-    - [⚡ 物理更新循环](#-物理更新循环)
-    - [🎨 渲染管线](#-渲染管线)
-    - [⚙️ JobSystem 并行处理](#️-jobsystem-并行处理)
-    - [🎬 动画状态机](#-动画状态机)
-- [📊 项目状态](#-项目状态)
-- [🧪 性能分析](#-性能分析)
-- [❓ 常见问题](#-常见问题)
+- [🎯 快速开始](#-快速开始)
+    - [环境与依赖 (Environment & Dependencies)](#环境与依赖-environment--dependencies)
+    - [🔧 构建 Luma 引擎 (Building Luma Engine)](#-构建-luma-引擎-building-luma-engine)
+- [⚙️ 核心系统深度解析](#️-核心系统深度解析)
+- [📊 项目状态与路线图](#-项目状态与路线图)
+    - [✅ 已完成功能](#-已完成功能)
+    - [🚀 开发路线图](#-开发路线图)
 - [🤝 贡献指南](#-贡献指南)
+    - [代码规范](#代码规范)
+    - [提交流程](#提交流程)
+- [📄 许可证](#-许可证)
 
----
+-----
+
+## ✨ 核心特性 & 性能亮点
+
+Luma 引擎专为极致性能和现代化开发体验而设计。我们相信，卓越的性能是释放创造力的基石。
+
+### 🚀 性能对比：Luma vs. Unity DOTS
+
+Unity版本:6.1 lts
+在相同硬件上，Luma 在大规模动态精灵渲染和物理模拟场景中均表现出显著的性能优势。
+
+#### 场景渲染性能 (动态精灵)
+
+*在视野内动态生成、移动、旋转和缩放大量精灵。*
+
+| 实体数量          | Luma 引擎 (FPS) | Unity DOTS (FPS) | **性能倍数**  |
+|:--------------|:-------------:|:----------------:|:---------:|
+| **100,000**   |   ~100 FPS    |     ~30 FPS      | **~3.3×** |
+| **200,000**   |    ~50 FPS    |     ~15 FPS      | **~3.3×** |
+| **1,000,000** |    ~10 FPS    |      ~2 FPS      | **~5.0×** |
+
+#### 物理模拟性能
+
+*10,000 个动态物理刚体 (Box2D) 实时碰撞模拟。*
+
+| 指标         |     本引擎      |  Unity   | **性能倍数**  |
+|:-----------|:------------:|:--------:|:---------:|
+| **总帧时间**   | **2.40 ms**  | 45.45 ms | **18.9×** |
+| **理论 FPS** | **~416 FPS** | ~22 FPS  | **18.9×** |
+
+### 🌟 关键功能一览
+
+<table>
+<tr>
+<td width="50%">
+
+#### 🧩 **现代 ECS 架构**
+
+- 基于业界领先的 **EnTT** 库，实现极致性能的数据访问。
+- 逻辑与数据完全分离，代码结构清晰，易于扩展和维护。
+
+#### ⚡ **高性能并行计算**
+
+- 内置基于**工作窃取**算法的 `JobSystem`，动态负载均衡，榨干多核CPU性能。
+- 提供完整的 **C# JobSystem 绑定**，让游戏逻辑也能享受并行带来的快感。
+
+</td>
+<td width="50%">
+
+#### ✨ **可视化蓝图系统**
+
+- 强大的节点式编辑器，无需编码即可创建复杂逻辑。
+- **直接生成高性能 C# 代码**，而非运行时解释，性能无损。
+- 可调用任意 C# 函数，支持自定义函数和变量。
+
+#### 🔗 **无缝 C++/C# 互操作**
+
+- 基于 .NET 9 CoreCLR 宿主，实现稳定、高效的双向通信。
+- **脚本热重载**：修改 C# 代码后无需重启引擎即可立即看到效果。
+
+</td>
+</tr>
+</table>
+
+-----
+
+## 📖 概述与设计哲学
+
+Luma 引擎的核心目标是为 2D 游戏开发者提供一个兼具极致性能与现代化工作流的开发平台。我们遵循以下设计原则：
+
+- **数据驱动**: 引擎的一切（场景、实体、组件、动画）皆为数据。这使得热重载、编辑器扩展和程序化内容生成变得极其简单。
+- **模块化与可扩展性**: 引擎的每个核心系统（渲染、物理、音频等）都是高度解耦的模块，方便独立升级、替换或扩展。
+- **性能优先**: 从 ECS 架构的选择到 JobSystem 的设计，每一个决策都将性能放在首位。
+
+### 🛠️ 技术栈
+
+| 类别         | 技术          | 版本/库             |
+|:-----------|:------------|:-----------------|
+| **核心语言**   | C++         | C++20 标准         |
+| **脚本语言**   | C#          | .NET 9 (CoreCLR) |
+| **构建系统**   | CMake       | 3.21+            |
+| **ECS 框架** | EnTT        | v3.11+           |
+| **2D 物理**  | Box2D       | v2.4+            |
+| **渲染后端**   | Skia + Dawn | 跨平台图形 API 封装     |
+| **窗口与输入**  | SDL3        | 跨平台窗口管理          |
+| **编辑器 UI** | Dear ImGui  | 即时模式 GUI 工具包     |
+| **数据序列化**  | yaml-cpp    | YAML 格式读写        |
+
+-----
 
 ## 🎯 快速开始
 
@@ -51,7 +133,7 @@ cd Luma
 
 在开始构建之前，请确保你的系统环境和所有依赖项都已正确配置。
 
-### 1\. 前置要求 (Prerequisites)
+#### 1. 前置要求 (Prerequisites)
 
 请确保你已安装以下系统级的库和工具：
 
@@ -62,7 +144,7 @@ cd Luma
 * **OpenSSL**
 * **C++ 编译器** (例如: Visual Studio 2022 / GCC 11 / Clang 14)
 
-### 2\. 获取依赖库 (Download Dependencies)
+#### 2. 获取依赖库 (Download Dependencies)
 
 所有第三方库都需要放置在项目根目录下的 `External` 文件夹中。请按照以下步骤操作：
 
@@ -79,19 +161,19 @@ cd External
 
 将以下所有库克隆到 `External` 目录下。
 
-| 库 (Library) | 克隆地址 (Repository URL) |
-| :--- | :--- |
-| `astc-encoder` | `https://github.com/ARM-software/astc-encoder.git` |
-| `box2d` | `https://github.com/erincatto/box2d.git` |
-| `entt` | `https://github.com/skypjack/entt.git` |
-| `glm` | `https://github.com/g-truc/glm.git` |
-| `imgui` | `https://github.com/ocornut/imgui.git` |
-| `imgui-node-editor` | `https://github.com/thedmd/imgui-node-editor.git` |
-| `ImGuizmo` | `https://github.com/CedricGuillemet/ImGuizmo.git` |
-| `json` | `https://github.com/nlohmann/json.git` |
-| `llama-cpp` | `https://github.com/ggerganov/llama.cpp.git` |
-| `SDL` | `https://github.com/libsdl-org/SDL.git` |
-| `yaml-cpp` | `https://github.com/jbeder/yaml-cpp.git` |
+| 库 (Library)         | 克隆地址 (Repository URL)                              |
+|:--------------------|:---------------------------------------------------|
+| `astc-encoder`      | `https://github.com/ARM-software/astc-encoder.git` |
+| `box2d`             | `https://github.com/erincatto/box2d.git`           |
+| `entt`              | `https://github.com/skypjack/entt.git`             |
+| `glm`               | `https://github.com/g-truc/glm.git`                |
+| `imgui`             | `https://github.com/ocornut/imgui.git`             |
+| `imgui-node-editor` | `https://github.com/thedmd/imgui-node-editor.git`  |
+| `ImGuizmo`          | `https://github.com/CedricGuillemet/ImGuizmo.git`  |
+| `json`              | `https://github.com/nlohmann/json.git`             |
+| `llama-cpp`         | `https://github.com/ggerganov/llama.cpp.git`       |
+| `SDL`               | `https://github.com/libsdl-org/SDL.git`            |
+| `yaml-cpp`          | `https://github.com/jbeder/yaml-cpp.git`           |
 
 你可以使用以下脚本一次性克隆所有仓库：
 
@@ -113,20 +195,21 @@ git clone https://github.com/jbeder/yaml-cpp.git
 
 `CoreCLR` 和 `Skia` 作为预编译的二进制包提供。
 
-1.  前往 [Luma-External Releases](https://www.google.com/search?q=https://github.com/NGLSG/Luma-External/releases/tag/Prebuilt) 页面。
-2.  根据你的操作系统，下载对应的 `.zip` 包。例如，Windows 用户需要下载 `skia-win.zip` 和 `coreclr-win-x64.zip`。
-3.  将下载的 `.zip` 文件**解压**到 `External` 目录中。
+1. 前往 [Luma-External Releases](https://github.com/NGLSG/Luma-External/releases/tag/Prebuilt)页面。
+2. 根据你的操作系统，下载对应的 `.zip` 包。例如，Windows 用户需要下载 `skia-win.zip` 和 `coreclr-win-x64.zip`。
+3. 将下载的 `.zip` 文件**解压**到 `External` 目录中。
 
-| 依赖包 (Binary Package) | 操作系统 (OS) | 下载文件 (Download File) |
-| :--- | :--- | :--- |
-| `coreclr` | Linux (x64) | `coreclr-linux-x64.zip` |
-| `coreclr` | Windows (x64) | `coreclr-win-x64.zip` |
-| `skia` | Linux | `skia-linux.zip` |
-| `skia` | Windows | `skia-win.zip` |
+| 依赖包 (Binary Package) | 操作系统 (OS)     | 下载文件 (Download File)    |
+|:---------------------|:--------------|:------------------------|
+| `coreclr`            | Linux (x64)   | `coreclr-linux-x64.zip` |
+| `coreclr`            | Windows (x64) | `coreclr-win-x64.zip`   |
+| `skia`               | Linux         | `skia-linux.zip`        |
+| `skia`               | Windows       | `skia-win.zip`          |
 
 **第四步：配置依赖构建文件**
 
-这是非常关键的一步。你需要将项目**根目录**下的 `ExternalCMakeLists.txt` 文件**移动**到 `External` 目录，并将其**重命名**为 `CMakeLists.txt`。
+这是非常关键的一步。你需要将项目**根目录**下的 `ExternalCMakeLists.txt` 文件**移动**到 `External` 目录，并将其**重命名**为
+`CMakeLists.txt`。
 
 在项目**根目录**下执行以下命令：
 
@@ -135,7 +218,7 @@ git clone https://github.com/jbeder/yaml-cpp.git
 mv ExternalCMakeLists.txt External/CMakeLists.txt
 
 # 对于 Windows CMD
-# move ExternalCMakeLists.txt External\CMakeLists.txt
+# move ExternalCMakeLists.txt ExternalCMakeLists.txt
 ```
 
 完成以上步骤后，你的 `External` 目录结构应该如下所示：
@@ -155,7 +238,7 @@ Luma/
 └── ... (项目其他文件)
 ```
 
-## 🔧 构建 Luma 引擎 (Building Luma Engine)
+### 🔧 构建 Luma 引擎 (Building Luma Engine)
 
 所有依赖准备就绪后，你可以使用 CMake 来构建项目。
 
@@ -176,814 +259,102 @@ cmake --build .
 ```
 
 编译成功后，可执行文件将位于 `build` 目录下的相应子目录中。
+
 -----
 
-### 🖥️ 系统配置要求
+## ⚙️ 核心系统深度解析
 
-| 组件 | 最低要求 | 推荐配置 | 当前支持情况 |
-| :--- | :--- | :--- | :--- |
-| **操作系统** | Windows 10 (64位) / Linux (主流发行版) | Windows 11 (22H2+) / Ubuntu 22.04+ | Windows / **Linux** |
-| **图形API** | DirectX 11 / Vulkan 1.2 | DirectX 12 Ultimate / Vulkan 1.3 | DX11/DX12/**Vulkan/GL/GLES** |
-| **编译器** | MSVC 2019 (v16.11+) / GCC 11+ / Clang 14+ | MSVC 2022 最新版 / 最新版 GCC/Clang | 需安装对应平台SDK |
-| **内存** | 8GB RAM | 16GB+ RAM | 建议12GB以上物理内存 |
-| **显卡** | NVIDIA GTX 1060 / AMD RX 580 或同等性能 | RTX 3060 / RX 6700 XT 或更高 | 需支持Shader Model 6.0+ / Vulkan 1.2+ |
+<details>
+<summary><strong>📦 资产与资源系统</strong></summary>
 
-**跨平台路线说明**：
-
-```diff
-+ 当前平台支持：
-  - Windows (DirectX 11/12, Vulkan)
-+ - Linux (Vulkan, OpenGL, OpenGL ES)
-+ 正在进行中：
-+ - Android (Vulkan)
-- 评估中：
-  - macOS (Metal)
-```
-
-## 📖 概述
-
-Luma 引擎是一个专为现代 2D 游戏开发设计的高性能引擎。核心目标是打造一个Unity2D的替代品。
-
-### 🎨 核心设计哲学
-
-<table>
-<tr>
-<td width="50%">
-
-#### 🎯 数据驱动
-
-引擎的行为和内容完全由外部数据定义，支持热重载和实时编辑。
-
-#### 🧩 ECS 架构
-
-基于 EnTT 的高性能实体组件系统，实现了数据与逻辑的完全分离。
-
-</td>
-<td width="50%">
-
-#### 🔗 GUID 引用
-
-所有资产通过全局唯一标识符进行引用，确保跨平台的稳定性。
-
-#### ⚡ 并行优化
-
-基于工作窃取算法的 JobSystem，充分利用多核 CPU 性能。
-
-</td>
-</tr>
-</table>
-
-### 🛠️ 技术栈
-
-#### 核心技术
-
-| 类别       | 技术    | 版本     | 用途   |
-|----------|-------|--------|------|
-| **编程语言** | C++   | 20     | 引擎核心 |
-| **脚本语言** | C#    | .NET 9 | 游戏逻辑 |
-| **构建系统** | CMake | 3.20+  | 项目构建 |
-
-#### 核心库
-
-| 库名              | 用途     | 特性         |
-|-----------------|--------|------------|
-| **EnTT**        | ECS 系统 | 高性能、类型安全   |
-| **Box2D**       | 物理模拟   | 2D 物理、碰撞检测 |
-| **Skia + Dawn** | 渲染后端   | 跨平台图形渲染    |
-| **yaml-cpp**    | 数据序列化  | 人类可读的配置    |
-| **SDL3**        | 窗口管理   | 跨平台窗口和输入   |
-| **Dear ImGui**  | 调试界面   | 即时模式 GUI   |
-| **GLM**         | 数学运算   | 向量和矩阵运算    |
-
----
-
-## 🏗️ 整体架构
-
-下图展示了 Luma 引擎的模块化架构和数据流：
+Luma 采用基于 **GUID** 的现代化资产管线。所有 `Assets/` 目录下的源文件都会被自动处理，生成一个包含唯一ID和导入设置的
+`.meta` 文件。运行时，`AssetManager` 根据 GUID 高效地从磁盘加载或从缓存中获取资源，实现了资源引用的稳定与高效。
 
 ```mermaid
 graph TD
-    subgraph "🎮 应用层"
-        Editor[编辑器应用]
-        Runtime[运行时/打包应用]
-    end
-
-    subgraph "🎭 场景与逻辑层"
-        SceneManager[场景管理器]
-        RuntimeScene[运行时场景]
-        Systems[系统集合]
-        Registry[ECS 注册表]
-        AnimController[动画控制器]
-        RuntimeScene --> Systems
-        RuntimeScene --> Registry
-        RuntimeScene --> AnimController
-    end
-
-    subgraph "⚙️ 并行处理层"
-        JobSystem[JobSystem 工作窃取]
-        TaskQueue[任务队列]
-        WorkerThreads[工作线程池]
-        JobSystem --> TaskQueue
-        JobSystem --> WorkerThreads
-    end
-
-    subgraph "📦 资产与资源层"
-        AssetManager[资产管理器]
-        Importers[导入器集合]
-        Loaders[加载器集合]
-        RuntimeCaches[运行时缓存]
-        SourceFiles[源文件]
-        RuntimeAssets[运行时资源]
-        AssetManager --> Importers
-        Importers --> SourceFiles
-        Loaders --> AssetManager
-        Loaders --> RuntimeAssets
-        RuntimeCaches --> RuntimeAssets
-    end
-
-    subgraph "🎨 渲染层"
-        SceneRenderer[场景渲染器]
-        RenderSystem[渲染系统]
-        GraphicsBackend[图形后端]
-        RenderPackets[渲染包]
-        SceneRenderer --> RenderPackets
-        RenderSystem --> RenderPackets
-        GraphicsBackend --> RenderSystem
-    end
-
-    Editor --> SceneManager
-    Runtime --> SceneManager
-    Editor --> RuntimeScene
-    Runtime --> RuntimeScene
-    RuntimeScene --> Systems
-    Systems --> Registry
-    Systems --> RuntimeCaches
-    Systems --> JobSystem
-    SceneManager --> Loaders
-    Editor --> SceneRenderer
-    Runtime --> SceneRenderer
-    SceneRenderer --> Registry
+    A[源文件 .png] --> B{TextureImporter} --> C[元文件 .meta]
+    C --> D{AssetManager}
+    E[游戏系统] --> D
+    D --> F{运行时缓存}
+    F --> G[运行时资源 SkImage]
+    D --> H[加载器 Loader] --> G
+    G --> E
 ```
 
----
+</details>
 
-## ⚙️ 核心系统
+<details>
+<summary><strong>✨ 可视化蓝图系统</strong></summary>
 
-### 📦 资产管线工作流
+它不仅提供了直观的节点编辑体验，更通过**直接生成 C# 源码**的方式，彻底消除了传统可视化脚本的性能瓶颈。
 
-> **目标**: 将开发者创建的源文件转换为引擎可用的元数据文件
+- **工作流程**: `蓝图可视化编辑` -> `保存为.blueprint文件` -> `C#代码生成器` -> `生成.cs脚本` -> `参与项目编译` ->
+  `原生性能运行`
+- **功能**: 支持事件、分支、循环、自定义函数/变量、调用任意外部 C# 函数、逻辑区域注释框等全部功能。
 
-#### 工作流程图
+</details>
 
-```mermaid
-graph TD
-    A[👨‍💻 开发者创建<br/>Player.png] --> B{🔍 AssetManager<br/>扫描目录}
-B --> C{🔧 匹配 Importer}
-C --> D[📖 读取源文件<br/>提取数据和哈希]
-D --> E[📋 创建 AssetMetadata]
-E --> F[💾 序列化为<br/>Player.png.meta]
+<details>
+<summary><strong>⚡ 物理与 JobSystem</strong></summary>
 
-style A fill:#e1f5fe
-style F fill: #e8f5e8
-```
+物理模拟基于 **Box2D**，运行在**固定时间步长**的独立循环中，确保了结果的确定性。为了处理大量物理对象的交互，物理世界的步进计算被封装成一个
+Job，并由 **JobSystem** 分发到多个核心上并行处理，极大提升了性能。
 
-#### 详细步骤
+JobSystem 本身基于**工作窃取**算法，能高效处理各种均衡及不均衡的并行计算任务，并已提供完整的 **C# API**。
 
-| 步骤           | 操作                               | 说明            |
-|--------------|----------------------------------|---------------|
-| **1. 文件创建**  | 开发者在 `Assets/` 目录创建 `Player.png` | 支持多种资产类型      |
-| **2. 自动扫描**  | `AssetManager` 检测文件变化            | 实时监控文件系统      |
-| **3. 导入器匹配** | 根据扩展名选择 `TextureImporter`        | 可扩展的导入器系统     |
-| **4. 数据提取**  | 提取纹理数据、计算哈希值                     | 确保数据完整性       |
-| **5. 元数据生成** | 创建 `.meta` 文件                    | 包含 GUID 和导入设置 |
+</details>
 
-### 💾 运行时资源加载
+<details>
+<summary><strong>🎬 动画、Tilemap、UI 和音频</strong></summary>
 
-> **目标**: 根据 GUID 高效加载和缓存运行时资源
+- **动画状态机**: 提供了强大的可视化编辑器来创建和管理 2D 动画状态（Idle, Run, Jump等）及其过渡条件，并通过 C# API 轻松控制。
+- **Tilemap 系统**: 类似于 Unity 的 Tile Palette，支持标准、规则瓦片，甚至允许将**预制体 (Prefab)** 作为笔刷来绘制包含复杂逻辑的游戏对象。
+- **UI 系统**: 基于 ECS 构建，提供了 `Text`, `Image`, `Button`, `InputText` 等核心组件，并预留了 `ScrollView` 的支持。
+- **音频系统**: 基于 **SDL3**，提供了一个支持 3D 空间音效和动态多声道混音的高性能音频管理器。
 
-#### 工作流程图
+</details>
 
-```mermaid
-graph TD
-    A[🎯 系统请求资源] --> B{💾 检查缓存}
-B -->|命中|C[✅ 返回缓存资源]
-B -->|未命中|D{🔧 调用加载器}
-D --> E{📋 获取元数据}
-E --> F[🏗️ 创建运行时实例]
-F --> G[💾 存入缓存]
-G --> C
+-----
 
-style C fill: #e8f5e8
-style G fill: #fff3e0
-```
-
-#### 缓存策略
-
-| 缓存类型       | 生命周期   | 用途      |
-|------------|--------|---------|
-| **强引用缓存**  | 手动释放   | 频繁使用的资源 |
-| **弱引用缓存**  | 自动回收   | 临时资源    |
-| **LRU 缓存** | 最近最少使用 | 内存受限环境  |
-
-### 🎭 场景实例化
-
-> **目标**: 将场景数据转换为可运行的实体组件集合
-
-#### 工作流程图
-
-```mermaid
-graph TD
-    A[🎬 加载场景] --> B[🏗️ 创建 RuntimeScene]
-B --> C[📋 解析场景数据]
-C --> D{🎭 遍历实体节点}
-D --> E{❓ 节点类型}
-E -->|预制体实例| F[📦 加载预制体]
-E -->|普通对象|G[🎮 创建游戏对象]
-F --> H[🔧 应用组件覆盖]
-G --> H
-H --> I[🌳 递归创建子节点]
-I --> J[✅ 完成场景创建]
-
-style J fill:#e8f5e8
-```
-
-### 🔗 脚本系统互操作
-
-> **目标**: 实现 C++ 和 C# 之间的无缝通信
-
-#### 架构图
-
-```mermaid
-graph LR
-    subgraph "C++ 引擎核心"
-        A[事件管理器]
-        B[系统管理器]
-        C[C-API 接口]
-        D[JobSystem]
-    end
-
-    subgraph "互操作层"
-        E[CoreCLR 宿主]
-        F[函数指针缓存]
-        G[P/Invoke 桥接]
-        H[JobSystem 绑定]
-    end
-
-    subgraph "C# 脚本层"
-        I[脚本组件]
-        J[事件处理器]
-        K[Interop 类]
-        L[IJob 接口]
-    end
-
-    A --> C
-    D --> C
-    C --> G
-    C --> H
-    G --> K
-    H --> L
-    K --> J
-    J --> I
-    I --> K
-    K --> G
-    L --> H
-    G --> C
-    H --> C
-    C --> B
-```
-
-#### C# JobSystem 使用示例
-
-```csharp
-/// <summary>
-/// 一个用于并行计算数组片段总和的作业。
-/// </summary>
-private class SumJob : IJob
-{
-    private readonly long[] data;
-    private readonly int startIndex;
-    private readonly int endIndex;
-    private readonly long[] partialSum;
-    private readonly int resultIndex;
-
-    public SumJob(long[] sourceData, int start, int end, long[] results, int index)
-    {
-        data = sourceData;
-        startIndex = start;
-        endIndex = end;
-        partialSum = results;
-        resultIndex = index;
-    }
-
-    /// <summary>
-    /// 执行求和任务。
-    /// </summary>
-    public void Execute()
-    {
-        long sum = 0;
-        for (int i = startIndex; i < endIndex; i++)
-        {
-            sum += data[i];
-        }
-        partialSum[resultIndex] = sum;
-    }
-}
-
-// 使用 JobSystem 调度任务
-var jobHandles = new List<JobHandle>();
-for (int i = 0; i < jobCount; i++)
-{
-    var job = new SumJob(data, startIndex, endIndex, results, i);
-    jobHandles.Add(JobSystem.Schedule(job));
-}
-JobSystem.CompleteAll(jobHandles);
-```
-
-### ⚡ 物理更新循环
-
-> **目标**: 保持物理模拟与图形渲染的同步
-
-#### 更新流程
-
-```mermaid
-graph TD
-    A[⏰ 物理系统更新] --> B[📥 同步运动学刚体]
-B --> C[🔄 读取 Transform 组件]
-C --> D[📐 计算所需速度]
-D --> E[⚡ 设置刚体速度]
-E --> F[🌍 执行物理步进]
-F --> G[📤 同步动态刚体]
-G --> H[📍 读取刚体位置]
-H --> I[🔄 更新 Transform 组件]
-
-style F fill: #ffecb3
-```
-
-### 🎨 渲染管线
-
-> **目标**: 高效地将场景内容渲染到屏幕
-
-#### 渲染流程
-
-```mermaid
-graph TD
-subgraph "🖼️ 编辑器渲染循环"
-A[🚀 开始帧] --> B[🎭 场景视图渲染]
-B --> C[🔧 设置视口参数]
-C --> D[📦 提取渲染数据]
-D --> E[🎨 生成渲染包]
-E --> F[⚡ 批处理优化]
-F --> G[🖌️ 执行绘制命令]
-G --> H[🖥️ UI 界面渲染]
-H --> I[📺 呈现最终画面]
-end
-
-style I fill: #e8f5e8
-```
-
-### ⚙️ JobSystem 并行处理
-
-> **目标**: 基于工作窃取算法的高性能并行计算系统
-
-#### 系统架构
-
-```mermaid
-graph TD
-    subgraph "主线程"
-        A[任务提交]
-        B[任务完成等待]
-    end
-
-    subgraph "JobSystem 核心"
-        C[全局任务队列]
-        D[工作窃取调度器]
-    end
-
-    subgraph "工作线程池"
-        E[工作线程 1]
-        F[工作线程 2]
-        G[工作线程 N]
-        H[本地任务队列 1]
-        I[本地任务队列 2]
-        J[本地任务队列 N]
-    end
-
-    A --> C
-    C --> D
-    D --> E
-    D --> F
-    D --> G
-    E --> H
-    F --> I
-    G --> J
-    E -.-> I
-    E -.-> J
-    F -.-> H
-    F -.-> J
-    G -.-> H
-    G -.-> I
-    E --> B
-    F --> B
-    G --> B
-```
-
-#### 性能基准测试结果
-
-基于真实硬件测试（20核心处理器）的性能数据：
-
-| 测试场景         | 单线程耗时   | 简单多线程耗时       | JobSystem耗时   | 性能提升比  |
-|--------------|---------|---------------|---------------|--------|
-| **均衡负载计算**   | 3.59 ms | 1.63 ms       | 1.18 ms       | 3.0×   |
-| **不均衡负载计算**  | N/A     | 2.38 ms       | 1.30 ms       | 1.8×   |
-| **复杂矩阵运算**   | N/A     | 127.06 ms     | 111.17 ms     | 1.1×   |
-| **高并发吞吐量测试** | N/A     | 33,101 jobs/s | 33,178 jobs/s | 1.002× |
-
-#### 关键特性
-
-- **工作窃取算法**: 动态负载均衡，避免线程空闲
-- **无锁设计**: 高性能的并发安全实现
-- **细粒度任务**: 支持 256-2048 个任务的灵活调度
-- **C# 绑定**: 完整的脚本层并行计算支持
-
-### 🎬 动画状态机
-
-> **目标**: 基于状态机的高效 2D 动画播放系统
-
-#### 状态机架构
-
-```mermaid
-graph TD
-    subgraph "动画控制器"
-        A[AnimationController]
-        B[状态机实例]
-        C[参数集合]
-    end
-
-    subgraph "状态节点"
-        D[Idle 状态]
-        E[Running 状态]
-        F[Jump 状态]
-    end
-
-    subgraph "过渡条件"
-        G[Bool参数: running]
-        H[Trigger参数: jump]
-        I[Float参数: speed]
-    end
-
-    A --> B
-    A --> C
-    B --> D
-    B --> E
-    B --> F
-    D -->|running = true| E
-    E -->|running = false| D
-    D -->|jump trigger| F
-    F -->|完成| D
-    C --> G
-    C --> H
-    C --> I
-```
-
-#### 使用示例
-
-```csharp
-public class PlayerController : Script
-{
-    private AnimationController controller;
-    
-    public override void OnCreate()
-    {
-        controller = AnimationSystem.GetController(Self);
-    }
-    
-    public override void OnUpdate(float deltaTime)
-    {
-        bool isRunning = Input.IsKeyPressed(Scancode.A) || 
-                        Input.IsKeyPressed(Scancode.D);
-        
-        // 设置动画参数
-        controller?.SetBool("running", isRunning);
-        
-        if (Input.IsKeyJustPressed(Scancode.Space))
-        {
-            controller?.SetTrigger("jump");
-        }
-    }
-}
-```
-
----
-
-## 📊 项目状态
+## 📊 项目状态与路线图
 
 ### ✅ 已完成功能
 
-<table>
-<tr>
-<td width="50%">
-
-#### 🏗️ 核心系统
-
-- ✅ 完整的 GUID 驱动资产管线
-- ✅ 多格式资产支持（纹理、材质、预制体、场景、脚本）
-- ✅ 高性能运行时资源缓存
-- ✅ 基于 EnTT 的 ECS 架构
-- ✅ **工作窃取 JobSystem**
-- ✅ **动画状态机系统**
-- ✅ **可视化蓝图系统动态生成高性能C#代码**
-
-</td>
-<td width="50%">
-
-#### 🎮 游戏功能
-
-- ✅ C# 脚本宿主环境
-- ✅ C++/C# 双向通信
-- ✅ **C# JobSystem 绑定**
-- ✅ Box2D 物理集成
-- ✅ 基于物理的交互系统
-- ✅ **2D 动画播放与控制**
-
-</td>
-</tr>
-<tr>
-<td colspan="2">
-
-#### 🎨 渲染与工具链
-
-- ✅ 自动批处理的 2D 渲染管线
-- ✅ 离屏渲染支持
-- ✅ **完整编辑器工具**
-- ✅ Scene View 和 Game View
-- ✅ **生产级游戏打包功能**
-- ✅ 实现 Profiler 分析器
-- ✅ 实现 可视化物理编辑
-- ✅ 实现 动态扩展的Inspector 窗口,支持C#属性反射
-
-</td>
-</tr>
-</table>
+- **核心**: 资产管线, ECS, JobSystem, 动画状态机, **可视化蓝图**, Tilemap, UI, **空间音频**
+- **功能**: C# 脚本宿主 (热重载), C++/C# 互操作, 物理集成
+- **工具**: 功能完善的编辑器, 打包功能, Profiler, 可视化物理调试
 
 ### 🚀 开发路线图
 
 | 优先级   | 功能         | 状态     | 预计完成    |
-|-------|------------|--------|---------|
+|:------|:-----------|:-------|:--------|
 | **中** | C-API 功能扩展 | 📋 计划中 | Q3 2025 |
-| **低** | 让界面更现代化    | 💭 研究中 | Q4 2025 |
+| **低** | 现代化界面升级    | 💭 研究中 | Q4 2025 |
 | **低** | 粒子系统       | 📋 计划中 | Q4 2025 |
 
-### 📈 性能指标
+-----
 
-#### 场景渲染性能
+## 🤝 贡献指南
 
-- 设备：同一台测试设备（冷却后状态）
-- 对比引擎：Unity 6000.1.13f1
-- 数据说明：所有数据均为实测均值，无插值/外推
-- 测试场景：在同一场景下，使用相同的实体数量和组件配置进行测试
-
-| 场景                 | 关键指标   | 本引擎            | Unity                       | 性能倍数      |
-|--------------------|--------|----------------|-----------------------------|-----------|
-| **10,000 实体 + 碰撞** | 总帧时间   | **2.40 ms**    | 45.45 ms                    | **18.9×** |
-|                    | 理论 FPS | **416 FPS**    | 22 FPS                      | 同上        |
-|                    | 物理更新耗时 | **0.92 ms**    | 未测试                         | —         |
-|                    | 内存占用   | **114.375 MB** | 未测试                         | —         |
-| **100,000 实体纯渲染**  | FPS    | **85 FPS**     | 8–9 FPS                     | **9.4×**  |
-| **200,000 纯渲染**    | FPS    | **60 FPS**     | 60 FPS（实例化 + JobSystem）     | **1.0×**  |
-| **1,000,000 纯渲染**  | FPS    | 13 FPS         | **20 FPS**（实例化 + JobSystem） | **0.65×** |
-
-#### JobSystem 并行性能
-
-基于 20 核心处理器的测试结果：
-
-| 测试场景        | 单线程基准   | JobSystem     | 性能提升     |
-|-------------|---------|---------------|----------|
-| **均衡计算负载**  | 3.59 ms | 1.18 ms       | **3.0×** |
-| **不均衡负载**   | N/A     | vs 静态分区 1.8×  | 动态调度优势   |
-| **高并发吞吐量**  | N/A     | 33,178 jobs/s | 优于线程池    |
-| **内存密集型计算** | N/A     | 8.08 GB/s     | 高内存带宽    |
-
----
-
-### 🧮 性能分析
-
-1. **内存效率**：
-
-- 每个实体约占用11.7KB (117120KB/10000)
-
-2. **耗时分布**：
-   ```mermaid
-   pie
-       title 帧时间占比
-       "绘制" : 62
-       "物理" : 38
-   ```
-
-3. **JobSystem 线程利用率**：
-   ```mermaid
-   pie
-    title 任务分配均衡性
-    "线程 4,5 (各29任务)" : 22.7
-    "线程 3,7,8 (各27-28)" : 21.1
-    "线程 1,2,8 (各23)" : 18.0
-    "线程 0,6 (各18)" : 14.1
-    "线程 9,10,11 (各9-16)" : 24.1
-   ```
-
----
-
-### 📜 API 文档生成
-
-为了维护项目代码的清晰度和可维护性，Luma 引擎使用 [Doxygen](https://www.doxygen.nl/) 自动生成 API
-文档。
-
-#### 环境准备
-
-1. **安装 Doxygen**: 从官方网站下载并安装最新版本的 Doxygen。
-2. **安装 Graphviz** (可选): 为了生成类图、协作图等可视化图表，需要安装 [Graphviz](https://graphviz.org/download/)，并将其
-   `bin` 目录添加到系统环境变量 `PATH` 中。
-
-#### 生成步骤
-
-1. 将下方提供的 `Doxyfile` 配置文件放置在项目根目录。
-
-2. 在项目根目录打开终端，执行以下命令：
-
-   ```sh
-   doxygen Doxyfile
-   ```
-
-3. 命令执行完毕后，会在项目根目录生成一个 `docs/` 文件夹。打开 `docs/html/index.html` 即可浏览完整的 API 文档
-
----
-
-### ❓ 常见问题
-
-<details>
-<summary><strong>如何添加自定义组件？</strong></summary>
-
-1. 创建组件结构体：
-
-```cpp
-struct CustomComponent:IComponent {
-    float value;
-    std::string name;
-};
-```
-
-2. 注册组件：
-
-```cpp
-Registery_<CustomComponent>("CustomComponent")
-    .property("name",&CustomComponent::name)
-    .property("value", &CustomComponent::value);
-```
-
-3. 在脚本中使用：
-
-```csharp
-var component = Self.GetComponent<CustomComponent>();
-```
-
-</details>
-
-<details>
-<summary><strong>如何优化渲染性能？</strong></summary>
-
-- 使用精灵图集减少纹理切换
-- 启用自动批处理
-- 合理使用层级排序
-- 避免频繁的 Transform 修改
-
-</details>
-
-<details>
-<summary><strong>如何使用 JobSystem 进行并行计算？</strong></summary>
-
-```csharp
-// 1. 实现 IJob 接口
-public class MyJob : IJob
-{
-    public void Execute()
-    {
-        // 您的计算逻辑
-    }
-}
-
-// 2. 调度任务
-var job = new MyJob();
-var handle = JobSystem.Schedule(job);
-
-// 3. 等待完成
-JobSystem.Complete(handle);
-```
-
-</details>
-
-<details>
-<summary><strong>脚本热重载如何工作？</strong></summary>
-
-引擎监控 C# 脚本文件变化，自动重新编译并重新加载程序集，保持游戏状态不变。
-</details>
-
-<details>
-<summary><strong>如何创建动画状态机？</strong></summary>
-
-1. 在编辑器中创建 AnimationController 资产
-2. 添加状态和过渡条件
-3. 在脚本中获取控制器：
-
-```csharp
-var controller = AnimationSystem.GetController(Self);
-controller.SetBool("running", true);
-```
-
-</details>
-
----
-
-### 🤝 贡献指南
+我们欢迎所有对游戏引擎开发充满热情的开发者加入 Luma 项目！
 
 ### 代码规范
 
-#### 命名约定
-
-- **类名**: `PascalCase` (例: `AssetManager`)
-- **函数名**: `PascalCase` (例: `LoadAsset`)
-- **变量名**: `camelCase` (例: `deltaTime`)
-- **私有成员**: `camelCase` (例: `textureCache`)
-- **常量**: `UPPER_SNAKE_CASE` (例: `MAX_TEXTURES`)
-
-#### 注释规范
-
-项目采用 Doxygen 风格的注释来确保代码的可读性并自动生成 API 文档。所有公开的类、方法和成员都必须添加符合规范的注释。
-
-**函数/方法注释示例:**
-
-```cpp
-/**
- * @brief 加载指定 GUID 的纹理资源。
- * @details 此函数会首先检查内部缓存。如果缓存未命中，则会从磁盘加载资源文件，
- * 解码为 Skia 图像对象，并将其存入缓存以备后续使用。
- * @param guid 纹理资源的全局唯一标识符 (GUID)。
- * @return sk_sp<SkImage> 加载成功返回指向 SkImage 对象的智能指针，失败则返回 nullptr。
- * @note 此操作可能会涉及 I/O，属于耗时操作，不应在性能敏感的主循环中频繁调用。
- */
-sk_sp<SkImage> LoadTexture(const Guid& guid);
-```
-
-**类/结构体注释示例:**
-
-```cpp
-/**
- * @brief 资产管理器，负责项目中所有资产的导入、加载和生命周期管理。
- * @details 这是一个单例 (Singleton) 类，提供了通过 GUID 或路径访问资产元数据的接口。
- * 它还负责监控文件系统变更并自动触发资产导入流程。
- * @see AssetMetadata, IAssetImporter
- */
-class AssetManager : public LazySingleton<AssetManager>
-{
-public:
-    // 公开接口...
-
-private:
-    /// @brief 运行时纹理资源的缓存。键为 GUID 字符串，值为 Skia 图像对象。
-    std::unordered_map<std::string, sk_sp<SkImage>> textureCache;
-};
-```
-
-**关键指令说明:**
-
-| 指令        | 用途                           |
-| :---------- | :----------------------------- |
-| `@brief`    | 提供一个简短的单行摘要。         |
-| `@details`  | 提供更详尽的描述信息。           |
-| `@param`    | 描述函数的参数。               |
-| `@return`   | 描述函数的返回值。             |
-| `@note`     | 添加需要特别注意的事项。         |
-| `@see`      | 引用其他相关的类或函数。         |
-| `///`       | 用于成员变量或简单注释的单行格式。 |
+- **命名**: `PascalCase` 用于类型和函数, `camelCase` 用于变量。
+- **注释**: 项目采用 **Doxygen** 风格，所有公开 API 都需要有完整的注释。
 
 ### 提交流程
 
-1. **Fork** 仓库并创建功能分支
-2. 按照代码规范编写代码
-3. 添加必要的测试用例
-4. 更新相关文档
-5. 提交 **Pull Request**
+1. **Fork** 本仓库并从 `main` 分支创建您的功能分支。
+2. 编写代码并确保遵循项目规范。
+3. 提交 **Pull Request** 并详细描述您的改动。
 
----
+-----
 
 <div align="center">
 
 ## 📄 许可证
 
-本项目采用 [许可证](LICENSE) 开源。
-
----
-
-**Luma 引擎** - 为现代 2D 游戏开发而生 🎮
-
-[⬆️ 返回顶部](#-luma-引擎)
+本项目采用 [MIT 许可证](LICENSE) 开源。
 
 </div>
