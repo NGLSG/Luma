@@ -51,3 +51,4 @@ Scripting/binding/.idea/
 External/
 # ...but DO NOT ignore the CMakeLists.txt file inside it.
 !External/CMakeLists.txt
+Scripting/binding/.vs
