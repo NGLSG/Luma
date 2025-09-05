@@ -17,6 +17,7 @@
 #include <functional>
 #include <set>
 
+
 namespace BlueprintCSharpCodeGenerator
 {
     struct CodeGenContext;
@@ -27,7 +28,7 @@ namespace BlueprintCSharpCodeGenerator
     {
         const Blueprint& blueprint;
         std::stringstream ss;
-        int indent = 0; 
+        int indent = 0;
         uint32_t tempVarCounter = 0;
 
         std::map<std::pair<uint32_t, std::string>, std::string> valueCache;
@@ -86,6 +87,9 @@ namespace BlueprintCSharpCodeGenerator
         }
     };
 
+    
+    
+    
     std::string SanitizeValue(const std::string& value, const std::string& type)
     {
         if (type == "System.String") return "\"" + value + "\"";
@@ -93,15 +97,20 @@ namespace BlueprintCSharpCodeGenerator
         return value;
     }
 
+    
+    
+    
     std::string ResolveValue(CodeGenContext& ctx, uint32_t targetNodeID, const std::string& targetPinName)
     {
         const auto* link = ctx.FindLinkToInput(targetNodeID, targetPinName);
         const BlueprintNode* targetNode = ctx.nodeLookup.at(targetNodeID);
 
+        
         if (!link)
         {
             if (targetNode->InputDefaults.count(targetPinName))
             {
+                
                 return targetNode->InputDefaults.at(targetPinName);
             }
             return "default";
@@ -124,18 +133,55 @@ namespace BlueprintCSharpCodeGenerator
         case BlueprintNodeType::FunctionEntry:
             resultVar = link->FromPinName;
             break;
+        case BlueprintNodeType::Declaration:
+            resultVar = ctx.valueCache.count({sourceNode->ID, "输出变量"})
+                            ? ctx.valueCache.at({sourceNode->ID, "输出变量"})
+                            : "/* 错误: 变量未声明 */";
+            break;
         case BlueprintNodeType::FlowControl:
-            if (sourceNode->TargetMemberName == "GetSelf")
             {
-                resultVar = "this";
+                std::string fullName = sourceNode->TargetClassFullName + "." + sourceNode->TargetMemberName;
+                if (fullName == "Utility.GetSelf")
+                {
+                    resultVar = "this";
+                }
+                if (fullName == "Utility.GetEntity")
+                {
+                    resultVar = "Self";
+                }
+                
+                else if (fullName == "Utility.Input")
+                {
+                    std::string value = sourceNode->InputDefaults.count("值") ? sourceNode->InputDefaults.at("值") : "";
+                    std::string type = sourceNode->InputDefaults.count("类型")
+                                           ? sourceNode->InputDefaults.at("类型")
+                                           : "System.Object";
+                    resultVar = SanitizeValue(value, type);
+                }
+                else
+                {
+                    
+                    if (ctx.valueCache.count({sourceNode->ID, link->FromPinName}))
+                    {
+                        resultVar = ctx.valueCache.at({sourceNode->ID, link->FromPinName});
+                    }
+                    else
+                    {
+                        resultVar = "default";
+                    }
+                }
+                break;
+            }
+        default:
+            
+            if (ctx.valueCache.count({sourceNode->ID, link->FromPinName}))
+            {
+                resultVar = ctx.valueCache.at({sourceNode->ID, link->FromPinName});
             }
             else
             {
                 resultVar = "default";
             }
-            break;
-        default:
-            resultVar = "default";
             break;
         }
 
@@ -143,6 +189,9 @@ namespace BlueprintCSharpCodeGenerator
         return resultVar;
     }
 
+    
+    
+    
     void GenerateExecChain(CodeGenContext& ctx, uint32_t startNodeID, const std::string& startPinName)
     {
         const auto* currentLink = ctx.FindLinkFromOutput(startNodeID, startPinName);
@@ -155,18 +204,95 @@ namespace BlueprintCSharpCodeGenerator
         {
         case BlueprintNodeType::VariableSet:
             {
-                std::string value = ResolveValue(ctx, currentNodeID, "值");
-                ctx.AppendLine(currentNode->VariableName + " = " + value + ";");
+                
+                std::string varName;
+                if (!currentNode->VariableName.empty())
+                {
+                    varName = currentNode->VariableName;
+                }
+                else if (currentNode->InputDefaults.count("变量名"))
+                {
+                    varName = currentNode->InputDefaults.at("变量名");
+                }
+
+                if (!varName.empty())
+                {
+                    std::string value = ResolveValue(ctx, currentNodeID, "值");
+                    ctx.AppendLine(varName + " = " + value + ";");
+                }
+                else
+                {
+                    ctx.AppendLine("/* 错误: 设置变量节点未指定变量名 */");
+                }
+
                 GenerateExecChain(ctx, currentNodeID, "然后");
                 break;
             }
         case BlueprintNodeType::FunctionCall:
             {
+                
+                if (currentNode->TargetClassFullName == "Luma.SDK.Entity")
+                {
+                    const std::string& member = currentNode->TargetMemberName;
+                    if (member == "HasComponent" || member == "GetComponent" || member == "AddComponent" || member ==
+                        "SetComponent")
+                    {
+                        
+                        std::string target = ResolveValue(ctx, currentNodeID, "目标");
+                        std::string componentType = "object";
+                        if (currentNode->InputDefaults.count("组件类型"))
+                        {
+                            componentType = currentNode->InputDefaults.at("组件类型");
+                        }
+
+                        if (componentType.empty() || componentType == "object" || componentType == "选择类型")
+                        {
+                            ctx.AppendLine("/* 错误: 节点(ID:" + std::to_string(currentNode->ID) + ") 的组件类型未指定 */");
+                        }
+                        else
+                        {
+                            if (member == "HasComponent")
+                            {
+                                std::string tempVar = "temp_" + std::to_string(ctx.tempVarCounter++);
+                                ctx.AppendLine(
+                                    "bool " + tempVar + " = " + target + ".HasComponent<" + componentType + ">();");
+                                ctx.valueCache[{currentNode->ID, "返回值"}] = tempVar;
+                            }
+                            else if (member == "GetComponent")
+                            {
+                                std::string tempVar = "temp_" + std::to_string(ctx.tempVarCounter++);
+                                ctx.AppendLine(
+                                    "var " + tempVar + " = " + target + ".GetComponent<" + componentType + ">();");
+                                ctx.valueCache[{currentNode->ID, "返回值"}] = tempVar;
+                            }
+                            else if (member == "AddComponent")
+                            {
+                                std::string tempVar = "temp_" + std::to_string(ctx.tempVarCounter++);
+                                ctx.AppendLine(
+                                    "var " + tempVar + " = " + target + ".AddComponent<" + componentType + ">();");
+                                ctx.valueCache[{currentNode->ID, "返回值"}] = tempVar;
+                            }
+                            else if (member == "SetComponent")
+                            {
+                                std::string valueToSet = ResolveValue(ctx, currentNodeID, "组件值");
+                                ctx.AppendLine(target + ".SetComponent<" + componentType + ">(" + valueToSet + ");");
+                            }
+                        }
+
+                        
+                        GenerateExecChain(ctx, currentNodeID, "然后");
+                        break; 
+                    }
+                }
+
+                
                 const auto& funcs = ctx.blueprint.Functions;
                 auto it = std::find_if(funcs.begin(), funcs.end(), [&](const BlueprintFunction& func)
                 {
                     return func.Name == currentNode->TargetMemberName;
                 });
+
+                
                 if (it != funcs.end())
                 {
                     const auto& func = *it;
@@ -191,74 +317,76 @@ namespace BlueprintCSharpCodeGenerator
                         ctx.AppendLine(callStmt + ";");
                     }
                 }
+                
                 else
                 {
                     std::string funcFullName = currentNode->TargetClassFullName + "." + currentNode->TargetMemberName;
                     const auto* definition = BlueprintNodeRegistry::GetInstance().GetDefinition(funcFullName);
-                    if (!definition) break;
 
-                    bool isNonStatic = false;
-                    for (const auto& pin : definition->InputPins)
+                    if (!definition)
                     {
-                        if (pin.Name == "目标")
-                        {
-                            isNonStatic = true;
-                            break;
-                        }
-                    }
-
-                    std::string params;
-                    bool first = true;
-                    for (const auto& pin : definition->InputPins)
-                    {
-                        if (pin.Type != "Exec" && pin.Name != "目标")
-                        {
-                            if (!first) params += ", ";
-                            params += ResolveValue(ctx, currentNodeID, pin.Name);
-                            first = false;
-                        }
-                    }
-
-                    std::string callStmt;
-                    if (isNonStatic)
-                    {
-                        std::string target = ResolveValue(ctx, currentNodeID, "目标");
-                        if (target == "default" || target.empty())
-                        {
-                            callStmt = "/* 错误: 目标未连接 */";
-                        }
-                        else
-                        {
-                            callStmt = target + "." + currentNode->TargetMemberName + "(" + params + ")";
-                        }
-                    }
-                    else 
-                    {
-                        callStmt = currentNode->TargetClassFullName + "." + currentNode->TargetMemberName + "(" + params
-                            + ")";
-                    }
-
-                    std::string returnType = "void";
-                    std::string returnPinName;
-                    for (const auto& pin : definition->OutputPins)
-                    {
-                        if (pin.Type != "Exec")
-                        {
-                            returnType = pin.Type;
-                            returnPinName = pin.Name;
-                            break;
-                        }
-                    }
-
-                    if (returnType != "void")
-                    {
-                        std::string tempVar = "temp_" + std::to_string(ctx.tempVarCounter++);
-                        ctx.AppendLine(returnType + " " + tempVar + " = " + callStmt + ";");
-                        ctx.valueCache[{currentNode->ID, returnPinName}] = tempVar;
+                        ctx.AppendLine("/* 错误: 找不到函数定义 '" + funcFullName + "' */");
                     }
                     else
                     {
-                        ctx.AppendLine(callStmt + ";");
+                        bool isNonStatic = false;
+                        for (const auto& pin : definition->InputPins)
+                        {
+                            if (pin.Name == "目标")
+                            {
+                                isNonStatic = true;
+                                break;
+                            }
+                        }
+
+                        std::string params;
+                        bool first = true;
+                        for (const auto& pin : definition->InputPins)
+                        {
+                            if (pin.Type != "Exec" && pin.Name != "目标" && pin.Type != "TemplateType")
+                            {
+                                if (!first) params += ", ";
+                                params += ResolveValue(ctx, currentNodeID, pin.Name);
+                                first = false;
+                            }
+                        }
+
+                        std::string callStmt;
+                        if (isNonStatic)
+                        {
+                            std::string target = ResolveValue(ctx, currentNodeID, "目标");
+                            callStmt = (target == "default" || target.empty())
+                                           ? "/* 错误: 目标未连接 */"
+                                           : target + "." + currentNode->TargetMemberName + "(" + params + ")";
+                        }
+                        else
+                        {
+                            callStmt = currentNode->TargetClassFullName + "." + currentNode->TargetMemberName + "(" +
+                                params + ")";
+                        }
+
+                        std::string returnType = "void";
+                        std::string returnPinName;
+                        for (const auto& pin : definition->OutputPins)
+                        {
+                            if (pin.Type != "Exec")
+                            {
+                                returnType = pin.Type;
+                                returnPinName = pin.Name;
+                                break;
+                            }
+                        }
+
+                        if (returnType != "void")
+                        {
+                            std::string tempVar = "temp_" + std::to_string(ctx.tempVarCounter++);
+                            ctx.AppendLine(returnType + " " + tempVar + " = " + callStmt + ";");
+                            ctx.valueCache[{currentNode->ID, returnPinName}] = tempVar;
+                        }
+                        else
+                        {
+                            ctx.AppendLine(callStmt + ";");
+                        }
                     }
                 }
 
@@ -270,11 +398,10 @@ namespace BlueprintCSharpCodeGenerator
                 std::string fullName = currentNode->TargetClassFullName + "." + currentNode->TargetMemberName;
                 if (fullName == "FlowControl.If")
                 {
-                    std::string condition = "false";
-                    if (currentNode->InputDefaults.count("条件"))
+                    std::string condition = ResolveValue(ctx, currentNodeID, "条件");
+                    if (condition == "default" || condition.empty())
                     {
-                        condition = currentNode->InputDefaults.at("条件");
-                        if (condition.empty()) condition = "false";
+                        condition = "false";
                     }
 
                     ctx.AppendLine("if (" + condition + ")");
@@ -291,7 +418,7 @@ namespace BlueprintCSharpCodeGenerator
                     ctx.AppendLine("}");
                     GenerateExecChain(ctx, currentNodeID, "然后");
                 }
-                else if (currentNode->TargetMemberName == "ForLoop")
+                else if (fullName == "FlowControl.ForLoop")
                 {
                     std::string firstIndex = ResolveValue(ctx, currentNodeID, "起始索引");
                     std::string lastIndex = ResolveValue(ctx, currentNodeID, "结束索引");
@@ -308,7 +435,7 @@ namespace BlueprintCSharpCodeGenerator
                     ctx.AppendLine("}");
                     GenerateExecChain(ctx, currentNodeID, "然后");
                 }
-                else if (currentNode->TargetMemberName == "Return")
+                else if (fullName == "FlowControl.Return")
                 {
                     std::string returnType = "void";
                     if (currentNode->InputDefaults.count("返回类型"))
@@ -316,7 +443,7 @@ namespace BlueprintCSharpCodeGenerator
                         returnType = currentNode->InputDefaults.at("返回类型");
                     }
 
-                    if (returnType == "void")
+                    if (returnType == "void" || returnType.empty())
                     {
                         ctx.AppendLine("return;");
                     }
@@ -330,21 +457,24 @@ namespace BlueprintCSharpCodeGenerator
             }
         case BlueprintNodeType::Declaration:
             {
-                std::string varType = currentNode->InputDefaults.at("变量类型");
-                std::string varName = currentNode->InputDefaults.at("变量名");
-                std::string initialValue = currentNode->InputDefaults.at("初始值");
+                std::string varType = currentNode->InputDefaults.count("变量类型")
+                                          ? currentNode->InputDefaults.at("变量类型")
+                                          : "var";
+                std::string varName = currentNode->InputDefaults.count("变量名")
+                                          ? currentNode->InputDefaults.at("变量名")
+                                          : ("__unnamed_var_" + std::to_string(currentNode->ID));
 
                 if (!varType.empty() && !varName.empty())
                 {
+                    std::string initialValue = ResolveValue(ctx, currentNodeID, "初始值");
                     std::string declaration = varType + " " + varName;
-                    if (!initialValue.empty())
+                    if (initialValue != "default")
                     {
-                        declaration += " = " + SanitizeValue(initialValue, varType);
+                        declaration += " = " + initialValue;
                     }
                     declaration += ";";
                     ctx.AppendLine(declaration);
 
-                    
                     ctx.valueCache[{currentNodeID, "输出变量"}] = varName;
                 }
                 GenerateExecChain(ctx, currentNodeID, "然后");
@@ -355,6 +485,9 @@ namespace BlueprintCSharpCodeGenerator
         }
     }
 
+    
+    
+    
     static std::string Generate(const Blueprint& blueprintData)
     {
         CodeGenContext ctx(blueprintData);
@@ -370,6 +503,7 @@ namespace BlueprintCSharpCodeGenerator
         ctx.AppendLine("{");
         ctx.indent++;
 
+        
         for (const auto& var : blueprintData.Variables)
         {
             std::string line = "[Export]\npublic " + var.Type + " " + var.Name;
@@ -385,6 +519,7 @@ namespace BlueprintCSharpCodeGenerator
             ctx.AppendLine("");
         }
 
+        
         for (const auto& node : blueprintData.Nodes)
         {
             if (node.Type == BlueprintNodeType::Event)
@@ -400,9 +535,11 @@ namespace BlueprintCSharpCodeGenerator
                     if (pin.Type != "Exec")
                     {
                         if (!first) signature += ", ";
-                        signature += pin.Type + " " + pin.Name;
+                        
+                        std::string pinNameSanitized = pin.Name; 
+                        signature += pin.Type + " " + pinNameSanitized;
                         first = false;
-                        ctx.valueCache[{node.ID, pin.Name}] = pin.Name;
+                        ctx.valueCache[{node.ID, pin.Name}] = pinNameSanitized;
                     }
                 }
                 signature += ")";
@@ -416,6 +553,7 @@ namespace BlueprintCSharpCodeGenerator
             }
         }
 
+        
         for (const auto& func : blueprintData.Functions)
         {
             const BlueprintNode* entryNode = nullptr;

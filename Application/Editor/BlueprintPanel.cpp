@@ -458,14 +458,15 @@ void BlueprintPanel::drawNodeEditor()
                     std::string& value = sourceData->InputDefaults[pin.name];
                     char buffer[256];
                     strncpy(buffer, value.c_str(), sizeof(buffer));
-                    buffer[sizeof(buffer)-1] = '\0';
-                    if (ImGui::InputText(("##" + pin.name + std::to_string(pin.id.Get())).c_str(), buffer, sizeof(buffer)))
+                    buffer[sizeof(buffer) - 1] = '\0';
+                    if (ImGui::InputText(("##" + pin.name + std::to_string(pin.id.Get())).c_str(), buffer,
+                                         sizeof(buffer)))
                     {
                         value = buffer;
                     }
                 }
             }
-            else if (pin.type == "SelectType")
+            else if (pin.type == "SelectType" || pin.type == "TemplateType")
             {
                 ImGui::TextUnformatted(pin.name.c_str());
                 std::string& selectedType = sourceData->InputDefaults[pin.name];
@@ -517,36 +518,66 @@ void BlueprintPanel::drawNodeEditor()
                     value = buffer;
                 }
             }
-            else if (pin.type == "InputString")
+            else if (sourceData->TargetClassFullName == "Luma.SDK.Debug" && pin.name == "message")
             {
-                ImGui::TextUnformatted(pin.name.c_str());
-                std::string& value = sourceData->InputDefaults[pin.name];
-                std::string buttonText = value.empty()
-                                             ? "编辑条件"
-                                             : (value.length() > 15 ? value.substr(0, 12) + "..." : value);
+                ed::BeginPin(pin.id, ed::PinKind::Input);
+                ImGui::Text("-> %s", pin.name.c_str());
+                ed::EndPin();
 
-                if (ImGui::Button((buttonText + "##" + std::to_string(pin.id.Get())).c_str(), ImVec2(100, 25)))
+                if (!pin.isConnected)
                 {
-                    InputStringWindow* window = findInputStringWindow(node.sourceDataID, pin.name);
-                    if (!window)
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(150);
+
+                    std::string& value = sourceData->InputDefaults[pin.name];
+                    char buffer[256];
+                    strncpy(buffer, value.c_str(), sizeof(buffer));
+                    buffer[sizeof(buffer) - 1] = '\0';
+
+                    std::string inputId = "##" + pin.name + std::to_string(pin.id.Get());
+                    if (ImGui::InputText(inputId.c_str(), buffer, sizeof(buffer)))
                     {
-                        InputStringWindow newWindow;
-                        newWindow.nodeId = node.sourceDataID;
-                        newWindow.pinName = pin.name;
-                        newWindow.isOpen = true;
-                        newWindow.needsFocus = true;
-                        newWindow.size = ImVec2(300, 200);
-                        newWindow.windowId = "InputString##" + std::to_string(node.sourceDataID) + "_" + pin.name;
-                        m_inputStringWindows.push_back(newWindow);
-                    }
-                    else
-                    {
-                        window->isOpen = true;
-                        window->needsFocus = true;
+                        value = buffer;
                     }
                 }
             }
-            else
+            else if (sourceData->TargetMemberName == "If" && pin.name == "条件")
+            {
+                ed::BeginPin(pin.id, ed::PinKind::Input);
+                ImGui::Text("-> %s", pin.name.c_str());
+                ed::EndPin();
+
+                if (!pin.isConnected)
+                {
+                    ImGui::SameLine();
+                    std::string& value = sourceData->InputDefaults[pin.name];
+                    std::string buttonText = value.empty()
+                                                 ? "编辑条件"
+                                                 : (value.length() > 15 ? value.substr(0, 12) + "..." : value);
+
+                    if (ImGui::Button((buttonText + "##" + std::to_string(pin.id.Get())).c_str(), ImVec2(100, 0)))
+                    {
+                        InputStringWindow* window = findInputStringWindow(node.sourceDataID, pin.name);
+                        if (!window)
+                        {
+                            InputStringWindow newWindow;
+                            newWindow.nodeId = node.sourceDataID;
+                            newWindow.pinName = pin.name;
+                            newWindow.isOpen = true;
+                            newWindow.needsFocus = true;
+                            newWindow.size = ImVec2(300, 200);
+                            newWindow.windowId = "InputString##" + std::to_string(node.sourceDataID) + "_" + pin.name;
+                            m_inputStringWindows.push_back(newWindow);
+                        }
+                        else
+                        {
+                            window->isOpen = true;
+                            window->needsFocus = true;
+                        }
+                    }
+                }
+            }
+            else 
             {
                 ed::BeginPin(pin.id, ed::PinKind::Input);
                 ImGui::Text("-> %s", pin.name.c_str());
@@ -566,9 +597,35 @@ void BlueprintPanel::drawNodeEditor()
                 if (varType.empty()) varType = "System.Object";
                 pin.type = varType;
             }
-
+            else if (sourceData->TargetClassFullName == "Utility" && sourceData->TargetMemberName == "Input" && pin.name
+                == "输出")
+            {
+                std::string selectedType = sourceData->InputDefaults["类型"];
+                if (selectedType.empty()) selectedType = "System.Object";
+                pin.type = selectedType;
+            }
+            else if ((sourceData->TargetMemberName == "GetComponent" || sourceData->TargetMemberName == "AddComponent")
+                && pin.name == "返回值")
+            {
+                std::string componentType = sourceData->InputDefaults["组件类型"];
+                if (componentType.empty() || componentType == "选择类型")
+                {
+                    pin.type = "System.Object";
+                }
+                else
+                {
+                    pin.type = componentType;
+                }
+            }
             ed::BeginPin(pin.id, ed::PinKind::Output);
-            ImGui::Text("%s ->", pin.name.c_str());
+            if (pin.type == "Exec")
+            {
+                ImGui::Text("%s ->", pin.name.c_str());
+            }
+            else
+            {
+                ImGui::Text("%s (%s) ->", pin.name.c_str(), pin.type.c_str());
+            }
             ed::EndPin();
         }
         ImGui::EndGroup();
@@ -2082,18 +2139,40 @@ bool BlueprintPanel::canCreateLink(const BPin* startPin, const BPin* endPin) con
     if (startPin->nodeId == endPin->nodeId) return false;
     if (startPin->kind == endPin->kind) return false;
 
-    if (endPin->isConnected) return false;
+    const BPin* pOut = (startPin->kind == ed::PinKind::Output) ? startPin : endPin;
+    const BPin* pIn = (startPin->kind == ed::PinKind::Output) ? endPin : startPin;
 
-    if (startPin->kind == ed::PinKind::Input && endPin->kind == ed::PinKind::Output)
+    if (pIn->isConnected) return false;
+
+    if (pOut->type == "Exec")
     {
-        std::swap(startPin, endPin);
+        return pIn->type == "Exec";
     }
 
-    if (startPin->type == "Exec")
+    auto getCanonicalType = [](const std::string& typeName) -> std::string_view
     {
-        return endPin->type == "Exec";
+        if (typeName == "float") return "System.Single";
+        if (typeName == "double") return "System.Double";
+        if (typeName == "int") return "System.Int32";
+        if (typeName == "long") return "System.Int64";
+        if (typeName == "bool") return "System.Boolean";
+        if (typeName == "string") return "System.String";
+        if (typeName == "object") return "System.Object";
+        if (typeName == "short") return "System.Int16";
+        if (typeName == "byte") return "System.Byte";
+        if (typeName == "char") return "System.Char";
+        return typeName;
+    };
+
+    std::string_view pInCanonicalType = getCanonicalType(pIn->type);
+    std::string_view pOutCanonicalType = getCanonicalType(pOut->type);
+
+    if (pInCanonicalType == "System.Object")
+    {
+        return pOut->type != "Exec";
     }
-    return startPin->type == endPin->type;
+
+    return pOutCanonicalType == pInCanonicalType;
 }
 
 void BlueprintPanel::rebuildPinConnections()

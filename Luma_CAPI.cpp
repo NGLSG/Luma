@@ -79,23 +79,6 @@ LUMA_API void* Entity_GetComponent(LumaSceneHandle scene, LumaEntityHandle entit
     return registration->get_raw_ptr(AsScene(scene)->GetRegistry(), (entt::entity)entity);
 }
 
-LUMA_API intptr_t* ScriptComponent_GetGCHandle(void* componentPtr)
-{
-    if (!componentPtr)
-    {
-        return nullptr;
-    }
-
-    const auto* scriptComponent = static_cast<const ECS::ScriptComponent*>(componentPtr);
-
-    if (!scriptComponent->managedGCHandle)
-    {
-        return nullptr;
-    }
-
-    return scriptComponent->managedGCHandle;
-}
-
 LUMA_API void Entity_RemoveComponent(LumaSceneHandle scene, LumaEntityHandle entity, const char* componentName)
 {
     if (!scene) return;
@@ -673,7 +656,7 @@ void ScriptComponent_GetAllGCHandlesCount(LumaSceneHandle scene, uint32_t entity
 
     const auto& scriptsComp = registry.get<const ECS::ScriptsComponent>((entt::entity)entity);
 
-    
+
     int count = 0;
     for (const auto& scriptComp : scriptsComp.scripts)
     {
@@ -684,4 +667,17 @@ void ScriptComponent_GetAllGCHandlesCount(LumaSceneHandle scene, uint32_t entity
     }
 
     *outCount = count;
+}
+
+intptr_t ScriptComponent_GetGCHandle(void* componentPtr, const char* typeName)
+{
+    if (!componentPtr || !typeName) return 0;
+
+    auto* scriptsComp = static_cast<ECS::ScriptsComponent*>(componentPtr);
+    auto& sComp = scriptsComp->GetScriptByTypeName(typeName);
+    if (sComp.managedGCHandle)
+    {
+        return *sComp.managedGCHandle;
+    }
+    return 0;
 }

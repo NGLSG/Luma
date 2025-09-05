@@ -54,9 +54,9 @@ namespace ECS
 
 
         ScriptComponent& AddScript(const AssetHandle& scriptAsset, entt::entity entity);
-        ScriptComponent& GetScriptByName(const std::string& scriptName);
+        ScriptComponent& GetScriptByTypeName(const std::string& scriptName);
         ScriptComponent& GetScriptByAsset(const AssetHandle& scriptAsset);
-        std::vector<AssetHandle> GetAllScriptsByName(const std::string& scriptName);
+        std::vector<AssetHandle> GetAllScriptsByTypeName(const std::string& scriptName);
         void RemoveScriptByAsset(const AssetHandle& scriptAsset);
         void RemoveScriptByName(const std::string& scriptName);
     };

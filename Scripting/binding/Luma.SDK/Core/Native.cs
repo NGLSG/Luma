@@ -123,11 +123,12 @@ internal static class Native
     [DllImport(DllName, CharSet = CharSet.Ansi)]
     internal static extern IntPtr ScriptComponent_GetGCHandle(IntPtr componentPtr, string typeName);
 
-    [DllImport(DllName)]
-    public static extern void ScriptComponent_GetAllGCHandlesCount(IntPtr scenePtr, uint entityId, ref int outCount);
 
     [DllImport(DllName)]
-    public static extern void ScriptComponent_GetAllGCHandles(IntPtr scenePtr, uint entityId, IntPtr outHandles,
+    internal static extern void ScriptComponent_GetAllGCHandlesCount(IntPtr scenePtr, uint entityId, ref int outCount);
+
+    [DllImport(DllName)]
+    internal static extern void ScriptComponent_GetAllGCHandles(IntPtr scenePtr, uint entityId, IntPtr outHandles,
         int outCount);
 
     #region SIMD Bindings

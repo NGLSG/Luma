@@ -3,13 +3,12 @@
 #include "Utils/Logger.h"
 #include <imgui_node_editor.h>
 #include "BlueprintData.h"
-#include <sstream> 
+#include <sstream>
 
 namespace ed = ax::NodeEditor;
 
 namespace
 {
-    
     std::string Trim(const std::string& str)
     {
         const auto strBegin = str.find_first_not_of(" \t\n\r");
@@ -22,7 +21,7 @@ namespace
         return str.substr(strBegin, strRange);
     }
 
-    
+
     std::vector<std::string> Split(const std::string& s, char delimiter)
     {
         std::vector<std::string> tokens;
@@ -49,8 +48,9 @@ void BlueprintNodeRegistry::RegisterAll()
 
     RegisterCoreNodes();
     RegisterScriptNodes();
+    RegisterSDKNodes();
 
-    
+
     for (const auto& [name, def] : m_definitions)
     {
         LogInfo("Registered Blueprint Node: {} (Category: {})", name, def.Category);
@@ -172,10 +172,38 @@ void BlueprintNodeRegistry::RegisterCoreNodes()
         },
         .OutputPins = {
             {"然后", "Exec", ed::PinKind::Output},
-            {"输出变量", "System.Object", ed::PinKind::Output} 
+            {"输出变量", "System.Object", ed::PinKind::Output}
         }
     });
-
+    RegisterNode({
+        .FullName = "Utility.Input",
+        .DisplayName = "输入",
+        .Category = "通用",
+        .Description = "提供一个无需声明变量的即时输入值。",
+        .NodeType = BlueprintNodeType::FlowControl,
+        .InputPins = {
+            {"值", "NodeInputText", ed::PinKind::Input},
+            {"类型", "SelectType", ed::PinKind::Input},
+        },
+        .OutputPins = {
+            {"输出", "System.Object", ed::PinKind::Output}
+        }
+    });
+    RegisterNode({
+        .FullName = "Variable.Set",
+        .DisplayName = "设置变量",
+        .Category = "变量",
+        .Description = "修改一个已存在变量的值。",
+        .NodeType = BlueprintNodeType::VariableSet,
+        .InputPins = {
+            {"", "Exec", ed::PinKind::Input},
+            {"变量名", "NodeInputText", ed::PinKind::Input},
+            {"值", "NodeInputText", ed::PinKind::Input},
+        },
+        .OutputPins = {
+            {"然后", "Exec", ed::PinKind::Output}
+        }
+    });
     RegisterNode({
         .FullName = "Utility.GetSelf",
         .DisplayName = "获取自身引用",
@@ -185,6 +213,17 @@ void BlueprintNodeRegistry::RegisterCoreNodes()
         .InputPins = {},
         .OutputPins = {
             {"自身", "self", ed::PinKind::Output}
+        }
+    });
+    RegisterNode({
+        .FullName = "Utility.GetEntity",
+        .DisplayName = "获取实体",
+        .Category = "通用",
+        .Description = "获取当前蓝图脚本实例的实体。",
+        .NodeType = BlueprintNodeType::FlowControl,
+        .InputPins = {},
+        .OutputPins = {
+            {"实体", entityType, ed::PinKind::Output}
         }
     });
     RegisterNode({
@@ -209,7 +248,7 @@ void BlueprintNodeRegistry::RegisterCoreNodes()
         .NodeType = BlueprintNodeType::FlowControl,
         .InputPins = {
             {"", "Exec", ed::PinKind::Input},
-            {"条件", "InputString", ed::PinKind::Input}
+            {"条件", "System.Boolean", ed::PinKind::Input}
         },
         .OutputPins = {
             {"为真", "Exec", ed::PinKind::Output},
@@ -367,5 +406,256 @@ void BlueprintNodeRegistry::RegisterCoreNodes()
             {"然后", "Exec", ed::PinKind::Output},
             {"另一物体", entityType, ed::PinKind::Output}
         }
+    });
+}
+
+void BlueprintNodeRegistry::RegisterSDKNodes()
+{
+    RegisterNode({
+        .FullName = "Luma.SDK.Debug.Log", .DisplayName = "日志::普通输出", .Category = "SDK|调试",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}, {"message", "System.Object"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Debug.LogWarning", .DisplayName = "日志::输出警告", .Category = "SDK|调试",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}, {"message", "System.Object"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Debug.LogError", .DisplayName = "日志::输出错误", .Category = "SDK|调试",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}, {"message", "System.Object"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+
+    
+    
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.GetCursorPosition", .DisplayName = "鼠标.获取坐标", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "Luma.SDK.Vector2Int"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.GetCursorDelta", .DisplayName = "鼠标.获取移动增量", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "Luma.SDK.Vector2Int"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.GetScrollDelta", .DisplayName = "鼠标.获取滚动增量", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "Luma.SDK.Vector2"}}
+    });
+
+    
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.IsLeftMouseButtonPressed", .DisplayName = "鼠标.左键按下瞬间", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.IsLeftMouseButtonDown", .DisplayName = "鼠标.左键持续按下", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.IsLeftMouseButtonUp", .DisplayName = "鼠标.左键抬起瞬间", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+
+    
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.IsRightMouseButtonPressed", .DisplayName = "鼠标.右键按下瞬间", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.IsRightMouseButtonDown", .DisplayName = "鼠标.右键持续按下", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.IsRightMouseButtonUp", .DisplayName = "鼠标.右键抬起瞬间", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+
+    
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.IsMiddleMouseButtonPressed", .DisplayName = "鼠标.中键按下瞬间", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.IsMiddleMouseButtonDown", .DisplayName = "鼠标.中键持续按下", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.IsMiddleMouseButtonUp", .DisplayName = "鼠标.中键抬起瞬间", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.IsKeyPressed", .DisplayName = "键盘.按键按下瞬间", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}, {"scancode", "Luma.SDK.Scancode"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.IsKeyUp", .DisplayName = "键盘.按键抬起瞬间", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}, {"scancode", "Luma.SDK.Scancode"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Input.IsKeyDown", .DisplayName = "键盘.按键持续按下", .Category = "SDK|输入",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}, {"scancode", "Luma.SDK.Scancode"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+
+
+    const std::string entityType = "Luma.SDK.Entity";
+    RegisterNode({
+        .FullName = "Luma.SDK.Entity.SetActive", .DisplayName = "实体.设置激活状态", .Category = "SDK|实体",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", entityType}, {"", "Exec"}, {"active", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.Entity.HasComponent", .DisplayName = "实体.拥有组件", .Category = "SDK|实体|组件",
+        .Description = "检查实体是否拥有指定类型的组件。",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {
+            {"", "Exec"},
+            {"目标", entityType},
+            {"组件类型", "TemplateType"} 
+        },
+        .OutputPins = {
+            {"然后", "Exec"},
+            {"返回值", "System.Boolean"}
+        }
+    });
+
+    RegisterNode({
+        .FullName = "Luma.SDK.Entity.GetComponent", .DisplayName = "实体.获取组件", .Category = "SDK|实体|组件",
+        .Description = "获取实体上指定类型的组件实例。",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {
+            {"", "Exec"},
+            {"目标", entityType},
+            {"组件类型", "TemplateType"}
+        },
+        .OutputPins = {
+            {"然后", "Exec"},
+            {"返回值", "System.Object"} 
+        }
+    });
+
+    RegisterNode({
+        .FullName = "Luma.SDK.Entity.AddComponent", .DisplayName = "实体.添加组件", .Category = "SDK|实体|组件",
+        .Description = "为实体添加一个指定类型的新组件。",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {
+            {"", "Exec"},
+            {"目标", entityType},
+            {"组件类型", "TemplateType"}
+        },
+        .OutputPins = {
+            {"然后", "Exec"},
+            {"返回值", "System.Object"} 
+        }
+    });
+
+    RegisterNode({
+        .FullName = "Luma.SDK.Entity.SetComponent", .DisplayName = "实体.设置组件", .Category = "SDK|实体|组件",
+        .Description = "设置或更新实体上指定类型的组件数据。",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {
+            {"", "Exec"},
+            {"目标", entityType},
+            {"组件类型", "TemplateType"},
+            {"组件值", "System.Object"} 
+        },
+        .OutputPins = {
+            {"然后", "Exec"}
+        }
+    });
+
+
+    const std::string animControllerType = "Luma.SDK.AnimationController";
+    RegisterNode({
+        .FullName = "Luma.SDK.AnimationSystem.GetController", .DisplayName = "动画系统.获取动画器",
+        .Category = "SDK|动画",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"", "Exec"}, {"entity", entityType}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", animControllerType}}
+    });
+
+    RegisterNode({
+        .FullName = "Luma.SDK.AnimationController.Play", .DisplayName = "动画器.播放动画",
+        .Category = "SDK|动画",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", animControllerType}, {"", "Exec"}, {"animationName", "System.String"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+
+    RegisterNode({
+        .FullName = "Luma.SDK.AnimationController.Stop", .DisplayName = "动画器.停止动画",
+        .Category = "SDK|动画",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", animControllerType}, {"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AnimationController.IsPlaying", .DisplayName = "动画器.是否正在播放指定动画",
+        .Category = "SDK|动画",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", animControllerType}, {"", "Exec"}, {"animationName", "System.String"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AnimationController.SetFrameRate", .DisplayName = "动画器.设置动画帧率",
+        .Category = "SDK|动画",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", animControllerType}, {"", "Exec"}, {"frameRate", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AnimationController.SetFloat", .DisplayName = "动画器.设置浮点参数",
+        .Category = "SDK|动画",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", animControllerType}, {"", "Exec"}, {"name", "System.String"}, {"value", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AnimationController.SetBool", .DisplayName = "动画器.设置开关参数",
+        .Category = "SDK|动画",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", animControllerType}, {"", "Exec"}, {"name", "System.String"}, {"value", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AnimationController.SetBool", .DisplayName = "动画器.设置触发器参数",
+        .Category = "SDK|动画",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", animControllerType}, {"", "Exec"}, {"name", "System.String"}},
+        .OutputPins = {{"然后", "Exec"}}
     });
 }

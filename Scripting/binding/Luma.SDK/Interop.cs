@@ -492,7 +492,7 @@ public static class Interop
             string? valueAsYaml = Marshal.PtrToStringUTF8(valueAsYamlPtr);
             if (string.IsNullOrEmpty(propName) || valueAsYaml == null) return;
 
-            
+
             if (propName.StartsWith("__EventLink_"))
             {
                 string eventName = propName.Substring("__EventLink_".Length);
@@ -516,7 +516,7 @@ public static class Interop
             {
                 string? guidStr = YamlDeserializer.Deserialize<string>(valueAsYaml);
                 uint targetId = Native.Scene_FindGameObjectByGuid(instance.Self.ScenePtr, guidStr);
-                if (targetId != 0)
+                if (targetId != int.MaxValue)
                 {
                     Entity targetEntity = new Entity(targetId, instance.Self.ScenePtr);
                     finalValue = targetEntity.GetScript(memberType);
@@ -538,7 +538,7 @@ public static class Interop
         }
         catch (Exception e)
         {
-            Debug.Log($"[EXCEPTION] SetExportedProperty failed: {e.Message}");
+            Debug.LogError($"SetExportedProperty failed: {e.Message}\n{e.StackTrace}");
         }
     }
 
@@ -546,7 +546,6 @@ public static class Interop
     {
         try
         {
-            
             FieldInfo? eventField = instance.GetType().GetField(eventName);
             if (eventField == null || !eventField.FieldType.Name.Contains("LumaEvent"))
             {
@@ -554,13 +553,13 @@ public static class Interop
                 return;
             }
 
-            
+
             object? lumaEvent = eventField.GetValue(instance);
             if (lumaEvent == null)
             {
                 Debug.LogWarning($"setupEventTargets: 事件字段 '{eventName}' 为空，尝试创建新实例");
 
-                
+
                 try
                 {
                     lumaEvent = Activator.CreateInstance(eventField.FieldType);
@@ -574,7 +573,7 @@ public static class Interop
                 }
             }
 
-            
+
             var targets = YamlDeserializer.Deserialize<List<Dictionary<string, object>>>(targetsYaml);
             if (targets == null || targets.Count == 0)
             {
@@ -582,12 +581,12 @@ public static class Interop
                 return;
             }
 
-            
+
             Type lumaEventType = lumaEvent.GetType();
             MethodInfo? clearMethod = lumaEventType.GetMethod("Clear");
             clearMethod?.Invoke(lumaEvent, null);
 
-            
+
             Type? delegateType = getDelegateTypeForLumaEvent(lumaEventType);
             if (delegateType == null)
             {
@@ -602,7 +601,7 @@ public static class Interop
                 return;
             }
 
-            
+
             int successCount = 0;
             foreach (var target in targets)
             {
@@ -631,7 +630,7 @@ public static class Interop
 
                 Entity targetEntity = new Entity(targetEntityId, instance.Self.ScenePtr);
 
-                
+
                 var targetScripts = targetEntity.GetScripts();
                 bool methodFound = false;
 
@@ -642,7 +641,6 @@ public static class Interop
                     {
                         try
                         {
-                            
                             Delegate? methodDelegate =
                                 Delegate.CreateDelegate(delegateType, targetScript, targetMethod);
                             addMethod.Invoke(lumaEvent, new object[] { methodDelegate });
@@ -671,9 +669,7 @@ public static class Interop
         }
     }
 
-    
-    
-    
+
     private static Type? getDelegateTypeForLumaEvent(Type lumaEventType)
     {
         if (lumaEventType == typeof(LumaEvent))
@@ -700,9 +696,7 @@ public static class Interop
         return null;
     }
 
-    
-    
-    
+
     private static MethodInfo? findCompatibleMethod(Type scriptType, string methodName, Type delegateType)
     {
         MethodInfo[] methods = scriptType.GetMethods(BindingFlags.Public | BindingFlags.Instance);
@@ -714,13 +708,11 @@ public static class Interop
 
             try
             {
-                
                 Delegate.CreateDelegate(delegateType, null, method);
                 return method;
             }
             catch
             {
-                
                 continue;
             }
         }

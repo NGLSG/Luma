@@ -18,7 +18,7 @@ namespace ECS
         return scripts.back();
     }
 
-    ScriptComponent& ScriptsComponent::GetScriptByName(const std::string& scriptName)
+    ScriptComponent& ScriptsComponent::GetScriptByTypeName(const std::string& scriptName)
     {
         for (auto& script : scripts)
         {
@@ -43,7 +43,7 @@ namespace ECS
         throw std::runtime_error("Script not found with given asset handle.");
     }
 
-    std::vector<AssetHandle> ScriptsComponent::GetAllScriptsByName(const std::string& scriptName)
+    std::vector<AssetHandle> ScriptsComponent::GetAllScriptsByTypeName(const std::string& scriptName)
     {
         std::vector<AssetHandle> result;
         for (const auto& script : scripts)

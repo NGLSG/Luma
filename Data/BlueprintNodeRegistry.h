@@ -57,6 +57,7 @@ private:
     BlueprintNodeRegistry();
     void RegisterScriptNodes();
     void RegisterCoreNodes();
+    void RegisterSDKNodes();
 
     std::unordered_map<std::string, BlueprintNodeDefinition> m_definitions;
 
