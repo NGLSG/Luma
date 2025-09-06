@@ -56,7 +56,6 @@ set(LUMA_SUPPORTED_EXTENSIONS "")
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     check_cxx_compiler_flag("-mavx" HAS_AVX)
     if (HAS_AVX)
-        add_compile_options(-mavx)
         add_compile_definitions(LUMA_AVX)
         list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX")
         message(STATUS "启用 AVX 支持")
@@ -64,7 +63,6 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clan
 
     check_cxx_compiler_flag("-mavx2" HAS_AVX2)
     if (HAS_AVX2)
-        add_compile_options(-mavx2)
         add_compile_definitions(LUMA_AVX2)
         list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX2")
         message(STATUS "启用 AVX2 支持")
@@ -72,7 +70,6 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clan
 
     check_cxx_compiler_flag("-mavx512f" HAS_AVX512)
     if (HAS_AVX512)
-        add_compile_options(-mavx512f)
         add_compile_definitions(LUMA_AVX512)
         list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX512")
         message(STATUS "启用 AVX512 支持")
@@ -90,7 +87,7 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clan
 elseif (MSVC)
     # MSVC 编译器的指令集检测
     set(MSVC_ARCH_FLAGS "")
-    foreach(FLAG SSE2 SSE4.2 AVX AVX2 AVX512)
+    foreach (FLAG SSE2 SSE4.2 AVX AVX2 AVX512)
         string(TOLOWER ${FLAG} LOWERCASE_FLAG)
         string(REPLACE "." "" SAFE_FLAG ${LOWERCASE_FLAG})
         set(TEST_FILE ${CMAKE_BINARY_DIR}/test_${SAFE_FLAG}.cpp)
@@ -106,7 +103,7 @@ elseif (MSVC)
             list(APPEND LUMA_SUPPORTED_EXTENSIONS ${FLAG})
             message(STATUS "启用 ${FLAG} 支持")
         endif ()
-    endforeach()
+    endforeach ()
 endif ()
 
 message(STATUS "支持的指令集扩展: ${LUMA_SUPPORTED_EXTENSIONS}")
@@ -167,7 +164,15 @@ target_compile_definitions(LumaEngine PUBLIC
 target_link_libraries(LumaEngine PUBLIC Luma3rd)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    target_compile_options(LumaEngine PRIVATE -mavx -mavx2 -mfma)
+    if (HAS_AVX)
+        target_compile_options(LumaEngine PRIVATE -mavx)
+    endif ()
+    if (HAS_AVX2)
+        target_compile_options(LumaEngine PRIVATE -mavx2 -mfma)
+    endif ()
+    if (HAS_AVX512)
+        target_compile_options(LumaEngine PRIVATE -mavx512f -mavx512cd -mavx512vl -mavx512dq -mavx512bw)
+    endif ()
 endif ()
 
 # 为 LumaEngine 添加特殊的链接选项来处理符号冲突
@@ -344,14 +349,14 @@ elseif (UNIX AND NOT APPLE)
     file(GLOB OTHER_FILES CONFIGURE_DEPENDS LIST_DIRECTORIES false "${CMAKE_BINARY_DIR}/*")
     list(REMOVE_DUPLICATES OTHER_FILES) # 避免重复
 
-    foreach(FILE_PATH ${OTHER_FILES})
+    foreach (FILE_PATH ${OTHER_FILES})
         get_filename_component(FILE_NAME ${FILE_PATH} NAME)
         get_filename_component(FILE_EXT ${FILE_PATH} EXT)
         # 确保是无后缀文件，并且不是目录或我们已经添加过的目标
-        if(NOT IS_DIRECTORY "${FILE_PATH}" AND FILE_EXT STREQUAL "" AND NOT FILE_NAME STREQUAL "Makefile" AND NOT FILE_NAME STREQUAL "Game" AND NOT FILE_NAME STREQUAL "Editor")
+        if (NOT IS_DIRECTORY "${FILE_PATH}" AND FILE_EXT STREQUAL "" AND NOT FILE_NAME STREQUAL "Makefile" AND NOT FILE_NAME STREQUAL "Game" AND NOT FILE_NAME STREQUAL "Editor")
             list(APPEND ALL_BUILD_ARTIFACTS "${FILE_PATH}")
-        endif()
-    endforeach()
+        endif ()
+    endforeach ()
 endif ()
 
 foreach (ARTIFACT ${ALL_BUILD_ARTIFACTS})

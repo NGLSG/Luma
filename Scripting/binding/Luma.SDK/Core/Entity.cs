@@ -222,7 +222,6 @@ public readonly struct Entity
 
         try
         {
-            
             int handleCount = 0;
             Native.ScriptComponent_GetAllGCHandlesCount(ScenePtr, Id, ref handleCount);
 
@@ -231,7 +230,7 @@ public readonly struct Entity
                 return scripts;
             }
 
-            
+
             IntPtr[] handles = new IntPtr[handleCount];
             unsafe
             {
@@ -239,7 +238,7 @@ public readonly struct Entity
                 {
                     Native.ScriptComponent_GetAllGCHandles(ScenePtr, Id, (IntPtr)handlesPtr, handleCount);
 
-                    
+
                     for (int i = 0; i < handleCount; i++)
                     {
                         IntPtr handlePtr = handles[i];
@@ -261,5 +260,32 @@ public readonly struct Entity
         }
 
         return scripts;
+    }
+
+    
+    
+    
+    
+    
+    
+    public void SendMessage(string message, params object[] args)
+    {
+        foreach (var script in GetScripts())
+        {
+            try
+            {
+                var method = script.GetType().GetMethod(message,
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.NonPublic);
+                if (method != null)
+                {
+                    method.Invoke(script, args);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"SendMessage 调用脚本方法 '{message}' 失败: {e.Message}");
+            }
+        }
     }
 }

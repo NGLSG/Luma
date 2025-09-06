@@ -245,6 +245,21 @@ private:
         char searchBuffer[256] = {0}; ///< 类型搜索缓冲区。
     };
 
+    /**
+     * @struct SelectFunctionWindow
+     * @brief 管理用于选择函数的弹出窗口状态。
+     */
+    struct SelectFunctionWindow
+    {
+        bool isOpen = false;
+        bool needsFocus = false;
+        std::string windowId;
+        uint32_t nodeId; // 节点的 sourceDataID
+        std::string pinName;
+        char searchBuffer[128] = "";
+    };
+
+
     // =========================================================================
     // 绘制函数 (Drawing Methods)
     // =========================================================================
@@ -320,7 +335,10 @@ private:
      * @brief 绘制用于创建新逻辑区域的模态弹窗。
      */
     void drawCreateRegionPopup();
-
+    /**
+     * @brief 绘制所有活动的 SelectFunction 窗口。
+     */
+    void drawSelectFunctionWindows();
     // =========================================================================
     // 数据处理与状态管理 (Data Handling & State Management)
     // =========================================================================
@@ -464,6 +482,13 @@ private:
      */
     bool doesEventNodeExist(const std::string& fullName);
 
+    /**
+     * @brief 查找与指定节点和引脚关联的 SelectFunction 窗口。
+     * @param nodeId 节点源ID。
+     * @param pinName 引脚名称。
+     * @return 指向 SelectFunctionWindow 对象的指针，如果未找到则返回 nullptr。
+     */
+    SelectFunctionWindow* findSelectFunctionWindow(uint32_t nodeId, const std::string& pinName);
     // =========================================================================
     // ID 生成器 (ID Generators)
     // =========================================================================
@@ -558,6 +583,7 @@ private:
     // --- 其他 (Miscellaneous) ---
     std::vector<std::string> m_sortedTypeNames; ///< 缓存排序后的可用类型名称列表。
     ListenerHandle m_scriptCompiledListener; ///< 监听脚本编译事件的句柄。
+    std::vector<SelectFunctionWindow> m_selectFunctionWindows;
 };
 
 #endif //LUMAENGINE_BLUEPRINTPANEL_H

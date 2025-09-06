@@ -1,4 +1,6 @@
 #include "SIMDWrapper.h"
+
+#include <cfloat>
 #ifdef LUMA_X64
 namespace
 {
@@ -50,7 +52,7 @@ namespace
 #if defined(_MSC_VER)
             __cpuid(regs.data(), level);
 #elif defined(__GNUC__) || defined(__clang__)
-            __cpuid(level, regs[0], regs[1], regs[2], regs[3]);
+            cpuid(regs, level);
 #endif
         }
 
@@ -59,7 +61,7 @@ namespace
 #if defined(_MSC_VER)
             __cpuidex(regs.data(), level, count);
 #elif defined(__GNUC__) || defined(__clang__)
-            __cpuid_count(level, count, regs[0], regs[1], regs[2], regs[3]);
+            cpuidex(regs,level, count);
 #endif
         }
 

@@ -276,6 +276,23 @@ void BlueprintNodeRegistry::RegisterCoreNodes()
     });
 
     RegisterNode({
+        .FullName = "Utility.MakeArray",
+        .DisplayName = "创建数组",
+        .Category = "通用",
+        .Description = "创建一个指定类型的数组。",
+        .NodeType = BlueprintNodeType::FlowControl,
+        .InputPins = {
+            {"", "Exec", ed::PinKind::Input},
+            {"元素类型", "SelectType", ed::PinKind::Input},
+            {"参数列表", "Args", ed::PinKind::Input},
+        },
+        .OutputPins = {
+            {"数组", "System.Array", ed::PinKind::Output},
+            {"然后", "Exec", ed::PinKind::Output}
+        },
+    });
+
+    RegisterNode({
         .FullName = "Luma.SDK.Script.OnCreate",
         .DisplayName = "当创建时",
         .Category = "事件|生命周期",
@@ -430,8 +447,7 @@ void BlueprintNodeRegistry::RegisterSDKNodes()
         .OutputPins = {{"然后", "Exec"}}
     });
 
-    
-    
+
     RegisterNode({
         .FullName = "Luma.SDK.Input.GetCursorPosition", .DisplayName = "鼠标.获取坐标", .Category = "SDK|输入",
         .NodeType = BlueprintNodeType::FunctionCall,
@@ -451,7 +467,7 @@ void BlueprintNodeRegistry::RegisterSDKNodes()
         .OutputPins = {{"然后", "Exec"}, {"返回值", "Luma.SDK.Vector2"}}
     });
 
-    
+
     RegisterNode({
         .FullName = "Luma.SDK.Input.IsLeftMouseButtonPressed", .DisplayName = "鼠标.左键按下瞬间", .Category = "SDK|输入",
         .NodeType = BlueprintNodeType::FunctionCall,
@@ -471,7 +487,7 @@ void BlueprintNodeRegistry::RegisterSDKNodes()
         .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
     });
 
-    
+
     RegisterNode({
         .FullName = "Luma.SDK.Input.IsRightMouseButtonPressed", .DisplayName = "鼠标.右键按下瞬间", .Category = "SDK|输入",
         .NodeType = BlueprintNodeType::FunctionCall,
@@ -491,7 +507,7 @@ void BlueprintNodeRegistry::RegisterSDKNodes()
         .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
     });
 
-    
+
     RegisterNode({
         .FullName = "Luma.SDK.Input.IsMiddleMouseButtonPressed", .DisplayName = "鼠标.中键按下瞬间", .Category = "SDK|输入",
         .NodeType = BlueprintNodeType::FunctionCall,
@@ -529,6 +545,44 @@ void BlueprintNodeRegistry::RegisterSDKNodes()
         .InputPins = {{"", "Exec"}, {"scancode", "Luma.SDK.Scancode"}},
         .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Boolean"}}
     });
+    RegisterNode({
+        .FullName = "Luma.SDK.EventManager.Subscribe", .DisplayName = "事件系统.订阅事件", .Category = "SDK|事件",
+        .Description = "订阅一个类型的事件，当该类型事件被触发时，调用指定的回调函数。",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {
+            {"", "Exec"},
+            {"事件类型", "TemplateType"},
+            {"回调函数", "FunctionSelection"}
+        },
+        .OutputPins = {
+            {"然后", "Exec"},
+            {"返回值", "Luma.SDK.EventHandle"}
+        }
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.EventManager.Unsubscribe", .DisplayName = "事件系统.取消订阅", .Category = "SDK|事件",
+        .Description = "取消订阅之前订阅的事件，停止接收该事件的通知。",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {
+            {"", "Exec"},
+            {"订阅句柄", "Luma.SDK.EventHandle"}
+        },
+        .OutputPins = {
+            {"然后", "Exec"}
+        }
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.EventManager.Publish", .DisplayName = "事件系统.触发事件", .Category = "SDK|事件",
+        .Description = "触发一个事件，通知所有订阅该事件类型的监听器。",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {
+            {"", "Exec"},
+            {"事件实例", "object"}
+        },
+        .OutputPins = {
+            {"然后", "Exec"}
+        }
+    });
 
 
     const std::string entityType = "Luma.SDK.Entity";
@@ -545,13 +599,28 @@ void BlueprintNodeRegistry::RegisterSDKNodes()
         .InputPins = {
             {"", "Exec"},
             {"目标", entityType},
-            {"组件类型", "TemplateType"} 
+            {"组件类型", "TemplateType"}
         },
         .OutputPins = {
             {"然后", "Exec"},
             {"返回值", "System.Boolean"}
         }
     });
+    RegisterNode({
+        .FullName = "Luma.SDK.Entity.SendMessage", .DisplayName = "实体.触发实体方法", .Category = "SDK|实体",
+        .Description = "向实体发送一个消息，触发对应的消息处理函数",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {
+            {"", "Exec"},
+            {"目标", entityType},
+            {"消息名", "System.String"},
+            {"参数列表", "System.Object[]"}
+        },
+        .OutputPins = {
+            {"然后", "Exec"}
+        },
+    });
+
 
     RegisterNode({
         .FullName = "Luma.SDK.Entity.GetComponent", .DisplayName = "实体.获取组件", .Category = "SDK|实体|组件",
@@ -564,7 +633,7 @@ void BlueprintNodeRegistry::RegisterSDKNodes()
         },
         .OutputPins = {
             {"然后", "Exec"},
-            {"返回值", "System.Object"} 
+            {"返回值", "System.Object"}
         }
     });
 
@@ -579,7 +648,7 @@ void BlueprintNodeRegistry::RegisterSDKNodes()
         },
         .OutputPins = {
             {"然后", "Exec"},
-            {"返回值", "System.Object"} 
+            {"返回值", "System.Object"}
         }
     });
 
@@ -591,7 +660,7 @@ void BlueprintNodeRegistry::RegisterSDKNodes()
             {"", "Exec"},
             {"目标", entityType},
             {"组件类型", "TemplateType"},
-            {"组件值", "System.Object"} 
+            {"组件值", "System.Object"}
         },
         .OutputPins = {
             {"然后", "Exec"}

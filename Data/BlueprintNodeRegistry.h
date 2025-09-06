@@ -31,6 +31,7 @@ struct BlueprintNodeDefinition
 
     std::vector<BlueprintPinDefinition> InputPins;
     std::vector<BlueprintPinDefinition> OutputPins;
+    std::string DynamicArrayPinName;
 };
 
 
