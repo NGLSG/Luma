@@ -28,7 +28,7 @@ void InspectorPanel::Update(float deltaTime)
 void InspectorPanel::Draw()
 {
     ImGui::Begin(GetPanelName(), &m_isVisible);
-
+    m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     drawLockButton();
     ImGui::Separator();
 
@@ -420,7 +420,7 @@ void InspectorPanel::drawComponents(RuntimeGameObject& gameObject)
     {
         if (componentName == "Transform")
         {
-            auto& transform = registry.get<ECS::Transform>(entityHandle);
+            auto& transform = registry.get<ECS::TransformComponent>(entityHandle);
             bool hasParent = gameObject.HasComponent<ECS::ParentComponent>();
 
             std::string headerName;
@@ -658,7 +658,7 @@ void InspectorPanel::displayBatchTransformValues(const std::vector<RuntimeGameOb
     if (selectedObjects.empty()) return;
 
     auto firstEntity = static_cast<entt::entity>(selectedObjects[0]);
-    auto& firstTransform = registry.get<ECS::Transform>(firstEntity);
+    auto& firstTransform = registry.get<ECS::TransformComponent>(firstEntity);
 
     bool positionSame = true;
     bool rotationSame = true;
@@ -671,7 +671,7 @@ void InspectorPanel::displayBatchTransformValues(const std::vector<RuntimeGameOb
     for (size_t i = 1; i < selectedObjects.size(); ++i)
     {
         auto entity = static_cast<entt::entity>(selectedObjects[i]);
-        auto& transform = registry.get<ECS::Transform>(entity);
+        auto& transform = registry.get<ECS::TransformComponent>(entity);
 
         ECS::Vector2f currentPos = allHaveParent ? transform.localPosition : transform.position;
         float currentRot = allHaveParent ? transform.localRotation : transform.rotation;
@@ -725,7 +725,7 @@ void InspectorPanel::applyBatchTransformPosition(const std::vector<RuntimeGameOb
     for (const auto& obj : selectedObjects)
     {
         auto entityHandle = static_cast<entt::entity>(obj);
-        auto& transform = registry.get<ECS::Transform>(entityHandle);
+        auto& transform = registry.get<ECS::TransformComponent>(entityHandle);
 
         if (allHaveParent)
         {
@@ -748,7 +748,7 @@ void InspectorPanel::applyBatchTransformRotation(const std::vector<RuntimeGameOb
     for (const auto& obj : selectedObjects)
     {
         auto entityHandle = static_cast<entt::entity>(obj);
-        auto& transform = registry.get<ECS::Transform>(entityHandle);
+        auto& transform = registry.get<ECS::TransformComponent>(entityHandle);
 
         if (allHaveParent)
         {
@@ -771,7 +771,7 @@ void InspectorPanel::applyBatchTransformScale(const std::vector<RuntimeGameObjec
     for (const auto& obj : selectedObjects)
     {
         auto entityHandle = static_cast<entt::entity>(obj);
-        auto& transform = registry.get<ECS::Transform>(entityHandle);
+        auto& transform = registry.get<ECS::TransformComponent>(entityHandle);
 
         if (allHaveParent)
         {

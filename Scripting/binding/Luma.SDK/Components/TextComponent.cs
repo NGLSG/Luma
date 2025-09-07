@@ -1,8 +1,9 @@
 using System.Runtime.InteropServices;
+using Luma.SDK.Generation;
 
 namespace Luma.SDK.Components;
 
-enum TextAlignment
+public enum TextAlignment
 {
     TopLeft = 0,
     TopCenter,
@@ -16,14 +17,27 @@ enum TextAlignment
 };
 
 [StructLayout(LayoutKind.Sequential)]
-struct TextComponent : IComponent
+public struct TextComponent : IComponent
 {
     [MarshalAs(UnmanagedType.U1)] public bool Enable;
-    AssetHandle fontHandle;
-    string text;
-    float fontSize;
-    Color color;
-    TextAlignment alignment;
-    int zIndex;
-    string name;
+    public AssetHandle fontHandle;
+    public string text;
+    public float fontSize;
+    public Color color;
+    public TextAlignment alignment;
+    public int zIndex;
+    public string name;
+}
+[GenerateLogicComponentProperties]
+public partial class LogicTextComponent : LogicComponent<TextComponent>
+{
+    public LogicTextComponent(Entity entity) : base(entity)
+    {
+    }
+
+    public partial string Text { get; set; }
+    public partial Color Color { get; set; }
+    public partial TextAlignment Alignment { get; set; }
+    public partial int ZIndex { get; set; }
+    public partial float FontSize { get;  set; }
 }

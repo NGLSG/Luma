@@ -9,6 +9,7 @@
 #include "ComponentRegistry.h"
 #include "SceneManager.h"
 #include "Sprite.h"
+#include "Input/Keyboards.h"
 #include "Loaders/TextureLoader.h"
 
 void AnimationEditorPanel::Initialize(EditorContext* context)
@@ -1455,6 +1456,30 @@ void AnimationEditorPanel::removeEventTarget(AnimFrame& frame, size_t index)
     }
 }
 
+void AnimationEditorPanel::handleShortcutInput()
+{
+    if (!m_isFocused) return;
+    if (Keyboard::LeftCtrl.IsPressed() && Keyboard::S.IsPressed())
+    {
+        saveCurrentClip();
+    }
+    if (Keyboard::Delete.IsPressed())
+    {
+        if (m_multiSelectedFrames.size() == 1)
+        {
+            removeKeyFrame(*m_multiSelectedFrames.begin());
+        }
+        else if (m_multiSelectedFrames.size() > 1)
+        {
+            for (int frameIndex : m_multiSelectedFrames)
+            {
+                removeKeyFrame(frameIndex);
+            }
+            m_multiSelectedFrames.clear();
+        }
+    }
+}
+
 void AnimationEditorPanel::drawEventEditor()
 {
     if (!ImGui::Begin("动画事件编辑器", &m_eventEditorOpen))
@@ -1691,6 +1716,7 @@ void AnimationEditorPanel::Draw()
 
     if (ImGui::Begin(GetPanelName(), &m_isVisible, ImGuiWindowFlags_MenuBar))
     {
+        m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
         if (ImGui::BeginMenuBar())
         {
             if (ImGui::BeginMenu("文件"))
@@ -1758,6 +1784,7 @@ void AnimationEditorPanel::Draw()
         }
     }
     ImGui::End();
+    handleShortcutInput();
     if (m_frameEditWindowOpen) { drawFrameEditor(); }
     if (m_componentSelectorOpen) { drawComponentSelector(); }
     if (m_eventEditorOpen) { drawEventEditor(); }

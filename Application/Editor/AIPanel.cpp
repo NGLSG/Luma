@@ -182,6 +182,7 @@ void AIPanel::Draw()
     ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
     if (ImGui::Begin(GetPanelName(), &m_isVisible))
     {
+        m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
         if (ImGui::Button("聊天")) m_currentView = View::Chat;
         ImGui::SameLine();
         if (ImGui::Button("设置")) m_currentView = View::Settings;
@@ -1498,9 +1499,9 @@ namespace GameScripts
         // ===================================================================================
 
         private Transform _transform;
-        private RigidBodyComponent _rigidBody;
+        private RigidBody2D _rigidBody;
         private AnimationController _animController;
-        private BoxColliderComponent _boxCollider;
+        private BoxCollider _boxCollider;
 
         private bool _isGrounded = false;
         private float _shootCooldown = 0.0f;
@@ -1532,25 +1533,23 @@ namespace GameScripts
         public override void OnCreate()
         {
             // --- 获取组件 ---
-            // 推荐在 OnCreate 中获取并缓存所有需要的组件引用。
+            // 逻辑组件是 class (引用类型)，推荐在 OnCreate 中获取并缓存所有需要的组件引用。
             _transform = Self.GetComponent<Transform>();
-            _rigidBody = Self.GetComponent<RigidBodyComponent>();
+            _rigidBody = Self.GetComponent<RigidBody2D>();
+            _animController = Self.GetComponent<AnimationController>(); // AnimationController 现在也是一个标准组件
 
             // --- 检查和添加组件 ---
-            if (Self.HasComponent<BoxColliderComponent>())
+            if (Self.HasComponent<BoxCollider>())
             {
-                _boxCollider = Self.GetComponent<BoxColliderComponent>();
+                _boxCollider = Self.GetComponent<BoxCollider>();
             }
             else
             {
-                Debug.LogWarning("Player is missing BoxColliderComponent. Adding one automatically.");
-                _boxCollider = (BoxColliderComponent)Self.AddComponent<BoxColliderComponent>();
+                Debug.LogWarning("Player is missing BoxCollider. Adding one automatically.");
+                _boxCollider = Self.AddComponent<BoxCollider>();
             }
 
-            // --- 获取动画控制器 ---
-            _animController = AnimationSystem.GetController(Self);
-
-            Debug.Log($"Player '{Self.Name}' created at position: {_transform.Position}");
+            Debug.Log($"Player '{Self.Name}' created at position: {_transform?.Position}");
 
             // --- JobSystem 使用示例 ---
             // 调度一个简单的后台任务。
@@ -1562,20 +1561,18 @@ namespace GameScripts
         /// </summary>
         public override void OnUpdate(float deltaTime)
         {
-            // --- 缓存组件 ---
-            // 由于 RigidBody 和 Collider 是 struct，它们的值不会自动同步，
-            // 所以在修改前需要重新获取最新的状态。
-            _rigidBody = Self.GetComponent<RigidBodyComponent>();
-
             // --- 输入处理与物理 ---
+            // 由于 _rigidBody 是缓存的引用，可以直接使用，无需每帧重新获取。
+            if (_rigidBody == null) return;
+
             Vector2 velocity = _rigidBody.LinearVelocity;
             float horizontalInput = 0;
 
-            if (Input.IsKeyPressed(Scancode.A) || Input.IsKeyPressed(Scancode.Left))
+            if (Input.IsKeyDown(Scancode.A) || Input.IsKeyDown(Scancode.Left))
             {
                 horizontalInput = -1;
             }
-            else if (Input.IsKeyPressed(Scancode.D) || Input.IsKeyPressed(Scancode.Right))
+            else if (Input.IsKeyDown(Scancode.D) || Input.IsKeyDown(Scancode.Right))
             {
                 horizontalInput = 1;
             }
@@ -1588,10 +1585,10 @@ namespace GameScripts
                 _animController?.SetTrigger("Jump");
             }
 
-            // --- 将修改后的组件写回引擎 ---
-            // [重要] 因为 RigidBodyComponent 是 struct (值类型), 必须将其写回才能生效。
+            // --- 将修改后的组件属性写回引擎 ---
+            // [重要] 因为 RigidBody2D 是一个逻辑组件 (class),
+            // 修改其属性 (如 LinearVelocity) 会自动将数据同步到引擎，无需手动调用 SetComponent。
             _rigidBody.LinearVelocity = velocity;
-            Self.SetComponent(_rigidBody);
 
             // --- 动画控制 ---
             _animController?.SetBool("IsRunning", horizontalInput != 0);

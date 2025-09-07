@@ -22,7 +22,7 @@ void GameViewPanel::Draw()
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::Begin(GetPanelName(), &m_isVisible);
-
+    m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     const ImVec2 viewportScreenPos = ImGui::GetCursorScreenPos();
     const ImVec2 viewportSize = ImGui::GetContentRegionAvail();
 

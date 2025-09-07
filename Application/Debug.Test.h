@@ -71,7 +71,7 @@ namespace Debug
             RuntimeGameObject go = scene->CreateGameObject("Sprite_" + std::to_string(i));
 
 
-            auto& transform = go.GetComponent<ECS::Transform>();
+            auto& transform = go.GetComponent<ECS::TransformComponent>();
             transform.position = {pos_x_dist(gen), pos_y_dist(gen)};
             transform.rotation = rot_dist(gen);
             transform.scale = scale_dist(gen);

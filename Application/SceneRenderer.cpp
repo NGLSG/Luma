@@ -33,13 +33,13 @@ void SceneRenderer::Extract(entt::registry& registry, std::vector<RenderPacket>&
 
     PROFILE_SCOPE("SceneRenderer::Extract - Optimized Sprite Processing");
     {
-        auto spriteView = registry.view<const ECS::Transform, const ECS::SpriteComponent>();
+        auto spriteView = registry.view<const ECS::TransformComponent, const ECS::SpriteComponent>();
 
 
         size_t estimatedSpriteCount = spriteView.size_hint();
         if (estimatedSpriteCount > 0)
         {
-            spriteView.each([&](const ECS::Transform& transform, const ECS::SpriteComponent& sprite)
+            spriteView.each([&](const ECS::TransformComponent& transform, const ECS::SpriteComponent& sprite)
             {
                 if (!sprite.image) return;
 
@@ -99,7 +99,7 @@ void SceneRenderer::Extract(entt::registry& registry, std::vector<RenderPacket>&
 
     PROFILE_SCOPE("SceneRenderer::Extract - Optimized Tilemap Processing");
     {
-        auto tilemapView = registry.view<const ECS::Transform, const ECS::TilemapComponent, const
+        auto tilemapView = registry.view<const ECS::TransformComponent, const ECS::TilemapComponent, const
                                          ECS::TilemapRendererComponent>();
 
         for (auto entity : tilemapView)
@@ -107,7 +107,7 @@ void SceneRenderer::Extract(entt::registry& registry, std::vector<RenderPacket>&
             if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
                 continue;
 
-            const auto& tilemapTransform = tilemapView.get<const ECS::Transform>(entity);
+            const auto& tilemapTransform = tilemapView.get<const ECS::TransformComponent>(entity);
             const auto& tilemap = tilemapView.get<const ECS::TilemapComponent>(entity);
             const auto& renderer = tilemapView.get<const ECS::TilemapRendererComponent>(entity);
 
@@ -192,7 +192,7 @@ void SceneRenderer::Extract(entt::registry& registry, std::vector<RenderPacket>&
                 if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
                     continue;
 
-                const auto& transform = view.template get<const ECS::Transform>(entity);
+                const auto& transform = view.template get<const ECS::TransformComponent>(entity);
                 const auto& textData = getTextComponent(view, entity);
 
                 if (!textData.typeface || textData.text.empty()) continue;
@@ -234,14 +234,14 @@ void SceneRenderer::Extract(entt::registry& registry, std::vector<RenderPacket>&
         };
 
 
-        auto textView = registry.view<const ECS::Transform, const ECS::TextComponent>();
+        auto textView = registry.view<const ECS::TransformComponent, const ECS::TextComponent>();
         processTextView(textView, [](auto& view, auto entity) -> const ECS::TextComponent&
         {
             return view.template get<const ECS::TextComponent>(entity);
         });
 
 
-        auto inputTextView = registry.view<const ECS::Transform, const ECS::InputTextComponent>();
+        auto inputTextView = registry.view<const ECS::TransformComponent, const ECS::InputTextComponent>();
         processTextView(inputTextView, [](auto& view, auto entity)
         {
             const auto& inputText = view.template get<const ECS::InputTextComponent>(entity);

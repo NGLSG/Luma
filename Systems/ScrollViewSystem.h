@@ -14,7 +14,7 @@ namespace ECS
     /**
      * @brief 变换组件结构体，通常包含位置、旋转和缩放信息。
      */
-    struct Transform;
+    struct TransformComponent;
     /**
      * @brief 滚动视图组件结构体。
      */
@@ -51,7 +51,7 @@ namespace Systems
                                      ECS::ScrollViewComponent& scrollView, const EngineContext& context);
         void invokeScrollChangedEvent(RuntimeScene* scene, const std::vector<ECS::SerializableEventTarget>& targets,
                                       const ECS::Vector2f& scrollPosition);
-        bool isPointInViewport(const ECS::Vector2f& point, const ECS::Transform& transform,
+        bool isPointInViewport(const ECS::Vector2f& point, const ECS::TransformComponent& transform,
                                const ECS::Vector2f& viewportSize);
         ECS::Vector2f clampScrollPosition(const ECS::Vector2f& scrollPos, const ECS::Vector2f& contentSize,
                                           const ECS::Vector2f& viewportSize);

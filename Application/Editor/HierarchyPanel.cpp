@@ -21,12 +21,18 @@ void HierarchyPanel::Initialize(EditorContext* context)
     totalNodeCount = 0;
     visibleNodeCount = 0;
     lastBuildTime = 0.0f;
+    m_sceneChangeListener = EventBus::GetInstance().Subscribe<SceneUpdateEvent>(
+        [this](const SceneUpdateEvent&)
+        {
+            this->needsRebuildCache = true;
+        });
 }
 
 void HierarchyPanel::Update(float deltaTime)
 {
     if (!m_context->gameObjectsToDelete.empty() && m_context->activeScene)
     {
+        SceneManager::GetInstance().PushUndoState(m_context->activeScene);
         for (const auto& objGuid : m_context->gameObjectsToDelete)
         {
             RuntimeGameObject objToDel = m_context->activeScene->FindGameObjectByGuid(objGuid);
@@ -59,7 +65,7 @@ void HierarchyPanel::Update(float deltaTime)
     }
 
 
-    if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !m_context->selectionList.empty())
+    if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !m_context->selectionList.empty() && m_isFocused)
     {
         m_context->gameObjectsToDelete = m_context->selectionList;
     }
@@ -98,7 +104,7 @@ void HierarchyPanel::Draw()
     }
 
     ImGui::Begin(GetPanelName(), &m_isVisible);
-
+    m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     if (m_context->editingMode == EditingMode::Prefab)
     {
@@ -165,6 +171,7 @@ void HierarchyPanel::Shutdown()
     hierarchyCache.clear();
     visibleNodeIndices.clear();
     expandedStates.clear();
+    EventBus::GetInstance().Unsubscribe(m_sceneChangeListener);
 }
 
 void HierarchyPanel::drawSceneCamera()
@@ -983,7 +990,7 @@ void HierarchyPanel::handleDragDrop()
             }
 
             LogInfo("在根目录处理 {} 个GameObject的拖拽", draggedGuids.size());
-
+            SceneManager::GetInstance().PushUndoState(m_context->activeScene);
             bool anyMoved = false;
             for (const auto& draggedGuid : draggedGuids)
             {

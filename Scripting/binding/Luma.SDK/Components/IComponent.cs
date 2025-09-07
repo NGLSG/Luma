@@ -2,11 +2,7 @@
 
 namespace Luma.SDK.Components;
 
-
-
-
-
-
 public interface IComponent
 {
 }
+

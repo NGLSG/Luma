@@ -19,7 +19,7 @@ namespace Systems
         auto& registry = scene->GetRegistry();
 
 
-        auto rootView = registry.view<ECS::Transform>(entt::exclude<ECS::ParentComponent>);
+        auto rootView = registry.view<ECS::TransformComponent>(entt::exclude<ECS::ParentComponent>);
 
 
         for (auto entity : rootView)
@@ -32,7 +32,7 @@ namespace Systems
 
     void TransformSystem::UpdateWorldTransform(entt::entity entity, entt::registry& registry)
     {
-        auto& transform = registry.get<ECS::Transform>(entity);
+        auto& transform = registry.get<ECS::TransformComponent>(entity);
         glm::mat4 worldMatrix(1.0f);
 
         if (registry.all_of<ECS::ParentComponent>(entity))
@@ -40,7 +40,7 @@ namespace Systems
             auto& parentComponent = registry.get<ECS::ParentComponent>(entity);
             if (registry.valid(parentComponent.parent))
             {
-                auto& parentTransform = registry.get<ECS::Transform>(parentComponent.parent);
+                auto& parentTransform = registry.get<ECS::TransformComponent>(parentComponent.parent);
 
 
                 glm::mat4 parentWorldMatrix = glm::translate(glm::mat4(1.0f),
@@ -74,7 +74,7 @@ namespace Systems
             glm::quat rotationQuat;
             glm::decompose(worldMatrix, scaleVec, rotationQuat, translationVec, skew, perspective);
             auto& parentComponent = registry.get<ECS::ParentComponent>(entity);
-            auto& parentTransform = registry.get<ECS::Transform>(parentComponent.parent);
+            auto& parentTransform = registry.get<ECS::TransformComponent>(parentComponent.parent);
             transform.position = {
                 transform.localPosition.x + parentTransform.position.x,
                 transform.localPosition.y + parentTransform.position.y

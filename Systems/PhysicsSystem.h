@@ -33,6 +33,12 @@ namespace Systems
         }
     };
 
+    enum ForceMode
+    {
+        Force,
+        Impulse
+    };
+
     /**
      * @brief 为 EntityPair 提供哈希函数，以便在哈希容器中使用。
      */
@@ -119,14 +125,34 @@ namespace Systems
          * @brief 执行从起点到终点的射线投射。
          * @param startPoint 射线投射的起始点。
          * @param endPoint 射线投射的结束点。
+         * @param penetrate 如果为 true，射线将穿透所有物体并返回所有碰撞结果；如果为 false，射线将在第一个碰撞处停止。
          * @return 如果射线击中任何物体，则返回包含 RayCastResult 的 std::optional；否则返回 std::nullopt。
          */
-        std::optional<RayCastResult> RayCast(const ECS::Vector2f& startPoint, const ECS::Vector2f& endPoint) const;
+        std::optional<RayCastResults> RayCast(const ECS::Vector2f& startPoint, const ECS::Vector2f& endPoint,
+                                              bool penetrate = false) const;
+        /**
+         *
+         * @brief 执行圆形区域检测，检查指定中心和半径内的碰撞体。
+         * @param center 圆形区域的中心点。
+         * @param radius 圆形区域的半径。
+         * @param registry
+         * @param tags 可选的标签列表，用于过滤检测结果。只有具有这些标签的实体才会被考虑。
+         */
+        std::optional<RayCastResult> CircleCheck(const ECS::Vector2f& center, float radius,
+                                                 entt::registry& registry, const std::vector<std::string>& tags = {}) const;
+        /**
+         * @brief 对指定实体施加力或冲量。
+         * @param entity 要施加力的实体。
+         * @param force 施加的力向量。
+         * @param mode 力的应用模式（Force 或 Impulse）。
+         */
+        void ApplyForce(entt::entity entity, const ECS::Vector2f& force, ForceMode mode);
 
     private:
-        void CreateShapesForEntity(entt::entity entity, entt::registry& registry, const ECS::Transform& transform);
+        void CreateShapesForEntity(entt::entity entity, entt::registry& registry, const ECS::TransformComponent& transform);
         void RecreateAllShapesForEntity(entt::entity entity, entt::registry& registry);
-
+        void OnComponentUpdate(const ComponentUpdatedEvent& event);
+        void SyncRigidBodyProperties(entt::entity entity, entt::registry& registry);
         bool Destroyed = false; ///< 指示物理系统是否已被销毁。
 
     private:
@@ -136,6 +162,8 @@ namespace Systems
         float m_accumulator = 0.0f; ///< 物理步进累加器。
         std::unordered_set<EntityPair, EntityPairHash> m_currentContacts; ///< 当前正在接触的实体对集合。
         std::unordered_set<EntityPair, EntityPairHash> m_currentTriggers; ///< 当前正在触发的实体对集合。
+        ListenerHandle m_componentUpdateListener; /// < 组件更新事件的监听器句柄。
+        RuntimeScene* m_scene = nullptr;
     };
 }
 

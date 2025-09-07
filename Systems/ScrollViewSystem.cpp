@@ -18,7 +18,7 @@ namespace Systems
     {
         auto& registry = scene->GetRegistry();
 
-        auto scrollViewView = registry.view<ECS::ScrollViewComponent, ECS::Transform>();
+        auto scrollViewView = registry.view<ECS::ScrollViewComponent, ECS::TransformComponent>();
 
         for (auto entity : scrollViewView)
         {
@@ -34,7 +34,7 @@ namespace Systems
                                                    ECS::ScrollViewComponent& scrollView, const EngineContext& context)
     {
         auto& registry = scene->GetRegistry();
-        auto& transform = registry.get<ECS::Transform>(entity);
+        auto& transform = registry.get<ECS::TransformComponent>(entity);
 
         bool scrollChanged = false;
         ECS::Vector2f newScrollPosition = scrollView.scrollPosition;
@@ -141,7 +141,7 @@ namespace Systems
         }
     }
 
-    bool ScrollViewSystem::isPointInViewport(const ECS::Vector2f& point, const ECS::Transform& transform,
+    bool ScrollViewSystem::isPointInViewport(const ECS::Vector2f& point, const ECS::TransformComponent& transform,
                                              const ECS::Vector2f& viewportSize)
     {
         ECS::Vector2f halfSize = {

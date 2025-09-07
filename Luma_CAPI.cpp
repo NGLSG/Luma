@@ -1,6 +1,10 @@
 #include "Luma_CAPI.h"
 
+#include <AudioManager.h>
+#include <Loaders/AudioLoader.h>
+
 #include "AnimationControllerComponent.h"
+#include "PhysicsSystem.h"
 #include "SceneManager.h"
 #include "SIMDWrapper.h"
 #include "Resources/RuntimeAsset/RuntimeScene.h"
@@ -680,4 +684,136 @@ intptr_t ScriptComponent_GetGCHandle(void* componentPtr, const char* typeName)
         return *sComp.managedGCHandle;
     }
     return 0;
+}
+
+LUMA_API void Physics_ApplyForce(LumaSceneHandle scene, LumaEntityHandle entity, Vector2f_CAPI force,
+                                 ForceMode_CAPI mode)
+{
+    auto runtimeScene = AsScene(scene);
+    if (auto* physicsSystem = runtimeScene->GetSystem<Systems::PhysicsSystem>())
+    {
+        ECS::Vector2f f = {force.x, force.y};
+        Systems::ForceMode m = (mode == ForceMode_Force) ? Systems::ForceMode::Force : Systems::ForceMode::Impulse;
+        physicsSystem->ApplyForce(static_cast<entt::entity>(entity), f, m);
+    }
+}
+
+LUMA_API bool Physics_RayCast(LumaSceneHandle scene, Vector2f_CAPI start, Vector2f_CAPI end, bool penetrate,
+                              RayCastResult_CAPI* outHits, int maxHits, int* outHitCount)
+{
+    if (!outHitCount) return false;
+    *outHitCount = 0;
+
+    auto* runtimeScene = AsScene(scene);
+    auto* physicsSystem = runtimeScene->GetSystem<Systems::PhysicsSystem>();
+    if (!physicsSystem) return false;
+
+    ECS::Vector2f s = {start.x, start.y};
+    ECS::Vector2f e = {end.x, end.y};
+
+    auto results = physicsSystem->RayCast(s, e, penetrate);
+
+    if (!results || results->results.empty())
+    {
+        return false;
+    }
+
+    *outHitCount = static_cast<int>(results->results.size());
+
+    if (outHits && maxHits > 0)
+    {
+        int numToCopy = std::min(*outHitCount, maxHits);
+        for (int i = 0; i < numToCopy; ++i)
+        {
+            const auto& hit = results->results[i];
+            outHits[i].hitEntity = static_cast<LumaEntityHandle>(hit.entity);
+            outHits[i].point = {hit.point.x, hit.point.y};
+            outHits[i].normal = {hit.normal.x, hit.normal.y};
+            outHits[i].fraction = hit.fraction;
+        }
+    }
+
+    return true;
+}
+
+LUMA_API bool Physics_CircleCheck(LumaSceneHandle scene, Vector2f_CAPI center, float radius,
+                                  const char* tags[], int tagCount, RayCastResult_CAPI* outHit)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !outHit) return false;
+
+    auto* physicsSystem = runtimeScene->GetSystem<Systems::PhysicsSystem>();
+    if (!physicsSystem) return false;
+
+    ECS::Vector2f c = {center.x, center.y};
+    std::vector<std::string> tagsVec;
+    if (tags && tagCount > 0)
+    {
+        tagsVec.assign(tags, tags + tagCount);
+    }
+
+    auto result = physicsSystem->CircleCheck(c, radius, runtimeScene->GetRegistry(), tagsVec);
+
+    if (result)
+    {
+        outHit->hitEntity = static_cast<LumaEntityHandle>(result->entity);
+        outHit->point = {result->point.x, result->point.y};
+        outHit->normal = {result->normal.x, result->normal.y};
+        outHit->fraction = result->fraction;
+        return true;
+    }
+
+    return false;
+}
+
+LUMA_API uint32_t AudioManager_Play(PlayDesc_CAPI desc)
+{
+    if (!desc.audioHandle.Valid()) return 0;
+
+    AudioLoader loader(AudioManager::GetInstance().GetSampleRate(), AudioManager::GetInstance().GetChannels());
+    sk_sp<RuntimeAudio> audio = loader.LoadAsset(desc.audioHandle.assetGuid);
+    if (!audio) return 0;
+
+    AudioManager::PlayDesc playDesc;
+    playDesc.audio = audio;
+    playDesc.loop = desc.loop;
+    playDesc.volume = desc.volume;
+    playDesc.spatial = desc.spatial;
+    playDesc.sourceX = desc.sourceX;
+    playDesc.sourceY = desc.sourceY;
+    playDesc.sourceZ = desc.sourceZ;
+    playDesc.minDistance = desc.minDistance;
+    playDesc.maxDistance = desc.maxDistance;
+
+    return AudioManager::GetInstance().Play(playDesc);
+}
+
+LUMA_API void AudioManager_Stop(uint32_t voiceId)
+{
+    AudioManager::GetInstance().Stop(voiceId);
+}
+
+LUMA_API void AudioManager_StopAll()
+{
+    AudioManager::GetInstance().StopAll();
+}
+
+LUMA_API bool AudioManager_IsFinished(uint32_t voiceId)
+{
+    return AudioManager::GetInstance().IsFinished(voiceId);
+}
+
+LUMA_API void AudioManager_SetVolume(uint32_t voiceId, float volume)
+{
+    AudioManager::GetInstance().SetVolume(voiceId, volume);
+}
+
+LUMA_API void AudioManager_SetLoop(uint32_t voiceId, bool loop)
+{
+    AudioManager::GetInstance().SetLoop(voiceId, loop);
+}
+
+LUMA_API void AudioManager_SetVoicePosition(uint32_t voiceId, float x, float y, float z)
+{
+    AudioManager::GetInstance().SetVoicePosition(voiceId, x, y, z);
 }

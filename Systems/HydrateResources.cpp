@@ -317,7 +317,7 @@ namespace Systems
 
         auto& tilemap = registry.get<ECS::TilemapComponent>(entity);
         auto tilemapGo = currentScene->FindGameObjectByEntity(entity);
-        const auto& tilemapTransform = registry.get<ECS::Transform>(entity);
+        const auto& tilemapTransform = registry.get<ECS::TransformComponent>(entity);
 
         TileLoader tileLoader;
         RuleTileLoader ruleTileLoader;
@@ -498,9 +498,9 @@ namespace Systems
                     RuntimeGameObject newInstance = currentScene->Instantiate(*prefab, &tilemapGo);
                     if (newInstance.IsValid())
                     {
-                        if (newInstance.HasComponent<ECS::Transform>())
+                        if (newInstance.HasComponent<ECS::TransformComponent>())
                         {
-                            auto& transform = newInstance.GetComponent<ECS::Transform>();
+                            auto& transform = newInstance.GetComponent<ECS::TransformComponent>();
                             transform.position = {
                                 tilemapTransform.position.x + tilemap.cellSize.x * coord.x,
                                 tilemapTransform.position.y + tilemap.cellSize.y * coord.y

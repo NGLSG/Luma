@@ -16,7 +16,7 @@ namespace Systems
     {
         auto& registry = scene->GetRegistry();
 
-        auto buttonView = registry.view<ECS::ButtonComponent, ECS::Transform>();
+        auto buttonView = registry.view<ECS::ButtonComponent, ECS::TransformComponent>();
 
         for (auto entity : buttonView)
         {

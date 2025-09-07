@@ -11,6 +11,9 @@
 
     <ItemGroup>
         <PackageReference Include="YamlDotNet" Version="16.3.0"/>
+        <ProjectReference Include="..\Luma.SDK.Generator\Luma.SDK.Generator.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false"/>
     </ItemGroup>
 
 </Project>

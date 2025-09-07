@@ -35,56 +35,78 @@ public struct RectF
     public float Height;
 }
 
+
 public enum AssetType
 {
     Unknown = 0,
+
+    
     Texture,
+
+    
     Material,
+
+    
     CSharpScript,
+
+    
     Scene,
+
+    
     Prefab,
+
+    
     Audio,
+
+    
     Video,
-    Animation,
+
+    
+    AnimationClip,
+
+    
+    AnimationController,
+
+    
     PhysicsMaterial,
+
+    
     LocalGameObject,
-    Font,
-}
 
+    
+    Blueprint,
 
+    
+    Tile,
 
+    
+    Tileset,
 
+    
+    RuleTile,
+
+    
+    Font, 
+};
 
 [StructLayout(LayoutKind.Sequential)]
 public struct AssetHandle
 {
-    
-    
-    
-    
     public Guid AssetGuid;
 
-    
-    
-    
+
     public AssetType AssetType;
 
-    
-    
-    
+
     public AssetHandle(Guid guid, AssetType type = AssetType.Unknown)
     {
         AssetGuid = guid;
         AssetType = type;
     }
 
-    
-    
-    
+
     public bool IsValid() => AssetGuid != Guid.Empty;
 
-    
-    
-    
+
     public static AssetHandle Invalid => new(Guid.Empty, AssetType.Unknown);
 }

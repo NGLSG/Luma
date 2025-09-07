@@ -5,7 +5,7 @@
 #include <cstddef>
 
 #include "Scripting/CoreCLRHost.h"
-
+#include "Components/AssetHandle.h"
 /**
  * @brief Luma场景的句柄类型。
  */
@@ -31,6 +31,40 @@ struct Vector2f_CAPI
 {
     float x; ///< X坐标。
     float y; ///< Y坐标。
+};
+
+/**
+ * @brief C-API 版本的物理命中结果结构体。
+ */
+struct RayCastResult_CAPI
+{
+    LumaEntityHandle hitEntity; ///< 命中的实体句柄。
+    Vector2f_CAPI point; ///< 命中点的世界坐标。
+    Vector2f_CAPI normal; ///< 命中点处的法线向量。
+    float fraction; ///< 命中点在射线上的分数位置 (0 到 1)。
+};
+
+/**
+ * @brief C-API 版本的力模式枚举。
+ */
+typedef enum
+{
+    ForceMode_Force,
+    ForceMode_Impulse
+} ForceMode_CAPI;
+
+/**
+ * @brief AudioManager::PlayDesc 的 C-API 兼容版本。
+ */
+struct PlayDesc_CAPI
+{
+    AssetHandle audioHandle;   ///< 音频资源的句柄。
+    bool loop;                 ///< 是否循环。
+    float volume;              ///< 音量。
+    bool spatial;              ///< 是否启用空间音频。
+    float sourceX, sourceY, sourceZ; ///< 音源世界坐标。
+    float minDistance;         ///< 最小衰减距离。
+    float maxDistance;         ///< 最大衰减距离。
 };
 
 #ifdef __cplusplus
@@ -239,7 +273,7 @@ LUMA_API void GameObject_SetActive(LumaSceneHandle scene, LumaEntityHandle entit
  */
 LUMA_API intptr_t ScriptComponent_GetGCHandle(void* componentPtr, const char* typeName);
 LUMA_API void ScriptComponent_GetAllGCHandles(LumaSceneHandle scene, uint32_t entity, intptr_t* outHandles, int count);
-LUMA_API void ScriptComponent_GetAllGCHandlesCount(LumaSceneHandle scene,uint32_t entity, int* outCount);
+LUMA_API void ScriptComponent_GetAllGCHandlesCount(LumaSceneHandle scene, uint32_t entity, int* outCount);
 /**
  * @brief 播放指定实体的动画。
  * @param scene 场景句柄。
@@ -473,6 +507,88 @@ LUMA_API void SIMDVectorAbs(const float* input, float* result, size_t count);
 LUMA_API void SIMDVectorRotatePoints(const float* points_x, const float* points_y,
                                      const float* sin_vals, const float* cos_vals,
                                      float* result_x, float* result_y, size_t count);
+/**
+* @brief 对指定实体施加力或冲量。
+* @param scene 场景句柄。
+* @param entity 实体句柄。
+* @param force 施加的力向量。
+* @param mode 力的应用模式 (Force 或 Impulse)。
+*/
+LUMA_API void Physics_ApplyForce(LumaSceneHandle scene, LumaEntityHandle entity, Vector2f_CAPI force,
+                                 ForceMode_CAPI mode);
+
+/**
+ * @brief 执行射线检测。
+ * @param scene 场景句柄。
+ * @param start 射线起点 (像素坐标)。
+ * @param end 射线终点 (像素坐标)。
+ * @param penetrate 是否穿透。
+ * @param outHits 用于接收命中结果的数组指针。
+ * @param maxHits outHits 数组的最大容量。
+ * @param outHitCount 返回实际命中的数量。
+ * @return 如果有任何命中，则返回 true。
+ */
+LUMA_API bool Physics_RayCast(LumaSceneHandle scene, Vector2f_CAPI start, Vector2f_CAPI end, bool penetrate,
+                              RayCastResult_CAPI* outHits, int maxHits, int* outHitCount);
+
+/**
+ * @brief 执行圆形区域检测。
+ * @param scene 场景句柄。
+ * @param center 圆形中心 (像素坐标)。
+ * @param radius 圆形半径 (像素)。
+ * @param tags 用于过滤的标签数组。
+ * @param tagCount 标签数量。
+ * @param outHit 用于接收最近命中结果的指针。
+ * @return 如果有任何命中，则返回 true。
+ */
+LUMA_API bool Physics_CircleCheck(LumaSceneHandle scene, Vector2f_CAPI center, float radius,
+                                  const char* tags[], int tagCount, RayCastResult_CAPI* outHit);
+
+/**
+ * @brief 根据描述播放一个音频。
+ * @param desc 音频播放的描述。
+ * @return 返回一个唯一的 voiceId，失败则返回 0。
+ */
+LUMA_API uint32_t AudioManager_Play(PlayDesc_CAPI desc);
+
+/**
+ * @brief 停止指定 voiceId 的音频。
+ * @param voiceId 要停止的音频 ID。
+ */
+LUMA_API void AudioManager_Stop(uint32_t voiceId);
+
+/**
+ * @brief 停止所有正在播放的音频。
+ */
+LUMA_API void AudioManager_StopAll();
+
+/**
+ * @brief 检查指定 voiceId 的音频是否播放完毕。
+ * @param voiceId 要检查的音频 ID。
+ * @return 如果已结束或无效，返回 true。
+ */
+LUMA_API bool AudioManager_IsFinished(uint32_t voiceId);
+
+/**
+ * @brief 设置指定 voiceId 音频的音量。
+ * @param voiceId 音频 ID。
+ * @param volume 新音量 (0.0f - 1.0f)。
+ */
+LUMA_API void AudioManager_SetVolume(uint32_t voiceId, float volume);
+
+/**
+ * @brief 设置指定 voiceId 音频的循环状态。
+ * @param voiceId 音频 ID。
+ * @param loop 是否循环。
+ */
+LUMA_API void AudioManager_SetLoop(uint32_t voiceId, bool loop);
+
+/**
+ * @brief 设置指定 voiceId 音频的位置。
+ * @param voiceId 音频 ID。
+ * @param x, y, z 新的世界坐标。
+ */
+LUMA_API void AudioManager_SetVoicePosition(uint32_t voiceId, float x, float y, float z);
 #ifdef __cplusplus
 }
 #endif

@@ -56,6 +56,8 @@ void TilesetPanel::Draw()
 
     if (ImGui::Begin(windowTitle.c_str(), &m_isVisible))
     {
+        m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
         if (!m_currentTileset)
         {
             ImVec2 center = ImGui::GetContentRegionAvail();

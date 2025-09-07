@@ -7,6 +7,7 @@
 
 
 #include "ActivityComponent.h"
+#include "TagComponent.h"
 #include "../Loaders/PrefabLoader.h"
 #include "Event/Events.h"
 
@@ -55,6 +56,7 @@ sk_sp<RuntimeScene> RuntimeScene::CreatePlayModeCopy()
 {
     auto copy = sk_make_sp<RuntimeScene>();
     copy->CloneFromScene(*this);
+    EventBus::GetInstance().Publish(SceneUpdateEvent{});
     return copy;
 }
 
@@ -242,6 +244,7 @@ void RuntimeScene::DestroyGameObject(RuntimeGameObject& gameObject)
 
 
     m_registry.destroy(entity);
+    EventBus::GetInstance().Publish(SceneUpdateEvent{});
 }
 
 void RuntimeScene::Update(float deltaTime, EngineContext& engineCtx, bool pauseNormalSystem)
@@ -272,6 +275,7 @@ void RuntimeScene::LoadFromData(const Data::SceneData& sceneData)
     {
         CreateHierarchyFromNode(rootNode, nullptr, false);
     }
+    EventBus::GetInstance().Publish(SceneUpdateEvent{});
 }
 
 RuntimeGameObject RuntimeScene::FindGameObjectByEntity(entt::entity handle)
@@ -311,8 +315,9 @@ RuntimeGameObject RuntimeScene::CreateGameObject(const std::string& name)
     id.guid = Guid::NewGuid();
 
 
-    newGameObject.AddComponent<ECS::Transform>();
+    newGameObject.AddComponent<ECS::TransformComponent>();
     newGameObject.AddComponent<ECS::ActivityComponent>();
+    newGameObject.AddComponent<ECS::TagComponent>();
 
 
     m_guidToEntityMap[id.guid] = newHandle;
@@ -322,7 +327,7 @@ RuntimeGameObject RuntimeScene::CreateGameObject(const std::string& name)
 
 
     EventBus::GetInstance().Publish(GameObjectCreatedEvent{m_registry, newHandle});
-
+    EventBus::GetInstance().Publish(SceneUpdateEvent{});
     return newGameObject;
 }
 
@@ -397,10 +402,20 @@ RuntimeGameObject RuntimeScene::CreateHierarchyFromNode(const Data::PrefabNode& 
     }
 
 
-    if (!newGameObject.HasComponent<ECS::Transform>())
+    if (!newGameObject.HasComponent<ECS::TransformComponent>())
     {
-        newGameObject.AddComponent<ECS::Transform>();
+        newGameObject.AddComponent<ECS::TransformComponent>();
         EventBus::GetInstance().Publish(ComponentAddedEvent{m_registry, newHandle, "Transform"});
+    }
+    if (!newGameObject.HasComponent<ECS::ActivityComponent>())
+    {
+        newGameObject.AddComponent<ECS::ActivityComponent>();
+        EventBus::GetInstance().Publish(ComponentAddedEvent{m_registry, newHandle, "ActivityComponent"});
+    }
+    if (!newGameObject.HasComponent<ECS::TagComponent>())
+    {
+        newGameObject.AddComponent<ECS::TagComponent>();
+        EventBus::GetInstance().Publish(ComponentAddedEvent{m_registry, newHandle, "TagComponent"});
     }
 
 
@@ -456,13 +471,14 @@ void RuntimeScene::SetRootSiblingIndex(RuntimeGameObject& object, int newIndex)
     if (newIndex > m_rootGameObjects.size()) newIndex = (int)m_rootGameObjects.size();
 
     m_rootGameObjects.insert(m_rootGameObjects.begin() + newIndex, object);
+    EventBus::GetInstance().Publish(SceneUpdateEvent{});
 }
 
 
 RuntimeGameObject RuntimeScene::Instantiate(RuntimePrefab& prefab, RuntimeGameObject* parent)
 {
     const Data::PrefabNode& rootNode = prefab.GetData().root;
-
+    EventBus::GetInstance().Publish(SceneUpdateEvent{});
     return CreateHierarchyFromNode(rootNode, parent);
 }
 

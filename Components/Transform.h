@@ -11,7 +11,7 @@ namespace ECS
      * @brief 表示实体在世界空间中的变换信息（位置、旋转、缩放）。
      * 继承自 IComponent，使其可以作为实体组件。
      */
-    struct Transform : IComponent
+    struct TransformComponent : IComponent
     {
         Vector2f position = {0.0f, 0.0f}; ///< 世界空间中的位置。
         float rotation = 0.0f; ///< 世界空间中的旋转角度（以弧度或度为单位，取决于具体实现）。
@@ -24,7 +24,7 @@ namespace ECS
         /**
          * @brief 默认构造函数，初始化为默认变换值。
          */
-        Transform() = default;
+        TransformComponent() = default;
 
         /**
          * @brief 构造函数，使用指定的位置、旋转和缩放初始化变换。
@@ -32,7 +32,7 @@ namespace ECS
          * @param rot 初始旋转角度。
          * @param scl 初始缩放。
          */
-        Transform(const Vector2f& pos, float rot = 0.0f, float scl = 1.0f)
+        TransformComponent(const Vector2f& pos, float rot = 0.0f, float scl = 1.0f)
             : position(pos), rotation(rot), scale(scl)
         {
         }
@@ -44,7 +44,7 @@ namespace ECS
          * @param rot 初始旋转角度。
          * @param scl 初始缩放。
          */
-        Transform(float x, float y, float rot = 0.0f, Vector2f scl = 1.0f)
+        TransformComponent(float x, float y, float rot = 0.0f, Vector2f scl = 1.0f)
             : position(x, y), rotation(rot), scale(scl)
         {
         }
@@ -57,14 +57,14 @@ namespace YAML
      * @brief YAML 序列化/反序列化 ECS::Transform 结构的特化转换器。
      */
     template <>
-    struct convert<ECS::Transform>
+    struct convert<ECS::TransformComponent>
     {
         /**
          * @brief 将 ECS::Transform 对象编码为 YAML 节点。
          * @param transform 要编码的 Transform 对象。
          * @return 表示 Transform 对象的 YAML 节点。
          */
-        static Node encode(const ECS::Transform& transform)
+        static Node encode(const ECS::TransformComponent& transform)
         {
             Node node;
             node["position"] = transform.position;
@@ -79,7 +79,7 @@ namespace YAML
          * @param transform 用于存储解码结果的 Transform 对象。
          * @return 如果解码成功则返回 true，否则返回 false。
          */
-        static bool decode(const Node& node, ECS::Transform& transform)
+        static bool decode(const Node& node, ECS::TransformComponent& transform)
         {
             if (!node.IsMap())
                 return false;
@@ -98,13 +98,13 @@ namespace YAML
  */
 REGISTRY
 {
-    Registry_<ECS::Transform>("Transform")
+    Registry_<ECS::TransformComponent>("TransformComponent")
         .SetNonRemovable() ///< 设置该组件不可移除。
-        .property("position", &ECS::Transform::position) ///< 注册位置属性。
-        .property("rotation", &ECS::Transform::rotation) ///< 注册旋转属性。
-        .property("scale", &ECS::Transform::scale) ///< 注册缩放属性。
-        .property("localPosition", &ECS::Transform::localPosition, false) ///< 注册局部位置属性，不可序列化。
-        .property("localRotation", &ECS::Transform::localRotation, false) ///< 注册局部旋转属性，不可序列化。
-        .property("localScale", &ECS::Transform::localScale, false); ///< 注册局部缩放属性，不可序列化。
+        .property("position", &ECS::TransformComponent::position) ///< 注册位置属性。
+        .property("rotation", &ECS::TransformComponent::rotation) ///< 注册旋转属性。
+        .property("scale", &ECS::TransformComponent::scale) ///< 注册缩放属性。
+        .property("localPosition", &ECS::TransformComponent::localPosition, false) ///< 注册局部位置属性，不可序列化。
+        .property("localRotation", &ECS::TransformComponent::localRotation, false) ///< 注册局部旋转属性，不可序列化。
+        .property("localScale", &ECS::TransformComponent::localScale, false); ///< 注册局部缩放属性，不可序列化。
 }
 #endif

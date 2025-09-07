@@ -36,9 +36,9 @@ namespace Systems
             desc.spatial = ac.spatial;
 
 
-            if (reg.all_of<ECS::Transform>(e))
+            if (reg.all_of<ECS::TransformComponent>(e))
             {
-                auto& tc = reg.get<ECS::Transform>(e);
+                auto& tc = reg.get<ECS::TransformComponent>(e);
                 auto p = tc.position;
                 desc.sourceX = p.x;
                 desc.sourceY = p.y;
@@ -80,9 +80,9 @@ namespace Systems
                     desc.volume = ac.volume;
                     desc.spatial = ac.spatial;
 
-                    if (reg.all_of<ECS::Transform>(e))
+                    if (reg.all_of<ECS::TransformComponent>(e))
                     {
-                        auto& tc = reg.get<ECS::Transform>(e);
+                        auto& tc = reg.get<ECS::TransformComponent>(e);
                         auto p = tc.position;
                         desc.sourceX = p.x;
                         desc.sourceY = p.y;
@@ -97,9 +97,9 @@ namespace Systems
             }
 
 
-            if (ac.voiceId != 0 && reg.all_of<ECS::Transform>(e))
+            if (ac.voiceId != 0 && reg.all_of<ECS::TransformComponent>(e))
             {
-                auto& tc = reg.get<ECS::Transform>(e);
+                auto& tc = reg.get<ECS::TransformComponent>(e);
                 auto p = tc.position;
                 AudioManager::GetInstance().SetVoicePosition(ac.voiceId, p.x, p.y, 0);
             }

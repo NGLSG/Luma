@@ -7,6 +7,7 @@
 #include "../Resources/RuntimeAsset/RuntimeScene.h"
 #include "AssetManager.h"
 #include "Path.h"
+#include "Input/Keyboards.h"
 #include "Loaders/AnimationClipLoader.h"
 
 
@@ -48,6 +49,7 @@ void AnimationControllerEditorPanel::Draw()
     }
     if (ImGui::Begin(GetPanelName(), &m_isVisible, ImGuiWindowFlags_MenuBar))
     {
+        m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
         if (ImGui::BeginMenuBar())
         {
             if (ImGui::BeginMenu("文件"))
@@ -129,7 +131,7 @@ void AnimationControllerEditorPanel::Draw()
     }
     ImGui::End();
 
-
+    handleShortcutInput();
     if (m_transitionEditWindowOpen)
     {
         drawTransitionEditor();
@@ -675,6 +677,19 @@ void AnimationControllerEditorPanel::deleteLink(ed::LinkId linkId)
                                  }), m_links.end());
 
     LogInfo("删除过渡连接");
+}
+
+void AnimationControllerEditorPanel::handleShortcutInput()
+{
+    if (!m_isFocused) return;
+    if (Keyboard::LeftCtrl.IsPressed() && Keyboard::S.IsPressed())
+    {
+        saveToControllerData();
+    }
+    if (Keyboard::LeftCtrl.IsPressed() && Keyboard::W.IsPressed())
+    {
+        CloseCurrentController();
+    }
 }
 
 

@@ -36,7 +36,7 @@
 #define PIXELS_PER_METER 32.0f;
 #endif
 
-static bool IsPointInSprite(const ECS::Vector2f& worldPoint, const ECS::Transform& transform,
+static bool IsPointInSprite(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
                             const ECS::SpriteComponent& sprite)
 {
     const float halfWidth = 100.f / sprite.image->getImportSettings().pixelPerUnit * (sprite.sourceRect.Width() > 0
@@ -168,7 +168,7 @@ static SkRect GetLocalTextBounds(const ECS::TextComponent& textComp, float paddi
 }
 
 
-static bool isPointInText(const ECS::Vector2f& worldPoint, const ECS::Transform& transform,
+static bool isPointInText(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
                           const ECS::TextComponent& textComp)
 {
     if (!textComp.typeface)
@@ -203,14 +203,14 @@ static bool isPointInText(const ECS::Vector2f& worldPoint, const ECS::Transform&
     return scaledBounds.contains(localPoint.x, localPoint.y);
 }
 
-entt::entity SceneViewPanel::findEntityByTransform(const ECS::Transform& targetTransform)
+entt::entity SceneViewPanel::findEntityByTransform(const ECS::TransformComponent& targetTransform)
 {
     auto& registry = m_context->activeScene->GetRegistry();
-    auto view = registry.view<ECS::Transform>();
+    auto view = registry.view<ECS::TransformComponent>();
 
     for (auto entity : view)
     {
-        const auto& transform = view.get<ECS::Transform>(entity);
+        const auto& transform = view.get<ECS::TransformComponent>(entity);
 
         if (&transform == &targetTransform)
         {
@@ -221,7 +221,7 @@ entt::entity SceneViewPanel::findEntityByTransform(const ECS::Transform& targetT
     return entt::null;
 }
 
-bool SceneViewPanel::isPointInEmptyObject(const ECS::Vector2f& worldPoint, const ECS::Transform& transform)
+bool SceneViewPanel::isPointInEmptyObject(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform)
 {
     ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, transform.position);
     ImVec2 worldMouseScreen = worldToScreenWith(m_editorCameraProperties, worldPoint);
@@ -293,7 +293,7 @@ void SceneViewPanel::Draw()
     PROFILE_FUNCTION();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::Begin(GetPanelName(), &m_isVisible);
-
+    m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     const ImVec2 viewportScreenPos = ImGui::GetCursorScreenPos();
     const ImVec2 viewportSize = ImGui::GetContentRegionAvail();
@@ -405,10 +405,10 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
     for (const auto& selectedGuid : m_context->selectionList)
     {
         RuntimeGameObject gameObject = m_context->activeScene->FindGameObjectByGuid(selectedGuid);
-        if (!gameObject.IsValid() || !gameObject.HasComponent<ECS::Transform>())
+        if (!gameObject.IsValid() || !gameObject.HasComponent<ECS::TransformComponent>())
             continue;
 
-        const auto& transform = gameObject.GetComponent<ECS::Transform>();
+        const auto& transform = gameObject.GetComponent<ECS::TransformComponent>();
         bool hasVisualRepresentation = false;
 
 
@@ -493,7 +493,7 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
     }
 }
 
-void SceneViewPanel::drawBoxColliderOutline(ImDrawList* drawList, const ECS::Transform& transform,
+void SceneViewPanel::drawBoxColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                             const ECS::BoxColliderComponent& boxCollider, ImU32 outlineColor,
                                             ImU32 fillColor, float thickness)
 {
@@ -541,7 +541,7 @@ void SceneViewPanel::drawBoxColliderOutline(ImDrawList* drawList, const ECS::Tra
     drawList->AddPolyline(screenCorners.data(), 4, outlineColor, ImDrawFlags_Closed, thickness);
 }
 
-void SceneViewPanel::drawCircleColliderOutline(ImDrawList* drawList, const ECS::Transform& transform,
+void SceneViewPanel::drawCircleColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                const ECS::CircleColliderComponent& circleCollider, ImU32 outlineColor,
                                                ImU32 fillColor, float thickness)
 {
@@ -578,7 +578,7 @@ void SceneViewPanel::drawCircleColliderOutline(ImDrawList* drawList, const ECS::
     drawList->AddLine(screenCenter, directionEnd, outlineColor, thickness);
 }
 
-void SceneViewPanel::drawPolygonColliderOutline(ImDrawList* drawList, const ECS::Transform& transform,
+void SceneViewPanel::drawPolygonColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                 const ECS::PolygonColliderComponent& polygonCollider,
                                                 ImU32 outlineColor,
                                                 ImU32 fillColor, float thickness)
@@ -623,7 +623,7 @@ void SceneViewPanel::drawPolygonColliderOutline(ImDrawList* drawList, const ECS:
     }
 }
 
-void SceneViewPanel::drawEdgeColliderOutline(ImDrawList* drawList, const ECS::Transform& transform,
+void SceneViewPanel::drawEdgeColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                              const ECS::EdgeColliderComponent& edgeCollider, ImU32 outlineColor,
                                              float thickness)
 {
@@ -675,7 +675,7 @@ void SceneViewPanel::drawEdgeColliderOutline(ImDrawList* drawList, const ECS::Tr
     }
 }
 
-void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS::Transform& transform,
+void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                 const ECS::SpriteComponent& sprite, ImU32 outlineColor,
                                                 ImU32 fillColor, float thickness)
 {
@@ -737,7 +737,7 @@ void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS:
     }
 }
 
-void SceneViewPanel::drawCapsuleColliderOutline(ImDrawList* drawList, const ECS::Transform& transform,
+void SceneViewPanel::drawCapsuleColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                 const ECS::CapsuleColliderComponent& capsuleCollider,
                                                 ImU32 outlineColor,
                                                 ImU32 fillColor, float thickness)
@@ -903,7 +903,7 @@ void SceneViewPanel::drawCapsuleColliderOutline(ImDrawList* drawList, const ECS:
 
 
 void SceneViewPanel::drawColliderEditHandles(ImDrawList* drawList, RuntimeGameObject& gameObject,
-                                             const ECS::Transform& transform)
+                                             const ECS::TransformComponent& transform)
 {
     if (!gameObject.HasComponent<ECS::BoxColliderComponent>()) return;
 
@@ -998,7 +998,7 @@ void SceneViewPanel::drawDashedLine(ImDrawList* drawList, const ImVec2& start, c
     }
 }
 
-void SceneViewPanel::drawScrollViewSelectionOutline(ImDrawList* drawList, const ECS::Transform& transform,
+void SceneViewPanel::drawScrollViewSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                     const ECS::ScrollViewComponent& scrollViewComp, ImU32 outlineColor,
                                                     ImU32 fillColor, float thickness)
 {
@@ -1112,7 +1112,7 @@ void SceneViewPanel::drawScrollViewSelectionOutline(ImDrawList* drawList, const 
     }
 }
 
-void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::Transform& transform,
+void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                               const ECS::TextComponent& textComp, ImU32 outlineColor,
                                               ImU32 fillColor, float thickness)
 {
@@ -1155,7 +1155,7 @@ void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::T
 }
 
 
-void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const ECS::Transform& transform,
+void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                    const ECS::InputTextComponent& inputTextComp, ImU32 outlineColor,
                                                    ImU32 fillColor, float thickness)
 {
@@ -1208,7 +1208,7 @@ void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const E
     }
 }
 
-void SceneViewPanel::drawEmptyObjectSelection(ImDrawList* drawList, const ECS::Transform& transform,
+void SceneViewPanel::drawEmptyObjectSelection(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                               const std::string& objectName, ImU32 outlineColor,
                                               ImU32 labelBgColor, ImU32 labelTextColor)
 {
@@ -1277,7 +1277,7 @@ void SceneViewPanel::drawEmptyObjectSelection(ImDrawList* drawList, const ECS::T
     drawList->AddText(labelPos, labelTextColor, objectName.c_str());
 }
 
-void SceneViewPanel::drawObjectNameLabel(ImDrawList* drawList, const ECS::Transform& transform,
+void SceneViewPanel::drawObjectNameLabel(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                          const std::string& objectName, ImU32 labelBgColor, ImU32 labelTextColor)
 {
     ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, transform.position);
@@ -1334,15 +1334,15 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
 
             if (newInstance.IsValid())
             {
-                if (newInstance.HasComponent<ECS::Transform>())
+                if (newInstance.HasComponent<ECS::TransformComponent>())
                 {
-                    auto& transform = newInstance.GetComponent<ECS::Transform>();
+                    auto& transform = newInstance.GetComponent<ECS::TransformComponent>();
                     transform.position = worldPosition;
                 }
                 else
                 {
                     LogWarn("实例化的预制体缺少Transform组件，手动添加");
-                    auto& transform = newInstance.AddComponent<ECS::Transform>();
+                    auto& transform = newInstance.AddComponent<ECS::TransformComponent>();
                     transform.position = worldPosition;
                 }
 
@@ -1371,9 +1371,9 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
 
         if (newGo.IsValid())
         {
-            if (newGo.HasComponent<ECS::Transform>())
+            if (newGo.HasComponent<ECS::TransformComponent>())
             {
-                newGo.GetComponent<ECS::Transform>().position = worldPosition;
+                newGo.GetComponent<ECS::TransformComponent>().position = worldPosition;
             }
 
 
@@ -1429,9 +1429,9 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
 
             if (newGo.IsValid())
             {
-                if (newGo.HasComponent<ECS::Transform>())
+                if (newGo.HasComponent<ECS::TransformComponent>())
                 {
-                    newGo.GetComponent<ECS::Transform>().position = worldPosition;
+                    newGo.GetComponent<ECS::TransformComponent>().position = worldPosition;
                 }
 
                 
@@ -1844,10 +1844,10 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
     const ImVec2 currentMousePos = ImGui::GetIO().MousePos;
 
     std::vector<std::pair<entt::entity, int>> candidates;
-    auto inputTextView = registry.view<ECS::Transform, ECS::InputTextComponent>();
+    auto inputTextView = registry.view<ECS::TransformComponent, ECS::InputTextComponent>();
     for (auto entity : inputTextView)
     {
-        const auto& transform = inputTextView.get<ECS::Transform>(entity);
+        const auto& transform = inputTextView.get<ECS::TransformComponent>(entity);
         const auto& inputText = inputTextView.get<ECS::InputTextComponent>(entity);
         const ECS::TextComponent& displayText = (!inputText.text.text.empty() || inputText.isFocused)
                                                     ? inputText.text
@@ -1858,13 +1858,13 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
         }
     }
 
-    auto spriteView = registry.view<ECS::Transform, ECS::SpriteComponent>();
+    auto spriteView = registry.view<ECS::TransformComponent, ECS::SpriteComponent>();
     for (auto entity : spriteView)
     {
         const auto& sprite = spriteView.get<ECS::SpriteComponent>(entity);
         if (sprite.image)
         {
-            const auto& transform = spriteView.get<ECS::Transform>(entity);
+            const auto& transform = spriteView.get<ECS::TransformComponent>(entity);
             if (IsPointInSprite(worldMousePos, transform, sprite))
             {
                 candidates.emplace_back(entity, sprite.zIndex + 1000);
@@ -1872,24 +1872,24 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
         }
     }
 
-    auto textView = registry.view<ECS::Transform, ECS::TextComponent>();
+    auto textView = registry.view<ECS::TransformComponent, ECS::TextComponent>();
     for (auto entity : textView)
     {
         if (registry.any_of<ECS::InputTextComponent>(entity)) continue;
         const auto& textComp = textView.get<ECS::TextComponent>(entity);
-        const auto& transform = textView.get<ECS::Transform>(entity);
+        const auto& transform = textView.get<ECS::TransformComponent>(entity);
         if (isPointInText(worldMousePos, transform, textComp))
         {
             candidates.emplace_back(entity, textComp.zIndex + 1000);
         }
     }
 
-    auto emptyView = registry.view<ECS::Transform>();
+    auto emptyView = registry.view<ECS::TransformComponent>();
     for (auto entity : emptyView)
     {
         if (registry.any_of<ECS::SpriteComponent, ECS::TextComponent, ECS::InputTextComponent>(entity))
             continue;
-        const auto& transform = emptyView.get<ECS::Transform>(entity);
+        const auto& transform = emptyView.get<ECS::TransformComponent>(entity);
         if (isPointInEmptyObject(worldMousePos, transform))
         {
             candidates.emplace_back(entity, 0);
@@ -1986,7 +1986,7 @@ void SceneViewPanel::handleObjectDragging(const ECS::Vector2f& worldMousePos)
         RuntimeGameObject gameObject = m_context->activeScene->FindGameObjectByGuid(draggedObj.guid);
         if (!gameObject.IsValid()) continue;
 
-        auto& transform = gameObject.GetComponent<ECS::Transform>();
+        auto& transform = gameObject.GetComponent<ECS::TransformComponent>();
         ECS::Vector2f newWorldPosition = worldMousePos + draggedObj.dragOffset;
 
         if (gameObject.HasComponent<ECS::ParentComponent>())
@@ -1996,7 +1996,7 @@ void SceneViewPanel::handleObjectDragging(const ECS::Vector2f& worldMousePos)
 
             if (parentGO.IsValid())
             {
-                auto& parentTransform = parentGO.GetComponent<ECS::Transform>();
+                auto& parentTransform = parentGO.GetComponent<ECS::TransformComponent>();
 
 
                 transform.localPosition = {
@@ -2021,9 +2021,9 @@ void SceneViewPanel::initiateDragging(const ECS::Vector2f& worldMousePos)
     for (const auto& selectedGuid : m_context->selectionList)
     {
         RuntimeGameObject gameObject = m_context->activeScene->FindGameObjectByGuid(selectedGuid);
-        if (gameObject.IsValid() && gameObject.HasComponent<ECS::Transform>())
+        if (gameObject.IsValid() && gameObject.HasComponent<ECS::TransformComponent>())
         {
-            const auto& transform = gameObject.GetComponent<ECS::Transform>();
+            const auto& transform = gameObject.GetComponent<ECS::TransformComponent>();
 
             DraggedObject draggedObj;
             draggedObj.guid = selectedGuid;
@@ -2053,7 +2053,7 @@ bool SceneViewPanel::handleColliderHandlePicking(const ECS::Vector2f& worldMouse
             RuntimeGameObject go = m_context->activeScene->FindGameObjectByGuid(handle.entityGuid);
             if (go.IsValid() && go.HasComponent<ECS::BoxColliderComponent>())
             {
-                const auto& transform = go.GetComponent<ECS::Transform>();
+                const auto& transform = go.GetComponent<ECS::TransformComponent>();
                 const auto& boxCollider = go.GetComponent<ECS::BoxColliderComponent>();
 
 
@@ -2104,7 +2104,7 @@ void SceneViewPanel::handleColliderHandleDragging(const ECS::Vector2f& worldMous
     RuntimeGameObject go = m_context->activeScene->FindGameObjectByGuid(m_activeColliderHandle.entityGuid);
     if (!go.IsValid() || !go.HasComponent<ECS::BoxColliderComponent>()) return;
 
-    auto& transform = go.GetComponent<ECS::Transform>();
+    auto& transform = go.GetComponent<ECS::TransformComponent>();
     auto& boxCollider = go.GetComponent<ECS::BoxColliderComponent>();
     auto& handle = m_activeColliderHandle;
 

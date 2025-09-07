@@ -63,9 +63,15 @@ public:
     {
     }
 
+    virtual bool IsFocused() const
+    {
+        return m_isFocused;
+    }
+
 protected:
+    bool m_isFocused = false; ///< 面板的焦点状态。
     EditorContext* m_context = nullptr; ///< 编辑器上下文指针。
-    bool m_isVisible = true;            ///< 面板的可见性状态。
+    bool m_isVisible = true; ///< 面板的可见性状态。
 };
 
 #endif

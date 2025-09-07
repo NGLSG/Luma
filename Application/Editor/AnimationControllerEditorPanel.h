@@ -225,6 +225,7 @@ private:
      * @param linkId 要删除的链接的ID。
      */
     void deleteLink(ed::LinkId linkId);
+    void handleShortcutInput();
 
     /**
      * @brief 获取下一个可用的节点ID。

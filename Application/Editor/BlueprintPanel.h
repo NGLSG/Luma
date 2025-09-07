@@ -489,6 +489,8 @@ private:
      * @return 指向 SelectFunctionWindow 对象的指针，如果未找到则返回 nullptr。
      */
     SelectFunctionWindow* findSelectFunctionWindow(uint32_t nodeId, const std::string& pinName);
+
+    void handleShortcutInput();
     // =========================================================================
     // ID 生成器 (ID Generators)
     // =========================================================================

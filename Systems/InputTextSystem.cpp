@@ -147,7 +147,7 @@ namespace Systems
     {
         auto& registry = scene->GetRegistry();
         auto& inputText = registry.get<ECS::InputTextComponent>(entity);
-        auto& transform = registry.get<ECS::Transform>(entity);
+        auto& transform = registry.get<ECS::TransformComponent>(entity);
 
         if (context.window)
         {

@@ -140,6 +140,7 @@ private:
 
 
     std::unordered_map<Guid, bool> expandedStates; ///< 存储每个节点的展开状态。
+    ListenerHandle m_sceneChangeListener; ///< 监听场景更改事件的句柄。
 
 
     int totalNodeCount; ///< 缓存中所有节点的总数。

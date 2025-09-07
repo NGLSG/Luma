@@ -14,7 +14,7 @@ void AssetInspectorPanel::Initialize(EditorContext* context)
 void AssetInspectorPanel::Draw()
 {
     ImGui::Begin(GetPanelName(), &m_isVisible);
-
+    m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     if (m_context->selectedAssets != m_currentEditingPaths)
     {

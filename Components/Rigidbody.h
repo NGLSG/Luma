@@ -109,6 +109,9 @@ namespace ECS
 
         AssetHandle physicsMaterial = AssetHandle(AssetType::PhysicsMaterial); ///< 物理材质
 
+        Vector2f linearVelocity = Vector2f(0.0f); /// < 线性速度
+        float angularVelocity = 0.0f; /// < 角速度
+
         bool simulated = true; ///< 是否模拟
 
         float mass = 1.0f; ///< 质量
@@ -187,6 +190,8 @@ namespace YAML
             node["collisionDetection"] = ECS::CollisionDetectionTypeToString(rhs.collisionDetection);
             node["sleepingMode"] = ECS::SleepingModeToString(rhs.sleepingMode);
             node["constraints"] = rhs.constraints;
+            node["linearVelocity"] = rhs.linearVelocity;
+            node["angularVelocity"] = rhs.angularVelocity;
 
             return node;
         }
@@ -215,6 +220,14 @@ namespace YAML
                 rhs.constraints = node["constraints"].as<ECS::BodyConstraints>();
             }
 
+            if (node["linearVelocity"])
+            {
+                rhs.linearVelocity = node["linearVelocity"].as<ECS::Vector2f>();
+            }
+            if (node["angularVelocity"])
+            {
+                rhs.angularVelocity = node["angularVelocity"].as<float>();
+            }
             return true;
         }
     };
@@ -300,6 +313,8 @@ REGISTRY
         .property("Body Type", &ECS::RigidBodyComponent::bodyType)
         .property("Physics Material", &ECS::RigidBodyComponent::physicsMaterial)
         .property("Simulated", &ECS::RigidBodyComponent::simulated)
+        .property("Linear Velocity", &ECS::RigidBodyComponent::linearVelocity)
+        .property("Angular Velocity", &ECS::RigidBodyComponent::angularVelocity)
         .property("Mass", &ECS::RigidBodyComponent::mass)
         .property("Linear Damping", &ECS::RigidBodyComponent::linearDamping)
         .property("Angular Damping", &ECS::RigidBodyComponent::angularDamping)

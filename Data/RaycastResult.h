@@ -15,4 +15,10 @@ struct RayCastResult
     ECS::Vector2f normal; ///< 命中点处的表面法线。
     float fraction; ///< 光线投射距离的归一化分数（0.0到1.0）。
 };
+
+struct RayCastResults
+{
+    std::vector<RayCastResult> results; ///< 光线投射命中的所有结果。
+};
+
 #endif

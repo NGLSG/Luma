@@ -23,6 +23,10 @@ namespace ECS
 
 class RuntimeGameObject;
 
+struct SceneUpdateEvent
+{
+};
+
 /**
  * @brief 表示一个运行时场景，管理游戏对象、组件和系统。
  *
@@ -279,9 +283,9 @@ public:
 
 private:
     friend class ApplicationBase; ///< 允许 ApplicationBase 访问私有成员。
-    friend class Editor;          ///< 允许 Editor 访问私有成员。
-    friend class Game;            ///< 允许 Game 访问私有成员。
-    friend class ISystem;         ///< 允许 ISystem 访问私有成员。
+    friend class Editor; ///< 允许 Editor 访问私有成员。
+    friend class Game; ///< 允许 Game 访问私有成员。
+    friend class ISystem; ///< 允许 ISystem 访问私有成员。
 
 
     /**

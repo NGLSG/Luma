@@ -37,7 +37,7 @@ namespace Systems
     }
 
 
-    static bool isPointInSprite(const ECS::Vector2f& worldPoint, const ECS::Transform& transform,
+    static bool isPointInSprite(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
                                 const ECS::SpriteComponent& sprite)
     {
         const float halfWidth = (sprite.sourceRect.Width() > 0
@@ -70,7 +70,7 @@ namespace Systems
     }
 
 
-    static bool isPointInRectUI(const ECS::Vector2f& worldPoint, const ECS::Transform& transform,
+    static bool isPointInRectUI(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
                                 const ECS::Vector2f& size)
     {
         const float halfWidth = size.x * 0.5f;
@@ -159,14 +159,14 @@ namespace Systems
         std::vector<std::pair<entt::entity, int>> candidates;
 
 
-        auto buttonView = registry.view<ECS::Transform, ECS::ButtonComponent>();
+        auto buttonView = registry.view<ECS::TransformComponent, ECS::ButtonComponent>();
         for (auto entity : buttonView)
         {
             if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
                 continue;
             const auto& button = buttonView.get<ECS::ButtonComponent>(entity);
             if (!button.Enable) continue;
-            const auto& transform = buttonView.get<ECS::Transform>(entity);
+            const auto& transform = buttonView.get<ECS::TransformComponent>(entity);
             ECS::Vector2f buttonSize = {100.0f, 30.0f};
             if (auto* sprite = registry.try_get<ECS::SpriteComponent>(entity))
             {
@@ -186,14 +186,14 @@ namespace Systems
             }
         }
 
-        auto inputTextView = registry.view<ECS::Transform, ECS::InputTextComponent>();
+        auto inputTextView = registry.view<ECS::TransformComponent, ECS::InputTextComponent>();
         for (auto entity : inputTextView)
         {
             if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
                 continue;
             const auto& inputText = inputTextView.get<ECS::InputTextComponent>(entity);
             if (!inputText.Enable) continue;
-            const auto& transform = inputTextView.get<ECS::Transform>(entity);
+            const auto& transform = inputTextView.get<ECS::TransformComponent>(entity);
             ECS::Vector2f inputSize = {200.0f, 25.0f};
             if (auto* sprite = registry.try_get<ECS::SpriteComponent>(entity))
             {
@@ -213,13 +213,13 @@ namespace Systems
             }
         }
 
-        auto scrollViewView = registry.view<ECS::Transform, ECS::ScrollViewComponent>();
+        auto scrollViewView = registry.view<ECS::TransformComponent, ECS::ScrollViewComponent>();
         for (auto entity : scrollViewView)
         {
             if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
                 continue;
             const auto& scrollView = scrollViewView.get<ECS::ScrollViewComponent>(entity);
-            const auto& transform = scrollViewView.get<ECS::Transform>(entity);
+            const auto& transform = scrollViewView.get<ECS::TransformComponent>(entity);
             if (isPointInRectUI(worldMousePos, transform, scrollView.viewportSize))
             {
                 candidates.emplace_back(entity, 1000);
@@ -227,14 +227,14 @@ namespace Systems
         }
 
 
-        auto spriteView = registry.view<ECS::Transform, ECS::SpriteComponent>();
+        auto spriteView = registry.view<ECS::TransformComponent, ECS::SpriteComponent>();
         for (auto entity : spriteView)
         {
             if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
                 continue;
             const auto& sprite = spriteView.get<ECS::SpriteComponent>(entity);
             if (!sprite.image->getImage()) continue;
-            const auto& transform = spriteView.get<ECS::Transform>(entity);
+            const auto& transform = spriteView.get<ECS::TransformComponent>(entity);
             if (isPointInSprite(worldMousePos, transform, sprite))
             {
                 candidates.emplace_back(entity, sprite.zIndex);

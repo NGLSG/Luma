@@ -118,14 +118,14 @@ private:
      * @param targetTransform 目标变换组件。
      * @return 找到的实体，如果未找到则返回entt::null。
      */
-    entt::entity findEntityByTransform(const ECS::Transform& targetTransform);
+    entt::entity findEntityByTransform(const ECS::TransformComponent& targetTransform);
     /**
      * @brief 检查世界坐标点是否在空对象（无渲染组件）的范围内。
      * @param worldPoint 世界坐标点。
      * @param transform 空对象的变换组件。
      * @return 如果点在空对象范围内，则返回true；否则返回false。
      */
-    bool isPointInEmptyObject(const ECS::Vector2f& worldPoint, const ECS::Transform& transform);
+    bool isPointInEmptyObject(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform);
 
 
     /**
@@ -143,7 +143,7 @@ private:
      * @param fillColor 填充颜色。
      * @param thickness 轮廓线粗细。
      */
-    void drawBoxColliderOutline(ImDrawList* drawList, const ECS::Transform& transform,
+    void drawBoxColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                 const ECS::BoxColliderComponent& boxCollider, ImU32 outlineColor, ImU32 fillColor,
                                 float thickness);
     /**
@@ -155,7 +155,7 @@ private:
      * @param fillColor 填充颜色。
      * @param thickness 轮廓线粗细。
      */
-    void drawCircleColliderOutline(ImDrawList* drawList, const ECS::Transform& transform,
+    void drawCircleColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                    const ECS::CircleColliderComponent& circleCollider, ImU32 outlineColor,
                                    ImU32 fillColor, float thickness);
     /**
@@ -167,7 +167,7 @@ private:
      * @param fillColor 填充颜色。
      * @param thickness 轮廓线粗细。
      */
-    void drawPolygonColliderOutline(ImDrawList* drawList, const ECS::Transform& transform,
+    void drawPolygonColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                     const ECS::PolygonColliderComponent& polygonCollider, ImU32 outlineColor,
                                     ImU32 fillColor, float thickness);
     /**
@@ -178,7 +178,7 @@ private:
      * @param outlineColor 轮廓颜色。
      * @param thickness 轮廓线粗细。
      */
-    void drawEdgeColliderOutline(ImDrawList* drawList, const ECS::Transform& transform,
+    void drawEdgeColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                  const ECS::EdgeColliderComponent& edgeCollider, ImU32 outlineColor, float thickness);
     /**
      * @brief 绘制精灵的选中轮廓。
@@ -189,7 +189,7 @@ private:
      * @param fillColor 填充颜色。
      * @param thickness 轮廓线粗细。
      */
-    void drawSpriteSelectionOutline(ImDrawList* drawList, const ECS::Transform& transform,
+    void drawSpriteSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                     const ECS::SpriteComponent& sprite, ImU32 outlineColor, ImU32 fillColor,
                                     float thickness);
     /**
@@ -201,7 +201,7 @@ private:
      * @param fillColor 填充颜色。
      * @param thickness 轮廓线粗细。
      */
-    void drawCapsuleColliderOutline(ImDrawList* drawList, const ECS::Transform& transform,
+    void drawCapsuleColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                     const ECS::CapsuleColliderComponent& capsuleCollider, ImU32 outlineColor,
                                     ImU32 fillColor, float thickness);
     /**
@@ -210,7 +210,7 @@ private:
      * @param gameObject 运行时游戏对象。
      * @param transform 碰撞体所属的变换组件。
      */
-    void drawColliderEditHandles(ImDrawList* drawList, RuntimeGameObject& gameObject, const ECS::Transform& transform);
+    void drawColliderEditHandles(ImDrawList* drawList, RuntimeGameObject& gameObject, const ECS::TransformComponent& transform);
     /**
      * @brief 绘制虚线。
      * @param drawList ImGui绘图列表。
@@ -231,7 +231,7 @@ private:
      * @param fillColor 填充颜色。
      * @param thickness 轮廓线粗细。
      */
-    void drawScrollViewSelectionOutline(ImDrawList* drawList, const ECS::Transform& transform,
+    void drawScrollViewSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                         const ECS::ScrollViewComponent& scrollViewComp, ImU32 outlineColor,
                                         ImU32 fillColor, float thickness);
     /**
@@ -243,7 +243,7 @@ private:
      * @param fillColor 填充颜色。
      * @param thickness 轮廓线粗细。
      */
-    void drawInputTextSelectionOutline(ImDrawList* drawList, const ECS::Transform& transform,
+    void drawInputTextSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                        const ECS::InputTextComponent& inputTextComp, ImU32 outlineColor,
                                        ImU32 fillColor, float thickness);
     /**
@@ -255,7 +255,7 @@ private:
      * @param fillColor 填充颜色。
      * @param thickness 轮廓线粗细。
      */
-    void drawTextSelectionOutline(ImDrawList* drawList, const ECS::Transform& transform,
+    void drawTextSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                   const ECS::TextComponent& textComp, ImU32 outlineColor, ImU32 fillColor,
                                   float thickness);
     /**
@@ -267,7 +267,7 @@ private:
      * @param labelBgColor 标签背景颜色。
      * @param labelTextColor 标签文本颜色。
      */
-    void drawEmptyObjectSelection(ImDrawList* drawList, const ECS::Transform& transform, const std::string& objectName,
+    void drawEmptyObjectSelection(ImDrawList* drawList, const ECS::TransformComponent& transform, const std::string& objectName,
                                   ImU32 outlineColor, ImU32 labelBgColor, ImU32 labelTextColor);
     /**
      * @brief 绘制对象名称标签。
@@ -277,7 +277,7 @@ private:
      * @param labelBgColor 标签背景颜色。
      * @param labelTextColor 标签文本颜色。
      */
-    void drawObjectNameLabel(ImDrawList* drawList, const ECS::Transform& transform, const std::string& objectName,
+    void drawObjectNameLabel(ImDrawList* drawList, const ECS::TransformComponent& transform, const std::string& objectName,
                              ImU32 labelBgColor, ImU32 labelTextColor);
 
 

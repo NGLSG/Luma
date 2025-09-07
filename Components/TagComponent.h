@@ -21,13 +21,13 @@ namespace ECS
         TagComponent() = default;
 
         /// 标签的名称。
-        std::string name;
+        std::string tag;
 
         /**
          * @brief 构造函数，使用给定的标签名称初始化。
          * @param tagName 标签的名称。
          */
-        TagComponent(const std::string& tagName) : name(tagName)
+        TagComponent(const std::string& tagName) : tag(tagName)
         {
         }
 
@@ -35,7 +35,7 @@ namespace ECS
          * @brief 移动构造函数，使用给定的标签名称初始化。
          * @param tagName 标签的名称（右值引用）。
          */
-        TagComponent(std::string&& tagName) : name(std::move(tagName))
+        TagComponent(std::string&& tagName) : tag(std::move(tagName))
         {
         }
     };
@@ -59,7 +59,7 @@ namespace YAML
         static Node encode(const ECS::TagComponent& tag)
         {
             Node node;
-            node["name"] = tag.name;
+            node["tag"] = tag.tag;
             return node;
         }
 
@@ -71,10 +71,10 @@ namespace YAML
          */
         static bool decode(const Node& node, ECS::TagComponent& tag)
         {
-            if (!node.IsMap() || !node["name"])
+            if (!node.IsMap() || !node["tag"])
                 return false;
 
-            tag.name = node["name"].as<std::string>();
+            tag.tag = node["tag"].as<std::string>();
             return true;
         }
     };
@@ -89,6 +89,7 @@ namespace YAML
 REGISTRY
 {
     Registry_<ECS::TagComponent>("TagComponent")
-        .property("name", &ECS::TagComponent::name);
+        .SetNonRemovable()
+        .property("name", &ECS::TagComponent::tag);
 }
 #endif

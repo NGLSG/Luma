@@ -12,6 +12,21 @@ internal enum LumaLogLevel
     Critical
 }
 
+public enum ForceMode
+{
+    Force,
+    Impulse
+};
+
+[StructLayout(LayoutKind.Sequential)]
+public struct RaycastHit
+{
+    public readonly uint hitEntityHandle;
+    public readonly Vector2 Point;
+    public readonly Vector2 Normal;
+    public readonly float Fraction;
+}
+
 internal static class Native
 {
     private const string DllName = "LumaEngine";
@@ -131,6 +146,17 @@ internal static class Native
     internal static extern void ScriptComponent_GetAllGCHandles(IntPtr scenePtr, uint entityId, IntPtr outHandles,
         int outCount);
 
+    [DllImport(DllName)]
+    public static extern void Physics_ApplyForce(IntPtr scene, uint entity, Vector2 force, ForceMode mode);
+
+    [DllImport(DllName)]
+    public static extern bool Physics_RayCast(IntPtr scene, Vector2 start, Vector2 end, bool penetrate,
+        [Out] RaycastHit[] outHits, int maxHits, out int outHitCount);
+
+    [DllImport(DllName)]
+    public static extern bool Physics_CircleCheck(IntPtr scene, Vector2 center, float radius,
+        [In] string[] tags, int tagCount, out RaycastHit outHit);
+
     #region SIMD Bindings
 
     [DllImport(DllName)]
@@ -164,6 +190,66 @@ internal static class Native
     internal static extern void SIMDVectorRotatePoints(float[] points_x, float[] points_y,
         float[] sin_vals, float[] cos_vals,
         float[] result_x, float[] result_y, int count);
+
+    #endregion
+
+    #region AudioManager
+
+    
+    
+    
+    
+    
+    [DllImport(DllName)]
+    public static extern uint AudioManager_Play(PlayDesc desc);
+
+    
+    
+    
+    
+    [DllImport(DllName)]
+    public static extern void AudioManager_Stop(uint voiceId);
+
+    
+    
+    
+    [DllImport(DllName)]
+    public static extern void AudioManager_StopAll();
+
+    
+    
+    
+    
+    
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public static extern bool AudioManager_IsFinished(uint voiceId);
+
+    
+    
+    
+    
+    
+    [DllImport(DllName)]
+    public static extern void AudioManager_SetVolume(uint voiceId, float volume);
+
+    
+    
+    
+    
+    
+    [DllImport(DllName)]
+    public static extern void AudioManager_SetLoop(uint voiceId, [MarshalAs(UnmanagedType.I1)] bool loop);
+
+    
+    
+    
+    
+    
+    
+    
+    [DllImport(DllName)]
+    public static extern void AudioManager_SetVoicePosition(uint voiceId, float x, float y, float z);
 
     #endregion
 }

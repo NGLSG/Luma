@@ -173,8 +173,8 @@ void RuntimeGameObject::SetParent(RuntimeGameObject parent)
         RemoveComponent<ECS::ParentComponent>();
     }
 
-    auto& childTransform = GetComponent<ECS::Transform>();
-    auto& parentTransform = parent.GetComponent<ECS::Transform>();
+    auto& childTransform = GetComponent<ECS::TransformComponent>();
+    auto& parentTransform = parent.GetComponent<ECS::TransformComponent>();
 
 
     glm::mat4 parentWorldMatrix = glm::translate(glm::mat4(1.0f),

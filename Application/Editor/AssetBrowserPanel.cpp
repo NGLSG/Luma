@@ -123,7 +123,7 @@ void AssetBrowserPanel::Update(float deltaTime)
 void AssetBrowserPanel::Draw()
 {
     ImGui::Begin(GetPanelName(), &m_isVisible);
-
+    m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     drawToolbar();
 
     static float leftPaneWidth = 200.0f;

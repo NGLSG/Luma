@@ -168,6 +168,8 @@ private:
      */
     void removeEventTarget(AnimFrame& frame, size_t index);
 
+    void handleShortcutInput();
+
 public:
     /**
      * @brief 构造函数。

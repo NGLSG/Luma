@@ -1,6 +1,7 @@
 #include "PhysicsSystem.h"
 
 
+#include "TagComponent.h"
 #include "../Resources/RuntimeAsset/RuntimePhysicsMaterial.h"
 #include "../Resources/RuntimeAsset/RuntimeScene.h"
 #include "../Resources/Loaders/PhysicsMaterialLoader.h"
@@ -20,6 +21,112 @@ namespace Systems
     static constexpr float PIXELS_PER_METER = 32.0f;
     static constexpr float METER_PER_PIXEL = 1.0f / PIXELS_PER_METER;
     static constexpr float PI = 3.14159265358979323846f;
+
+    namespace
+    {
+        
+        
+        
+        struct RayCastCallbackContext
+        {
+            std::vector<RayCastResult>* hits;
+            bool penetrate;
+        };
+
+        
+        
+        
+        
+        
+        
+        
+        float RayCastCallback(b2ShapeId shapeId, b2Vec2 point, b2Vec2 normal, float fraction, void* context)
+        {
+            auto* queryContext = static_cast<RayCastCallbackContext*>(context);
+
+            b2BodyId bodyId = b2Shape_GetBody(shapeId);
+            void* userData = b2Body_GetUserData(bodyId);
+            if (userData == nullptr)
+            {
+                
+                return 1.0f;
+            }
+            entt::entity hitEntity = static_cast<entt::entity>(reinterpret_cast<uintptr_t>(userData));
+
+            
+            queryContext->hits->emplace_back(RayCastResult{
+                hitEntity,
+                {point.x * PIXELS_PER_METER, -point.y * PIXELS_PER_METER},
+                {normal.x, -normal.y},
+                fraction
+            });
+
+            
+            return queryContext->penetrate ? 1.0f : fraction;
+        }
+
+        
+        
+        
+        struct CircleCheckCallbackContext
+        {
+            entt::registry& registry;
+            const std::vector<std::string>& tags;
+            b2Vec2 queryCenter;
+
+            float closestDistanceSq = std::numeric_limits<float>::max();
+            entt::entity bestHit = entt::null;
+        };
+
+        
+        
+        
+        
+        bool CircleCheckCallback(b2ShapeId shapeId, void* context)
+        {
+            auto* queryContext = static_cast<CircleCheckCallbackContext*>(context);
+
+            b2BodyId bodyId = b2Shape_GetBody(shapeId);
+            void* userData = b2Body_GetUserData(bodyId);
+            if (userData == nullptr)
+            {
+                return true; 
+            }
+            entt::entity hitEntity = static_cast<entt::entity>(reinterpret_cast<uintptr_t>(userData));
+
+            
+            if (!queryContext->tags.empty())
+            {
+                auto* tagComponent = queryContext->registry.try_get<ECS::TagComponent>(hitEntity);
+                bool tagMatch = false;
+                if (tagComponent)
+                {
+                    for (const auto& tag : queryContext->tags)
+                    {
+                        if (tagComponent->tag == tag)
+                        {
+                            tagMatch = true;
+                            break;
+                        }
+                    }
+                }
+                if (!tagMatch)
+                {
+                    return true; 
+                }
+            }
+
+            b2Vec2 bodyPos = b2Body_GetPosition(bodyId);
+            float distanceSq = b2DistanceSquared(bodyPos, queryContext->queryCenter);
+            if (distanceSq < queryContext->closestDistanceSq)
+            {
+                queryContext->closestDistanceSq = distanceSq;
+                queryContext->bestHit = hitEntity;
+            }
+
+            return true; 
+        }
+    }
 
     b2Rot AngleToB2Rot(float angle)
     {
@@ -86,6 +193,7 @@ namespace Systems
 
     void PhysicsSystem::OnCreate(RuntimeScene* scene, EngineContext& context)
     {
+        m_scene = scene;
         int threadCount = std::thread::hardware_concurrency();
         int workerCount = std::max(1, threadCount - 2);
 
@@ -104,11 +212,11 @@ namespace Systems
         m_world = b2CreateWorld(&worldDef);
 
         auto& registry = scene->GetRegistry();
-        auto bodyView = registry.view<ECS::Transform, ECS::RigidBodyComponent>();
+        auto bodyView = registry.view<ECS::TransformComponent, ECS::RigidBodyComponent>();
 
         for (auto entity : bodyView)
         {
-            auto [transform, rb] = bodyView.get<ECS::Transform, ECS::RigidBodyComponent>(entity);
+            auto [transform, rb] = bodyView.get<ECS::TransformComponent, ECS::RigidBodyComponent>(entity);
             b2BodyDef bodyDef = b2DefaultBodyDef();
 
             switch (rb.bodyType)
@@ -144,6 +252,8 @@ namespace Systems
 
             b2BodyId bodyId = b2CreateBody(m_world, &bodyDef);
             rb.runtimeBody = bodyId;
+            b2Body_SetLinearVelocity(bodyId, {rb.linearVelocity.x, -rb.linearVelocity.y});
+            b2Body_SetAngularVelocity(bodyId, -rb.angularVelocity);
 
             CreateShapesForEntity(entity, registry, transform);
         }
@@ -152,7 +262,10 @@ namespace Systems
     void PhysicsSystem::OnUpdate(RuntimeScene* scene, float deltaTime, EngineContext& context)
     {
         if (m_world.index1 == B2_NULL_INDEX) return;
-
+        if (m_scene != scene)
+        {
+            m_scene = scene;
+        }
         auto& registry = scene->GetRegistry();
         {
             std::unordered_set<entt::entity> dirtyEntities;
@@ -210,12 +323,12 @@ namespace Systems
         }
 
 
-        auto kinematicView = registry.view<ECS::Transform, ECS::RigidBodyComponent>();
+        auto kinematicView = registry.view<ECS::TransformComponent, ECS::RigidBodyComponent>();
         for (auto entity : kinematicView)
         {
             if (!scene->FindGameObjectByEntity(entity).IsActive())
                 continue;
-            auto [transform, rb] = kinematicView.get<ECS::Transform, ECS::RigidBodyComponent>(entity);
+            auto [transform, rb] = kinematicView.get<ECS::TransformComponent, ECS::RigidBodyComponent>(entity);
             if (!rb.Enable)
                 continue;
             if (rb.bodyType == ECS::BodyType::Kinematic && rb.runtimeBody.index1 != B2_NULL_INDEX)
@@ -375,12 +488,12 @@ namespace Systems
         }
 
 
-        auto dynamicView = registry.view<ECS::Transform, ECS::RigidBodyComponent>();
+        auto dynamicView = registry.view<ECS::TransformComponent, ECS::RigidBodyComponent>();
         for (auto entity : dynamicView)
         {
             if (!scene->FindGameObjectByEntity(entity).IsActive())
                 continue;
-            auto [transform, rb] = dynamicView.get<ECS::Transform, ECS::RigidBodyComponent>(entity);
+            auto [transform, rb] = dynamicView.get<ECS::TransformComponent, ECS::RigidBodyComponent>(entity);
             if (!rb.Enable)
                 continue;
             if (rb.bodyType == ECS::BodyType::Dynamic && rb.runtimeBody.index1 != B2_NULL_INDEX)
@@ -415,48 +528,118 @@ namespace Systems
         return m_world;
     }
 
-    std::optional<RayCastResult> PhysicsSystem::RayCast(const ECS::Vector2f& startPoint,
-                                                        const ECS::Vector2f& endPoint) const
+    
+    
+    
+    
+    
+    
+    
+    std::optional<RayCastResults> PhysicsSystem::RayCast(const ECS::Vector2f& startPoint, const ECS::Vector2f& endPoint,
+                                                         bool penetrate) const
     {
         if (m_world.index1 == B2_NULL_INDEX)
         {
             return std::nullopt;
         }
 
-
-        b2Vec2 origin = {startPoint.x / PIXELS_PER_METER, -startPoint.y / PIXELS_PER_METER};
-        b2Vec2 target = {endPoint.x / PIXELS_PER_METER, -endPoint.y / PIXELS_PER_METER};
+        
+        b2Vec2 origin = {startPoint.x * METER_PER_PIXEL, -startPoint.y * METER_PER_PIXEL};
+        b2Vec2 target = {endPoint.x * METER_PER_PIXEL, -endPoint.y * METER_PER_PIXEL};
         b2Vec2 translation = b2Sub(target, origin);
 
-        std::optional<RayCastResult> result = std::nullopt;
+        std::vector<RayCastResult> allHits;
+        RayCastCallbackContext context = {&allHits, penetrate};
 
-        auto callback = [](b2ShapeId shapeId, b2Vec2 point, b2Vec2 normal, float fraction, void* context) -> float
+        
+        b2World_CastRay(m_world, origin, translation, b2DefaultQueryFilter(), RayCastCallback, &context);
+
+        if (allHits.empty())
         {
-            auto* result_ptr = static_cast<std::optional<RayCastResult>*>(context);
+            return std::nullopt;
+        }
 
-            b2BodyId bodyId = b2Shape_GetBody(shapeId);
-            void* userData = b2Body_GetUserData(bodyId);
-            entt::entity hitEntity = (entt::entity)(uintptr_t)userData;
+        
+        std::sort(allHits.begin(), allHits.end(), [](const auto& a, const auto& b)
+        {
+            return a.fraction < b.fraction;
+        });
 
-            *result_ptr = RayCastResult{
-                hitEntity,
+        return RayCastResults{std::move(allHits)};
+    }
 
-                {point.x * PIXELS_PER_METER, -point.y * PIXELS_PER_METER},
 
+    std::optional<RayCastResult> PhysicsSystem::CircleCheck(const ECS::Vector2f& center, float radius,
+                                                            entt::registry& registry,
+                                                            const std::vector<std::string>& tags) const
+    {
+        if (m_world.index1 == B2_NULL_INDEX || radius <= 0.0f)
+        {
+            return std::nullopt;
+        }
+
+        
+        b2Vec2 queryCenter = {center.x * METER_PER_PIXEL, -center.y * METER_PER_PIXEL};
+        CircleCheckCallbackContext context = {registry, tags, queryCenter};
+
+        float scaledRadius = radius * METER_PER_PIXEL;
+
+        b2AABB aabb;
+        aabb.lowerBound = {queryCenter.x - scaledRadius, queryCenter.y - scaledRadius};
+        aabb.upperBound = {queryCenter.x + scaledRadius, queryCenter.y + scaledRadius};
+
+        b2World_OverlapAABB(m_world, aabb, b2DefaultQueryFilter(), CircleCheckCallback, &context);
+
+        
+        if (context.bestHit != entt::null)
+        {
+            
+            if (!registry.valid(context.bestHit) || !registry.all_of<ECS::RigidBodyComponent>(context.bestHit))
+            {
+                return std::nullopt;
+            }
+
+            const auto& rb = registry.get<ECS::RigidBodyComponent>(context.bestHit);
+            b2Vec2 bodyPos = b2Body_GetPosition(rb.runtimeBody);
+
+            
+            
+            b2Vec2 normal = b2Sub(queryCenter, bodyPos);
+            if (b2LengthSquared(normal) > 1e-6f)
+            {
+                normal = b2Normalize(normal);
+            }
+
+            return RayCastResult{
+                context.bestHit,
+                {bodyPos.x * PIXELS_PER_METER, -bodyPos.y * PIXELS_PER_METER},
                 {normal.x, -normal.y},
-                fraction
+                0.0f
             };
+        }
 
-            return fraction;
-        };
+        return std::nullopt;
+    }
 
-        b2World_CastRay(m_world, origin, translation, b2DefaultQueryFilter(), callback, &result);
-
-        return result;
+    void PhysicsSystem::ApplyForce(entt::entity entity, const ECS::Vector2f& force, ForceMode mode)
+    {
+        auto& registry = m_scene->GetRegistry();
+        if (!registry.valid(entity)) return;
+        if (!registry.all_of<ECS::RigidBodyComponent>(entity)) return;
+        auto& rb = registry.get<ECS::RigidBodyComponent>(entity);
+        if (rb.runtimeBody.index1 == B2_NULL_INDEX) return;
+        if (mode == ForceMode::Force)
+        {
+            b2Body_ApplyForceToCenter(rb.runtimeBody, {force.x, -force.y}, true);
+        }
+        else if (mode == ForceMode::Impulse)
+        {
+            b2Body_ApplyLinearImpulseToCenter(rb.runtimeBody, {force.x, -force.y}, true);
+        }
     }
 
     void PhysicsSystem::CreateShapesForEntity(entt::entity entity, entt::registry& registry,
-                                              const ECS::Transform& transform)
+                                              const ECS::TransformComponent& transform)
     {
         auto& rb = registry.get<ECS::RigidBodyComponent>(entity);
         b2BodyId bodyId = rb.runtimeBody;
@@ -682,7 +865,7 @@ namespace Systems
 
     void PhysicsSystem::RecreateAllShapesForEntity(entt::entity entity, entt::registry& registry)
     {
-        if (!registry.all_of<ECS::RigidBodyComponent, ECS::Transform>(entity))
+        if (!registry.all_of<ECS::RigidBodyComponent, ECS::TransformComponent>(entity))
         {
             return;
         }
@@ -732,7 +915,52 @@ namespace Systems
         }
 
 
-        const auto& transform = registry.get<ECS::Transform>(entity);
+        const auto& transform = registry.get<ECS::TransformComponent>(entity);
         CreateShapesForEntity(entity, registry, transform);
+    }
+
+    void PhysicsSystem::OnComponentUpdate(const ComponentUpdatedEvent& event)
+    {
+        if (event.registry.all_of<ECS::RigidBodyComponent>(event.entity))
+        {
+            SyncRigidBodyProperties(event.entity, event.registry);
+        }
+    }
+
+    void PhysicsSystem::SyncRigidBodyProperties(entt::entity entity, entt::registry& registry)
+    {
+        if (!registry.valid(entity) || !registry.all_of<ECS::RigidBodyComponent>(entity))
+        {
+            return;
+        }
+
+        auto& rb = registry.get<ECS::RigidBodyComponent>(entity);
+        if (rb.runtimeBody.index1 == B2_NULL_INDEX)
+        {
+            return;
+        }
+
+        b2Body_SetType(rb.runtimeBody, static_cast<b2BodyType>(rb.bodyType));
+
+        b2Body_SetLinearVelocity(rb.runtimeBody, {rb.linearVelocity.x, -rb.linearVelocity.y});
+        b2Body_SetAngularVelocity(rb.runtimeBody, -rb.angularVelocity);
+
+        b2Body_SetLinearDamping(rb.runtimeBody, rb.linearDamping);
+        b2Body_SetAngularDamping(rb.runtimeBody, rb.angularDamping);
+        b2Body_SetGravityScale(rb.runtimeBody, rb.gravityScale);
+
+        bool isAwake = (rb.sleepingMode != ECS::SleepingMode::StartAsleep);
+        bool enableSleep = (rb.sleepingMode != ECS::SleepingMode::NeverSleep);
+        b2Body_SetAwake(rb.runtimeBody, enableSleep);
+
+        b2MotionLocks locks;
+        locks.linearX = rb.constraints.freezePositionX;
+        locks.linearY = rb.constraints.freezePositionY;
+        locks.angularZ = rb.constraints.freezeRotation;
+        b2Body_SetMotionLocks(rb.runtimeBody, locks);
+
+        b2Body_SetBullet(rb.runtimeBody, rb.collisionDetection == ECS::CollisionDetectionType::Continuous);
+
+        RecreateAllShapesForEntity(entity, registry);
     }
 }

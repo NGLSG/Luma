@@ -11,6 +11,8 @@
 #include <string_view>
 #include <implot.h>
 #include "imgui_internal.h"
+#include "Input/Cursor.h"
+#include "Input/Keyboards.h"
 
 struct PairHash
 {
@@ -164,6 +166,7 @@ void BlueprintPanel::Draw()
 
     if (ImGui::Begin(panelName.c_str(), &m_isVisible, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse))
     {
+        m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
         drawMenuBar();
 
         if (!m_currentBlueprint)
@@ -239,6 +242,7 @@ void BlueprintPanel::Draw()
         }
     }
     ImGui::End();
+    handleShortcutInput();
 
     if (m_currentBlueprint)
     {
@@ -414,7 +418,7 @@ void BlueprintPanel::drawNodeEditor()
             const auto* definition = BlueprintNodeRegistry::GetInstance().GetDefinition(nodeFullName);
             if (definition)
             {
-                ImVec2 nodePosition = ed::ScreenToCanvas(ImGui::GetMousePos());
+                ImVec2 nodePosition = ed::ScreenToCanvas({static_cast<float>(LumaCursor::GetPosition().x), static_cast<float>(LumaCursor::GetPosition().y)});
                 createNodeFromDefinition(definition, nodePosition);
             }
         }
@@ -428,6 +432,7 @@ void BlueprintPanel::drawNodeEditor()
             });
             if (it != funcs.end())
             {
+                
                 ImVec2 nodePosition = ed::ScreenToCanvas(ImGui::GetMousePos());
                 createFunctionCallNode(*it, nodePosition);
             }
@@ -440,36 +445,34 @@ void BlueprintPanel::drawNodeEditor()
         BlueprintNode* sourceData = findSourceDataById(node.sourceDataID);
         if (!sourceData) continue;
 
-        
+
         if (sourceData->TargetMemberName == "MakeArray")
         {
-            
             std::string elementType = "System.Object";
             if (sourceData->InputDefaults.count("元素类型") && !sourceData->InputDefaults.at("元素类型").empty())
             {
                 elementType = sourceData->InputDefaults.at("元素类型");
             }
 
-            
+
             for (auto& pin : node.outputPins)
             {
                 if (pin.name == "数组")
                 {
-                    pin.type = elementType + "[]"; 
+                    pin.type = elementType + "[]";
                 }
             }
 
-            
+
             for (auto& pin : node.inputPins)
             {
-                
                 if (pin.name.rfind("_dyn_element_", 0) == 0)
                 {
                     pin.type = elementType;
                 }
             }
         }
-        
+
 
         ed::BeginNode(node.id);
         ImGui::TextUnformatted(node.name.c_str());
@@ -477,9 +480,9 @@ void BlueprintPanel::drawNodeEditor()
 
         ImGui::BeginGroup();
 
-        
+
         bool requestAddParameter = false;
-        ed::PinId pinIdToDelete = 0; 
+        ed::PinId pinIdToDelete = 0;
 
         for (auto& pin : node.inputPins)
         {
@@ -617,18 +620,17 @@ void BlueprintPanel::drawNodeEditor()
             }
             else if (pin.type == "FunctionSelection")
             {
-                
                 ImGui::TextUnformatted(pin.name.c_str());
                 ImGui::SameLine();
 
-                
+
                 std::string& selectedFunction = sourceData->InputDefaults[pin.name];
                 const char* buttonText = selectedFunction.empty() ? "(选择回调函数)" : selectedFunction.c_str();
 
-                
-                if (ImGui::Button((std::string(buttonText) + "##" + std::to_string(pin.id.Get())).c_str(), ImVec2(180, 0)))
+
+                if (ImGui::Button((std::string(buttonText) + "##" + std::to_string(pin.id.Get())).c_str(),
+                                  ImVec2(180, 0)))
                 {
-                    
                     SelectFunctionWindow* window = findSelectFunctionWindow(node.sourceDataID, pin.name);
                     if (!window)
                     {
@@ -637,13 +639,12 @@ void BlueprintPanel::drawNodeEditor()
                         newWindow.pinName = pin.name;
                         newWindow.isOpen = true;
                         newWindow.needsFocus = true;
-                        
+
                         newWindow.windowId = "选择函数##" + std::to_string(node.sourceDataID) + "_" + pin.name;
                         m_selectFunctionWindows.push_back(newWindow);
                     }
                     else
                     {
-                        
                         window->isOpen = true;
                         window->needsFocus = true;
                     }
@@ -660,11 +661,11 @@ void BlueprintPanel::drawNodeEditor()
 
                 ImGui::PopID();
             }
-            
+
             else if (pin.name.rfind("_dyn_element_", 0) == 0)
             {
                 ed::BeginPin(pin.id, ed::PinKind::Input);
-                
+
                 std::string displayName = pin.name.substr(13);
                 ImGui::Text("-> %s (%s)", displayName.c_str(), pin.type.c_str());
                 ed::EndPin();
@@ -701,7 +702,7 @@ void BlueprintPanel::drawNodeEditor()
                 }
             }
 
-            
+
             std::string elementType = "System.Object";
             if (sourceData->InputDefaults.count("元素类型") && !sourceData->InputDefaults.at("元素类型").empty())
             {
@@ -711,7 +712,7 @@ void BlueprintPanel::drawNodeEditor()
             BPin newPin;
             newPin.id = getNextPinId();
             newPin.nodeId = node.id;
-            
+
             newPin.name = "_dyn_element_" + std::to_string(dynamicCount);
             newPin.type = elementType;
             newPin.kind = ed::PinKind::Input;
@@ -1340,7 +1341,7 @@ void BlueprintPanel::drawCreateFunctionPopup()
                 regionData.Title = m_functionEditorBuffer.Name;
                 regionData.FunctionID = m_functionEditorBuffer.ID;
                 regionData.Position = {100.0f, 100.0f};
-                regionData.Size = {500.0f, 400.0f};
+                regionData.Size = {600.0f, 400.0f};
                 m_currentBlueprint->GetBlueprintData().CommentRegions.push_back(regionData);
 
                 BRegion region;
@@ -1360,7 +1361,8 @@ void BlueprintPanel::drawCreateFunctionPopup()
                 bpNode.ID = getNextNodeId();
                 bpNode.Type = BlueprintNodeType::FunctionEntry;
                 bpNode.TargetMemberName = m_functionEditorBuffer.Name;
-                bpNode.Position = {regionData.Position.x + 20, regionData.Position.y + 40};
+                ImVec2 entryNodePos = {regionData.Position.x + 20, regionData.Position.y + 40};
+                bpNode.Position = {entryNodePos.x, entryNodePos.y};
                 m_currentBlueprint->GetBlueprintData().Nodes.push_back(bpNode);
 
                 BNode editorNode;
@@ -1377,6 +1379,49 @@ void BlueprintPanel::drawCreateFunctionPopup()
                     });
                 }
                 m_nodes.push_back(editorNode);
+
+                if (m_functionEditorBuffer.ReturnType != "void")
+                {
+                    const auto* returnDef = BlueprintNodeRegistry::GetInstance().GetDefinition("FlowControl.Return");
+                    if (returnDef)
+                    {
+                        BlueprintNode bpReturnNode;
+                        bpReturnNode.ID = getNextNodeId();
+                        bpReturnNode.Type = returnDef->NodeType;
+                        bpReturnNode.Position = {entryNodePos.x + 400, entryNodePos.y};
+
+                        std::string_view fullName(returnDef->FullName);
+                        size_t lastDot = fullName.find_last_of('.');
+                        if (lastDot != std::string_view::npos)
+                        {
+                            bpReturnNode.TargetClassFullName = std::string(fullName.substr(0, lastDot));
+                            bpReturnNode.TargetMemberName = std::string(fullName.substr(lastDot + 1));
+                        }
+
+                        bpReturnNode.InputDefaults["返回类型"] = m_functionEditorBuffer.ReturnType;
+                        m_currentBlueprint->GetBlueprintData().Nodes.push_back(bpReturnNode);
+
+                        BNode editorReturnNode;
+                        editorReturnNode.id = ed::NodeId(bpReturnNode.ID);
+                        editorReturnNode.sourceDataID = bpReturnNode.ID;
+                        editorReturnNode.name = returnDef->DisplayName;
+                        editorReturnNode.position = {bpReturnNode.Position.x, bpReturnNode.Position.y};
+
+                        for (const auto& pinDef : returnDef->InputPins)
+                        {
+                            BPin pin = {
+                                getNextPinId(), editorReturnNode.id, pinDef.Name, pinDef.Type, ed::PinKind::Input
+                            };
+                            if (pin.name == "输入值")
+                            {
+                                pin.type = m_functionEditorBuffer.ReturnType;
+                            }
+                            editorReturnNode.inputPins.push_back(pin);
+                        }
+
+                        m_nodes.push_back(editorReturnNode);
+                    }
+                }
             }
 
             m_showCreateFunctionPopup = false;
@@ -1453,9 +1498,34 @@ BlueprintPanel::SelectFunctionWindow* BlueprintPanel::findSelectFunctionWindow(
     return nullptr;
 }
 
+void BlueprintPanel::handleShortcutInput()
+{
+    if (!m_isFocused) return;
+    if (Keyboard::LeftCtrl.IsPressed() && Keyboard::S.IsPressed())
+    {
+        saveToBlueprintData();
+    }
+    if (Keyboard::LeftCtrl.IsPressed() && Keyboard::W.IsPressed())
+    {
+        CloseCurrentBlueprint();
+    }
+    if (Keyboard::Delete.IsPressed())
+    {
+        if (m_contextNodeId.Get() != 0)
+        {
+            deleteNode(m_contextNodeId);
+            m_contextNodeId = ed::NodeId(0);
+        }
+        if (m_contextLinkId.Get() != 0)
+        {
+            deleteLink(m_contextLinkId);
+            m_contextLinkId = ed::LinkId(0);
+        }
+    }
+}
+
 void BlueprintPanel::drawSelectFunctionWindows()
 {
-    
     std::erase_if(m_selectFunctionWindows, [](const auto& window) { return !window.isOpen; });
 
     for (auto& window : m_selectFunctionWindows)
@@ -1487,7 +1557,7 @@ void BlueprintPanel::drawSelectFunctionWindows()
                     if (ImGui::Selectable("(无)", selectedFunction.empty()))
                     {
                         selectedFunction.clear();
-                        window.isOpen = false; 
+                        window.isOpen = false;
                     }
 
                     const auto& functions = m_currentBlueprint->GetBlueprintData().Functions;
@@ -1498,7 +1568,7 @@ void BlueprintPanel::drawSelectFunctionWindows()
                             if (ImGui::Selectable(func.Name.c_str(), selectedFunction == func.Name))
                             {
                                 selectedFunction = func.Name;
-                                window.isOpen = false; 
+                                window.isOpen = false;
                             }
                         }
                     }
@@ -1640,6 +1710,9 @@ void BlueprintPanel::drawBackgroundContextMenu()
     ImVec2 open_position = ImGui::GetMousePosOnOpeningCurrentPopup();
     if (ImGui::BeginPopup("CreateNodeMenu"))
     {
+        
+        ImVec2 open_position_canvas = ed::ScreenToCanvas(open_position);
+
         if (m_currentBlueprint && !m_currentBlueprint->GetBlueprintData().Functions.empty())
         {
             if (ImGui::BeginMenu("函数调用"))
@@ -1648,7 +1721,7 @@ void BlueprintPanel::drawBackgroundContextMenu()
                 {
                     if (ImGui::MenuItem(func.Name.c_str()))
                     {
-                        createFunctionCallNode(func, ed::ScreenToCanvas(open_position));
+                        createFunctionCallNode(func, open_position_canvas);
                     }
                 }
                 ImGui::EndMenu();
@@ -2044,14 +2117,13 @@ void BlueprintPanel::initializeFromBlueprintData()
             }
         }
 
-        
-        
+
         auto insert_it = std::find_if(node.inputPins.begin(), node.inputPins.end(), [](const BPin& pin)
         {
             return pin.type == "Args";
         });
 
-        
+
         if (insert_it != node.inputPins.end())
         {
             if (bpNodeData.InputDefaults.count("_DynamicArgsCount"))
@@ -2070,7 +2142,7 @@ void BlueprintPanel::initializeFromBlueprintData()
                         dynamicPin.kind = ed::PinKind::Input;
                         dynamic_pins_to_add.push_back(dynamicPin);
                     }
-                    
+
                     if (!dynamic_pins_to_add.empty())
                     {
                         node.inputPins.insert(insert_it, dynamic_pins_to_add.begin(), dynamic_pins_to_add.end());
@@ -2082,7 +2154,7 @@ void BlueprintPanel::initializeFromBlueprintData()
                 }
             }
         }
-        
+
 
         m_nodes.push_back(node);
         bpNodeIdToEditorNodeId[bpNodeData.ID] = node.id;
@@ -2146,11 +2218,10 @@ void BlueprintPanel::saveToBlueprintData()
             sourceData->Position.x = node.position.x;
             sourceData->Position.y = node.position.y;
 
-            
+
             std::vector<std::string> keysToRemove;
             for (const auto& pair : sourceData->InputDefaults)
             {
-                
                 if (pair.first.rfind("_dyn_element_", 0) == 0 || pair.first == "_DynamicArgsCount")
                 {
                     keysToRemove.push_back(pair.first);
@@ -2164,11 +2235,8 @@ void BlueprintPanel::saveToBlueprintData()
             int dynamicArgCount = 0;
             for (const auto& pin : node.inputPins)
             {
-                
                 if (pin.name.rfind("_dyn_element_", 0) == 0)
                 {
-                    
-                    
                     std::string baseKey = "_DynamicArg_" + std::to_string(dynamicArgCount);
                     sourceData->InputDefaults[baseKey + "_Name"] = pin.name;
                     sourceData->InputDefaults[baseKey + "_Type"] = pin.type;
@@ -2180,7 +2248,6 @@ void BlueprintPanel::saveToBlueprintData()
             {
                 sourceData->InputDefaults["_DynamicArgsCount"] = std::to_string(dynamicArgCount);
             }
-            
         }
     }
 
@@ -2473,10 +2540,9 @@ bool BlueprintPanel::canCreateLink(const BPin* startPin, const BPin* endPin) con
         if (typeName == "byte") return "System.Byte";
         if (typeName == "char") return "System.Char";
 
-        
-        
+
         if (typeName == "DynamicObject") return "System.Object";
-        
+
 
         return typeName;
     };
