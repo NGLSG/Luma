@@ -5,65 +5,62 @@
 [Engine Architecture](ARCHITECTURE_EN.md)
 [中文版本](README.md)
 
-**A modern, modular, data-driven, high-performance 2D game engine built with C++20 and C#, created to be a powerful
-Unity 2D alternative.**
+**A modern, modular, data-driven high-performance real-time 2D game engine based on C++20 and C#, designed to be a powerful alternative to Unity 2D.**
 
 </div>
 
----
+-----
 
 ## Table of Contents
 
 - [✨ Core Features & Performance Highlights](#-core-features--performance-highlights)
-    - [🚀 Performance Comparison: Luma vs. Unity DOTS](#-performance-comparison-luma-vs-unity-dots)
-    - [🌟 Key Functionality Overview](#-key-functionality-overview)
+  - [🚀 Performance Comparison: Luma vs. Unity DOTS](#-performance-comparison-luma-vs-unity-dots)
+  - [🌟 Key Features at a Glance](#-key-features-at-a-glance)
 - [📖 Overview & Design Philosophy](#-overview--design-philosophy)
-    - [🛠️ Technology Stack](#️-technology-stack)
+  - [🛠️ Tech Stack](#️-tech-stack)
 - [🎯 Quick Start](#-quick-start)
-    - [Environment & Dependencies](#environment--dependencies)
-    - [🔧 Building the Luma Engine](#-building-the-luma-engine)
-- [⚙️ Deep-Dive: Core Systems](#️-deep-dive-core-systems)
+  - [Environment & Dependencies](#environment--dependencies)
+  - [🔧 Building the Luma Engine](#-building-the-luma-engine)
+- [⚙️ Core Systems Deep Dive](#️-core-systems-deep-dive)
 - [📊 Project Status & Roadmap](#-project-status--roadmap)
-    - [✅ Completed Features](#-completed-features)
-    - [🚀 Development Roadmap](#-development-roadmap)
-- [🤝 Contributing](#-contributing)
-    - [Code Style](#code-style)
-    - [Submission Workflow](#submission-workflow)
+  - [✅ Completed Features](#-completed-features)
+  - [🚀 Development Roadmap](#-development-roadmap)
+- [🤝 Contribution Guide](#-contribution-guide)
+  - [Code Style](#code-style)
+  - [Submission Process](#submission-process)
 - [📄 License](#-license)
 
----
+-----
 
 ## ✨ Core Features & Performance Highlights
 
-Luma Engine is designed for ultimate performance and a modern developer experience. We believe outstanding performance
-is the cornerstone of unleashed creativity.
+The Luma Engine is designed for ultimate performance and a modern development experience. We believe that exceptional performance is the cornerstone of unleashing creativity.
 
 ### 🚀 Performance Comparison: Luma vs. Unity DOTS
 
-Unity version: 6.1 LTS  
-On identical hardware, Luma demonstrates significant performance advantages in large-scale dynamic sprite rendering and
-physics simulation scenarios.
+Unity Version: 6.1 lts
+On identical hardware, Luma demonstrates significant performance advantages in both large-scale dynamic sprite rendering and physics simulation scenarios.
 
 #### Scene Rendering Performance (Dynamic Sprites)
 
-*Generate, move, rotate, and scale massive numbers of sprites in view.*
+*Dynamically generating, moving, rotating, and scaling a large number of sprites within the view.*
 
-| Entity Count  | Luma Engine (FPS) | Unity DOTS (FPS) | **Performance Multiplier** |
-|:--------------|:-----------------:|:----------------:|:--------------------------:|
-| **100,000**   |     ~100 FPS      |     ~30 FPS      |         **~3.3×**          |
-| **200,000**   |      ~50 FPS      |     ~15 FPS      |         **~3.3×**          |
-| **1,000,000** |      ~10 FPS      |      ~2 FPS      |         **~5.0×**          |
+| Entity Count        | Luma Engine (FPS) | Unity DOTS (FPS) | **Performance Multiplier** |
+|:--------------------|:-----------------:|:----------------:|:--------------------------:|
+| **100,000**         |     ~100 FPS      |     ~30 FPS      |          **~3.3×**         |
+| **200,000**         |      ~50 FPS      |     ~15 FPS      |          **~3.3×**         |
+| **1,000,000**       |      ~10 FPS      |      ~2 FPS      |          **~5.0×**         |
 
 #### Physics Simulation Performance
 
-*Real-time collision simulation of 10,000 dynamic rigid bodies (Box2D).*
+*Real-time collision simulation for 10,000 dynamic physics rigid bodies (Box2D).*
 
-| Metric              |     Luma     |  Unity   | **Performance Multiplier** |
-|:--------------------|:------------:|:--------:|:--------------------------:|
-| **Frame Time**      | **2.40 ms**  | 45.45 ms |         **18.9×**          |
-| **Theoretical FPS** | **~416 FPS** | ~22 FPS  |         **18.9×**          |
+| Metric          |     Luma Engine     |   Unity    | **Performance Multiplier** |
+|:----------------|:-------------------:|:----------:|:--------------------------:|
+| **Total Frame Time** |    **2.40 ms**     | 45.45 ms   |          **18.9×**         |
+| **Theoretical FPS**  |   **~416 FPS**     | ~22 FPS    |          **18.9×**         |
 
-### 🌟 Key Functionality Overview
+### 🌟 Key Features at a Glance
 
 <table>
 <tr>
@@ -71,66 +68,61 @@ physics simulation scenarios.
 
 #### 🧩 **Modern ECS Architecture**
 
-- Built on the industry-leading **EnTT** library for ultra-fast data access.
-- Full separation of logic and data keeps code clean, extensible, and maintainable.
+- Based on the industry-leading **EnTT** library for ultimate data access performance.
+- Complete separation of logic and data, resulting in clear code structure, easy extension, and maintenance.
 
 #### ⚡ **High-Performance Parallel Computing**
 
-- Built-in `JobSystem` based on a **work-stealing** scheduler for dynamic load balancing that fully utilizes multi-core
-  CPUs.
-- Complete **C# JobSystem bindings** so game logic can harness the same parallel power.
+- Built-in **work-stealing** algorithm-based `JobSystem` for dynamic load balancing, maximizing multi-core CPU performance.
+- Provides complete **C# JobSystem bindings**, allowing game logic to also benefit from parallelism.
 
 </td>
 <td width="50%">
 
 #### ✨ **Visual Blueprint System**
 
-- Powerful node-based editor—create complex logic without writing code.
-- **Directly generates high-performance C# source** instead of runtime interpretation—zero overhead.
-- Call any C# function, support custom functions and variables.
+- Powerful node-based editor for creating complex logic without coding.
+- **Directly generates high-performance C# code**, not runtime interpretation, ensuring no performance loss.
+- Can call any C# function, supports custom functions and variables.
 
-#### 🔗 **Seamless C++/C# Interop**
+#### 🔗 **Seamless C++/C# Interoperability**
 
-- Hosted on .NET 9 CoreCLR for stable, high-efficiency two-way communication.
-- **Hot-reload scripting**: modify C# code and see results instantly without restarting the engine.
+- Based on .NET 9 CoreCLR hosting for stable and efficient bidirectional communication.
+- **Script Hot Reload**: See changes in C# code immediately without restarting the engine.
 
 </td>
 </tr>
 </table>
 
----
+-----
 
 ## 📖 Overview & Design Philosophy
 
-The core mission of Luma Engine is to provide 2D game developers with a platform that combines ultimate performance with
-a modern workflow. We follow these design principles:
+The core goal of the Luma Engine is to provide 2D game developers with a development platform that combines ultimate performance with a modern workflow. We adhere to the following design principles:
 
-- **Data-Driven**: Everything in the engine—scenes, entities, components, animations—is data. This makes hot-reloading,
-  editor extensibility, and procedural content effortless.
-- **Modularity & Extensibility**: Every core system (rendering, physics, audio, etc.) is a highly decoupled module,
-  making independent upgrades, replacements, or extensions trivial.
-- **Performance First**: From the choice of ECS architecture to the design of the JobSystem, every decision prioritizes
-  performance.
+- **Data-Driven**: Everything in the engine (scenes, entities, components, animations) is data. This makes hot reloading, editor extensions, and procedural content generation extremely simple.
+- **Modularity & Extensibility**: Each core system of the engine (rendering, physics, audio, etc.) is a highly decoupled module, facilitating independent upgrades, replacements, or extensions.
+- **Performance First**: From the choice of ECS architecture to the design of the JobSystem, every decision prioritizes performance.
 
-### 🛠️ Technology Stack
+### 🛠️ Tech Stack
 
-| Category               | Technology  | Version / Library                       |
-|:-----------------------|:------------|:----------------------------------------|
-| **Core Language**      | C++         | C++20 standard                          |
-| **Scripting**          | C#          | .NET 9 (CoreCLR)                        |
-| **Build System**       | CMake       | 3.21+                                   |
-| **ECS Framework**      | EnTT        | v3.11+                                  |
-| **2D Physics**         | Box2D       | v2.4+                                   |
-| **Rendering Backend**  | Skia + Dawn | Cross-platform graphics API abstraction |
-| **Window & Input**     | SDL3        | Cross-platform window management        |
-| **Editor UI**          | Dear ImGui  | Immediate-mode GUI toolkit              |
-| **Data Serialization** | yaml-cpp    | YAML read/write                         |
+| Category          | Technology       | Version/Library        |
+|:------------------|:-----------------|:-----------------------|
+| **Core Language** | C++              | C++20 Standard         |
+| **Scripting Language** | C#       | .NET 9 (CoreCLR)       |
+| **Build System**  | CMake            | 3.21+                  |
+| **ECS Framework** | EnTT             | latest                 |
+| **2D Physics**    | Box2D            | latest                 |
+| **Rendering Backend** | Skia + Dawn | Cross-platform Graphics API Wrapper |
+| **Window & Input** | SDL3            | Cross-platform Window Management    |
+| **Editor UI**     | Dear ImGui       | Immediate Mode GUI Toolkit          |
+| **Data Serialization** | yaml-cpp/json | YAML/json Read/Write   |
 
----
+-----
 
 ## 🎯 Quick Start
 
-First, clone the repository to your local machine:
+First, clone this repository to your local machine:
 
 ```bash
 git clone https://github.com/NGLSG/Luma.git
@@ -139,154 +131,152 @@ cd Luma
 
 ### Environment & Dependencies
 
-Before building, ensure your environment and all dependencies are properly configured.
+Before starting the build, please ensure your system environment and all dependencies are correctly configured.
 
 #### 1. Prerequisites
 
-Make sure the following system-level libraries and tools are installed:
+Please ensure you have installed the following system-level libraries and tools:
 
-- **Git**
-- **CMake** (version **3.21** or higher)
-- **Vulkan SDK**
-- **LibCurl**
-- **OpenSSL**
-- **C++ compiler** (e.g., Visual Studio 2022 / GCC 11 / Clang 14)
+*   **Git**
+*   **CMake** (Version **3.21** or higher)
+*   **Vulkan SDK**
+*   **LibCurl**
+*   **OpenSSL**
+*   **C++ Compiler** (e.g., Visual Studio 2022 / GCC 11 / Clang 14)
+
+> **Note**: Dependencies like LibCurl, OpenSSL, and the Vulkan SDK can be installed using package managers, e.g., `apt` on Ubuntu, `vcpkg` or `choco` on Windows.
 
 #### 2. Download Dependencies
 
-All third-party libraries must be placed in the `External` folder in the project root. Follow these steps:
+All third-party libraries need to be placed in the `External` folder at the project root. Please follow these steps:
 
-**Step 1: Create the `External` directory**
+**Step 1: Create the `External` Directory**
 
-If it does not exist, create it in the project root:
+If the `External` directory does not exist, create it in the project root.
 
 ```bash
 mkdir External
 cd External
 ```
 
-**Step 2: Clone source repositories**
+**Step 2: Clone Source Repositories**
 
-Clone the following repositories into the `External` directory:
+Clone all the following libraries into the `External` directory.
 
-| Library             | Repository URL                                     |
-|:--------------------|:---------------------------------------------------|
-| `astc-encoder`      | `https://github.com/ARM-software/astc-encoder.git` |
-| `box2d`             | `https://github.com/erincatto/box2d.git`           |
-| `entt`              | `https://github.com/skypjack/entt.git`             |
-| `glm`               | `https://github.com/g-truc/glm.git`                |
-| `imgui`             | `https://github.com/ocornut/imgui.git`             |
-| `imgui-node-editor` | `https://github.com/thedmd/imgui-node-editor.git`  |
-| `ImGuizmo`          | `https://github.com/CedricGuillemet/ImGuizmo.git`  |
-| `json`              | `https://github.com/nlohmann/json.git`             |
-| `llama-cpp`         | `https://github.com/ggerganov/llama.cpp.git`       |
-| `SDL`               | `https://github.com/libsdl-org/SDL.git`            |
-| `yaml-cpp`          | `https://github.com/jbeder/yaml-cpp.git`           |
+| Library               | Repository URL                                      |
+| :-------------------- | :-------------------------------------------------- |
+| `astc-encoder`        | `https://github.com/ARM-software/astc-encoder.git`  |
+| `box2d`               | `https://github.com/erincatto/box2d.git`            |
+| `entt`                | `https://github.com/skypjack/entt.git`              |
+| `glm`                 | `https://github.com/g-truc/glm.git`                 |
+| `imgui`               | `https://github.com/ocornut/imgui.git`              |
+| `imgui-node-editor`   | `https://github.com/thedmd/imgui-node-editor.git`   |
+| `ImGuizmo`            | `https://github.com/CedricGuillemet/ImGuizmo.git`   |
+| `json`                | `https://github.com/nlohmann/json.git`              |
+| `llama-cpp`           | `https://github.com/ggerganov/llama.cpp.git`        |
+| `SDL`                 | `https://github.com/libsdl-org/SDL.git`             |
+| `yaml-cpp`            | `https://github.com/jbeder/yaml-cpp.git`            |
 
-You can use the following one-liner to clone all repositories:
+You can use the following script to clone all repositories at once:
 
 ```bash
-git clone https://github.com/ARM-software/astc-encoder.git &&
-git clone https://github.com/erincatto/box2d.git &&
-git clone https://github.com/skypjack/entt.git &&
-git clone https://github.com/g-truc/glm.git &&
-git clone https://github.com/ocornut/imgui.git &&
-git clone https://github.com/thedmd/imgui-node-editor.git &&
-git clone https://github.com/CedricGuillemet/ImGuizmo.git &&
-git clone https://github.com/nlohmann/json.git &&
-git clone https://github.com/ggerganov/llama.cpp.git &&
-git clone https://github.com/libsdl-org/SDL.git &&
+git clone https://github.com/ARM-software/astc-encoder.git
+git clone https://github.com/erincatto/box2d.git
+git clone https://github.com/skypjack/entt.git
+git clone https://github.com/g-truc/glm.git
+git clone https://github.com/ocornut/imgui.git
+git clone https://github.com/thedmd/imgui-node-editor.git
+git clone https://github.com/CedricGuillemet/ImGuizmo.git
+git clone https://github.com/nlohmann/json.git
+git clone https://github.com/ggerganov/llama.cpp.git
+git clone https://github.com/libsdl-org/SDL.git
 git clone https://github.com/jbeder/yaml-cpp.git
 ```
 
-**Step 3: Download and extract binary dependencies**
+**Step 3: Download and Extract Binary Dependencies**
 
-Pre-compiled binaries for `CoreCLR` and `Skia` are provided.
+`CoreCLR` and `Skia` are provided as precompiled binary packages.
 
-1. Go to the [Luma-External Releases](https://github.com/NGLSG/Luma-External/releases/tag/Prebuilt) page.
-2. Download the appropriate `.zip` for your OS. For example, Windows users need `skia-win.zip` and
-   `coreclr-win-x64.zip`.
-3. Extract the archives **into** the `External` directory.
+1.  Go to the [Luma-External Releases](https://github.com/NGLSG/Luma-External/releases/tag/Prebuilt) page.
+2.  Download the corresponding `.zip` package for your operating system. For example, Windows users need to download `skia-win.zip` and `coreclr-win-x64.zip`.
+3.  **Extract** the downloaded `.zip` files into the `External` directory.
 
-| Dependency Package | OS            | Download File           |
-|:-------------------|:--------------|:------------------------|
-| `coreclr`          | Linux (x64)   | `coreclr-linux-x64.zip` |
-| `coreclr`          | Windows (x64) | `coreclr-win-x64.zip`   |
-| `skia`             | Linux         | `skia-linux.zip`        |
-| `skia`             | Windows       | `skia-win.zip`          |
+| Binary Package   | OS              | Download File             |
+| :--------------- | :-------------- | :------------------------ |
+| `coreclr`        | Linux (x64)     | `coreclr-linux-x64.zip`   |
+| `coreclr`        | Windows (x64)   | `coreclr-win-x64.zip`     |
+| `skia`           | Linux           | `skia-linux.zip`          |
+| `skia`           | Windows         | `skia-win.zip`            |
 
-**Step 4: Configure dependency build files**
+**Step 4: Configure Dependency Build File**
 
-This is a crucial step. Move the `ExternalCMakeLists.txt` file from the **project root** into the `External` directory
-and **rename** it to `CMakeLists.txt`.
+This is a crucial step. You need to **move** the `ExternalCMakeLists.txt` file from the project **root directory** to the `External` directory and **rename** it to `CMakeLists.txt`.
 
-Run the following from the **project root**:
+Execute the following command in the project **root directory**:
 
 ```bash
-# Linux / macOS / Git Bash
+# For Linux / macOS / Git Bash
 mv ExternalCMakeLists.txt External/CMakeLists.txt
 
-# Windows CMD
-move ExternalCMakeLists.txt External\CMakeLists.txt
+# For Windows CMD
+# move ExternalCMakeLists.txt External\CMakeLists.txt
 ```
 
-After completing these steps, your `External` directory should look like this:
+After completing the above steps, your `External` directory structure should look like this:
 
 ```
 Luma/
 ├── External/
-│   ├── CMakeLists.txt        <-- moved & renamed from root
+│   ├── CMakeLists.txt      <-- File moved and renamed from root
 │   ├── astc-encoder/
 │   ├── box2d/
-│   ├── coreclr-win-x64/     <-- extracted
+│   ├── coreclr-win-x64/    <-- Extracted directory
 │   ├── entt/
 │   ├── glm/
 │   ├── imgui/
-│   ├── ... (other repos)
-│   └── skia-win/            <-- extracted
-└── ... (rest of project)
+│   ├── ... (other cloned libs)
+│   └── skia-win/           <-- Extracted directory
+└── ... (other project files)
 ```
 
 ### 🔧 Building the Luma Engine
 
-With all dependencies in place, use CMake to build the project.
+With all dependencies ready, you can build the project using CMake.
 
-From the project root run:
+Execute the following commands in the project root directory:
 
 ```bash
-# 1. Create and enter a build directory
+# 1. Create a build directory and enter it
 mkdir build
 cd build
 
-# 2. Configure the project with CMake
+# 2. Run CMake to configure the project
 cmake ..
 
-# 3. Build
-# On Windows (Visual Studio) this generates a .sln—open it in VS to compile
-# On Linux (Makefiles) you can build directly
+# 3. Start the compilation
+# On Windows (Visual Studio), this generates a .sln file; open it in VS to build
+# On Linux (Makefiles), you can directly run the build command
 cmake --build .
 ```
 
-After successful compilation, the executables will be located in the appropriate sub-directory under `build`.
+After successful compilation, the executable will be located in the corresponding subdirectory within the `build` directory.
 
----
+-----
 
-## ⚙️ Deep-Dive: Core Systems
+## ⚙️ Core Systems Deep Dive
 
 <details>
 <summary><strong>📦 Asset & Resource System</strong></summary>
 
-Luma adopts a modern, **GUID-based** asset pipeline. All source files in `Assets/` are automatically processed to
-generate a `.meta` file containing a unique ID and import settings. At runtime, the `AssetManager` loads or caches
-resources from disk via GUID, ensuring stable and efficient resource referencing.
+Luma employs a modern asset pipeline based on **GUIDs**. All source files in the `Assets/` directory are automatically processed, generating a `.meta` file containing a unique ID and import settings. At runtime, the `AssetManager` efficiently loads resources from disk or retrieves them from the cache based on the GUID, ensuring stable and efficient resource referencing.
 
 ```mermaid
 graph TD
-    A[Source .png] --> B{TextureImporter} --> C[.meta file]
+    A[Source File .png] --> B{TextureImporter} --> C[Meta File .meta]
     C --> D{AssetManager}
     E[Game Systems] --> D
     D --> F{Runtime Cache}
-    F --> G[Runtime SkImage]
+    F --> G[Runtime Resource SkImage]
     D --> H[Loader] --> G
     G --> E
 ```
@@ -296,82 +286,73 @@ graph TD
 <details>
 <summary><strong>✨ Visual Blueprint System</strong></summary>
 
-Beyond an intuitive node editor, the system **directly generates C# source code**, eliminating the performance
-bottlenecks of traditional visual scripting.
+It not only provides an intuitive node editing experience but also eliminates the performance bottlenecks of traditional visual scripting by **directly generating C# source code**.
 
-- **Workflow**: `Visual Editing` → `Save .blueprint` → `C# Generator` → `Compile .cs` → `Native-Performance Runtime`
-- **Features**: Events, branches, loops, custom functions/variables, call any external C# method, comment boxes, and
-  more.
+- **Workflow**: `Visual Blueprint Editing` -> `Save as .blueprint file` -> `C# Code Generator` -> `Generate .cs script` -> `Participate in project compilation` -> `Run at native performance`
+- **Features**: Supports events, branches, loops, custom functions/variables, calling any external C# function, logic region comment boxes, and more.
 
 </details>
 
 <details>
 <summary><strong>⚡ Physics & JobSystem</strong></summary>
 
-Physics simulation is powered by **Box2D** and runs in a **fixed-timestep** loop to ensure deterministic results. To
-handle massive numbers of physics objects, world stepping is encapsulated as a Job and distributed across CPU cores by
-the **JobSystem**, yielding significant speed-ups.
+Physics simulation is based on **Box2D**, running in an independent loop with a **fixed timestep**, ensuring deterministic results. To handle interactions between a large number of physics objects, the physics world step calculation is encapsulated into a Job and distributed across multiple cores for parallel processing by the **JobSystem**, significantly improving performance.
 
-The JobSystem itself relies on a **work-stealing** algorithm, efficiently handling balanced and unbalanced workloads,
-with full **C# APIs** already available.
+The JobSystem itself is based on a **work-stealing** algorithm, efficiently handling various balanced and unbalanced parallel computing tasks, and already provides a complete **C# API**.
 
 </details>
 
 <details>
 <summary><strong>🎬 Animation, Tilemap, UI & Audio</strong></summary>
 
-- **Animation State Machine**: Powerful visual editor to create and manage 2D animation states (Idle, Run, Jump…) and
-  transitions, controllable via C# APIs.
-- **Tilemap System**: Similar to Unity’s Tile Palette, supports standard and rule tiles, plus the ability to use *
-  *Prefabs** as brushes for painting complex game objects.
-- **UI System**: ECS-based, with core components `Text`, `Image`, `Button`, `InputText`, and `ScrollView` support
-  planned.
-- **Audio System**: Powered by **SDL3**, featuring 3D spatial audio and dynamic multi-channel mixing.
+- **Animation State Machine**: Provides a powerful visual editor to create and manage 2D animation states (Idle, Run, Jump, etc.) and their transition conditions, easily controlled via C# API.
+- **Tilemap System**: Similar to Unity's Tile Palette, supports standard, rule tiles, and even allows **Prefabs** to be used as brushes to paint game objects containing complex logic.
+- **UI System**: Built on ECS, provides core components like `Text`, `Image`, `Button`, `InputText`, with support for `ScrollView` planned.
+- **Audio System**: Based on **SDL3**, provides a high-performance audio manager supporting 3D spatial sound and dynamic multi-channel mixing.
 
 </details>
 
----
+-----
 
 ## 📊 Project Status & Roadmap
 
 ### ✅ Completed Features
 
-- **Core**: Asset pipeline, ECS, JobSystem, animation state machine, **visual blueprints**, Tilemap, UI, **spatial audio
-  **
-- **Functionality**: C# scripting host (hot-reload), C++/C# interop, physics integration
-- **Tools**: Full-featured editor, packaging, profiler, visual physics debugging
+- **Core**: Asset Pipeline, ECS, JobSystem, Animation State Machine, **Visual Blueprints**, Tilemap, UI, **Spatial Audio**
+- **Features**: C# Script Hosting (Hot Reload), C++/C# Interop, Physics Integration
+- **Tools**: Fully-featured Editor, Packaging Functionality, Profiler, Visual Physics Debugging
 
 ### 🚀 Development Roadmap
 
-| Priority | Feature            | Status      | ETA     |
-|:---------|:-------------------|:------------|:--------|
-| Medium   | C-API Expansion    | 📋 Planned  | Q3 2025 |
-| Low      | Modern UI Overhaul | 💭 Research | Q4 2025 |
-| Low      | Particle System    | 📋 Planned  | Q4 2025 |
+| Priority  | Feature             | Status      | ETA         |
+| :-------- | :------------------ | :---------- | :---------- |
+| **Medium**| C-API Extension     | 📋 Planned  | Q3 2025     |
+| **Low**   | Modern UI Upgrade   | 💭 Researching | Q4 2025     |
+| **Low**   | Particle System     | 📋 Planned  | Q4 2025     |
 
----
+-----
 
-## 🤝 Contributing
+## 🤝 Contribution Guide
 
-We welcome all developers passionate about game-engine development to join the Luma project!
+We welcome all developers passionate about game engine development to join the Luma project!
 
 ### Code Style
 
 - **Naming**: `PascalCase` for types and functions, `camelCase` for variables.
-- **Comments**: Project uses **Doxygen** style—every public API must be fully documented.
+- **Comments**: The project uses **Doxygen** style; all public APIs require complete comments.
 
-### Submission Workflow
+### Submission Process
 
-1. **Fork** the repository and create a feature branch off `main`.
-2. Write code following the project guidelines.
-3. Submit a **Pull Request** with a detailed description of your changes.
+1.  **Fork** this repository and create your feature branch from `master`.
+2.  Write code ensuring it follows the project style.
+3.  Submit a **Pull Request** with a detailed description of your changes.
 
----
+-----
 
 <div align="center">
 
 ## 📄 License
 
-This project is open-sourced under the [License](LICENSE).
+This project is open source under the [MIT License](LICENSE).
 
 </div>
