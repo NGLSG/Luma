@@ -581,7 +581,7 @@ namespace BlueprintCSharpCodeGenerator
 
         for (const auto& var : blueprintData.Variables)
         {
-            std::string line = "[Export]\npublic " + var.Type + " " + var.Name;
+            std::string line = "[Export] public " + var.Type + " " + var.Name;
             if (!var.DefaultValue.empty())
             {
                 line += " = " + SanitizeValue(var.DefaultValue, var.Type);
