@@ -37,18 +37,22 @@ build/
 cmake-build-*/
 docs/
 Publish/
-
-# Specific dependency and temporary folders
-skia-win-x64/
+Scripting/binding/.vs
 Scripting/binding/Temp/
 Scripting/binding/.idea/
+
+
+# Specific dependency folders
+skia-win-x64/
 
 # Archives
 *.zip
 
 # External dependencies rule:
-# Ignore everything inside the External/ directory...
-External/
-# ...but DO NOT ignore the CMakeLists.txt file inside it.
+# Ignore all contents of the External/ directory...
+External/*
+
+# ...but DO NOT ignore the CMakeLists.txt file and the cmake/ directory inside it.
 !External/CMakeLists.txt
-Scripting/binding/.vs
+!External/cmake/
+*.gz

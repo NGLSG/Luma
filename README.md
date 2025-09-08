@@ -14,20 +14,20 @@
 ## 目录
 
 - [✨ 核心特性 & 性能亮点](#-核心特性--性能亮点)
-    - [🚀 性能对比：Luma vs. Unity DOTS](#-性能对比luma-vs-unity-dots)
-    - [🌟 关键功能一览](#-关键功能一览)
+  - [🚀 性能对比：Luma vs. Unity DOTS](#-性能对比luma-vs-unity-dots)
+  - [🌟 关键功能一览](#-关键功能一览)
 - [📖 概述与设计哲学](#-概述与设计哲学)
-    - [🛠️ 技术栈](#️-技术栈)
+  - [🛠️ 技术栈](#️-技术栈)
 - [🎯 快速开始](#-快速开始)
-    - [环境与依赖 (Environment & Dependencies)](#环境与依赖-environment--dependencies)
-    - [🔧 构建 Luma 引擎 (Building Luma Engine)](#-构建-luma-引擎-building-luma-engine)
+  - [环境与依赖 (Environment & Dependencies)](#环境与依赖-environment--dependencies)
+  - [🔧 构建 Luma 引擎 (Building Luma Engine)](#-构建-luma-引擎-building-luma-engine)
 - [⚙️ 核心系统深度解析](#️-核心系统深度解析)
 - [📊 项目状态与路线图](#-项目状态与路线图)
-    - [✅ 已完成功能](#-已完成功能)
-    - [🚀 开发路线图](#-开发路线图)
+  - [✅ 已完成功能](#-已完成功能)
+  - [🚀 开发路线图](#-开发路线图)
 - [🤝 贡献指南](#-贡献指南)
-    - [代码规范](#代码规范)
-    - [提交流程](#提交流程)
+  - [代码规范](#代码规范)
+  - [提交流程](#提交流程)
 - [📄 许可证](#-许可证)
 
 -----
@@ -140,128 +140,87 @@ cd Luma
 * **Git**
 * **CMake** (版本 **3.21** 或更高)
 * **Vulkan SDK**
-* **LibCurl**
-* **OpenSSL**
 * **C++ 编译器** (例如: Visual Studio 2022 / GCC 11 / Clang 14)
 
-> **注意**：对于LibCurl,OpenSSL,Vulkan SDK等依赖可以使用包管理器来安装，例如在Ubuntu上可以使用`apt`，在Windows上可以使用
-`vcpkg`或`choco`。
+#### 2. 依赖管理 (Dependency Management)
 
-#### 2. 获取依赖库 (Download Dependencies)
+Luma 使用 **CPM.cmake** 和 **Vcpkg** 的组合来管理第三方依赖。这简化了获取和构建依赖的过程。
 
-所有第三方库都需要放置在项目根目录下的 `External` 文件夹中。请按照以下步骤操作：
+**选项 A: 使用 Vcpkg (推荐)**
 
-**第一步：创建 `External` 目录**
+1.  **安装 Vcpkg**: 如果你还没有安装 Vcpkg，请按照 [官方指南](https://vcpkg.io/en/getting-started.html) 进行安装。
+2.  **配置 CMake**: 在配置 CMake 时，请确保指向你的 Vcpkg 工具链文件。
 
-如果 `External` 目录不存在，请在项目根目录创建它。
+    ```bash
+    # 在项目根目录下
+    mkdir build
+    cd build
+    # 请将 <path_to_vcpkg> 替换为你的 Vcpkg 安装路径
+    cmake .. -DCMAKE_TOOLCHAIN_FILE=<path_to_vcpkg>/scripts/buildsystems/vcpkg.cmake
+    ```
 
-```bash
-mkdir External
-cd External
-```
+    Vcpkg 会自动读取项目根目录下的 `vcpkg.json` 清单文件，并下载、编译和安装所有列出的依赖。
 
-**第二步：克隆源代码库**
+**选项 B: 使用系统包管理器 (Linux/macOS)**
 
-将以下所有库克隆到 `External` 目录下。
+对于一些常见的库（如 CURL、OpenSSL），你也可以使用系统的包管理器（如 `apt`、`brew`）来安装。请确保安装了开发包（通常以 `-dev` 或 `-devel` 结尾）。
 
-| 库 (Library)         | 克隆地址 (Repository URL)                              |
-|:--------------------|:---------------------------------------------------|
-| `astc-encoder`      | `https://github.com/ARM-software/astc-encoder.git` |
-| `box2d`             | `https://github.com/erincatto/box2d.git`           |
-| `entt`              | `https://github.com/skypjack/entt.git`             |
-| `glm`               | `https://github.com/g-truc/glm.git`                |
-| `imgui`             | `https://github.com/ocornut/imgui.git`             |
-| `imgui-node-editor` | `https://github.com/thedmd/imgui-node-editor.git`  |
-| `ImGuizmo`          | `https://github.com/CedricGuillemet/ImGuizmo.git`  |
-| `json`              | `https://github.com/nlohmann/json.git`             |
-| `llama-cpp`         | `https://github.com/ggerganov/llama.cpp.git`       |
-| `SDL`               | `https://github.com/libsdl-org/SDL.git`            |
-| `yaml-cpp`          | `https://github.com/jbeder/yaml-cpp.git`           |
-
-你可以使用以下脚本一次性克隆所有仓库：
+例如，在 Ubuntu 上：
 
 ```bash
-git clone https://github.com/ARM-software/astc-encoder.git
-git clone https://github.com/erincatto/box2d.git
-git clone https://github.com/skypjack/entt.git
-git clone https://github.com/g-truc/glm.git
-git clone https://github.com/ocornut/imgui.git
-git clone https://github.com/thedmd/imgui-node-editor.git
-git clone https://github.com/CedricGuillemet/ImGuizmo.git
-git clone https://github.com/nlohmann/json.git
-git clone https://github.com/ggerganov/llama.cpp.git
-git clone https://github.com/libsdl-org/SDL.git
-git clone https://github.com/jbeder/yaml-cpp.git
+sudo apt install libssl-dev libcurl4-openssl-dev
 ```
 
-**第三步：下载并解压二进制依赖**
+CMake 会优先使用通过 `find_package` 找到的系统包。
 
-`CoreCLR` 和 `Skia` 作为预编译的二进制包提供。
+**选项 C: 使用 CPM.cmake**
 
-1. 前往 [Luma-External Releases](https://github.com/NGLSG/Luma-External/releases/tag/Prebuilt)页面。
-2. 根据你的操作系统，下载对应的 `.zip` 包。例如，Windows 用户需要下载 `skia-win.zip` 和 `coreclr-win-x64.zip`。
-3. 将下载的 `.zip` 文件**解压**到 `External` 目录中。
+对于未通过 Vcpkg 或系统包管理器提供的依赖，项目使用 CPM.cmake 直接从源代码仓库下载和构建。这已内置在项目的 CMake 列表中，无需额外操作。
 
-| 依赖包 (Binary Package) | 操作系统 (OS)     | 下载文件 (Download File)    |
-|:---------------------|:--------------|:------------------------|
-| `coreclr`            | Linux (x64)   | `coreclr-linux-x64.zip` |
-| `coreclr`            | Windows (x64) | `coreclr-win-x64.zip`   |
-| `skia`               | Linux         | `skia-linux.zip`        |
-| `skia`               | Windows       | `skia-win.zip`          |
+#### 3. 特殊依赖：Skia 和 CoreCLR
 
-**第四步：配置依赖构建文件**
+`Skia` (图形库) 和 `CoreCLR` (.NET 运行时) 需要**手动下载**预编译的二进制包。
 
-这是非常关键的一步。你需要将项目**根目录**下的 `ExternalCMakeLists.txt` 文件**移动**到 `External` 目录，并将其**重命名**为
-`CMakeLists.txt`。
+1.  前往 [Luma-External Releases](https://github.com/NGLSG/Luma-External/releases/tag/Prebuilt) 页面。
+2.  根据你的操作系统，下载对应的 `.zip` 包。
+  *   **CoreCLR**: `coreclr-win-x64.zip` (Windows) 或 `coreclr-linux-x64.zip` (Linux)
+  *   **Skia**: `skia-win.zip` (Windows) 或 `skia-linux.zip` (Linux)
+3.  在项目根目录下创建 `External` 文件夹（如果不存在）。
+4.  将下载的 `.zip` 文件**解压**到 `External` 目录中。解压后应得到类似 `skia-win/` 和 `coreclr-win-x64/` 的文件夹。
 
-在项目**根目录**下执行以下命令：
-
-```bash
-# 对于 Linux / macOS / Git Bash
-mv ExternalCMakeLists.txt External/CMakeLists.txt
-
-# 对于 Windows CMD
-# move ExternalCMakeLists.txt ExternalCMakeLists.txt
-```
-
-完成以上步骤后，你的 `External` 目录结构应该如下所示：
+完成以上步骤后，你的 `External` 目录结构应类似于：
 
 ```
 Luma/
 ├── External/
-│   ├── CMakeLists.txt      <-- 这是从根目录移动并重命名过来的文件
-│   ├── astc-encoder/
-│   ├── box2d/
-│   ├── coreclr-win-x64/    <-- 解压后的目录
-│   ├── entt/
-│   ├── glm/
-│   ├── imgui/
-│   ├── ... (其他克隆的库)
-│   └── skia-win/           <-- 解压后的目录
-└── ... (项目其他文件)
+│   ├── CMakeLists.txt
+│   ├── coreclr-win-x64/    # 解压后的 CoreCLR
+│   └── skia-win/           # 解压后的 Skia
+└── ...
 ```
 
 ### 🔧 构建 Luma 引擎 (Building Luma Engine)
 
 所有依赖准备就绪后，你可以使用 CMake 来构建项目。
 
-在项目根目录执行以下命令：
+1.  **配置项目** (使用 Vcpkg 示例):
 
-```bash
-# 1. 创建一个 build 目录并进入
-mkdir build
-cd build
+    ```bash
+    # 在项目根目录下
+    mkdir build
+    cd build
+    # 请将 E:\vcpkg 替换为你的 Vcpkg 实际安装路径
+    cmake .. -DCMAKE_TOOLCHAIN_FILE=E:\vcpkg\scripts\buildsystems\vcpkg.cmake
+    ```
 
-# 2. 运行 CMake 来配置项目
-cmake ..
+2.  **编译项目**:
 
-# 3. 开始编译
-# 在 Windows (Visual Studio) 上，这会生成 .sln 文件，建议用 VS 打开编译
-# 在 Linux (Makefiles) 上，可以直接运行构建命令
-cmake --build .
-```
+    ```bash
+    cmake --build . --config Release
+    # 或者在生成的 Visual Studio 解决方案中编译
+    ```
 
-编译成功后，可执行文件将位于 `build` 目录下的相应子目录中。
+编译成功后，可执行文件将位于 `build` 目录下的相应子目录中（例如 `build/bin/Release/`）。
 
 -----
 
@@ -348,9 +307,9 @@ JobSystem 本身基于**工作窃取**算法，能高效处理各种均衡及不
 
 ### 提交流程
 
-1. **Fork** 本仓库并从 `master` 分支创建您的功能分支。
-2. 编写代码并确保遵循项目规范。
-3. 提交 **Pull Request** 并详细描述您的改动。
+1.  **Fork** 本仓库并从 `master` 分支创建您的功能分支。
+2.  编写代码并确保遵循项目规范。
+3.  提交 **Pull Request** 并详细描述您的改动。
 
 -----
 

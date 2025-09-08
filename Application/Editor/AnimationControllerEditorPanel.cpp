@@ -955,6 +955,15 @@ void AnimationControllerEditorPanel::drawNodeEditor()
     }
     ed::EndDelete();
 
+    ed::LinkId doubleClickedLinkId = ed::GetDoubleClickedLink();
+
+    ALink* clickedLink = findLinkById(doubleClickedLinkId);
+    if (clickedLink)
+    {
+        m_editingLinkIndex = static_cast<int>(clickedLink - m_links.data());
+        m_transitionEditWindowOpen = true;
+    }
+
 
     ed::Suspend();
     ed::NodeId contextNodeId = 0;
