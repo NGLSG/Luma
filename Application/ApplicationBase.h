@@ -20,6 +20,7 @@ struct LUMA_API ApplicationConfig
     std::string LastProjectPath = ""; ///< 上次打开的项目路径。
 };
 
+
 /**
  * @brief 应用程序基类。
  * 提供应用程序生命周期管理和核心系统初始化/关闭的抽象。
@@ -90,13 +91,17 @@ private:
      */
     void ShutdownCoreSystems();
 
+    void SimulationLoop(float targetFrameTime = 1.0f / 75.0f);
+    void RenderLoop();
+
 protected:
+    std::atomic<bool> m_isRunning;
     std::unique_ptr<PlatformWindow> m_window; ///< 应用程序窗口的智能指针。
     std::unique_ptr<GraphicsBackend> m_graphicsBackend; ///< 图形后端的智能指针。
     std::unique_ptr<RenderSystem> m_renderSystem; ///< 渲染系统的智能指针。
     EngineContext m_context; ///< 引擎上下文，包含全局可访问的数据。
     std::string m_title; ///< 应用程序窗口的标题。
-    bool m_isRunning = true; ///< 应用程序是否正在运行的标志。
+    //bool m_isRunning = true; ///< 应用程序是否正在运行的标志。
     ApplicationConfig m_config; ///< 应用程序的配置设置。
 };
 

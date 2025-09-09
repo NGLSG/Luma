@@ -8,6 +8,7 @@
 #include <cmath>
 
 #include "Profiler.h"
+#include "RenderableManager.h"
 #include "SceneManager.h"
 #include "TilemapComponent.h"
 
@@ -316,5 +317,167 @@ void SceneRenderer::Extract(entt::registry& registry, std::vector<RenderPacket>&
         {
             return a.zIndex < b.zIndex;
         });
+    }
+}
+
+
+
+
+
+
+void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
+{
+    PROFILE_SCOPE("SceneRenderer::ExtractToRenderableManager - Total");
+
+    auto& renderableManager = RenderableManager::GetInstance();
+
+    
+    
+    renderableManager.SwapBuffers();
+
+    std::vector<Renderable> renderables;
+    
+    
+
+    
+    PROFILE_SCOPE("SceneRenderer::ExtractToRenderableManager - Sprite Processing");
+    {
+        auto view = registry.view<const ECS::TransformComponent, const ECS::SpriteComponent>();
+        for (auto entity : view)
+        {
+            
+            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                continue;
+
+            const auto& transform = view.get<const ECS::TransformComponent>(entity);
+            const auto& sprite = view.get<const ECS::SpriteComponent>(entity);
+
+            
+            if (!sprite.image || !sprite.image->getImage()) continue;
+
+            const int pPU = sprite.image->getImportSettings().pixelPerUnit;
+
+            renderables.emplace_back(Renderable{
+                .entityId = entity,
+                .zIndex = sprite.zIndex,
+                .transform = transform, 
+                .data = SpriteRenderData{
+                    .image = sprite.image->getImage().get(),
+                    .material = sprite.material.get(),
+                    .sourceRect = sprite.sourceRect,
+                    .color = sprite.color,
+                    .filterQuality = static_cast<int>(sprite.image->getImportSettings().filterQuality),
+                    .wrapMode = static_cast<int>(sprite.image->getImportSettings().wrapMode),
+                    .ppuScaleFactor = (pPU > 0) ? 100.0f / static_cast<float>(pPU) : 1.0f
+                }
+            });
+        }
+    }
+
+    
+    PROFILE_SCOPE("SceneRenderer::ExtractToRenderableManager - Tilemap Processing");
+    {
+        auto view = registry.view<const ECS::TransformComponent, const ECS::TilemapComponent, const
+                                  ECS::TilemapRendererComponent>();
+        for (auto entity : view)
+        {
+            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                continue;
+
+            const auto& tilemapTransform = view.get<const ECS::TransformComponent>(entity);
+            const auto& tilemap = view.get<const ECS::TilemapComponent>(entity);
+            const auto& renderer = view.get<const ECS::TilemapRendererComponent>(entity);
+
+            for (const auto& [coord, resolvedTile] : tilemap.runtimeTileCache)
+            {
+                if (std::holds_alternative<SpriteTileData>(resolvedTile.data))
+                {
+                    const Guid& tileAssetGuid = resolvedTile.sourceTileAsset.assetGuid;
+                    if (tileAssetGuid.Valid() && renderer.hydratedSpriteTiles.contains(tileAssetGuid))
+                    {
+                        const auto& hydratedTile = renderer.hydratedSpriteTiles.at(tileAssetGuid);
+                        if (!hydratedTile.image) continue;
+
+                        
+                        ECS::TransformComponent tileTransform = tilemapTransform;
+                        tileTransform.position.x += coord.x * tilemap.cellSize.x;
+                        tileTransform.position.y += coord.y * tilemap.cellSize.y;
+
+                        const int pPU = hydratedTile.image->getImportSettings().pixelPerUnit;
+
+                        renderables.emplace_back(Renderable{
+                            .entityId = entity, 
+                            .zIndex = renderer.zIndex,
+                            .transform = tileTransform,
+                            .data = SpriteRenderData{
+                                .image = hydratedTile.image->getImage().get(),
+                                .material = renderer.material.get(),
+                                .sourceRect = hydratedTile.sourceRect,
+                                .color = hydratedTile.color,
+                                .filterQuality = static_cast<int>(hydratedTile.filterQuality),
+                                .wrapMode = static_cast<int>(hydratedTile.wrapMode),
+                                .ppuScaleFactor = (pPU > 0) ? 100.0f / static_cast<float>(pPU) : 1.0f
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    
+    PROFILE_SCOPE("SceneRenderer::ExtractToRenderableManager - Text Processing");
+    {
+        
+        auto processTextView = [&](auto& view, auto getTextComponent, auto entity)
+        {
+            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                return;
+
+            const auto& transform = view.template get<const ECS::TransformComponent>(entity);
+            const auto& textData = getTextComponent(view, entity);
+
+            if (!textData.typeface || textData.text.empty()) return;
+
+            renderables.emplace_back(Renderable{
+                .entityId = entity,
+                .zIndex = textData.zIndex,
+                .transform = transform,
+                .data = TextRenderData{
+                    .typeface = textData.typeface.get(),
+                    .text = textData.text, 
+                    .fontSize = textData.fontSize,
+                    .color = textData.color,
+                    .alignment = static_cast<int>(textData.alignment)
+                }
+            });
+        };
+
+        
+        auto textView = registry.view<const ECS::TransformComponent, const ECS::TextComponent>();
+        for (auto entity : textView)
+        {
+            processTextView(textView, [](auto& v, auto e) -> const ECS::TextComponent&
+            {
+                return v.template get<const ECS::TextComponent>(e);
+            }, entity);
+        }
+
+        
+        auto inputTextView = registry.view<const ECS::TransformComponent, const ECS::InputTextComponent>();
+        for (auto entity : inputTextView)
+        {
+            processTextView(inputTextView, [](auto& v, auto e)
+            {
+                const auto& inputText = v.template get<const ECS::InputTextComponent>(e);
+                return (inputText.isFocused || !inputText.text.text.empty()) ? inputText.text : inputText.placeholder;
+            }, entity);
+        }
+    }
+
+    
+    if (!renderables.empty())
+    {
+        renderableManager.AddRenderables(std::move(renderables)); 
     }
 }

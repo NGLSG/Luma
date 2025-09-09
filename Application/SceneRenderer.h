@@ -29,10 +29,10 @@ struct RenderPacket;
  */
 struct FastSpriteBatchKey
 {
-    uintptr_t imagePtr;     ///< 图像指针的整数表示。
-    uintptr_t materialPtr;  ///< 材质指针的整数表示。
-    uint32_t colorValue;    ///< 颜色值的打包表示。
-    uint16_t settings;      ///< 过滤质量和环绕模式的打包设置。
+    uintptr_t imagePtr; ///< 图像指针的整数表示。
+    uintptr_t materialPtr; ///< 材质指针的整数表示。
+    uint32_t colorValue; ///< 颜色值的打包表示。
+    uint16_t settings; ///< 过滤质量和环绕模式的打包设置。
 
     size_t precomputedHash; ///< 预计算的哈希值。
 
@@ -124,10 +124,10 @@ private:
  */
 struct FastTextBatchKey
 {
-    uintptr_t typefacePtr;  ///< 字体指针的整数表示。
-    uint32_t fontSizeInt;   ///< 字体大小的整数表示。
-    uint32_t colorValue;    ///< 颜色值的打包表示。
-    uint8_t alignment;      ///< 对齐方式的打包表示。
+    uintptr_t typefacePtr; ///< 字体指针的整数表示。
+    uint32_t fontSizeInt; ///< 字体大小的整数表示。
+    uint32_t colorValue; ///< 颜色值的打包表示。
+    uint8_t alignment; ///< 对齐方式的打包表示。
     size_t precomputedHash; ///< 预计算的哈希值。
 
     /**
@@ -247,8 +247,8 @@ template <typename T>
 class FrameArena
 {
 private:
-    std::vector<T> m_data;          ///< 存储数据的向量。
-    size_t m_currentIndex = 0;      ///< 当前分配的索引。
+    std::vector<T> m_data; ///< 存储数据的向量。
+    size_t m_currentIndex = 0; ///< 当前分配的索引。
 
 public:
     /**
@@ -325,14 +325,7 @@ public:
      */
     void Extract(entt::registry& registry, std::vector<RenderPacket>& outQueue);
 
-private:
-    std::unique_ptr<FrameArena<RenderableTransform>> m_transformArena = std::make_unique<FrameArena<
-        RenderableTransform>>(100000); ///< 用于存储可渲染变换的帧竞技场。
-    std::unique_ptr<FrameArena<std::string>> m_textArena = std::make_unique<FrameArena<std::string>>(4096); ///< 用于存储文本字符串的帧竞技场。
-
-    std::unordered_map<FastSpriteBatchKey, size_t> m_spriteGroupIndices; ///< 精灵批处理键到组索引的映射。
-    std::unordered_map<FastTextBatchKey, size_t> m_textGroupIndices;     ///< 文本批处理键到组索引的映射。
-
+    static void ExtractToRenderableManager(entt::registry& registry);
     /**
      * @brief 批处理组结构体。
      *
@@ -341,23 +334,33 @@ private:
     struct BatchGroup
     {
         std::vector<RenderableTransform> transforms; ///< 变换组件列表。
-        SkRect sourceRect;                           ///< 源矩形。
-        int zIndex;                                  ///< Z轴深度索引。
-        int filterQuality;                           ///< 过滤质量。
-        int wrapMode;                                ///< 环绕模式。
-        float ppuScaleFactor;                        ///< 每像素单位缩放因子。
-        std::vector<std::string> texts;              ///< 文本字符串列表。
+        SkRect sourceRect; ///< 源矩形。
+        int zIndex; ///< Z轴深度索引。
+        int filterQuality; ///< 过滤质量。
+        int wrapMode; ///< 环绕模式。
+        float ppuScaleFactor; ///< 每像素单位缩放因子。
+        std::vector<std::string> texts; ///< 文本字符串列表。
 
-        SkImage* image = nullptr;                    ///< 图像指针。
-        const Material* material = nullptr;          ///< 材质指针。
-        ECS::Color color;                            ///< 颜色。
-        SkTypeface* typeface = nullptr;              ///< 字体指针。
-        float fontSize = 0.0f;                       ///< 字体大小。
-        TextAlignment alignment;                     ///< 文本对齐方式。
+        SkImage* image = nullptr; ///< 图像指针。
+        const Material* material = nullptr; ///< 材质指针。
+        ECS::Color color; ///< 颜色。
+        SkTypeface* typeface = nullptr; ///< 字体指针。
+        float fontSize = 0.0f; ///< 字体大小。
+        TextAlignment alignment; ///< 文本对齐方式。
     };
 
+private:
+    std::unique_ptr<FrameArena<RenderableTransform>> m_transformArena = std::make_unique<FrameArena<
+        RenderableTransform>>(100000); ///< 用于存储可渲染变换的帧竞技场。
+    std::unique_ptr<FrameArena<std::string>> m_textArena = std::make_unique<FrameArena<std::string>>(4096);
+    ///< 用于存储文本字符串的帧竞技场。
+
+    std::unordered_map<FastSpriteBatchKey, size_t> m_spriteGroupIndices; ///< 精灵批处理键到组索引的映射。
+    std::unordered_map<FastTextBatchKey, size_t> m_textGroupIndices; ///< 文本批处理键到组索引的映射。
+
+
     std::vector<BatchGroup> m_spriteBatchGroups; ///< 精灵批处理组的向量。
-    std::vector<BatchGroup> m_textBatchGroups;   ///< 文本批处理组的向量。
+    std::vector<BatchGroup> m_textBatchGroups; ///< 文本批处理组的向量。
 };
 
 #endif

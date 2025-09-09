@@ -380,22 +380,20 @@ void Editor::Update(float deltaTime)
     }
 
 
-    AssetManager::GetInstance().Update(deltaTime);
-
-
-    for (auto& panel : m_panels)
-    {
-        if (panel->IsVisible())
-        {
-            panel->Update(deltaTime);
-        }
-    }
+    SceneRenderer::ExtractToRenderableManager(SceneManager::GetInstance().GetCurrentScene()->GetRegistry());
 }
 
 void Editor::Render()
 {
     PROFILE_FUNCTION();
-
+    AssetManager::GetInstance().Update(1 / m_context.currentFps);
+    for (auto& panel : m_panels)
+    {
+        if (panel->IsVisible())
+        {
+            panel->Update(1 / m_context.currentFps);
+        }
+    }
     if (!m_graphicsBackend || !m_imguiRenderer || !m_renderSystem)
     {
         LogError("Editor::Render: 核心组件未初始化。");

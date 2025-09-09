@@ -25,6 +25,7 @@
 
 #include "ColliderComponent.h"
 #include "RelationshipComponent.h"
+#include "RenderableManager.h"
 #include "TextComponent.h"
 #include "UIComponents.h"
 #include "glm/gtx/transform.hpp"
@@ -334,11 +335,7 @@ void SceneViewPanel::Draw()
 
 
             m_context->graphicsBackend->SetActiveRenderTarget(m_sceneViewTarget);
-            std::vector<RenderPacket> renderQueue;
-            PROFILE_SCOPE("SceneRenderer::Extract");
-            {
-                m_context->sceneRenderer->Extract(m_context->activeScene->GetRegistry(), renderQueue);
-            }
+            std::vector<RenderPacket> renderQueue = RenderableManager::GetInstance().GetInterpolationData(0.5f);
             PROFILE_SCOPE("SceneRenderer::Submit");
             {
                 for (const auto& packet : renderQueue)
@@ -1387,7 +1384,6 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
     }
     else if (meta->type == AssetType::CSharpScript)
     {
-        
         if (m_context->selectionType == SelectionType::GameObject && !m_context->selectionList.empty())
         {
             bool anyAdded = false;
@@ -1396,12 +1392,11 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
                 RuntimeGameObject selectedGo = m_context->activeScene->FindGameObjectByGuid(objGuid);
                 if (selectedGo.IsValid())
                 {
-                    
                     auto& scriptsComp = selectedGo.HasComponent<ECS::ScriptsComponent>()
                                             ? selectedGo.GetComponent<ECS::ScriptsComponent>()
                                             : selectedGo.AddComponent<ECS::ScriptsComponent>();
 
-                    
+
                     scriptsComp.AddScript(handle, selectedGo.GetEntityHandle());
                     anyAdded = true;
                     LogInfo("脚本已添加到GameObject: {}", selectedGo.GetName());
@@ -1417,7 +1412,7 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
                 LogWarn("没有向任何有效对象添加脚本");
             }
         }
-        
+
         else
         {
             if (!m_context->activeScene) return;
@@ -1434,9 +1429,9 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
                     newGo.GetComponent<ECS::TransformComponent>().position = worldPosition;
                 }
 
-                
+
                 auto& scriptsComp = newGo.AddComponent<ECS::ScriptsComponent>();
-                
+
                 scriptsComp.AddScript(handle, newGo.GetEntityHandle());
 
                 selectSingleObject(newGo.GetGuid());

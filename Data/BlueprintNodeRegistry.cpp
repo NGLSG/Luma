@@ -653,20 +653,7 @@ void BlueprintNodeRegistry::RegisterSDKNodes()
         }
     });
 
-    /*RegisterNode({
-        .FullName = "Luma.SDK.Entity.SetComponentData", .DisplayName = "实体.设置组件", .Category = "SDK|实体|组件",
-        .Description = "设置或更新实体上指定类型的组件数据。",
-        .NodeType = BlueprintNodeType::FunctionCall,
-        .InputPins = {
-            {"", "Exec"},
-            {"目标", entityType},
-            {"组件类型", "TemplateType"},
-            {"组件值", "System.Object"}
-        },
-        .OutputPins = {
-            {"然后", "Exec"}
-        }
-    });*/
+    
 
 
     const std::string animControllerType = "Luma.SDK.Components.AnimationController";

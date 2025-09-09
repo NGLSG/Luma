@@ -2,6 +2,7 @@
 #include "GameViewPanel.h"
 
 #include "ImGuiRenderer.h"
+#include "RenderableManager.h"
 #include "../Renderer/GraphicsBackend.h"
 #include "../Renderer/RenderSystem.h"
 #include "SceneRenderer.h"
@@ -57,8 +58,8 @@ void GameViewPanel::Draw()
                 m_context->graphicsBackend->SetActiveRenderTarget(m_gameViewTarget);
 
 
-                std::vector<RenderPacket> renderQueue;
-                m_context->sceneRenderer->Extract(m_context->activeScene->GetRegistry(), renderQueue);
+                std::vector<RenderPacket> renderQueue = RenderableManager::GetInstance().GetInterpolationData(0.5f);
+
                 for (const auto& packet : renderQueue)
                 {
                     m_context->engineContext->renderSystem->Submit(packet);

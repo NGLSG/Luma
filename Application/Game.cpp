@@ -17,6 +17,7 @@
 
 #include <Path.h>
 #include "ProjectSettings.h"
+#include "RenderableManager.h"
 
 Game::Game(ApplicationConfig config) : ApplicationBase(config)
 {
@@ -77,6 +78,7 @@ void Game::Update(float deltaTime)
 
 
         Camera::GetInstance().SetProperties(cameraProps);
+        m_sceneRenderer->ExtractToRenderableManager(activeScene->GetRegistry());
     }
 }
 
@@ -97,8 +99,7 @@ void Game::Render()
 
     if (auto activeScene = SceneManager::GetInstance().GetCurrentScene())
     {
-        std::vector<RenderPacket> renderQueue;
-        m_sceneRenderer->Extract(activeScene->GetRegistry(), renderQueue);
+        std::vector<RenderPacket> renderQueue = RenderableManager::GetInstance().GetInterpolationData(0.5f);
 
         for (const auto& packet : renderQueue)
         {
