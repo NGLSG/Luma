@@ -48,6 +48,12 @@ static SkTileMode GetSkTileMode(int wrapMode)
     }
 }
 
+struct CursorPrimitive
+{
+    SkPoint position;
+    float height;
+    SkColor4f color;
+};
 
 class RenderSystem::RenderSystemImpl
 {
@@ -63,7 +69,7 @@ public:
     std::vector<CircleBatch> circleBatches;
     std::vector<LineBatch> lineBatches;
     std::vector<ShaderBatch> shaderBatches;
-
+    std::vector<CursorPrimitive> cursorPrimitives;
 
     std::vector<SkPoint> positions;
     std::vector<SkPoint> texCoords;
@@ -101,6 +107,7 @@ public:
         circleBatches.reserve(32);
         lineBatches.reserve(32);
         shaderBatches.reserve(32);
+        cursorPrimitives.reserve(16);
     }
 
 
@@ -113,6 +120,7 @@ public:
         circleBatches.clear();
         lineBatches.clear();
         shaderBatches.clear();
+        cursorPrimitives.clear();
     }
 
 
@@ -123,6 +131,7 @@ public:
     void DrawAllCircleBatches(SkCanvas* canvas);
     void DrawAllLineBatches(SkCanvas* canvas);
     void DrawAllShaderBatches(SkCanvas* canvas);
+    void DrawAllCursorBatches(SkCanvas* canvas);
 
 private:
     enum class TextAlignment
@@ -211,6 +220,11 @@ void RenderSystem::Submit(const ShaderBatch& batch)
     }
 }
 
+void RenderSystem::DrawCursor(const SkPoint& position, float height, const SkColor4f& color)
+{
+    pImpl->cursorPrimitives.emplace_back(CursorPrimitive{position, height, color});
+}
+
 void RenderSystem::Submit(const RenderPacket& packet)
 {
     std::visit([this](auto&& batch)
@@ -273,7 +287,7 @@ void RenderSystem::Flush()
     pImpl->DrawAllCircleBatches(canvas);
     pImpl->DrawAllLineBatches(canvas);
     pImpl->DrawAllShaderBatches(canvas);
-
+    pImpl->DrawAllCursorBatches(canvas);
     canvas->restore();
 
     pImpl->ClearBatches();
@@ -404,7 +418,7 @@ void RenderSystem::RenderSystemImpl::DrawAllSpriteBatches(SkCanvas* canvas)
                 cos_r_soa[k] = t[k].cosR;
             }
 
-            
+
             for (size_t k = 0; k < simd_chunk_size; ++k)
             {
                 scaled_half_w[k] = worldHalfWidth * scale_x_soa[k];
@@ -871,4 +885,71 @@ void RenderSystem::RenderSystemImpl::DrawAllShaderBatches(SkCanvas* canvas)
             canvas->restore();
         }
     }
+}
+
+void RenderSystem::RenderSystemImpl::DrawAllCursorBatches(SkCanvas* canvas)
+{
+    if (cursorPrimitives.empty())
+    {
+        return;
+    }
+
+    
+    positions.clear();
+    colors.clear();
+    indices.clear();
+
+    SkPaint paint;
+    paint.setStyle(SkPaint::kFill_Style);
+
+    constexpr float CURSOR_WIDTH = 1.5f; 
+    const size_t maxVerticesPerDraw = maxPrimitivesPerBatch * 4;
+
+    auto flushCursorDrawCall = [&]()
+    {
+        if (positions.empty()) return;
+
+        canvas->drawVertices(SkVertices::MakeCopy(SkVertices::kTriangles_VertexMode, positions.size(),
+                                                  positions.data(), nullptr, colors.data(), indices.size(),
+                                                  indices.data()),
+                             SkBlendMode::kSrcOver, paint);
+        positions.clear();
+        colors.clear();
+        indices.clear();
+    };
+
+    for (const auto& cursor : cursorPrimitives)
+    {
+        if (positions.size() + 4 > maxVerticesPerDraw) [[unlikely]]
+        {
+            flushCursorDrawCall();
+        }
+
+        paint.setColor4f(cursor.color, nullptr); 
+        SkColor skColor = paint.getColor();
+
+        const SkPoint localCorners[4] = {
+            {0.0f, 0.0f},
+            {CURSOR_WIDTH, 0.0f},
+            {CURSOR_WIDTH, cursor.height},
+            {0.0f, cursor.height}
+        };
+
+        uint16_t baseVertex = static_cast<uint16_t>(positions.size());
+        for (int j = 0; j < 4; ++j)
+        {
+            positions.emplace_back(cursor.position.fX + localCorners[j].fX, cursor.position.fY + localCorners[j].fY);
+            colors.push_back(skColor);
+        }
+
+        indices.push_back(baseVertex + 0);
+        indices.push_back(baseVertex + 1);
+        indices.push_back(baseVertex + 2);
+        indices.push_back(baseVertex + 0);
+        indices.push_back(baseVertex + 2);
+        indices.push_back(baseVertex + 3);
+    }
+
+    
+    flushCursorDrawCall();
 }

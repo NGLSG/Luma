@@ -6,11 +6,18 @@
 #include "Components/Sprite.h"
 #include "Application/Window.h"
 #include <cstring>
+
+#include "RenderSystem.h"
 #include "yaml-cpp/yaml.h"
 #include "../Scripting/CoreCLRHost.h"
+#include "External/skia-linux/include/include/core/SkFontTypes.h"
+#include "include/core/SkFont.h"
+#include "include/core/SkFontMetrics.h"
 
 namespace Systems
 {
+    constexpr static float CURSOR_BLINK_RATE = 0.5f;
+
     static ECS::Vector2f worldToScreen(const ECS::Vector2f& worldPos, const Camera::CamProperties& cameraProps,
                                        const ECS::RectF& viewport)
     {
@@ -32,6 +39,9 @@ namespace Systems
         focusedEntity = entt::null;
     }
 
+    
+    
+    
     void InputTextSystem::OnUpdate(RuntimeScene* scene, float deltaTime, EngineContext& context)
     {
         auto& registry = scene->GetRegistry();
@@ -39,17 +49,19 @@ namespace Systems
         entt::entity newlyFocused = entt::null;
         bool clickOccurredOnNothing = false;
 
+        
         auto clickView = registry.view<PointerClickEvent, ECS::InputTextComponent>();
         for (auto entity : clickView)
         {
             if (!scene->FindGameObjectByEntity(entity).IsActive())
                 continue;
-            if (registry.get<ECS::InputTextComponent>(entity).Enable)
+
+            auto* inputComp = registry.try_get<ECS::InputTextComponent>(entity);
+            if (inputComp && inputComp->Enable)
             {
                 newlyFocused = entity;
             }
         }
-
         for (const auto& event : context.frameEvents)
         {
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
@@ -61,7 +73,6 @@ namespace Systems
                 break;
             }
         }
-
         if (newlyFocused != entt::null)
         {
             if (focusedEntity != newlyFocused)
@@ -80,10 +91,75 @@ namespace Systems
                 OnFocusLost(scene, focusedEntity, context);
             }
         }
+        
+
 
         if (registry.valid(focusedEntity))
         {
+            
             handleActiveInput(scene, focusedEntity, context);
+
+            auto& inputText = registry.get<ECS::InputTextComponent>(focusedEntity);
+            auto& transform = registry.get<ECS::TransformComponent>(focusedEntity);
+
+            
+            inputText.cursorBlinkTimer += deltaTime;
+            if (inputText.cursorBlinkTimer >= CURSOR_BLINK_RATE)
+            {
+                inputText.cursorBlinkTimer = 0.0f;
+                inputText.isCursorVisible = !inputText.isCursorVisible;
+            }
+
+            
+            if (inputText.isFocused && inputText.isCursorVisible && context.renderSystem)
+            {
+                
+                if (inputText.text.typeface)
+                {
+                    SkFont font(inputText.text.typeface, inputText.text.fontSize);
+                    SkFontMetrics metrics;
+                    font.getMetrics(&metrics);
+
+                    
+
+                    
+                    std::string textBeforeCursor = std::string(inputText.inputBuffer).substr(
+                        0, inputText.cursorPosition);
+                    std::string fullText = std::string(inputText.inputBuffer);
+
+                    SkRect boundsBeforeCursor;
+                    font.measureText(textBeforeCursor.c_str(), textBeforeCursor.size(), SkTextEncoding::kUTF8,
+                                     &boundsBeforeCursor);
+                    float widthBeforeCursor = boundsBeforeCursor.width();
+
+                    SkRect fullTextBounds;
+                    font.measureText(fullText.c_str(), fullText.size(), SkTextEncoding::kUTF8, &fullTextBounds);
+                    float fullTextWidth = fullTextBounds.width();
+
+                    
+                    
+                    float localCursorX = widthBeforeCursor;
+
+                    
+                    float s = sinf(transform.rotation);
+                    float c = cosf(transform.rotation);
+                    float worldOffsetX = localCursorX * c * transform.scale.x;
+                    float worldOffsetY = localCursorX * s * transform.scale.y;
+
+                    float finalCenterX = transform.position.x + worldOffsetX;
+                    float finalCenterY = transform.position.y + worldOffsetY;
+
+                    
+                    float cursorHeight = (metrics.fDescent - metrics.fAscent) * transform.scale.y;
+                    SkPoint cursorTopLeft = {
+                        finalCenterX,
+                        finalCenterY - cursorHeight / 2.0f 
+                    };
+
+                    
+                    context.renderSystem->DrawCursor(cursorTopLeft, cursorHeight, inputText.text.color);
+                }
+            }
         }
 
         if (!registry.valid(focusedEntity))
@@ -103,6 +179,12 @@ namespace Systems
 
         focusedEntity = entity;
         inputText.isFocused = true;
+
+        
+        inputText.isCursorVisible = true;
+        inputText.cursorBlinkTimer = 0.0f;
+
+        
 #ifdef _WIN32
         strncpy_s(inputText.inputBuffer, sizeof(inputText.inputBuffer),
                   inputText.text.text.c_str(), _TRUNCATE);
@@ -111,6 +193,8 @@ namespace Systems
         inputText.inputBuffer[sizeof(inputText.inputBuffer) - 1] = '\0';
 #endif
 
+        
+        inputText.cursorPosition = strlen(inputText.inputBuffer);
         inputText.lastText = inputText.text.text;
 
         if (context.window)
@@ -125,6 +209,8 @@ namespace Systems
         if (!inputText || !inputText->isFocused) return;
 
         inputText->isFocused = false;
+        
+        inputText->isCursorVisible = false;
 
         std::string newText = inputText->inputBuffer;
         inputText->text.text = newText;
@@ -143,12 +229,17 @@ namespace Systems
         }
     }
 
+    
+    
+    
+    
     void InputTextSystem::handleActiveInput(RuntimeScene* scene, entt::entity entity, EngineContext& context)
     {
         auto& registry = scene->GetRegistry();
         auto& inputText = registry.get<ECS::InputTextComponent>(entity);
         auto& transform = registry.get<ECS::TransformComponent>(entity);
 
+        
         if (context.window)
         {
             auto cameraProps = scene->GetCameraProperties();
@@ -156,6 +247,7 @@ namespace Systems
                                 ? context.sceneViewRect
                                 : ECS::RectF{0, 0, cameraProps.viewport.width(), cameraProps.viewport.height()};
 
+            
             float width = 100.0f;
             float height = 20.0f;
             if (auto* sprite = registry.try_get<ECS::SpriteComponent>(entity))
@@ -174,60 +266,138 @@ namespace Systems
                 static_cast<int>(width * transform.scale.x * cameraProps.zoom),
                 static_cast<int>(height * transform.scale.y * cameraProps.zoom)
             };
-            context.window->SetTextInputArea(imeRect, static_cast<int>(strlen(inputText.inputBuffer)));
+            context.window->SetTextInputArea(imeRect, static_cast<int>(inputText.cursorPosition));
         }
 
         bool textChanged = false;
-        if (!inputText.isReadOnly)
+        bool cursorMoved = false;
+
+        if (inputText.isReadOnly)
         {
-            for (const auto& event : context.frameEvents)
+            return; 
+        }
+
+        
+        std::string currentText(inputText.inputBuffer);
+
+        for (const auto& event : context.frameEvents)
+        {
+            
+            if (event.type == SDL_EVENT_TEXT_INPUT)
             {
-                if (event.type == SDL_EVENT_TEXT_INPUT)
+                std::string inputTextStr = event.text.text;
+                if (currentText.length() + inputTextStr.length() < sizeof(inputText.inputBuffer) &&
+                    currentText.length() + inputTextStr.length() <= static_cast<size_t>(inputText.maxLength))
                 {
-                    size_t bufferLen = strlen(inputText.inputBuffer);
-                    size_t inputLen = strlen(event.text.text);
-                    if (bufferLen + inputLen < sizeof(inputText.inputBuffer) &&
-                        static_cast<int>(bufferLen + inputLen) < inputText.maxLength)
-                    {
-#ifdef _WIN32
-                        strcat_s(inputText.inputBuffer, sizeof(inputText.inputBuffer), event.text.text);
-#else
-                        strncat(inputText.inputBuffer, event.text.text, sizeof(inputText.inputBuffer) - bufferLen - 1);
-#endif
-                        textChanged = true;
-                    }
+                    currentText.insert(inputText.cursorPosition, inputTextStr);
+                    inputText.cursorPosition += inputTextStr.length();
+                    textChanged = true;
                 }
-                else if (event.type == SDL_EVENT_KEY_DOWN)
+            }
+            
+            else if (event.type == SDL_EVENT_KEY_DOWN)
+            {
+                switch (event.key.key)
                 {
-                    size_t bufferLen = strlen(inputText.inputBuffer);
-                    if (event.key.key == SDLK_BACKSPACE && bufferLen > 0)
+                
+                case SDLK_BACKSPACE:
+                    if (inputText.cursorPosition > 0)
                     {
-                        inputText.inputBuffer[bufferLen - 1] = '\0';
+                        currentText.erase(inputText.cursorPosition - 1, 1);
+                        inputText.cursorPosition--;
                         textChanged = true;
                     }
-                    else if (event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER)
+                    break;
+
+                
+                case SDLK_DELETE:
+                    if (inputText.cursorPosition < currentText.length())
                     {
-                        invokeSubmitEvent(scene, inputText.onSubmitTargets, inputText.inputBuffer);
-                        OnFocusLost(scene, entity, context);
+                        currentText.erase(inputText.cursorPosition, 1);
+                        textChanged = true;
                     }
-                    else if (event.key.key == SDLK_ESCAPE)
+                    break;
+
+                
+                case SDLK_LEFT:
+                    if (inputText.cursorPosition > 0)
                     {
+                        inputText.cursorPosition--;
+                        cursorMoved = true;
+                    }
+                    break;
+
+                
+                case SDLK_RIGHT:
+                    if (inputText.cursorPosition < currentText.length())
+                    {
+                        inputText.cursorPosition++;
+                        cursorMoved = true;
+                    }
+                    break;
+
+                
+                case SDLK_HOME:
+                    if (inputText.cursorPosition > 0)
+                    {
+                        inputText.cursorPosition = 0;
+                        cursorMoved = true;
+                    }
+                    break;
+
+                
+                case SDLK_END:
+                    if (inputText.cursorPosition < currentText.length())
+                    {
+                        inputText.cursorPosition = currentText.length();
+                        cursorMoved = true;
+                    }
+                    break;
+
+                
+                case SDLK_RETURN:
+                case SDLK_KP_ENTER:
+                    invokeSubmitEvent(scene, inputText.onSubmitTargets, inputText.inputBuffer);
+                    OnFocusLost(scene, entity, context);
+                    return; 
+
+                
+                case SDLK_ESCAPE:
 #ifdef _WIN32
-                        strncpy_s(inputText.inputBuffer, sizeof(inputText.inputBuffer),
-                                  inputText.lastText.c_str(), _TRUNCATE);
+                    strncpy_s(inputText.inputBuffer, sizeof(inputText.inputBuffer),
+                              inputText.lastText.c_str(), _TRUNCATE);
 #else
-                        strncpy(inputText.inputBuffer, inputText.lastText.c_str(), sizeof(inputText.inputBuffer) - 1);
-                        inputText.inputBuffer[sizeof(inputText.inputBuffer) - 1] = '\0';
+                    strncpy(inputText.inputBuffer, inputText.lastText.c_str(), sizeof(inputText.inputBuffer) - 1);
+                    inputText.inputBuffer[sizeof(inputText.inputBuffer) - 1] = '\0';
 #endif
-                        OnFocusLost(scene, entity, context);
-                    }
+                    OnFocusLost(scene, entity, context);
+                    return; 
+
+                default:
+                    break;
                 }
             }
         }
 
+        
         if (textChanged)
         {
-            inputText.text.text = inputText.inputBuffer;
+            inputText.text.text = currentText;
+#ifdef _WIN32
+            strncpy_s(inputText.inputBuffer, sizeof(inputText.inputBuffer),
+                      currentText.c_str(), _TRUNCATE);
+#else
+            
+            strncpy(inputText.inputBuffer, currentText.c_str(), sizeof(inputText.inputBuffer) - 1);
+            inputText.inputBuffer[sizeof(inputText.inputBuffer) - 1] = '\0';
+#endif
+        }
+
+        
+        if (textChanged || cursorMoved)
+        {
+            inputText.isCursorVisible = true;
+            inputText.cursorBlinkTimer = 0.0f;
         }
     }
 

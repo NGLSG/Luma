@@ -131,6 +131,14 @@ public:
      */
     void ClearClipRect();
 
+    /**
+     * @brief 绘制一个自定义光标。
+     * @param position 光标位置。
+     * @param size 光标大小。
+     * @param color 光标颜色。
+     */
+    void DrawCursor(const SkPoint& position, float size, const SkColor4f& color);
+
 private:
     // 私有构造函数，通过Create静态方法创建实例。
     RenderSystem(GraphicsBackend& backend, size_t maxPrimitivesPerBatch);

@@ -43,12 +43,17 @@ namespace ECS
         bool isPasswordField = false; ///< 文本框是否为密码字段（输入内容显示为星号）。
 
         std::vector<SerializableEventTarget> onTextChangedTargets; ///< 文本内容改变时触发的事件目标列表。
-
         std::vector<SerializableEventTarget> onSubmitTargets; ///< 文本提交（例如按回车）时触发的事件目标列表。
+        bool Enable = true;
 
+        // --- 状态字段 ---
         bool isFocused = false; ///< 文本框当前是否获得焦点。
         std::string lastText = ""; ///< 上一次的文本内容，用于检测变化。
         char inputBuffer[512] = {0}; ///< 用于存储输入文本的缓冲区。
+
+        size_t cursorPosition = 0;      // 光标在 inputBuffer 中的索引
+        float cursorBlinkTimer = 0.0f;  // 光标闪烁计时器
+        bool isCursorVisible = false;   // 光标当前是否可见
     };
 
     /**
