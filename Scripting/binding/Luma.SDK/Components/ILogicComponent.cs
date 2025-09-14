@@ -38,7 +38,7 @@ public class LogicComponent<T> : ILogicComponent where T : struct, IComponent
         Entity = Entity.Invalid;
     }
 
-    private T _component;
+    protected T _component; 
     public Entity Entity { get; set; }
 
     public LogicComponent(Entity entity)

@@ -99,7 +99,8 @@ void Game::Render()
 
     if (auto activeScene = SceneManager::GetInstance().GetCurrentScene())
     {
-        std::vector<RenderPacket> renderQueue = RenderableManager::GetInstance().GetInterpolationData(0.5f);
+        std::vector<RenderPacket> renderQueue = RenderableManager::GetInstance().GetInterpolationData(
+        );
 
         for (const auto& packet : renderQueue)
         {

@@ -1,126 +1,294 @@
 #include "Profiler.h"
+#include "nlohmann/json.hpp" 
+#include <SDL3/SDL_dialog.h>
 #include <numeric>
 #include <algorithm>
 #include <functional>
+#include <sstream>
+#include <fstream>
+
+#include "imgui_internal.h"
 #define IM_PI 3.14159265358979323846f
+
+using json = nlohmann::json;
+
+namespace
+{
+    void AggregateNodeData(const ProfileNode& node, std::unordered_map<std::string, std::pair<float, int>>& aggregated)
+    {
+        if (node.name.rfind("线程", 0) != 0)
+        {
+            float childrenTime = 0.0f;
+            for (const auto& child : node.children)
+            {
+                childrenTime += child->timeMilliseconds;
+            }
+            float selfTime = node.timeMilliseconds - childrenTime;
+
+            auto it = aggregated.find(node.name);
+            if (it == aggregated.end())
+            {
+                aggregated[node.name] = {selfTime, node.callCount};
+            }
+            else
+            {
+                it->second.first += selfTime;
+                it->second.second += node.callCount;
+            }
+        }
+
+        for (const auto& child : node.children)
+        {
+            AggregateNodeData(*child, aggregated);
+        }
+    }
+
+    void FindMostExpensiveScope(const ProfileNode& node, std::string& mostExpensiveName, float& maxTime)
+    {
+        if (node.name.rfind("线程", 0) != 0)
+        {
+            float childrenTime = 0.0f;
+            for (const auto& child : node.children)
+            {
+                childrenTime += child->timeMilliseconds;
+            }
+            float selfTime = node.timeMilliseconds - childrenTime;
+
+            if (selfTime > maxTime)
+            {
+                maxTime = selfTime;
+                mostExpensiveName = node.name;
+            }
+        }
+        for (const auto& child : node.children)
+        {
+            FindMostExpensiveScope(*child, mostExpensiveName, maxTime);
+        }
+    }
+
+    void ConvertNodeToTraceEvents(const ProfileNode& node, json& events, int pid, const std::string& tid_str, const std::chrono::time_point<std::chrono::high_resolution_clock>& globalStartTime)
+    {
+        if (node.name.rfind("线程", 0) == 0)
+        {
+             for (const auto& child : node.children)
+             {
+                 ConvertNodeToTraceEvents(*child, events, pid, tid_str, globalStartTime);
+             }
+             return;
+        }
+
+        long long ts = std::chrono::duration_cast<std::chrono::microseconds>(node.startTime - globalStartTime).count();
+        long long dur = static_cast<long long>(node.timeMilliseconds * 1000.0f);
+
+        json event;
+        event["name"] = node.name;
+        event["cat"] = "profiler";
+        event["ph"] = "X";
+        event["ts"] = ts;
+        event["dur"] = dur;
+        event["pid"] = pid;
+        event["tid"] = tid_str;
+        events.push_back(event);
+
+        for (const auto& child : node.children)
+        {
+            ConvertNodeToTraceEvents(*child, events, pid, tid_str, globalStartTime);
+        }
+    }
+
+    void SDLCALL OnJsonFileSelected(void* userdata, const char* const* filelist, int filter)
+    {
+        if (filelist && filelist[0])
+        {
+            Profiler* profiler = static_cast<Profiler*>(userdata);
+            profiler->ExportToJSON(std::filesystem::path(filelist[0]));
+        }
+    }
+}
 
 Profiler::Profiler()
 {
+    m_historySize = 6400;
+    m_viewNumSamplesX = m_historySize;
     m_lastInteractionTime = std::chrono::steady_clock::now();
+}
+
+Profiler::ThreadData& Profiler::getCurrentThreadData()
+{
+    std::thread::id this_id = std::this_thread::get_id();
+    auto it = m_threadData.find(this_id);
+    if (it == m_threadData.end())
+    {
+        it = m_threadData.emplace(this_id, ThreadData()).first;
+        it->second.rootNode = std::make_unique<ProfileNode>();
+        it->second.currentNode = it->second.rootNode.get();
+    }
+    return it->second;
 }
 
 void Profiler::Pause() { m_isPaused = true; }
 void Profiler::Resume() { m_isPaused = false; }
 bool Profiler::IsPaused() const { return m_isPaused; }
 
-void Profiler::Update(float deltaTimeSeconds)
+void Profiler::Update()
 {
     if (m_isPaused)
     {
         return;
     }
-
-    timeSinceLastCollection += deltaTimeSeconds;
-    if (timeSinceLastCollection >= collectionIntervalSeconds)
-    {
-        timeSinceLastCollection -= collectionIntervalSeconds;
-        sampleAndStore();
-    }
+    sampleAndStore();
 }
 
-void Profiler::StoreResult(std::string_view name, float timeMilliseconds, int64_t memoryDelta)
+void Profiler::BeginScope(std::string_view name)
 {
-    if (m_isPaused)
+    if (m_isPaused) return;
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    ThreadData& data = getCurrentThreadData();
+    data.hasData = true;
+
+    data.currentNode->callCount++;
+
+    auto newNode = std::make_unique<ProfileNode>();
+    newNode->name = name;
+    newNode->parent = data.currentNode;
+    newNode->startTime = std::chrono::high_resolution_clock::now();
+    newNode->startMemory = Platform::GetCurrentProcessMemoryUsage();
+
+    data.currentNode = newNode.get();
+    data.currentNode->parent->children.push_back(std::move(newNode));
+}
+
+void Profiler::EndScope()
+{
+    if (m_isPaused) return;
+
+    auto endTime = std::chrono::high_resolution_clock::now();
+    size_t endMemory = Platform::GetCurrentProcessMemoryUsage();
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    ThreadData& data = getCurrentThreadData();
+
+    if (data.currentNode && data.currentNode->parent)
     {
-        return;
+        data.currentNode->timeMilliseconds = std::chrono::duration<float, std::milli>(endTime - data.currentNode->startTime).count();
+        data.currentNode->memoryDeltaBytes = static_cast<int64_t>(endMemory) - static_cast<int64_t>(data.currentNode->startMemory);
+        data.currentNode = data.currentNode->parent;
     }
-    m_collectingResults.push_back({std::string(name), timeMilliseconds, memoryDelta, 0});
 }
 
 void Profiler::sampleAndStore()
 {
-    std::unordered_map<std::string, ProfileResult> aggregated;
+    auto mergedRoot = std::make_unique<ProfileNode>();
+    mergedRoot->name = "[采集帧根节点]";
     float totalTime = 0.0f;
 
-    for (const auto& res : m_collectingResults)
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (auto& [id, data] : m_threadData)
     {
-        totalTime += res.timeMilliseconds;
-        auto it = aggregated.find(res.name);
-        if (it == aggregated.end())
+        if (!data.hasData) continue;
+
+        std::stringstream ss;
+        ss << "线程 " << id;
+        auto threadNode = std::make_unique<ProfileNode>();
+        threadNode->name = ss.str();
+
+        for (auto& child : data.rootNode->children)
         {
-            aggregated[res.name] = {res.name, res.timeMilliseconds, res.memoryDeltaBytes, 1};
+            threadNode->timeMilliseconds += child->timeMilliseconds;
+            threadNode->children.push_back(std::move(child));
         }
-        else
-        {
-            it->second.timeMilliseconds += res.timeMilliseconds;
-            it->second.memoryDeltaBytes += res.memoryDeltaBytes;
-            it->second.callCount++;
-        }
-    }
-    m_collectingResults.clear();
+        totalTime += threadNode->timeMilliseconds;
+        mergedRoot->children.push_back(std::move(threadNode));
 
-    std::vector<ProfileResult> currentSampleResults;
-    for (auto const& [name, result] : aggregated)
-    {
-        currentSampleResults.push_back(result);
+        data.rootNode = std::make_unique<ProfileNode>();
+        data.currentNode = data.rootNode.get();
+        data.hasData = false;
     }
 
-    std::sort(currentSampleResults.begin(), currentSampleResults.end(),
-              [](const ProfileResult& a, const ProfileResult& b)
-              {
-                  return a.timeMilliseconds > b.timeMilliseconds;
-              });
-
-    m_historicalSamples.push_back(std::move(currentSampleResults));
-    if (m_historicalSamples.size() > historySize)
+    m_historicalSamples.push_back(std::move(mergedRoot));
+    while(m_historicalSamples.size() > m_historySize)
     {
         m_historicalSamples.pop_front();
-        if (m_selectedSampleIndex == 0)
-        {
-            m_selectedSampleIndex = -1;
-        }
-        else if (m_selectedSampleIndex > 0)
-        {
-            m_selectedSampleIndex--;
-        }
+        if (m_selectedSampleIndex == 0) m_selectedSampleIndex = -1;
+        else if (m_selectedSampleIndex > 0) m_selectedSampleIndex--;
+    }
+
+    std::unordered_map<std::string, std::pair<float, int>> aggregated;
+    if(!m_historicalSamples.empty())
+    {
+        AggregateNodeData(*m_historicalSamples.back(), aggregated);
     }
 
     std::string mostExpensiveScope;
-    if (!m_historicalSamples.back().empty())
+    float maxTime = 0.0f;
+    if (!m_historicalSamples.empty())
     {
-        mostExpensiveScope = m_historicalSamples.back()[0].name;
+        FindMostExpensiveScope(*m_historicalSamples.back(), mostExpensiveScope, maxTime);
     }
+
     m_mostExpensiveScopeHistory.push_back(mostExpensiveScope);
-    if (m_mostExpensiveScopeHistory.size() > historySize)
+    while(m_mostExpensiveScopeHistory.size() > m_historySize)
     {
         m_mostExpensiveScopeHistory.pop_front();
     }
 
     m_totalTimeHistory.push_back(totalTime);
-    if (m_totalTimeHistory.size() > historySize)
+    while(m_totalTimeHistory.size() > m_historySize)
     {
         m_totalTimeHistory.pop_front();
     }
 
-    for (auto const& [name, result] : aggregated)
+    for (const auto& [name, data] : aggregated)
     {
-        if (m_scopedTimeHistory.find(name) == m_scopedTimeHistory.end())
-        {
-            m_scopedTimeHistory[name] = std::deque<float>();
-        }
-        m_scopedTimeHistory[name].push_back(result.timeMilliseconds);
+        m_scopedTimeHistory.try_emplace(name, std::deque<float>());
+        m_scopedTimeHistory[name].push_back(data.first);
     }
 
-    for (auto& pair : m_scopedTimeHistory)
+    for (auto& [name, history] : m_scopedTimeHistory)
     {
-        if (aggregated.find(pair.first) == aggregated.end())
+        if (aggregated.find(name) == aggregated.end())
         {
-            pair.second.push_back(0.0f);
+            history.push_back(0.0f);
         }
-        if (pair.second.size() > historySize)
+        while(history.size() > m_historySize)
         {
-            pair.second.pop_front();
+            history.pop_front();
         }
+    }
+}
+
+void Profiler::ExportToJSON(const std::filesystem::path& filepath)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_historicalSamples.empty()) return;
+
+    json traceEvents = json::array();
+
+    auto globalStartTime = std::chrono::high_resolution_clock::time_point::max();
+    for (const auto& frame : m_historicalSamples) {
+        for (const auto& threadNode : frame->children) {
+            if (!threadNode->children.empty()) {
+                globalStartTime = std::min(globalStartTime, threadNode->children[0]->startTime);
+            }
+        }
+    }
+
+    if (globalStartTime == std::chrono::high_resolution_clock::time_point::max()) return;
+
+    int pid = 1;
+    for (const auto& frame : m_historicalSamples)
+    {
+        for (const auto& threadNode : frame->children)
+        {
+            ConvertNodeToTraceEvents(*threadNode, traceEvents, pid, threadNode->name, globalStartTime);
+        }
+    }
+
+    std::ofstream file(filepath);
+    if (file.is_open())
+    {
+        file << traceEvents.dump(4);
     }
 }
 
@@ -129,8 +297,7 @@ void Profiler::drawTimelineView()
     static float topPaneHeight = 250.0f;
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 
-    if (ImGui::BeginChild("ProfilerGraph", ImVec2(0, topPaneHeight), false,
-                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+    if (ImGui::BeginChild("ProfilerGraph", ImVec2(0, topPaneHeight), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
     {
         const int totalSampleCount = static_cast<int>(m_totalTimeHistory.size());
 
@@ -231,13 +398,10 @@ void Profiler::drawTimelineView()
             {
                 if (i + 1 >= history.size()) continue;
 
-                ImVec2 p1(canvas_p0.x + (float)(i - viewStart) / m_viewNumSamplesX * canvas_sz.x,
-                          canvas_p1.y - (history[i] / yMax) * canvas_sz.y);
-                ImVec2 p2(canvas_p0.x + (float)(i + 1 - viewStart) / m_viewNumSamplesX * canvas_sz.x,
-                          canvas_p1.y - (history[i + 1] / yMax) * canvas_sz.y);
+                ImVec2 p1(canvas_p0.x + (float)(i - viewStart) / m_viewNumSamplesX * canvas_sz.x, canvas_p1.y - (history[i] / yMax) * canvas_sz.y);
+                ImVec2 p2(canvas_p0.x + (float)(i + 1 - viewStart) / m_viewNumSamplesX * canvas_sz.x, canvas_p1.y - (history[i + 1] / yMax) * canvas_sz.y);
 
-                const bool isMostExpensive = (i < m_mostExpensiveScopeHistory.size() && m_mostExpensiveScopeHistory[i]
-                    == name);
+                const bool isMostExpensive = (i < m_mostExpensiveScopeHistory.size() && m_mostExpensiveScopeHistory[i] == name);
                 drawList->AddLine(p1, p2, isMostExpensive ? colorRed : m_scopeColors.at(name), 2.0f);
             }
         }
@@ -266,62 +430,94 @@ void Profiler::drawTimelineView()
 
     if (ImGui::BeginChild("ProfilerDetails", ImVec2(0, 0)))
     {
-        int indexToShow = (m_selectedSampleIndex != -1)
-                              ? m_selectedSampleIndex
-                              : (m_historicalSamples.empty() ? -1 : (int)m_historicalSamples.size() - 1);
+        int indexToShow = (m_selectedSampleIndex != -1) ? m_selectedSampleIndex : (m_historicalSamples.empty() ? -1 : (int)m_historicalSamples.size() - 1);
 
         if (indexToShow != -1 && indexToShow < m_historicalSamples.size())
         {
-            const std::vector<ProfileResult>& resultsToShow = m_historicalSamples[indexToShow];
-            if (ImGui::BeginTable("profiling", 5,
-                                  ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Sortable |
-                                  ImGuiTableFlags_ScrollY))
+            const ProfileNode& rootNode = *m_historicalSamples[indexToShow];
+            if (ImGui::BeginTable("profilingTree", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable))
             {
-                ImGui::TableSetupColumn("Module / Function", ImGuiTableColumnFlags_DefaultSort);
-                ImGui::TableSetupColumn("Total Time (ms)");
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("在一个0.1秒采样周期内，该函数运行的总时长。");
-                ImGui::TableSetupColumn("Avg Time (ms)");
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Total Time / Call Count.\n这是该函数单次调用的平均耗时。");
-                ImGui::TableSetupColumn("Call Count");
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("在一个0.1秒采样周期内，该函数被调用的总次数。");
-                ImGui::TableSetupColumn("Memory Delta");
+                ImGui::TableSetupColumn("模块 / 函数", ImGuiTableColumnFlags_NoHide | ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("总耗时 (ms)");
+                ImGui::TableSetupColumn("自身耗时 (ms)");
+                ImGui::TableSetupColumn("总耗时占比");
+                ImGui::TableSetupColumn("调用次数");
+                ImGui::TableSetupColumn("内存变化");
                 ImGui::TableHeadersRow();
 
-                for (const auto& result : resultsToShow)
+                for(const auto& child : rootNode.children)
                 {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::TextUnformatted(result.name.c_str());
-                    ImGui::TableSetColumnIndex(1);
-                    if (!resultsToShow.empty() && result.name == resultsToShow[0].name)
-                        ImGui::TextColored(
-                            ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "%.4f", result.timeMilliseconds);
-                    else ImGui::Text("%.4f", result.timeMilliseconds);
-                    ImGui::TableSetColumnIndex(2);
-                    float avgTime = result.callCount > 0 ? result.timeMilliseconds / result.callCount : 0.0f;
-                    ImGui::Text("%.4f", avgTime);
-                    ImGui::TableSetColumnIndex(3);
-                    ImGui::Text("%d", result.callCount);
-                    ImGui::TableSetColumnIndex(4);
-                    if (result.memoryDeltaBytes > 0)
-                        ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.2f, 1.0f), "+%.2f KB",
-                                           (float)result.memoryDeltaBytes / 1024.0f);
-                    else if (result.memoryDeltaBytes < 0)
-                        ImGui::TextColored(
-                            ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "%.2f KB", (float)result.memoryDeltaBytes / 1024.0f);
-                    else ImGui::Text("0 B");
+                    drawProfileNodeTree(*child, rootNode);
                 }
+
                 ImGui::EndTable();
             }
         }
         else
         {
-            ImGui::Text("No data available. (Click a point in the timeline above to select a frame)");
+            ImGui::Text("暂无数据。(在上方时间线中点击一个采样点以查看详情)");
         }
     }
     ImGui::EndChild();
 
     ImGui::PopStyleVar();
+}
+
+void Profiler::drawProfileNodeTree(const ProfileNode& node, const ProfileNode& frameRoot)
+{
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAllColumns;
+    if (node.children.empty())
+    {
+        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet;
+    }
+
+    bool isThreadNode = node.name.rfind("线程", 0) == 0;
+    if (isThreadNode)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.8f, 1.0f, 1.0f));
+        flags |= ImGuiTreeNodeFlags_DefaultOpen;
+    }
+
+    bool opened = ImGui::TreeNodeEx(node.name.c_str(), flags, "%s", node.name.c_str());
+    if (isThreadNode) ImGui::PopStyleColor();
+
+
+    ImGui::TableNextColumn();
+
+    float totalFrameTime = 0.0f;
+    for (const auto& child : frameRoot.children) totalFrameTime += child->timeMilliseconds;
+
+    ImGui::Text("%.4f", node.timeMilliseconds);
+
+    ImGui::TableNextColumn();
+    float childrenTime = 0.0f;
+    for (const auto& child : node.children) childrenTime += child->timeMilliseconds;
+    float selfTime = node.timeMilliseconds - childrenTime;
+    ImGui::Text("%.4f", selfTime);
+
+    ImGui::TableNextColumn();
+    float percentage = totalFrameTime > 0 ? (node.timeMilliseconds / totalFrameTime) * 100.0f : 0.0f;
+    ImGui::Text("%.2f%%", percentage);
+
+    ImGui::TableNextColumn();
+    ImGui::Text("%d", node.callCount);
+
+    ImGui::TableNextColumn();
+    if (node.memoryDeltaBytes > 0) ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.2f, 1.0f), "+%.2f KB", (float)node.memoryDeltaBytes / 1024.0f);
+    else if (node.memoryDeltaBytes < 0) ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "%.2f KB", (float)node.memoryDeltaBytes / 1024.0f);
+    else ImGui::Text("0 B");
+
+    if (opened)
+    {
+        for (const auto& child : node.children)
+        {
+            drawProfileNodeTree(*child, frameRoot);
+        }
+        ImGui::TreePop();
+    }
 }
 
 void Profiler::drawSummaryView()
@@ -341,15 +537,24 @@ void Profiler::drawSummaryView()
     if (!m_historicalSamples.empty())
     {
         std::unordered_map<std::string, std::tuple<double, long long, long long>> totals;
-
-        for (const auto& sample : m_historicalSamples)
-        {
-            for (const auto& result : sample)
+        std::function<void(const ProfileNode&)> accumulate =
+            [&](const ProfileNode& node)
             {
-                std::get<0>(totals[result.name]) += result.timeMilliseconds;
-                std::get<1>(totals[result.name]) += result.callCount;
-                std::get<2>(totals[result.name]) += result.memoryDeltaBytes;
-            }
+                if (node.name.rfind("线程", 0) != 0 && node.name != "[采集帧根节点]")
+                {
+                    std::get<0>(totals[node.name]) += node.timeMilliseconds;
+                    std::get<1>(totals[node.name]) += node.callCount;
+                    std::get<2>(totals[node.name]) += node.memoryDeltaBytes;
+                }
+                for (const auto& child : node.children)
+                {
+                    accumulate(*child);
+                }
+            };
+
+        for (const auto& sampleRoot : m_historicalSamples)
+        {
+            accumulate(*sampleRoot);
         }
 
         for (const auto& [name, data] : totals)
@@ -376,12 +581,12 @@ void Profiler::drawSummaryView()
         return a.averageTimePerSample > b.averageTimePerSample;
     });
 
-    ImGui::Text("Average Performance Summary (up to last 60s)");
+    ImGui::Text("性能汇总平均值 (最近 %zu 条采样)", m_historicalSamples.size());
     ImGui::Separator();
 
     if (summaryResults.empty())
     {
-        ImGui::Text("No significant performance data to display.");
+        ImGui::Text("暂无有效的性能数据可供汇总。");
         return;
     }
 
@@ -389,8 +594,7 @@ void Profiler::drawSummaryView()
 
     const ImVec2 region = ImGui::GetContentRegionAvail();
     const float radius = std::min(region.x * 0.4f, region.y * 0.4f);
-    const ImVec2 pieCenter(ImGui::GetCursorScreenPos().x + radius + 30.0f,
-                           ImGui::GetCursorScreenPos().y + ImGui::GetContentRegionAvail().y * 0.5f);
+    const ImVec2 pieCenter(ImGui::GetCursorScreenPos().x + radius + 30.0f, ImGui::GetCursorScreenPos().y + ImGui::GetContentRegionAvail().y * 0.5f);
 
     float startAngle = -IM_PI / 2.0f;
     const int segments = 64;
@@ -407,16 +611,14 @@ void Profiler::drawSummaryView()
         if (res.proportion > 0.03f)
         {
             float textAngle = startAngle + angle * 0.5f;
-            ImVec2 textPos(pieCenter.x + cosf(textAngle) * radius * 0.6f,
-                           pieCenter.y + sinf(textAngle) * radius * 0.6f);
+            ImVec2 textPos(pieCenter.x + cosf(textAngle) * radius * 0.6f, pieCenter.y + sinf(textAngle) * radius * 0.6f);
 
             ImVec4 colorVec = ImColor(color);
             float luminance = colorVec.x * 0.299f + colorVec.y * 0.587f + colorVec.z * 0.114f;
             ImU32 textColor = luminance > 0.5f ? IM_COL32_BLACK : IM_COL32_WHITE;
 
             ImVec2 textSize = ImGui::CalcTextSize(res.name.c_str());
-            drawList->AddText(ImVec2(textPos.x - textSize.x * 0.5f, textPos.y - textSize.y * 0.5f), textColor,
-                              res.name.c_str());
+            drawList->AddText(ImVec2(textPos.x - textSize.x * 0.5f, textPos.y - textSize.y * 0.5f), textColor, res.name.c_str());
         }
         startAngle += angle;
     }
@@ -431,16 +633,14 @@ void Profiler::drawSummaryView()
 
         for (const auto& res : summaryResults)
         {
-            if (angle >= accumulatedProportion * 2.0f * IM_PI && angle < (accumulatedProportion + res.proportion) * 2.0f
-                * IM_PI)
+            if (angle >= accumulatedProportion * 2.0f * IM_PI && angle < (accumulatedProportion + res.proportion) * 2.0f * IM_PI)
             {
                 ImGui::BeginTooltip();
-                ImGui::TextColored(ImColor(m_scopeColors.count(res.name) ? m_scopeColors.at(res.name) : IM_COL32_WHITE),
-                                   "■ %s", res.name.c_str());
+                ImGui::TextColored(ImColor(m_scopeColors.count(res.name) ? m_scopeColors.at(res.name) : IM_COL32_WHITE), "■ %s", res.name.c_str());
                 ImGui::Separator();
-                ImGui::Text("Avg Time / 0.1s: %.4f ms", res.averageTimePerSample);
-                ImGui::Text("Avg Time / Call:   %.4f ms", res.averageTimePerCall);
-                ImGui::Text("Proportion:        %.2f %%", res.proportion * 100.0f);
+                ImGui::Text("平均耗时 / 帧:   %.4f ms", res.averageTimePerSample);
+                ImGui::Text("平均耗时 / 调用:   %.4f ms", res.averageTimePerCall);
+                ImGui::Text("占比:        %.2f %%", res.proportion * 100.0f);
                 ImGui::EndTooltip();
                 break;
             }
@@ -453,13 +653,13 @@ void Profiler::drawSummaryView()
 
     if (ImGui::BeginChild("LegendChild", ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar))
     {
-        if (ImGui::BeginTable("summary_legend", 5, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg))
+        if (ImGui::BeginTable("summary_legend", 5, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
         {
-            ImGui::TableSetupColumn("##Color", ImGuiTableColumnFlags_WidthFixed);
-            ImGui::TableSetupColumn("Module / Function", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableSetupColumn("Avg / 0.1s (ms)");
-            ImGui::TableSetupColumn("Avg / Call (ms)");
-            ImGui::TableSetupColumn("Avg Mem (KB)");
+            ImGui::TableSetupColumn("##颜色", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("模块 / 函数", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("平均 / 帧 (ms)");
+            ImGui::TableSetupColumn("平均 / 调用 (ms)");
+            ImGui::TableSetupColumn("平均内存 (KB)");
             ImGui::TableHeadersRow();
 
             for (const auto& res : summaryResults)
@@ -467,8 +667,7 @@ void Profiler::drawSummaryView()
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImU32 color = m_scopeColors.count(res.name) ? m_scopeColors.at(res.name) : IM_COL32_WHITE;
-                ImGui::ColorButton(res.name.c_str(), ImColor(color).Value,
-                                   ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoDragDrop, ImVec2(15, 15));
+                ImGui::ColorButton(res.name.c_str(), ImColor(color).Value, ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoDragDrop, ImVec2(15, 15));
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted(res.name.c_str());
                 ImGui::TableNextColumn();
@@ -486,37 +685,60 @@ void Profiler::drawSummaryView()
 
 void Profiler::DrawUI()
 {
-    ImGui::Begin("Profiler");
+    if (!ImGui::Begin("性能分析器"))
+    {
+        ImGui::End();
+        return;
+    }
 
-    if (m_isPaused) { if (ImGui::Button("Resume")) Resume(); }
-    else { if (ImGui::Button("Pause")) Pause(); }
+    if (m_isPaused) { if (ImGui::Button("继续")) Resume(); }
+    else { if (ImGui::Button("暂停")) Pause(); }
     ImGui::SameLine();
-    ImGui::TextUnformatted(m_isPaused ? "(Paused)" : "(Running)");
+    ImGui::TextUnformatted(m_isPaused ? "(已暂停)" : "(运行中)");
 
     ImGui::SameLine();
     ImGui::Spacing();
     ImGui::SameLine();
 
-    ImGui::PushStyleColor(ImGuiCol_Button, m_currentViewMode == ViewMode::Timeline
-                                               ? ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]
-                                               : ImGui::GetStyle().Colors[ImGuiCol_Button]);
-    if (ImGui::Button("Timeline")) m_currentViewMode = ViewMode::Timeline;
+    ImGui::PushStyleColor(ImGuiCol_Button, m_currentViewMode == ViewMode::Timeline ? ImGui::GetStyle().Colors[ImGuiCol_ButtonActive] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
+    if (ImGui::Button("时间线")) m_currentViewMode = ViewMode::Timeline;
     ImGui::PopStyleColor();
 
     ImGui::SameLine();
 
-    ImGui::PushStyleColor(ImGuiCol_Button, m_currentViewMode == ViewMode::Summary
-                                               ? ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]
-                                               : ImGui::GetStyle().Colors[ImGuiCol_Button]);
-    if (ImGui::Button("Summary")) m_currentViewMode = ViewMode::Summary;
+    ImGui::PushStyleColor(ImGuiCol_Button, m_currentViewMode == ViewMode::Summary ? ImGui::GetStyle().Colors[ImGuiCol_ButtonActive] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
+    if (ImGui::Button("汇总")) m_currentViewMode = ViewMode::Summary;
     ImGui::PopStyleColor();
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+
+    if (ImGui::Button("导出JSON"))
+    {
+        const SDL_DialogFileFilter filters[] = { {"JSON", "json"} };
+        SDL_ShowSaveFileDialog(OnJsonFileSelected, this, NULL, filters, 1, "profiler_trace.json");
+    }
+
+    ImGui::SameLine();
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+    ImGui::SameLine();
+
+    ImGui::Text("历史帧数:");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(100);
+    int historySize = static_cast<int>(m_historySize);
+    if (ImGui::InputInt("##HistorySize", &historySize))
+    {
+        m_historySize = std::max(100, historySize);
+    }
 
     if (m_currentViewMode == ViewMode::Timeline)
     {
         ImGui::SameLine();
         ImGui::Spacing();
         ImGui::SameLine();
-        if (ImGui::Checkbox("Follow Latest", &m_isFollowing))
+        if (ImGui::Checkbox("跟随最新", &m_isFollowing))
         {
             if (m_isFollowing) m_selectedSampleIndex = -1;
             m_lastInteractionTime = std::chrono::steady_clock::now();

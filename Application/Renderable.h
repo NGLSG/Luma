@@ -18,7 +18,7 @@ struct SpriteRenderData
     SkImage* image = nullptr;
     Material* material = nullptr;
     SkRect sourceRect;
-    const ECS::Color color;
+    ECS::Color color;
     int filterQuality;
     int wrapMode;
     float ppuScaleFactor;
@@ -29,7 +29,7 @@ struct TextRenderData
     SkTypeface* typeface = nullptr;
     std::string text;
     float fontSize;
-    const ECS::Color color;
+    ECS::Color color;
     int alignment;
 };
 
@@ -43,4 +43,5 @@ struct Renderable
         SpriteRenderData,
         TextRenderData
     > data;
+
 };

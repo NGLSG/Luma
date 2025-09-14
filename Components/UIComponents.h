@@ -21,14 +21,14 @@ namespace ECS
     {
         bool isInteractable = true; ///< 按钮是否可交互。
 
-        std::vector<SerializableEventTarget> onClickTargets; ///< 按钮点击时触发的事件目标列表。
-
         bool isPressed = false; ///< 按钮当前是否被按下。
         bool isHovered = false; ///< 按钮当前是否被鼠标悬停。
         ECS::Color NormalColor = ECS::Colors::White; ///< 按钮的正常颜色。
         ECS::Color HoverColor = ECS::Colors::LightGray; ///< 按钮被鼠标悬停时的颜色。
         ECS::Color PressedColor = ECS::Colors::Gray; ///< 按钮被按下时的颜色。
         ECS::Color DisabledColor = ECS::Colors::DarkGray; ///< 按钮禁用时的颜色。
+
+        std::vector<SerializableEventTarget> onClickTargets; ///< 按钮点击时触发的事件目标列表。
     };
 
     /**
@@ -42,18 +42,16 @@ namespace ECS
         bool isReadOnly = false; ///< 文本框是否只读。
         bool isPasswordField = false; ///< 文本框是否为密码字段（输入内容显示为星号）。
 
-        std::vector<SerializableEventTarget> onTextChangedTargets; ///< 文本内容改变时触发的事件目标列表。
-        std::vector<SerializableEventTarget> onSubmitTargets; ///< 文本提交（例如按回车）时触发的事件目标列表。
-        bool Enable = true;
-
         // --- 状态字段 ---
         bool isFocused = false; ///< 文本框当前是否获得焦点。
         std::string lastText = ""; ///< 上一次的文本内容，用于检测变化。
         char inputBuffer[512] = {0}; ///< 用于存储输入文本的缓冲区。
 
-        size_t cursorPosition = 0;      // 光标在 inputBuffer 中的索引
-        float cursorBlinkTimer = 0.0f;  // 光标闪烁计时器
-        bool isCursorVisible = false;   // 光标当前是否可见
+        size_t cursorPosition = 0; // 光标在 inputBuffer 中的索引
+        float cursorBlinkTimer = 0.0f; // 光标闪烁计时器
+        bool isCursorVisible = false; // 光标当前是否可见
+        std::vector<SerializableEventTarget> onTextChangedTargets; ///< 文本内容改变时触发的事件目标列表。
+        std::vector<SerializableEventTarget> onSubmitTargets; ///< 文本提交（例如按回车）时触发的事件目标列表。
     };
 
     /**
@@ -67,10 +65,8 @@ namespace ECS
         bool enableHorizontalScroll = true; ///< 是否启用水平滚动。
         bool enableVerticalScroll = true; ///< 是否启用垂直滚动。
         float scrollSensitivity = 20.0f; ///< 滚动灵敏度。
-
-        std::vector<SerializableEventTarget> onScrollChangedTargets; ///< 滚动位置改变时触发的事件目标列表。
-
         Vector2f lastScrollPosition = {0.0f, 0.0f}; ///< 上一次的滚动位置，用于检测变化。
+        std::vector<SerializableEventTarget> onScrollChangedTargets; ///< 滚动位置改变时触发的事件目标列表。
     };
 }
 

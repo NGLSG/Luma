@@ -11,6 +11,7 @@
 #include <string_view>
 #include <implot.h>
 #include "imgui_internal.h"
+#include "Profiler.h"
 #include "Input/Cursor.h"
 #include "Input/Keyboards.h"
 
@@ -55,6 +56,7 @@ void BlueprintPanel::Initialize(EditorContext* context)
 
 void BlueprintPanel::Update(float deltaTime)
 {
+    PROFILE_FUNCTION();
     if (m_context->currentEditingBlueprintGuid.Valid() && m_context->currentEditingBlueprintGuid !=
         m_currentBlueprintGuid)
     {
@@ -153,6 +155,7 @@ void BlueprintPanel::Focus()
 
 void BlueprintPanel::Draw()
 {
+    PROFILE_FUNCTION();
     if (!m_isVisible) return;
     if (m_requestFocus)
     {
@@ -418,7 +421,9 @@ void BlueprintPanel::drawNodeEditor()
             const auto* definition = BlueprintNodeRegistry::GetInstance().GetDefinition(nodeFullName);
             if (definition)
             {
-                ImVec2 nodePosition = ed::ScreenToCanvas({static_cast<float>(LumaCursor::GetPosition().x), static_cast<float>(LumaCursor::GetPosition().y)});
+                ImVec2 nodePosition = ed::ScreenToCanvas({
+                    static_cast<float>(LumaCursor::GetPosition().x), static_cast<float>(LumaCursor::GetPosition().y)
+                });
                 createNodeFromDefinition(definition, nodePosition);
             }
         }
@@ -432,7 +437,6 @@ void BlueprintPanel::drawNodeEditor()
             });
             if (it != funcs.end())
             {
-                
                 ImVec2 nodePosition = ed::ScreenToCanvas(ImGui::GetMousePos());
                 createFunctionCallNode(*it, nodePosition);
             }
@@ -1710,7 +1714,6 @@ void BlueprintPanel::drawBackgroundContextMenu()
     ImVec2 open_position = ImGui::GetMousePosOnOpeningCurrentPopup();
     if (ImGui::BeginPopup("CreateNodeMenu"))
     {
-        
         ImVec2 open_position_canvas = ed::ScreenToCanvas(open_position);
 
         if (m_currentBlueprint && !m_currentBlueprint->GetBlueprintData().Functions.empty())

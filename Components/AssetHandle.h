@@ -107,6 +107,7 @@ namespace YAML
         {
             Node node;
             node["guid"] = handle.assetGuid;
+            node["assetGuid"] = handle.assetGuid;
             node["type"] = handle.assetType;
             return node;
         }
@@ -122,7 +123,11 @@ namespace YAML
             if (!node.IsMap() || !node["guid"])
                 return false;
 
-            handle.assetGuid = node["guid"].as<Guid>();
+            if (node["guid"])
+                handle.assetGuid = node["guid"].as<Guid>();
+            else if (node["assetGuid"])
+                handle.assetGuid = node["assetGuid"].as<Guid>();
+
             if (node["type"])
             {
                 handle.assetType = node["type"].as<AssetType>();

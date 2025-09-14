@@ -120,7 +120,8 @@ private:
     void drawFileConflictPopupContent(); ///< 绘制文件冲突弹出窗口的内容。
 
 
-    void updateFps(); ///< 更新帧率显示。
+    void updateUps(); ///< 更新帧率显示。
+    void updateFps();
 
 private:
     EditorContext m_editorContext; ///< 编辑器上下文，包含编辑器状态和数据。

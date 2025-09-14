@@ -17,71 +17,160 @@ public struct AudioComponent : IComponent
     public float pitch;
 }
 
-[GenerateLogicComponentProperties]
-    public partial class Audio : LogicComponent<AudioComponent>
+
+
+public class Audio : LogicComponent<AudioComponent>
+{
+    
+    
+    
+    private const string ComponentName = "AudioComponent";
+    
+    private AudioSource? _playingSource;
+
+    
+    
+    
+    public Audio(Entity entity) : base(entity) { }
+
+    #region Component Properties
+
+    public AssetHandle AudioHandle
     {
-        private AudioSource? _playingSource;
-        
-        public Audio(Entity entity) : base(entity) { }
+        get => _component.audioHandle;
+        set
+        {
+            _component.audioHandle = value;
+            Entity.SetComponentProperty(ComponentName, "audioHandle", in value);
+        }
+    }
 
-        
-        public partial AssetHandle AudioHandle { get; set; }
-        public partial bool PlayOnStart { get; set; }
-        public partial bool Loop { get; set; }
-        public partial float Volume { get; set; }
-        public partial bool Spatial { get; set; }
-        public partial float MinDistance { get; set; }
-        public partial float MaxDistance { get; set; }
-        public partial float Pitch { get; set; } 
+    public bool PlayOnStart
+    {
+        get => _component.playOnStart;
+        set
+        {
+            _component.playOnStart = value;
+            Entity.SetComponentProperty(ComponentName, "playOnStart", in value);
+        }
+    }
 
-        
-        
-        
-        
-        public AudioSource? Play()
+    public bool Loop
+    {
+        get => _component.loop;
+        set
+        {
+            _component.loop = value;
+            Entity.SetComponentProperty(ComponentName, "loop", in value);
+        }
+    }
+
+    public float Volume
+    {
+        get => _component.volume;
+        set
+        {
+            _component.volume = value;
+            Entity.SetComponentProperty(ComponentName, "volume", in value);
+        }
+    }
+
+    public bool Spatial
+    {
+        get => _component.spatial;
+        set
+        {
+            _component.spatial = value;
+            Entity.SetComponentProperty(ComponentName, "spatial", in value);
+        }
+    }
+
+    public float MinDistance
+    {
+        get => _component.minDistance;
+        set
+        {
+            _component.minDistance = value;
+            Entity.SetComponentProperty(ComponentName, "minDistance", in value);
+        }
+    }
+
+    public float MaxDistance
+    {
+        get => _component.maxDistance;
+        set
+        {
+            _component.maxDistance = value;
+            Entity.SetComponentProperty(ComponentName, "maxDistance", in value);
+        }
+    }
+
+    public float Pitch
+    {
+        get => _component.pitch;
+        set
+        {
+            _component.pitch = value;
+            Entity.SetComponentProperty(ComponentName, "pitch", in value);
+        }
+    }
+
+    #endregion
+
+    #region Playback Control
+
+    
+    
+    
+    
+    public AudioSource? Play()
+    {
+        Stop();
+
+        var desc = new PlayDesc
+        {
+            AudioHandle = AudioHandle,
+            Loop = Loop,
+            Volume = Volume,
+            Spatial = Spatial,
+            MinDistance = MinDistance,
+            MaxDistance = MaxDistance
+            
+        };
+
+        if (Spatial)
         {
             
-            Stop();
-
-            var desc = new PlayDesc
+            var transform = Entity.GetComponent<Transform>();
+            if (transform != null)
             {
-                AudioHandle = AudioHandle,
-                Loop = Loop,
-                Volume = Volume,
-                Spatial = Spatial,
-                MinDistance = MinDistance,
-                MaxDistance = MaxDistance
-            };
-
-            if (Spatial)
-            {
-                var transform = Entity.GetComponent<Transform>();
-                if (transform != null)
-                {
-                    desc.SourceX = transform.Position.X;
-                    desc.SourceY = transform.Position.Y;
-                    desc.SourceZ = 0; 
-                }
+                var position = transform.Position; 
+                desc.SourceX = position.X;
+                desc.SourceY = position.Y;
+                desc.SourceZ = 0;
             }
-
-            _playingSource = AudioManager.Play(desc);
-            return _playingSource;
         }
 
-        
-        
-        
-        public void Stop()
-        {
-            if (_playingSource != null && !_playingSource.IsFinished)
-            {
-                _playingSource.Stop();
-            }
-            _playingSource = null;
-        }
-
-        
-        
-        
-        public bool IsPlaying => _playingSource != null && !_playingSource.IsFinished;
+        _playingSource = AudioManager.Play(desc);
+        return _playingSource;
     }
+
+    
+    
+    
+    public void Stop()
+    {
+        if (_playingSource != null && !_playingSource.IsFinished)
+        {
+            _playingSource.Stop();
+        }
+        _playingSource = null;
+    }
+
+    
+    
+    
+    public bool IsPlaying => _playingSource != null && !_playingSource.IsFinished;
+    
+    #endregion
+}

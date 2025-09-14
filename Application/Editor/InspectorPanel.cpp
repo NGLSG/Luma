@@ -9,6 +9,7 @@
 #include "../Resources/Loaders/PrefabLoader.h"
 #include "../Utils/Logger.h"
 #include "InspectorUI.h"
+#include "Profiler.h"
 #include "RelationshipComponent.h"
 #include "Transform.h"
 #include "ScriptComponent.h"
@@ -27,6 +28,7 @@ void InspectorPanel::Update(float deltaTime)
 
 void InspectorPanel::Draw()
 {
+    PROFILE_FUNCTION();
     ImGui::Begin(GetPanelName(), &m_isVisible);
     m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     drawLockButton();

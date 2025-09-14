@@ -14,17 +14,93 @@ public struct SpriteComponent : IComponent
     public int zIndex;
 }
 
-[GenerateLogicComponentProperties]
-public partial class Sprite : LogicComponent<SpriteComponent>
-{
 
+
+
+public class Sprite : LogicComponent<SpriteComponent>
+{
+    
+    
+    
+    private const string ComponentName = "SpriteComponent";
+
+    
+    
+    
+    
     public Sprite(Entity entity) : base(entity)
     {
     }
 
-    public partial Color Color { get; set; }
-    public partial int ZIndex { get; set; }
-    public partial RectF SourceRect { get; set; }
-    public partial AssetHandle TextureHandle { get; set; }
-    public partial AssetHandle MaterialHandle { get; set; }
+    
+    
+    
+    public Color Color
+    {
+        
+        get => _component.color;
+        
+        
+        set
+        {
+            
+            _component.color = value;
+            
+            
+            
+            Entity.SetComponentProperty(ComponentName, "color", in value);
+        }
+    }
+
+    
+    
+    
+    public int ZIndex
+    {
+        get => _component.zIndex;
+        set
+        {
+            _component.zIndex = value;
+            Entity.SetComponentProperty(ComponentName, "zIndex", in value);
+        }
+    }
+
+    
+    
+    
+    public RectF SourceRect
+    {
+        get => _component.sourceRect;
+        set
+        {
+            _component.sourceRect = value;
+            Entity.SetComponentProperty(ComponentName, "sourceRect", in value);
+        }
+    }
+
+    
+    
+    
+    public AssetHandle TextureHandle
+    {
+        get => _component.textureHandle;
+        set
+        {
+            _component.textureHandle = value;
+            Entity.SetComponentProperty(ComponentName, "textureHandle", in value);
+        }
+    }
+
+    
+    
+    
+    public AssetHandle MaterialHandle
+    {
+        get => _component.materialHandle;
+        set
+        {
+            _component.materialHandle = value;
+            Entity.SetComponentProperty(ComponentName, "materialHandle", in value);
+        }
+    }
 }

@@ -22,6 +22,7 @@
 #include "../Utils/Guid.h"
 #include "include/core/SkImage.h"
 
+struct RenderPacket;
 class RuntimeTexture;
 class Editor;
 
@@ -90,6 +91,7 @@ struct EditorContext
 
 
     sk_sp<RuntimeScene> activeScene = nullptr; ///< 当前激活的运行时场景
+    std::vector<RenderPacket> renderQueue; ///< 当前帧的渲染队列
     sk_sp<RuntimeScene> editingScene = nullptr; ///< 正在编辑的运行时场景
     sk_sp<RuntimeScene> sceneBeforePrefabEdit = nullptr; ///< 进入预制体编辑前保存的场景
     std::string currentSceneName; ///< 当前场景的名称
@@ -144,6 +146,13 @@ struct EditorContext
     std::chrono::steady_clock::time_point lastFpsUpdateTime; ///< 上次更新FPS的时间点
     int frameCount = 0; ///< 帧计数器
     float lastFps = 0.0f; ///< 上次计算的FPS值
+    float renderLatency = 0.0f; ///< 渲染延迟 (ms)
+
+    std::chrono::steady_clock::time_point lastUpsUpdateTime; ///< 上次更新UPS的时间点
+    int updateCount = 0; ///< 更新计数器
+    float lastUps = 0.0f; ///< 上次计算的UPS值
+    float updateLatency = 0.0f; ///< 逻辑更新延迟 (ms)
+
     float assetBrowserRefreshTimer = 0.0f; ///< 资源浏览器刷新计时器
     const float assetBrowserRefreshInterval = 0.0f; ///< 资源浏览器刷新间隔
 

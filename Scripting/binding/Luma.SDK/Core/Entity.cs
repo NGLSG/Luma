@@ -89,12 +89,6 @@ public readonly struct Entity
 
     #region Component & Script Management (数据组件 IComponent)
 
-    
-    
-    
-    
-    
-    
     public T GetComponentData<T>() where T : struct, IComponent
     {
         IntPtr componentPtr = Native.Entity_GetComponent(ScenePtr, Id, typeof(T).Name);
@@ -106,21 +100,13 @@ public readonly struct Entity
         return Marshal.PtrToStructure<T>(componentPtr);
     }
 
-    
-    
-    
-    
+
     public bool HasComponentData<T>() where T : struct, IComponent
     {
         return Native.Entity_HasComponent(ScenePtr, Id, typeof(T).Name);
     }
 
-    
-    
-    
-    
-    
-    
+
     public T AddComponentData<T>() where T : struct, IComponent
     {
         IntPtr componentPtr = Native.Entity_AddComponent(ScenePtr, Id, typeof(T).Name);
@@ -132,41 +118,62 @@ public readonly struct Entity
         return Marshal.PtrToStructure<T>(componentPtr);
     }
 
-    
-    
-    
-    
+
     public void RemoveComponentData<T>() where T : struct, IComponent
     {
         Native.Entity_RemoveComponent(ScenePtr, Id, typeof(T).Name);
     }
 
-    
-    
-    
-    
-    
-    public unsafe void SetComponentData<T>(in T component) where T : struct, IComponent
+
+    public void SetComponentData<T>(in T component) where T : struct, IComponent
     {
-        fixed (void* componentPtr = &component)
+        
+        string componentName = typeof(T).Name;
+
+        
+        int size = Marshal.SizeOf<T>();
+
+        
+        GCHandle handle = GCHandle.Alloc(component, GCHandleType.Pinned);
+        try
         {
-            Native.Entity_SetComponent(ScenePtr, Id, typeof(T).Name, (IntPtr)componentPtr);
+            IntPtr dataPtr = handle.AddrOfPinnedObject();
+            
+            Native.Entity_SetComponent(ScenePtr, Id, componentName, dataPtr, (IntPtr)size);
         }
+        finally
+        {
+            if (handle.IsAllocated)
+            {
+                handle.Free();
+            }
+        }
+    }
+
+    public unsafe void SetComponentProperty<TData>(string componentName, string propertyName, in TData value)
+        where TData : struct
+    {
+        
+        fixed (TData* dataPtr = &value)
+        {
+            Native.Entity_SetComponentProperty(ScenePtr, Id, componentName, propertyName, (IntPtr)dataPtr);
+        }
+    }
+
+    public unsafe TData GetComponentProperty<TData>(string componentName, string propertyName) where TData : struct
+    {
+        
+        TData result = default;
+        Native.Entity_GetComponentProperty(ScenePtr, Id, componentName, propertyName, (IntPtr)(&result));
+        return result;
     }
 
     #endregion
 
     #region Logic Component Management (逻辑组件 ILogicComponent)
 
-    
-    
-    
-    
-    
-    
     public T? GetComponent<T>() where T : class, ILogicComponent
     {
-
         if (HasComponent<T>())
         {
             return (T?)Activator.CreateInstance(typeof(T), this);
@@ -175,13 +182,9 @@ public readonly struct Entity
         return null;
     }
 
-    
-    
-    
-    
+
     public bool HasComponent<T>() where T : class, ILogicComponent
     {
-        
         Type? dataType = GetUnderlyingComponentType(typeof(T));
         if (dataType == null)
         {
@@ -191,16 +194,9 @@ public readonly struct Entity
         return Native.Entity_HasComponent(ScenePtr, Id, dataType.Name);
     }
 
-    
-    
-    
-    
-    
-    
+
     public T AddComponent<T>() where T : class, ILogicComponent
     {
-        
-
         Type? dataType = GetUnderlyingComponentType(typeof(T));
         if (dataType == null)
         {
@@ -216,14 +212,11 @@ public readonly struct Entity
             }
         }
 
-        
+
         return (T)Activator.CreateInstance(typeof(T), this)!;
     }
 
-    
-    
-    
-    
+
     public void RemoveComponent<T>() where T : class, ILogicComponent
     {
         Type? dataType = GetUnderlyingComponentType(typeof(T));
@@ -235,28 +228,24 @@ public readonly struct Entity
         Native.Entity_RemoveComponent(ScenePtr, Id, dataType.Name);
     }
 
-    
-    
-    
+
     private static Type? GetUnderlyingComponentType(Type logicComponentType)
     {
         Type? currentType = logicComponentType;
 
-        
+
         while (currentType != null && currentType != typeof(object))
         {
-            
             if (currentType.IsGenericType && currentType.GetGenericTypeDefinition() == typeof(LogicComponent<>))
             {
-                
                 return currentType.GetGenericArguments()[0];
             }
 
-            
+
             currentType = currentType.BaseType;
         }
 
-        
+
         return null;
     }
 

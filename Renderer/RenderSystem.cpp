@@ -23,6 +23,8 @@
 #include <functional>
 #include <SIMDWrapper.h>
 
+#include "Profiler.h"
+
 static SkFilterMode GetSkFilterMode(int quality)
 {
     switch (quality)
@@ -227,6 +229,7 @@ void RenderSystem::DrawCursor(const SkPoint& position, float height, const SkCol
 
 void RenderSystem::Submit(const RenderPacket& packet)
 {
+    PROFILE_FUNCTION();
     std::visit([this](auto&& batch)
     {
         this->Submit(std::forward<decltype(batch)>(batch));
@@ -236,6 +239,7 @@ void RenderSystem::Submit(const RenderPacket& packet)
 
 void RenderSystem::Clear(const SkColor4f& color)
 {
+    PROFILE_FUNCTION();
     auto surface = pImpl->backend.GetSurface();
     if (surface && surface->getCanvas())
     {
@@ -246,6 +250,7 @@ void RenderSystem::Clear(const SkColor4f& color)
 
 void RenderSystem::Clear(const SkColor& color)
 {
+    PROFILE_FUNCTION();
     auto surface = pImpl->backend.GetSurface();
     if (surface && surface->getCanvas())
     {
@@ -256,6 +261,7 @@ void RenderSystem::Clear(const SkColor& color)
 
 void RenderSystem::Flush()
 {
+    PROFILE_FUNCTION();
     auto surface = pImpl->backend.GetSurface();
     if (!surface) return;
 
@@ -894,7 +900,7 @@ void RenderSystem::RenderSystemImpl::DrawAllCursorBatches(SkCanvas* canvas)
         return;
     }
 
-    
+
     positions.clear();
     colors.clear();
     indices.clear();
@@ -902,7 +908,7 @@ void RenderSystem::RenderSystemImpl::DrawAllCursorBatches(SkCanvas* canvas)
     SkPaint paint;
     paint.setStyle(SkPaint::kFill_Style);
 
-    constexpr float CURSOR_WIDTH = 1.5f; 
+    constexpr float CURSOR_WIDTH = 1.5f;
     const size_t maxVerticesPerDraw = maxPrimitivesPerBatch * 4;
 
     auto flushCursorDrawCall = [&]()
@@ -925,7 +931,7 @@ void RenderSystem::RenderSystemImpl::DrawAllCursorBatches(SkCanvas* canvas)
             flushCursorDrawCall();
         }
 
-        paint.setColor4f(cursor.color, nullptr); 
+        paint.setColor4f(cursor.color, nullptr);
         SkColor skColor = paint.getColor();
 
         const SkPoint localCorners[4] = {
@@ -950,6 +956,6 @@ void RenderSystem::RenderSystemImpl::DrawAllCursorBatches(SkCanvas* canvas)
         indices.push_back(baseVertex + 3);
     }
 
-    
+
     flushCursorDrawCall();
 }

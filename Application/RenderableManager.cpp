@@ -3,39 +3,235 @@
 #include <algorithm>
 #include <variant>
 
+#include "JobSystem.h"
 #include "RenderComponent.h"
 #include "Profiler.h"
+#include "SIMDWrapper.h"
 
-void RenderableManager::SwapBuffers()
+inline float Lerp(float a, float b, float t)
+{
+    return a + (b - a) * t;
+}
+
+
+namespace
+{
+    struct ThreadLocalBatchResult
+    {
+        std::unordered_map<FastSpriteBatchKey, size_t> spriteGroupIndices;
+        std::unordered_map<FastTextBatchKey, size_t> textGroupIndices;
+        std::vector<SceneRenderer::BatchGroup> spriteBatchGroups;
+        std::vector<SceneRenderer::BatchGroup> textBatchGroups;
+    };
+
+
+    class InterpolationAndBatchJob : public IJob
+    {
+    public:
+        const Renderable* prevFrameStart;
+        const Renderable* prevFrameEnd;
+        const Renderable* currFrameStart;
+        const Renderable* currFrameEnd;
+        float alpha;
+
+
+        ThreadLocalBatchResult* result;
+        InterpolationAndBatchJob() = default;
+
+
+        InterpolationAndBatchJob(const Renderable* pStart, const Renderable* pEnd,
+                                 const Renderable* cStart, const Renderable* cEnd,
+                                 float a, ThreadLocalBatchResult* res)
+            : prevFrameStart(pStart), prevFrameEnd(pEnd),
+              currFrameStart(cStart), currFrameEnd(cEnd),
+              alpha(a), result(res)
+        {
+        }
+
+
+        void Execute() override
+        {
+            auto& simd = SIMD::GetInstance();
+            const float one_minus_alpha = 1.0f - alpha;
+
+            auto prevIt = prevFrameStart;
+            auto currIt = currFrameStart;
+
+
+            while (currIt != currFrameEnd)
+            {
+                while (prevIt != prevFrameEnd && prevIt->entityId < currIt->entityId)
+                {
+                    ++prevIt;
+                }
+
+                ECS::TransformComponent interpolatedTransform = currIt->transform;
+
+
+                if (prevIt != prevFrameEnd && prevIt->entityId == currIt->entityId)
+                {
+                    const float prevPos[2] = {prevIt->transform.position.x, prevIt->transform.position.y};
+                    const float currPos[2] = {currIt->transform.position.x, currIt->transform.position.y};
+                    float resultPos[2];
+
+                    const float prevScale[2] = {prevIt->transform.scale.x, prevIt->transform.scale.y};
+                    const float currScale[2] = {currIt->transform.scale.x, currIt->transform.scale.y};
+                    float resultScale[2];
+
+                    float term1[2], term2[2];
+
+
+                    simd.VectorScalarMultiply(prevPos, one_minus_alpha, term1, 2);
+                    simd.VectorScalarMultiply(currPos, alpha, term2, 2);
+                    simd.VectorAdd(term1, term2, resultPos, 2);
+
+
+                    simd.VectorScalarMultiply(prevScale, one_minus_alpha, term1, 2);
+                    simd.VectorScalarMultiply(currScale, alpha, term2, 2);
+                    simd.VectorAdd(term1, term2, resultScale, 2);
+
+                    interpolatedTransform.position = {resultPos[0], resultPos[1]};
+                    interpolatedTransform.scale = {resultScale[0], resultScale[1]};
+                    interpolatedTransform.rotation =
+                        Lerp(prevIt->transform.rotation, currIt->transform.rotation, alpha);
+                }
+
+
+                std::visit([&, this](auto&& arg)
+                {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, SpriteRenderData>)
+                    {
+                        const SpriteRenderData& spriteData = arg;
+                        FastSpriteBatchKey key(spriteData.image, spriteData.material, spriteData.color,
+                                               static_cast<ECS::FilterQuality>(spriteData.filterQuality),
+                                               static_cast<ECS::WrapMode>(spriteData.wrapMode));
+
+                        auto keyIt = result->spriteGroupIndices.find(key);
+                        size_t groupIndex;
+
+                        if (keyIt == result->spriteGroupIndices.end())
+                        {
+                            groupIndex = result->spriteBatchGroups.size();
+                            result->spriteGroupIndices[key] = groupIndex;
+                            result->spriteBatchGroups.emplace_back();
+
+                            auto& group = result->spriteBatchGroups.back();
+                            group.image = const_cast<SkImage*>(spriteData.image);
+                            group.material = spriteData.material;
+                            group.sourceRect = spriteData.sourceRect;
+                            group.color = spriteData.color;
+                            group.zIndex = currIt->zIndex;
+                            group.filterQuality = spriteData.filterQuality;
+                            group.wrapMode = spriteData.wrapMode;
+                            group.ppuScaleFactor = spriteData.ppuScaleFactor;
+                        }
+                        else
+                        {
+                            groupIndex = keyIt->second;
+                        }
+
+                        result->spriteBatchGroups[groupIndex].transforms.emplace_back(
+                            interpolatedTransform.position, interpolatedTransform.scale.x,
+                            interpolatedTransform.scale.y,
+                            sinf(interpolatedTransform.rotation), cosf(interpolatedTransform.rotation));
+                    }
+                    else if constexpr (std::is_same_v<T, TextRenderData>)
+                    {
+                        const TextRenderData& textData = arg;
+                        FastTextBatchKey key(const_cast<SkTypeface*>(textData.typeface), textData.fontSize,
+                                             static_cast<TextAlignment>(textData.alignment), textData.color);
+
+                        auto keyIt = result->textGroupIndices.find(key);
+                        size_t groupIndex;
+
+                        if (keyIt == result->textGroupIndices.end())
+                        {
+                            groupIndex = result->textBatchGroups.size();
+                            result->textGroupIndices[key] = groupIndex;
+                            result->textBatchGroups.emplace_back();
+
+                            auto& group = result->textBatchGroups.back();
+                            group.typeface = const_cast<SkTypeface*>(textData.typeface);
+                            group.fontSize = textData.fontSize;
+                            group.color = textData.color;
+                            group.alignment = static_cast<TextAlignment>(textData.alignment);
+                            group.zIndex = currIt->zIndex;
+                        }
+                        else
+                        {
+                            groupIndex = keyIt->second;
+                        }
+
+                        auto& group = result->textBatchGroups[groupIndex];
+                        group.transforms.emplace_back(
+                            interpolatedTransform.position, interpolatedTransform.scale.x,
+                            interpolatedTransform.scale.y,
+                            sinf(interpolatedTransform.rotation), cosf(interpolatedTransform.rotation));
+                        group.texts.emplace_back(textData.text);
+                    }
+                }, currIt->data);
+
+                ++currIt;
+            }
+        }
+    };
+}
+
+
+void RenderableManager::SubmitFrame(std::vector<Renderable>&& frameData)
 {
     std::scoped_lock lk(mutex);
+
+
+    buffers[2] = std::move(frameData);
+
+
     buffers[0].swap(buffers[1]);
-    
     buffers[1].swap(buffers[2]);
+
+
     buffers[2].clear();
+
+
+    m_prevStateTime = m_currStateTime;
+    m_currStateTime = std::chrono::steady_clock::now();
 }
 
-void RenderableManager::AddRenderable(const Renderable& renderable)
-{
-    std::scoped_lock lk(mutex);
-    buffers[2].push_back(renderable);
-}
-
-void RenderableManager::AddRenderables(std::vector<Renderable>&& renderables)
-{
-    std::scoped_lock lk(mutex);
-    
-    buffers[2].swap(renderables);
-}
-
-
-const std::vector<RenderPacket>& RenderableManager::GetInterpolationData(float alpha)
+const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 {
     PROFILE_SCOPE("RenderableManager::GetInterpolationData - Total");
 
-    std::scoped_lock lk(mutex);
+    std::vector<Renderable> prevFrameRenderables_copy;
+    std::vector<Renderable> currFrameRenderables_copy;
+    std::chrono::steady_clock::time_point prevStateTime_copy, currStateTime_copy;
 
-    
+    {
+        std::scoped_lock lk(mutex);
+        prevFrameRenderables_copy = buffers[0];
+        currFrameRenderables_copy = buffers[1];
+        prevStateTime_copy = m_prevStateTime;
+        currStateTime_copy = m_currStateTime;
+    }
+
+
+    float alpha = 0.0f;
+    auto renderTime = std::chrono::steady_clock::now();
+
+
+    auto stateDuration = std::chrono::duration<float>(currStateTime_copy - prevStateTime_copy);
+
+
+    auto renderDuration = std::chrono::duration<float>(renderTime - currStateTime_copy);
+
+    if (stateDuration.count() > 0.0f)
+    {
+        alpha = renderDuration.count() / stateDuration.count();
+    }
+
+
+    alpha = std::clamp(alpha, 0.0f, 1.0f);
+
     m_renderPackets.clear();
     m_transformArena->Reverse();
     m_textArena->Reverse();
@@ -44,132 +240,111 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData(float a
     m_spriteBatchGroups.clear();
     m_textBatchGroups.clear();
 
-    const auto& prevFrameRenderables = buffers[0]; 
-    const auto& currFrameRenderables = buffers[1]; 
 
-    
-    PROFILE_SCOPE("RenderableManager::GetInterpolationData - Build Lookup");
-    std::unordered_map<entt::entity, const ECS::TransformComponent*> prevTransforms;
-    prevTransforms.reserve(prevFrameRenderables.size());
-    for (const auto& renderable : prevFrameRenderables)
+    if (currFrameRenderables_copy.empty())
     {
-        prevTransforms[renderable.entityId] = &renderable.transform;
+        return m_renderPackets;
     }
 
-    
-    PROFILE_SCOPE("RenderableManager::GetInterpolationData - Interpolate & Batch");
-    for (const auto& currentRenderable : currFrameRenderables)
+
+    PROFILE_SCOPE("Stage 1: Parallel Interpolation & Batching");
+
+    auto& jobSystem = JobSystem::GetInstance();
+    int numJobs = jobSystem.GetThreadCount();
+
+    if (currFrameRenderables_copy.size() < 128)
     {
-        ECS::TransformComponent interpolatedTransform = currentRenderable.transform;
+        numJobs = 1;
+    }
 
-        
-        auto it = prevTransforms.find(currentRenderable.entityId);
-        if (it != prevTransforms.end())
+    std::vector<JobHandle> jobHandles;
+    jobHandles.reserve(numJobs);
+
+
+    std::vector<InterpolationAndBatchJob> jobs;
+    jobs.reserve(numJobs);
+
+    std::vector<ThreadLocalBatchResult> threadResults(numJobs);
+
+    size_t totalSize = currFrameRenderables_copy.size();
+    size_t chunkSize = (totalSize + numJobs - 1) / numJobs;
+
+    for (int i = 0; i < numJobs; ++i)
+    {
+        size_t start = i * chunkSize;
+        size_t end = std::min(start + chunkSize, totalSize);
+
+        if (start >= end) continue;
+
+
+        jobs.emplace_back(
+            prevFrameRenderables_copy.data(), prevFrameRenderables_copy.data() + prevFrameRenderables_copy.size(),
+            currFrameRenderables_copy.data() + start, currFrameRenderables_copy.data() + end,
+            alpha,
+            &threadResults[i]
+        );
+
+        jobHandles.push_back(jobSystem.Schedule(&jobs.back()));
+    }
+    JobSystem::CompleteAll(jobHandles);
+
+
+    PROFILE_SCOPE("Stage 2: Serial Merge");
+
+
+    for (const auto& result : threadResults)
+    {
+        for (const auto& threadGroup : result.spriteBatchGroups)
         {
-            const auto& prevTransform = *it->second;
-            const auto& currentTransform = currentRenderable.transform;
+            FastSpriteBatchKey key(threadGroup.image, threadGroup.material, threadGroup.color,
+                                   static_cast<ECS::FilterQuality>(threadGroup.filterQuality),
+                                   static_cast<ECS::WrapMode>(threadGroup.wrapMode));
 
-            interpolatedTransform.position = ECS::Lerp(prevTransform.position, currentTransform.position, alpha);
-            interpolatedTransform.scale = ECS::Lerp(prevTransform.scale, currentTransform.scale, alpha);
-            interpolatedTransform.rotation = Lerp(prevTransform.rotation, currentTransform.rotation, alpha);
+            auto it = m_spriteGroupIndices.find(key);
+            if (it == m_spriteGroupIndices.end())
+            {
+                size_t newIndex = m_spriteBatchGroups.size();
+                m_spriteGroupIndices[key] = newIndex;
+                m_spriteBatchGroups.push_back(threadGroup);
+            }
+            else
+            {
+                auto& masterGroup = m_spriteBatchGroups[it->second];
+                masterGroup.transforms.insert(masterGroup.transforms.end(), threadGroup.transforms.begin(),
+                                              threadGroup.transforms.end());
+            }
         }
-        
-
-        
-        std::visit([&](auto&& arg)
-        {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, SpriteRenderData>)
-            {
-                
-                const SpriteRenderData& spriteData = arg;
-                FastSpriteBatchKey key(
-                    spriteData.image,
-                    spriteData.material,
-                    spriteData.color,
-                    static_cast<ECS::FilterQuality>(spriteData.filterQuality),
-                    static_cast<ECS::WrapMode>(spriteData.wrapMode)
-                );
-
-                size_t groupIndex;
-                auto keyIt = m_spriteGroupIndices.find(key);
-                if (keyIt == m_spriteGroupIndices.end())
-                {
-                    groupIndex = m_spriteBatchGroups.size();
-                    m_spriteGroupIndices[key] = groupIndex;
-                    m_spriteBatchGroups.emplace_back();
-
-                    auto& group = m_spriteBatchGroups.back();
-                    group.image = const_cast<SkImage*>(spriteData.image);
-                    group.material = spriteData.material;
-                    group.sourceRect = spriteData.sourceRect;
-                    group.color = spriteData.color;
-                    group.zIndex = currentRenderable.zIndex;
-                    group.filterQuality = spriteData.filterQuality;
-                    group.wrapMode = spriteData.wrapMode;
-                    group.ppuScaleFactor = spriteData.ppuScaleFactor;
-                }
-                else
-                {
-                    groupIndex = keyIt->second;
-                }
-
-                auto& group = m_spriteBatchGroups[groupIndex];
-                group.transforms.emplace_back(RenderableTransform(
-                    interpolatedTransform.position,
-                    interpolatedTransform.scale.x,
-                    interpolatedTransform.scale.y,
-                    sinf(interpolatedTransform.rotation),
-                    cosf(interpolatedTransform.rotation)
-                ));
-            }
-            else if constexpr (std::is_same_v<T, TextRenderData>)
-            {
-                
-                const TextRenderData& textData = arg;
-                FastTextBatchKey key(
-                    const_cast<SkTypeface*>(textData.typeface),
-                    textData.fontSize,
-                    static_cast<TextAlignment>(textData.alignment),
-                    textData.color
-                );
-
-                size_t groupIndex;
-                auto keyIt = m_textGroupIndices.find(key);
-                if (keyIt == m_textGroupIndices.end())
-                {
-                    groupIndex = m_textBatchGroups.size();
-                    m_textGroupIndices[key] = groupIndex;
-                    m_textBatchGroups.emplace_back();
-
-                    auto& group = m_textBatchGroups.back();
-                    group.typeface = const_cast<SkTypeface*>(textData.typeface);
-                    group.fontSize = textData.fontSize;
-                    group.color = textData.color;
-                    group.alignment = static_cast<TextAlignment>(textData.alignment);
-                    group.zIndex = currentRenderable.zIndex;
-                }
-                else
-                {
-                    groupIndex = keyIt->second;
-                }
-
-                auto& group = m_textBatchGroups[groupIndex];
-                group.transforms.emplace_back(RenderableTransform(
-                    interpolatedTransform.position,
-                    interpolatedTransform.scale.x,
-                    interpolatedTransform.scale.y,
-                    sinf(interpolatedTransform.rotation),
-                    cosf(interpolatedTransform.rotation)
-                ));
-                group.texts.emplace_back(textData.text);
-            }
-        }, currentRenderable.data);
     }
 
-    
-    PROFILE_SCOPE("RenderableManager::GetInterpolationData - Packing");
+
+    for (const auto& result : threadResults)
+    {
+        for (const auto& threadGroup : result.textBatchGroups)
+        {
+            FastTextBatchKey key(threadGroup.typeface, threadGroup.fontSize, threadGroup.alignment, threadGroup.color);
+
+            auto it = m_textGroupIndices.find(key);
+            if (it == m_textGroupIndices.end())
+            {
+                size_t newIndex = m_textBatchGroups.size();
+                m_textGroupIndices[key] = newIndex;
+                m_textBatchGroups.push_back(threadGroup);
+            }
+            else
+            {
+                auto& masterGroup = m_textBatchGroups[it->second];
+                masterGroup.transforms.insert(masterGroup.transforms.end(), threadGroup.transforms.begin(),
+                                              threadGroup.transforms.end());
+                masterGroup.texts.insert(masterGroup.texts.end(), threadGroup.texts.begin(), threadGroup.texts.end());
+            }
+        }
+    }
+
+
+    PROFILE_SCOPE("Stage 3: Packing & Sorting");
+
     m_renderPackets.reserve(m_spriteBatchGroups.size() + m_textBatchGroups.size());
+
 
     for (const auto& group : m_spriteBatchGroups)
     {
@@ -182,18 +357,13 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData(float a
         m_renderPackets.emplace_back(RenderPacket{
             .zIndex = group.zIndex,
             .batchData = SpriteBatch{
-                .material = group.material,
-                .image = sk_ref_sp(group.image),
-                .sourceRect = group.sourceRect,
-                .color = group.color,
-                .transforms = transformBuffer,
-                .filterQuality = group.filterQuality,
-                .wrapMode = group.wrapMode,
-                .ppuScaleFactor = group.ppuScaleFactor,
-                .count = count
+                .material = group.material, .image = sk_ref_sp(group.image), .sourceRect = group.sourceRect,
+                .color = group.color, .transforms = transformBuffer, .filterQuality = group.filterQuality,
+                .wrapMode = group.wrapMode, .ppuScaleFactor = group.ppuScaleFactor, .count = count
             }
         });
     }
+
 
     for (const auto& group : m_textBatchGroups)
     {
@@ -212,23 +382,25 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData(float a
         m_renderPackets.emplace_back(RenderPacket{
             .zIndex = group.zIndex,
             .batchData = TextBatch{
-                .typeface = sk_ref_sp(group.typeface),
-                .fontSize = group.fontSize,
-                .color = group.color,
-                .texts = textBuffer,
-                .alignment = static_cast<int>(group.alignment),
-                .transforms = transformBuffer,
-                .count = count
+                .typeface = sk_ref_sp(group.typeface), .fontSize = group.fontSize, .color = group.color,
+                .texts = textBuffer, .alignment = static_cast<int>(group.alignment),
+                .transforms = transformBuffer, .count = count
             }
         });
     }
 
-    
-    PROFILE_SCOPE("RenderableManager::GetInterpolationData - Sorting");
+
     std::ranges::sort(m_renderPackets, [](const RenderPacket& a, const RenderPacket& b)
     {
         return a.zIndex < b.zIndex;
     });
 
     return m_renderPackets;
+}
+
+RenderableManager::RenderableManager()
+{
+    auto now = std::chrono::steady_clock::now();
+    m_prevStateTime = now;
+    m_currStateTime = now;
 }

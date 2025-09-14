@@ -17,7 +17,7 @@ struct LUMA_API ApplicationConfig
     int width = 1280; ///< 应用程序窗口的宽度。
     int height = 720; ///< 应用程序窗口的高度。
     bool vsync = false; ///< 是否启用垂直同步。
-    int SimulationFPS = 60; ///< 目标模拟更新频率 (Fixed Timestep)。
+    int SimulationFPS = 120; ///< 目标模拟更新频率 (Fixed Timestep)。
     Guid StartSceneGuid = Guid::Invalid(); ///< 启动场景的全局唯一标识符。
     std::string LastProjectPath = ""; ///< 上次打开的项目路径。
 };
@@ -94,21 +94,15 @@ private:
      */
     void ShutdownCoreSystems();
 
-    //TODO 渲染和模拟分离
     /**
-     * @brief 模拟循环（固定步长）。
-     * 在独立的线程上运行，负责所有逻辑和物理更新。
+     * @brief 模拟线程的主循环函数。
+     * 以固定的频率执行Update逻辑。
      */
-    void SimulationLoop();
-
-    /**
-     * @brief 渲染循环（可变步长）。
-     * 在主线程上运行，负责调用渲染指令，会尽可能快地执行。
-     */
-    void RenderLoop();
+    void simulationLoop();
 
 protected:
     std::atomic<bool> m_isRunning;
+    std::thread m_simulationThread; ///< 独立的模拟线程。
     std::unique_ptr<PlatformWindow> m_window; ///< 应用程序窗口的智能指针。
     std::unique_ptr<GraphicsBackend> m_graphicsBackend; ///< 图形后端的智能指针。
     std::unique_ptr<RenderSystem> m_renderSystem; ///< 渲染系统的智能指针。

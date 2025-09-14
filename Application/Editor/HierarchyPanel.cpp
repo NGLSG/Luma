@@ -29,7 +29,7 @@ void HierarchyPanel::Initialize(EditorContext* context)
 }
 
 void HierarchyPanel::Update(float deltaTime)
-{
+{PROFILE_FUNCTION();
     if (!m_context->gameObjectsToDelete.empty() && m_context->activeScene)
     {
         SceneManager::GetInstance().PushUndoState(m_context->activeScene);

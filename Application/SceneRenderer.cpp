@@ -333,7 +333,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
 
     
     
-    renderableManager.SwapBuffers();
+    
 
     std::vector<Renderable> renderables;
     
@@ -478,6 +478,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
     
     if (!renderables.empty())
     {
-        renderableManager.AddRenderables(std::move(renderables)); 
+        
+        RenderableManager::GetInstance().SubmitFrame(std::move(renderables));
     }
 }

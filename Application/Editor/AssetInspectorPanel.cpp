@@ -5,7 +5,10 @@
 #include "Resources/AssetManager.h"
 #include "Utils/Logger.h"
 #include <fstream>
+
+#include "Profiler.h"
 #include "../Resources/RuntimeAsset/RuntimeScene.h"
+
 void AssetInspectorPanel::Initialize(EditorContext* context)
 {
     m_context = context;
@@ -13,6 +16,7 @@ void AssetInspectorPanel::Initialize(EditorContext* context)
 
 void AssetInspectorPanel::Draw()
 {
+    PROFILE_FUNCTION();
     ImGui::Begin(GetPanelName(), &m_isVisible);
     m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 

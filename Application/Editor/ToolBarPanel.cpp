@@ -10,6 +10,7 @@
 #include "EngineCrypto.h"
 #include "InputTextSystem.h"
 #include "PreferenceSettings.h"
+#include "Profiler.h"
 #include "ProjectSettings.h"
 #include "ScriptMetadataRegistry.h"
 #include "ScrollViewSystem.h"
@@ -101,11 +102,11 @@ void ToolbarPanel::Initialize(EditorContext* context)
 
 void ToolbarPanel::Update(float deltaTime)
 {
-    updateFps();
 }
 
 void ToolbarPanel::Draw()
 {
+    PROFILE_FUNCTION();
     handleShortcuts();
     drawMainMenuBar();
     drawSettingsWindow();
@@ -741,10 +742,18 @@ void ToolbarPanel::drawPlayControls()
 
 void ToolbarPanel::drawFpsDisplay()
 {
-    std::string fpsText = std::format("FPS: {:.1f}", m_context->lastFps);
-    ImGui::SameLine(
-        ImGui::GetWindowWidth() - ImGui::CalcTextSize(fpsText.c_str()).x - ImGui::GetStyle().FramePadding.x * 2);
-    ImGui::Text("%s", fpsText.c_str());
+    std::string statsText = std::format("FPS: {0:.1f} ({1:.2f}ms) | UPS: {2:.1f} ({3:.2f}ms)",
+                                        m_context->lastFps,
+                                        m_context->renderLatency,
+                                        m_context->lastUps,
+                                        m_context->updateLatency);
+
+    
+    const float textWidth = ImGui::CalcTextSize(statsText.c_str()).x;
+    const float rightPadding = ImGui::GetStyle().FramePadding.x * 2;
+    ImGui::SameLine(ImGui::GetWindowWidth() - textWidth - rightPadding);
+
+    ImGui::Text("%s", statsText.c_str());
 }
 
 void ToolbarPanel::updateFps()
@@ -813,30 +822,44 @@ void ToolbarPanel::saveScene()
 void ToolbarPanel::play()
 {
     if (m_context->editorState != EditorState::Editing) return;
-    m_context->editorState = EditorState::Playing;
-    m_context->engineContext->appMode = ApplicationMode::PIE;
-    m_context->editingScene = m_context->activeScene;
-    sk_sp<RuntimeScene> playScene = m_context->editingScene->CreatePlayModeCopy();
-    m_context->activeScene = playScene;
-    m_context->activeScene->AddEssentialSystem<Systems::HydrateResources>();
-    m_context->activeScene->AddEssentialSystem<Systems::TransformSystem>();
-    m_context->activeScene->AddSystem<Systems::PhysicsSystem>();
-    m_context->activeScene->AddSystem<Systems::AudioSystem>();
-    m_context->activeScene->AddSystem<Systems::InteractionSystem>();
-    m_context->activeScene->AddSystem<Systems::ButtonSystem>();
-    m_context->activeScene->AddSystem<Systems::InputTextSystem>();
-    m_context->activeScene->AddSystem<Systems::ScrollViewSystem>();
-    m_context->activeScene->AddSystem<Systems::ScriptingSystem>();
-    m_context->activeScene->AddSystem<Systems::AnimationSystem>();
 
-    SceneManager::GetInstance().SetCurrentScene(m_context->activeScene);
-    m_context->activeScene->Activate(*m_context->engineContext);
-    LogInfo("进入播放模式。");
+    
+    auto switchToPlayMode = [ctx = m_context]()
+    {
+        if (ctx->editorState == EditorState::Playing) return; 
+
+        ctx->editorState = EditorState::Playing;
+        ctx->engineContext->appMode = ApplicationMode::PIE;
+        ctx->editingScene = ctx->activeScene;
+
+        sk_sp<RuntimeScene> playScene = ctx->editingScene->CreatePlayModeCopy();
+        playScene->AddEssentialSystem<Systems::HydrateResources>();
+        playScene->AddEssentialSystem<Systems::TransformSystem>();
+        playScene->AddSystem<Systems::PhysicsSystem>();
+        playScene->AddSystem<Systems::AudioSystem>();
+        playScene->AddSystem<Systems::InteractionSystem>();
+        playScene->AddSystem<Systems::ButtonSystem>();
+        playScene->AddSystem<Systems::InputTextSystem>();
+        playScene->AddSystem<Systems::ScrollViewSystem>();
+        playScene->AddSystem<Systems::ScriptingSystem>();
+        playScene->AddSystem<Systems::AnimationSystem>();
+        SceneManager::GetInstance().SetCurrentScene(playScene);
+        
+        playScene->Activate(*ctx->engineContext);
+        ctx->activeScene = playScene;
+
+
+        LogInfo("已通过命令队列安全进入播放模式。");
+    };
+
+    
+    m_context->engineContext->deferredCommands.Push(switchToPlayMode);
 }
 
 void ToolbarPanel::stop()
 {
     if (m_context->editorState == EditorState::Editing) return;
+    pause();
     m_context->editorState = EditorState::Editing;
     m_context->engineContext->appMode = ApplicationMode::Editor;
     m_context->activeScene.reset();

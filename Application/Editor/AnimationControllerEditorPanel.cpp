@@ -7,6 +7,7 @@
 #include "../Resources/RuntimeAsset/RuntimeScene.h"
 #include "AssetManager.h"
 #include "Path.h"
+#include "Profiler.h"
 #include "Input/Keyboards.h"
 #include "Loaders/AnimationClipLoader.h"
 
@@ -32,6 +33,7 @@ void AnimationControllerEditorPanel::Initialize(EditorContext* context)
 
 void AnimationControllerEditorPanel::Update(float deltaTime)
 {
+    PROFILE_FUNCTION();
     if (m_context->currentEditingAnimationControllerGuid.Valid())
     {
         OpenAnimationController(m_context->currentEditingAnimationControllerGuid);
@@ -40,6 +42,7 @@ void AnimationControllerEditorPanel::Update(float deltaTime)
 
 void AnimationControllerEditorPanel::Draw()
 {
+    PROFILE_FUNCTION();
     if (!m_isVisible)
         return;
     if (m_requestFocus)

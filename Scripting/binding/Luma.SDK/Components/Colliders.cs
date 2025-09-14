@@ -127,93 +127,301 @@ namespace Luma.SDK.Components
 
     #endregion
 
+
     #region Logic Components
 
-    [GenerateLogicComponentProperties]
-    public partial class BoxCollider : LogicComponent<BoxColliderComponent>
+    
+    
+    
+    public class BoxCollider : LogicComponent<BoxColliderComponent>
     {
+        private const string ComponentName = "BoxColliderComponent";
 
         public BoxCollider(Entity entity) : base(entity)
         {
         }
 
-        public partial Vector2 Offset { get; set; }
-        public partial bool IsTrigger { get; set; }
-        public partial bool IsDirty { get; set; }
-        public partial Vector2 Size { get; set; }
+        public Vector2 Offset
+        {
+            get => _component.Offset;
+            set
+            {
+                _component.Offset = value;
+                Entity.SetComponentProperty(ComponentName, "offset", in value);
+            }
+        }
+
+        public bool IsTrigger
+        {
+            get => _component.isTrigger;
+            set
+            {
+                _component.isTrigger = value;
+                Entity.SetComponentProperty(ComponentName, "isTrigger", in value);
+            }
+        }
+
+        public Vector2 Size
+        {
+            get => _component.Size;
+            set
+            {
+                _component.Size = value;
+                Entity.SetComponentProperty(ComponentName, "size", in value);
+            }
+        }
     }
 
-    [GenerateLogicComponentProperties]
-    public partial class CircleCollider : LogicComponent<CircleColliderComponent>
+    
+    
+    
+    public class CircleCollider : LogicComponent<CircleColliderComponent>
     {
+        private const string ComponentName = "CircleColliderComponent";
 
         public CircleCollider(Entity entity) : base(entity)
         {
         }
 
-        public partial Vector2 Offset { get; set; }
-        public partial bool IsTrigger { get; set; }
-        public partial bool IsDirty { get; set; }
-        public partial float Radius { get; set; }
-    }
-
-    [GenerateLogicComponentProperties]
-    public partial class PolygonCollider : LogicComponent<PolygonColliderComponent>
-    {
-
-        public PolygonCollider(Entity entity) : base(entity)
+        public Vector2 Offset
         {
+            get => _component.Offset;
+            set
+            {
+                _component.Offset = value;
+                Entity.SetComponentProperty(ComponentName, "offset", in value);
+            }
         }
 
-        public partial Vector2 Offset { get; set; }
-        public partial bool IsTrigger { get; set; }
-        public partial bool IsDirty { get; set; }
-        public partial IntPtr Vertices { get; set; }
-        public partial int VertexCount { get; set; }
-    }
-
-    [GenerateLogicComponentProperties]
-    public partial class EdgeCollider : LogicComponent<EdgeColliderComponent>
-    {
-
-        public EdgeCollider(Entity entity) : base(entity)
+        public bool IsTrigger
         {
+            get => _component.isTrigger;
+            set
+            {
+                _component.isTrigger = value;
+                Entity.SetComponentProperty(ComponentName, "isTrigger", in value);
+            }
         }
 
-        public partial Vector2 Offset { get; set; }
-        public partial bool IsTrigger { get; set; }
-        public partial bool IsDirty { get; set; }
-        public partial IntPtr Vertices { get; set; }
-        public partial int VertexCount { get; set; }
-        public partial bool Loop { get; set; }
+        public float Radius
+        {
+            get => _component.Radius;
+            set
+            {
+                _component.Radius = value;
+                Entity.SetComponentProperty(ComponentName, "radius", in value);
+            }
+        }
     }
 
-    [GenerateLogicComponentProperties]
-    public partial class CapsuleCollider : LogicComponent<CapsuleColliderComponent>
+    
+    
+    
+    public class CapsuleCollider : LogicComponent<CapsuleColliderComponent>
     {
+        private const string ComponentName = "CapsuleColliderComponent";
 
         public CapsuleCollider(Entity entity) : base(entity)
         {
         }
 
-        public partial Vector2 Offset { get; set; }
-        public partial bool IsTrigger { get; set; }
-        public partial bool IsDirty { get; set; }
-        public partial Vector2 Size { get; set; }
-        public partial CapsuleDirection Direction { get; set; }
+        public Vector2 Offset
+        {
+            get => _component.offset;
+            set
+            {
+                _component.offset = value;
+                Entity.SetComponentProperty(ComponentName, "offset", in value);
+            }
+        }
+
+        public bool IsTrigger
+        {
+            get => _component.isTrigger;
+            set
+            {
+                _component.isTrigger = value;
+                Entity.SetComponentProperty(ComponentName, "isTrigger", in value);
+            }
+        }
+
+        public Vector2 Size
+        {
+            get => _component.size;
+            set
+            {
+                _component.size = value;
+                Entity.SetComponentProperty(ComponentName, "size", in value);
+            }
+        }
+
+        public CapsuleDirection Direction
+        {
+            get => _component.direction;
+            set
+            {
+                _component.direction = value;
+                Entity.SetComponentProperty(ComponentName, "direction", in value);
+            }
+        }
     }
 
-    [GenerateLogicComponentProperties]
-    public partial class TilemapCollider : LogicComponent<TilemapColliderComponent>
+
+    
+    
+    
+    public class PolygonCollider : LogicComponent<PolygonColliderComponent>
     {
+        private const string ComponentName = "PolygonColliderComponent";
+
+        public PolygonCollider(Entity entity) : base(entity)
+        {
+        }
+
+        public Vector2 Offset
+        {
+            get => _component.Offset;
+            set
+            {
+                _component.Offset = value;
+                Entity.SetComponentProperty(ComponentName, "offset", in value);
+            }
+        }
+
+        public bool IsTrigger
+        {
+            get => _component.isTrigger;
+            set
+            {
+                _component.isTrigger = value;
+                Entity.SetComponentProperty(ComponentName, "isTrigger", in value);
+            }
+        }
+
+        
+        
+        
+        public Vector2[] Vertices
+        {
+            get
+            {
+                int count = Native.PolygonCollider_GetVertexCount(Entity.ScenePtr, Entity.Id);
+                if (count == 0)
+                {
+                    return Array.Empty<Vector2>();
+                }
+
+                var vertices = new Vector2[count];
+                Native.PolygonCollider_GetVertices(Entity.ScenePtr, Entity.Id, vertices);
+                return vertices;
+            }
+            set
+            {
+                var vertices = value ?? Array.Empty<Vector2>();
+                
+                _component.vertexCount = vertices.Length;
+                Native.PolygonCollider_SetVertices(Entity.ScenePtr, Entity.Id, vertices, vertices.Length);
+            }
+        }
+    }
+
+    
+    
+    
+    public class EdgeCollider : LogicComponent<EdgeColliderComponent>
+    {
+        private const string ComponentName = "EdgeColliderComponent";
+
+        public EdgeCollider(Entity entity) : base(entity)
+        {
+        }
+
+        public Vector2 Offset
+        {
+            get => _component.offset;
+            set
+            {
+                _component.offset = value;
+                Entity.SetComponentProperty(ComponentName, "offset", in value);
+            }
+        }
+
+        public bool IsTrigger
+        {
+            get => _component.isTrigger;
+            set
+            {
+                _component.isTrigger = value;
+                Entity.SetComponentProperty(ComponentName, "isTrigger", in value);
+            }
+        }
+
+        public bool Loop
+        {
+            get => _component.loop;
+            set
+            {
+                _component.loop = value;
+                Entity.SetComponentProperty(ComponentName, "loop", in value);
+            }
+        }
+
+        
+        
+        
+        public Vector2[] Vertices
+        {
+            get
+            {
+                int count = Native.EdgeCollider_GetVertexCount(Entity.ScenePtr, Entity.Id);
+                if (count == 0)
+                {
+                    return Array.Empty<Vector2>();
+                }
+
+                var vertices = new Vector2[count];
+                Native.EdgeCollider_GetVertices(Entity.ScenePtr, Entity.Id, vertices);
+                return vertices;
+            }
+            set
+            {
+                var vertices = value ?? Array.Empty<Vector2>();
+                _component.vertexCount = vertices.Length;
+                Native.EdgeCollider_SetVertices(Entity.ScenePtr, Entity.Id, vertices, vertices.Length);
+            }
+        }
+    }
+
+    
+    
+    
+    public class TilemapCollider : LogicComponent<TilemapColliderComponent>
+    {
+        private const string ComponentName = "TilemapColliderComponent";
 
         public TilemapCollider(Entity entity) : base(entity)
         {
         }
 
-        public partial Vector2 Offset { get; set; }
-        public partial bool IsTrigger { get; set; }
-        public partial bool IsDirty { get; set; }
+        public Vector2 Offset
+        {
+            get => _component.Offset;
+            set
+            {
+                _component.Offset = value;
+                Entity.SetComponentProperty(ComponentName, "offset", in value);
+            }
+        }
+
+        public bool IsTrigger
+        {
+            get => _component.isTrigger;
+            set
+            {
+                _component.isTrigger = value;
+                Entity.SetComponentProperty(ComponentName, "isTrigger", in value);
+            }
+        }
     }
 
     #endregion

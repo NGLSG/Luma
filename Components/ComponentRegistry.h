@@ -30,7 +30,10 @@ struct PropertyRegistration
 
     std::function<std::any(entt::registry&, entt::entity)> get; ///< 获取属性值的函数。
     std::function<void(entt::registry&, entt::entity, const std::any&)> set; ///< 设置属性值的函数。
-    std::function<bool(const std::string& label, entt::registry&, entt::entity, const UIDrawData&)> draw_ui; ///< 在UI中绘制属性的函数。
+    std::function<bool(const std::string& label, entt::registry&, entt::entity, const UIDrawData&)> draw_ui;
+    ///< 在UI中绘制属性的函数。
+    std::function<void(entt::registry&, entt::entity, void*)> set_from_raw_ptr; /// < 从原始指针设置属性值的函数。
+    std::function<void(entt::registry&, entt::entity, void*)> get_to_raw_ptr; /// < 获取属性值到原始指针的函数。
     bool isExposedInEditor = true; ///< 指示该属性是否在编辑器中暴露。
 };
 
@@ -250,6 +253,24 @@ public:
             }
             return false;
         };
+        prop.set_from_raw_ptr = [member_ptr](entt::registry& reg, entt::entity e, void* value_ptr)
+        {
+            // 这个 lambda 捕获了成员的类型信息，所以在这里是类型安全的
+            using MemberType = typename std::remove_reference<decltype(std::declval<T>().*member_ptr)>::type;
+            if (value_ptr)
+            {
+                (reg.get<T>(e).*member_ptr) = *static_cast<MemberType*>(value_ptr);
+            }
+        };
+
+        prop.get_to_raw_ptr = [member_ptr](entt::registry& reg, entt::entity e, void* value_ptr)
+        {
+            using MemberType = typename std::remove_reference<decltype(std::declval<T>().*member_ptr)>::type;
+            if (value_ptr)
+            {
+                *static_cast<MemberType*>(value_ptr) = (reg.get<T>(e).*member_ptr);
+            }
+        };
         m_registration.properties[name] = std::move(prop);
         return *this;
     }
@@ -306,6 +327,22 @@ public:
                 return true;
             }
             return false;
+        };
+        prop.set_from_raw_ptr = [set_fn](entt::registry& reg, entt::entity e, void* value_ptr)
+        {
+            using MemberType = std::invoke_result_t<Getter, const T&>;
+            if (value_ptr)
+            {
+                set_fn(reg.get<T>(e), *static_cast<MemberType*>(value_ptr));
+            }
+        };
+        prop.get_to_raw_ptr = [get_fn](entt::registry& reg, entt::entity e, void* value_ptr)
+        {
+            using MemberType = std::invoke_result_t<Getter, const T&>;
+            if (value_ptr)
+            {
+                *static_cast<MemberType*>(value_ptr) = get_fn(reg.get<T>(e));
+            }
         };
         m_registration.properties[name] = std::move(prop);
         return *this;

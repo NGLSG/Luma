@@ -8,7 +8,6 @@
 #include "Resources/RuntimeAsset/RuntimeScene.h"
 #endif
 
-
 #if defined(LUMA_EDITOR)
 #include "Application/Editor.h"
 #include "Application/ProjectSettings.h"

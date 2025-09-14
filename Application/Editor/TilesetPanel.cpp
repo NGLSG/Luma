@@ -8,6 +8,8 @@
 #include <fstream>
 #include <Resources/Loaders/RuleTileLoader.h>
 #include <Resources/Loaders/TilesetLoader.h>
+
+#include "Profiler.h"
 #include "../Resources/RuntimeAsset/RuntimeScene.h"
 #include "Loaders/TextureLoader.h"
 
@@ -19,6 +21,7 @@ void TilesetPanel::Initialize(EditorContext* context)
 
 void TilesetPanel::Update(float deltaTime)
 {
+    PROFILE_FUNCTION();
     if (!m_isVisible) return;
 
 
@@ -42,6 +45,7 @@ void TilesetPanel::Update(float deltaTime)
 
 void TilesetPanel::Draw()
 {
+    PROFILE_FUNCTION();
     if (!m_isVisible) return;
 
     std::string windowTitle = std::string(GetPanelName());

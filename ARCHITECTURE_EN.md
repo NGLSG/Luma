@@ -1,21 +1,18 @@
-Luma Engine – Architecture Deep-Dive  
-*(English Version)*
-
-This document details the core architecture and data-flow diagrams of every major system in Luma Engine.
+# Luma Engine - Architecture Design Details
 
 [Return to Main Document](README_EN.md)
 
 ---
 
-## 🏗️ High-Level Architecture
+## 🏗️ Overall Architecture
 
-The diagram below illustrates the modular architecture and data flow of Luma Engine:
+The diagram below shows the modular architecture and data flow of the Luma Engine:
 
 ```mermaid
 graph TD
     subgraph "🎮 Application Layer"
         Editor[Editor Application]
-        Runtime[Runtime / Shipping Application]
+        Runtime[Runtime/Packaged Application]
     end
 
     subgraph "🎭 Scene & Logic Layer"
@@ -30,7 +27,7 @@ graph TD
     end
 
     subgraph "⚙️ Parallel Processing Layer"
-        JobSystem[JobSystem Work-Stealing]
+        JobSystem[JobSystem Work Stealing]
         TaskQueue[Task Queue]
         WorkerThreads[Worker Thread Pool]
         JobSystem --> TaskQueue
@@ -41,7 +38,7 @@ graph TD
         AssetManager[Asset Manager]
         Importers[Importer Collection]
         Loaders[Loader Collection]
-        RuntimeCaches[Runtime Caches]
+        RuntimeCaches[Runtime Cache]
         SourceFiles[Source Files]
         RuntimeAssets[Runtime Assets]
         AssetManager --> Importers
@@ -75,38 +72,38 @@ graph TD
     SceneRenderer --> Registry
 ```
 
----
+-----
 
-## ⚙️ Core-System Data Flows
+## ⚙️ Core System Data Flow
 
 ### 📦 Asset Pipeline Workflow
 
 ```mermaid
 graph TD
     A[👨‍💻 Developer creates<br/>Player.png] --> B{🔍 AssetManager<br/>scans directory}
-    B --> C{🔧 Match Importer}
-    C --> D[📖 Read source file<br/>extract data & hash]
-    D --> E[📋 Create AssetMetadata]
-    E --> F[💾 Serialize to<br/>Player.png.meta]
+B --> C{🔧 Match Importer}
+C --> D[📖 Read source file<br/>Extract data and hash]
+D --> E[📋 Create AssetMetadata]
+E --> F[💾 Serialize to<br/>Player.png.meta]
 
-    style A fill:#e1f5fe
-    style F fill:#e8f5e8
+style A fill:#e1f5fe
+style F fill: #e8f5e8
 ```
 
 ### 💾 Runtime Resource Loading
 
 ```mermaid
 graph TD
-    A[🎯 System requests asset] --> B{💾 Check cache}
-    B -->|Hit| C[✅ Return cached resource]
-    B -->|Miss| D{🔧 Invoke loader}
-    D --> E{📋 Fetch metadata}
-    E --> F[🏗️ Create runtime instance]
-    F --> G[💾 Insert into cache]
-    G --> C
+    A[🎯 System requests resource] --> B{💾 Check cache}
+B -->|Hit| C[✅ Return cached resource]
+B -->|Miss| D{🔧 Call loader}
+D --> E{📋 Get metadata}
+E --> F[🏗️ Create runtime instance]
+F --> G[💾 Store in cache]
+G --> C
 
-    style C fill:#e8f5e8
-    style G fill:#fff3e0
+style C fill: #e8f5e8
+style G fill: #fff3e0
 ```
 
 ### 🎭 Scene Instantiation
@@ -114,20 +111,20 @@ graph TD
 ```mermaid
 graph TD
     A[🎬 Load scene] --> B[🏗️ Create RuntimeScene]
-    B --> C[📋 Parse scene data]
-    C --> D{🎭 Iterate entity nodes}
-    D --> E{❓ Node type}
-    E -->|Prefab instance| F[📦 Load prefab]
-    E -->|Plain object| G[🎮 Create game object]
-    F --> H[🔧 Apply component overrides]
-    G --> H
-    H --> I[🌳 Recursively create children]
-    I --> J[✅ Scene creation complete]
+B --> C[📋 Parse scene data]
+C --> D{🎭 Traverse entity nodes}
+D --> E{❓ Node type}
+E -->|Prefab instance| F[📦 Load prefab]
+E -->|Regular object| G[🎮 Create game object]
+F --> H[🔧 Apply component overrides]
+G --> H
+H --> I[🌳 Recursively create child nodes]
+I --> J[✅ Complete scene creation]
 
-    style J fill:#e8f5e8
+style J fill:#e8f5e8
 ```
 
-### 🔗 Scripting Interop
+### 🔗 Scripting System Interop
 
 ```mermaid
 graph LR
@@ -140,16 +137,16 @@ graph LR
 
     subgraph "Interop Layer"
         E[CoreCLR Host]
-        F[Function-pointer cache]
-        G[P/Invoke bridge]
-        H[JobSystem bindings]
+        F[Function Pointer Cache]
+        G[P/Invoke Bridge]
+        H[JobSystem Binding]
     end
 
-    subgraph "C# Script Layer"
-        I[Script Components]
-        J[Event Handlers]
-        K[Interop classes]
-        L[IJob interface]
+    subgraph "C# Scripting Layer"
+        I[Script Component]
+        J[Event Handler]
+        K[Interop Class]
+        L[IJob Interface]
     end
 
     A --> C; D --> C; C --> G; C --> H; G --> K; H --> L; K --> J; J --> I; I --> K
@@ -163,9 +160,9 @@ graph TD
         A[👨‍🎨 Edit blueprint in editor] --> B{💾 Save as .blueprint}
     end
     subgraph "Compilation Phase"
-        B --> C{⚙️ C# code generator}
+        B --> C{⚙️ C# Code Generator}
         C --> D[📄 Generate MyBlueprint.cs]
-        D --> E{🔧 C# compiler}
+        D --> E{🔧 C# Compiler}
     end
     subgraph "Runtime Phase"
         E --> F[📦 GameScripts.dll]
@@ -177,49 +174,57 @@ graph TD
 
 ```mermaid
 graph TD
-    A[⏰ Physics system update] --> B[📥 Sync kinematic bodies]
-    B --> C[🔄 Read Transform components]
-    C --> D[📐 Compute desired velocity]
-    D --> E[⚡ Set body velocity]
-    E --> F[🌍 Step physics world]
-    F --> G[📤 Sync dynamic bodies]
-    G --> H[📍 Read body positions]
-    H --> I[🔄 Update Transform components]
+    A[⏰ Physics system update] --> B[📥 Sync kinematic rigidbodies]
+B --> C[🔄 Read Transform component]
+C --> D[📐 Calculate required velocity]
+D --> E[⚡ Set rigidbody velocity]
+E --> F[🌍 Execute physics step]
+F --> G[📤 Sync dynamic rigidbodies]
+G --> H[📍 Read rigidbody position]
+H --> I[🔄 Update Transform component]
 
-    style F fill:#ffecb3
+style F fill: #ffecb3
 ```
 
 ### 🎨 Render Pipeline
 
 ```mermaid
 graph TD
-    subgraph "🖼️ Editor Render Loop"
-        A[🚀 Begin frame] --> B[🎭 Render scene view]
-        B --> C[🔧 Set viewport parameters]
-        C --> D[📦 Extract render data]
-        D --> E[🎨 Generate render packets]
-        E --> F[⚡ Batch optimization]
-        F --> G[🖌️ Execute draw commands]
-        G --> H[🖥️ Render UI]
-        H --> I[📺 Present final frame]
-    end
+subgraph "⚙️ Simulation Thread"
+Sim_A[Physics/AI/Script/Animation<br/>Systems Update] --> Sim_B[Update ECS data];
+Sim_B --> Sim_C["SceneRenderer:<br/>Traverse ECS, extract Renderable data"];
+Sim_C --> Sim_D[RenderableManager.SubmitFrame<br/>Atomically submit a full frame of Renderable data<br/>to the back buffer];
+end
 
-    style I fill:#e8f5e8
+subgraph "🔗 Thread Synchronization & Data Interpolation"
+SyncPoint[RenderableManager<br/>Holds complete state of last two frames Sₙ₋₁, Sₙ];
+end
+
+subgraph "🎨 Render Thread"
+Render_A["GetInterpolationData<br/>Calculate Alpha based on current time<br/>Interpolate Sₙ₋₁ and Sₙ, generate final transforms"];
+Render_A --> Render_B["SceneRenderer:<br/>Pack interpolated data into RenderPackets"];
+Render_B --> Render_C["RenderSystem:<br/>Batching Packets"];
+Render_C --> Render_D["GraphicsBackend:<br/>Convert batches into graphics API calls Draw Calls"];
+Render_D --> Render_E[GPU Rendering];
+end
+
+Sim_D -- "Thread-safe write" --> SyncPoint;
+SyncPoint -- "Thread-safe read & copy" --> Render_A;
 ```
 
 ### 🧩 Tilemap System
 
 ```mermaid
 graph TD
-    subgraph "Edit Time"
+    subgraph "Editing Time"
         A[🎨 Create Tile Palette] --> B[🖌️ Add brushes]
         B --> C[👨‍🎨 Paint in scene]
         C --> D[💾 Serialize to scene file]
     end
     subgraph "Runtime"
-        D --> E[⚙️ HydrateResources init]
-        E --> F[🧩 Generate mesh/sprites]
-        F --> G[⚡ Rendering & physics update]
+        D --> E[⚙️ HydrateResources initialization]
+        E --> F[🧩 Generate Mesh/Sprites]
+        F --> G[⚡️ Rendering & physics updates]
     end
 ```
 
@@ -227,11 +232,11 @@ graph TD
 
 ```mermaid
 graph TD
-    subgraph "🎮 Game Logic (C# / C++)"
-        A["System requests play sound"]
+    subgraph "🎮 Game Logic C# / C++"
+        A["System requests sound playback"]
     end
 
-    subgraph "🎧 Audio Manager (Main Thread)"
+    subgraph "🎧 Audio Manager Main Thread"
         B{"Play(soundRequest)"}
         C["Create Voice instance"]
         D["Add Voice to<br/>active list (thread-safe)"]
@@ -240,15 +245,20 @@ graph TD
     subgraph "🔊 Audio Thread Callback"
         E["Audio device requests data"]
         F{"Mix() loop"}
-        G["Iterate active Voices"]
-        H["Compute spatial attenuation & pan"]
+        G["Iterate all active Voices"]
+        H["Calculate spatial attenuation and panning"]
         I["Mix audio samples"]
-        J["Write to output buffer"]
+        J["Write output buffer"]
     end
 
+%% Define main thread logic
     A --> B --> C --> D
+
+%% Define audio thread logic
     E --> F --> G --> H --> I --> J
-    D -.->|shared active list| G
+
+%% Define cross-thread interaction
+    D -.->|Shared active list| G
 ```
 
 ### ⚙️ JobSystem Parallel Processing
@@ -257,7 +267,7 @@ graph TD
 graph TD
     subgraph "Main Thread"
         A[Task submission]
-        B[Wait for completion]
+        B[Task completion wait]
     end
 
     subgraph "JobSystem Core"
@@ -266,12 +276,12 @@ graph TD
     end
 
     subgraph "Worker Thread Pool"
-        E[Worker 1]
-        F[Worker 2]
-        G[Worker N]
-        H[Local queue 1]
-        I[Local queue 2]
-        J[Local queue N]
+        E[Worker Thread 1]
+        F[Worker Thread 2]
+        G[Worker Thread N]
+        H[Local task queue 1]
+        I[Local task queue 2]
+        J[Local task queue N]
     end
 
     A --> C; C --> D; D --> E; D --> F; D --> G;
@@ -286,8 +296,8 @@ graph TD
 graph TD
     subgraph "Animation Controller"
         A[AnimationController]
-        B[State-machine instance]
-        C[Parameter set]
+        B[State machine instance]
+        C[Parameter collection]
     end
 
     subgraph "State Nodes"
@@ -297,17 +307,17 @@ graph TD
     end
 
     subgraph "Transition Conditions"
-        G[Bool: running]
-        H[Trigger: jump]
-        I[Float: speed]
+        G[Bool parameter: running]
+        H[Trigger parameter: jump]
+        I[Float parameter: speed]
     end
 
     A --> B; A --> C; B --> D; B --> E; B --> F;
     D -->|running = true| E; E -->|running = false| D;
-    D -->|jump trigger| F; F -->|completed| D;
+    D -->|jump trigger| F; F -->|Complete| D;
     C --> G; C --> H; C --> I
 ```
 
----
+-----
 
 [⬆️ Return to Main Document](README_EN.md)

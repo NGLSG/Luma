@@ -47,6 +47,7 @@
 #include <array>
 
 #include "PreferenceSettings.h"
+#include "RenderableManager.h"
 #include "Editor/AIPanel.h"
 #include "Editor/AITool.h"
 #include "Editor/AnimationControllerEditorPanel.h"
@@ -187,6 +188,9 @@ bool Editor::checkDotNetEnvironment()
 
 Editor::~Editor() = default;
 
+
+
+
 void Editor::InitializeDerived()
 {
     initializeEditorContext();
@@ -232,7 +236,9 @@ void Editor::InitializeDerived()
     }
     PreferenceSettings::GetInstance().Initialize("./LumaEditor.settings");
 
+    
     m_editorContext.lastFpsUpdateTime = std::chrono::steady_clock::now();
+    m_editorContext.lastUpsUpdateTime = std::chrono::steady_clock::now();
 }
 
 void Editor::initializeEditorContext()
@@ -326,19 +332,14 @@ void Editor::loadStartupScene()
     }
 }
 
-void Editor::Update(float deltaTime)
+void Editor::Update(float fixedDeltaTime)
 {
     PROFILE_FUNCTION();
-
-
-    m_editorContext.engineContext->currentFps = m_editorContext.lastFps;
-
-
+    updateUps();
     {
         PROFILE_SCOPE("SceneManager::Update");
         SceneManager::GetInstance().Update(*m_editorContext.engineContext);
     }
-
 
     if (m_editorContext.activeScene)
     {
@@ -346,13 +347,11 @@ void Editor::Update(float deltaTime)
 
         bool needsTitleUpdate = false;
 
-
         if (m_editorContext.activeScene->GetName() != m_editorContext.currentSceneName)
         {
             m_editorContext.currentSceneName = m_editorContext.activeScene->GetName();
             needsTitleUpdate = true;
         }
-
 
         bool isDirty = SceneManager::GetInstance().IsCurrentSceneDirty();
         if (m_editorContext.wasSceneDirty != isDirty)
@@ -360,7 +359,6 @@ void Editor::Update(float deltaTime)
             m_editorContext.wasSceneDirty = isDirty;
             needsTitleUpdate = true;
         }
-
 
         if (needsTitleUpdate)
         {
@@ -371,70 +369,71 @@ void Editor::Update(float deltaTime)
             m_window->SetTitle(newTitle);
         }
 
-        if (m_editorContext.activeScene)
-            m_editorContext.activeScene->Update(deltaTime, *m_editorContext.engineContext,
-                                                m_editorContext.editorState == EditorState::Paused);
 
+        m_editorContext.activeScene->Update(fixedDeltaTime, *m_editorContext.engineContext,
+                                            m_editorContext.editorState == EditorState::Paused);
 
         Camera::GetInstance().SetProperties(m_editorContext.activeScene->GetCameraProperties());
+
+
+        SceneRenderer::ExtractToRenderableManager(m_editorContext.activeScene->GetRegistry());
     }
-
-
-    SceneRenderer::ExtractToRenderableManager(SceneManager::GetInstance().GetCurrentScene()->GetRegistry());
 }
 
 void Editor::Render()
 {
     PROFILE_FUNCTION();
-    AssetManager::GetInstance().Update(1 / m_context.currentFps);
-    for (auto& panel : m_panels)
-    {
-        if (panel->IsVisible())
-        {
-            panel->Update(1 / m_context.currentFps);
-        }
-    }
+
     if (!m_graphicsBackend || !m_imguiRenderer || !m_renderSystem)
     {
         LogError("Editor::Render: 核心组件未初始化。");
         return;
     }
+    {
+        PROFILE_SCOPE("UI::Update");
+
+        AssetManager::GetInstance().Update(1.f / m_context.currentFps);
+        for (auto& panel : m_panels)
+        {
+            if (panel->IsVisible())
+            {
+                panel->Update(1.f / m_context.currentFps);
+            }
+        }
+    }
 
 
+    m_editorContext.renderQueue = RenderableManager::GetInstance().GetInterpolationData();
     auto currentTime = std::chrono::steady_clock::now();
     float deltaTime = std::chrono::duration<float>(currentTime - m_editorContext.lastFrameTime).count();
     m_editorContext.lastFrameTime = currentTime;
-    Profiler::GetInstance().Update(deltaTime);
-
 
     if (!m_graphicsBackend->BeginFrame()) return;
-
 
     {
         PROFILE_SCOPE("ImGui::NewFrame");
         m_imguiRenderer->NewFrame();
     }
 
-
     ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()->ID, ImGui::GetMainViewport(),
                                  ImGuiDockNodeFlags_PassthruCentralNode);
 
     Profiler::GetInstance().DrawUI();
-
-    for (auto& panel : m_panels)
     {
-        if (panel->IsVisible())
+        PROFILE_SCOPE("UI::DrawPanels");
+
+        for (auto& panel : m_panels)
         {
-            panel->Draw();
+            if (panel->IsVisible())
+            {
+                panel->Draw();
+            }
         }
     }
 
-
     PopupManager::GetInstance().Render();
 
-
     m_imguiRenderer->EndFrame(*m_graphicsBackend);
-
 
     {
         PROFILE_SCOPE("GraphicsBackend::PresentFrame");
@@ -443,6 +442,7 @@ void Editor::Render()
 
     updateFps();
 }
+
 
 void Editor::ShutdownDerived()
 {
@@ -734,15 +734,47 @@ void Editor::drawFileConflictPopupContent()
     }
 }
 
+
+
+
+void Editor::updateUps()
+{
+    m_editorContext.updateCount++;
+    auto currentTime = std::chrono::steady_clock::now();
+    double elapsedSeconds = std::chrono::duration<double>(currentTime - m_editorContext.lastUpsUpdateTime).count();
+
+    
+    if (elapsedSeconds >= 1.0)
+    {
+        const int updateCount = m_editorContext.updateCount;
+        if (updateCount > 0)
+        {
+            m_editorContext.lastUps = static_cast<float>(updateCount / elapsedSeconds);
+            m_editorContext.updateLatency = static_cast<float>((elapsedSeconds * 1000.0) / updateCount);
+        }
+        m_editorContext.updateCount = 0;
+        m_editorContext.lastUpsUpdateTime = currentTime;
+    }
+}
+
+
+
+
 void Editor::updateFps()
 {
     m_editorContext.frameCount++;
     auto currentTime = std::chrono::steady_clock::now();
     double elapsedSeconds = std::chrono::duration<double>(currentTime - m_editorContext.lastFpsUpdateTime).count();
 
+    
     if (elapsedSeconds >= 1.0)
     {
-        m_editorContext.lastFps = static_cast<float>(m_editorContext.frameCount / elapsedSeconds);
+        const int frameCount = m_editorContext.frameCount;
+        if (frameCount > 0)
+        {
+            m_editorContext.lastFps = static_cast<float>(frameCount / elapsedSeconds);
+            m_editorContext.renderLatency = static_cast<float>((elapsedSeconds * 1000.0) / frameCount);
+        }
         m_editorContext.frameCount = 0;
         m_editorContext.lastFpsUpdateTime = currentTime;
     }

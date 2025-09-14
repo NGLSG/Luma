@@ -6,6 +6,8 @@
 #include <iomanip>
 #include <sstream>
 
+#include "Profiler.h"
+
 ConsolePanel::~ConsolePanel()
 {
     if (logListenerHandle.IsValid())
@@ -33,6 +35,7 @@ void ConsolePanel::Initialize(EditorContext* context)
 
 void ConsolePanel::Update(float deltaTime)
 {
+    PROFILE_FUNCTION();
     if (scrollToBottomB)
     {
         scrollToBottomB = false;
@@ -57,6 +60,7 @@ void ConsolePanel::Update(float deltaTime)
 
 void ConsolePanel::Draw()
 {
+    PROFILE_FUNCTION();
     ImGui::Begin(GetPanelName(), &m_isVisible);
     m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 

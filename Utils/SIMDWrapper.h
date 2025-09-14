@@ -107,6 +107,14 @@ public:
      * @param count 向量元素数量
      */
     virtual void VectorAbs(const float* input, float* result, size_t count) = 0;
+    /**
+        * @brief 向量与标量乘法运算 (result = a * b)
+        * @param a 输入向量A
+        * @param b 输入标量B
+        * @param result 结果存储向量
+        * @param count 向量元素数量
+        */
+    virtual void VectorScalarMultiply(const float* a, float b, float* result, size_t count) = 0;
 
     /**
      * @brief 获取当前实现支持的SIMD指令集描述
@@ -216,6 +224,14 @@ public:
      * @param count 向量元素数量
      */
     void VectorAbs(const float* input, float* result, size_t count);
+    /**
+         * @brief 单精度浮点向量与标量乘法运算
+         * @param a 输入向量A
+         * @param b 输入标量B
+         * @param result 结果存储向量
+         * @param count 向量元素数量
+         */
+    void VectorScalarMultiply(const float* a, float b, float* result, size_t count);
 
     /**
      * @brief 获取当前CPU支持的SIMD指令集

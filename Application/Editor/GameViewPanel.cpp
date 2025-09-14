@@ -21,6 +21,7 @@ void GameViewPanel::Update(float deltaTime)
 
 void GameViewPanel::Draw()
 {
+    PROFILE_FUNCTION();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::Begin(GetPanelName(), &m_isVisible);
     m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
@@ -58,7 +59,7 @@ void GameViewPanel::Draw()
                 m_context->graphicsBackend->SetActiveRenderTarget(m_gameViewTarget);
 
 
-                std::vector<RenderPacket> renderQueue = RenderableManager::GetInstance().GetInterpolationData(0.5f);
+                std::vector<RenderPacket> renderQueue = m_context->renderQueue;
 
                 for (const auto& packet : renderQueue)
                 {

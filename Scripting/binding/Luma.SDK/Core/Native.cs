@@ -45,8 +45,17 @@ internal static class Native
     internal static extern void Entity_RemoveComponent(IntPtr scene, uint entity, string componentName);
 
     [DllImport(DllName)]
-    internal static extern void Entity_SetComponent(IntPtr scene, uint entity, string componentName,
-        IntPtr componentData);
+    internal static extern void Entity_SetComponent(IntPtr scene, uint entity,
+        [MarshalAs(UnmanagedType.LPStr)] string componentName,
+        IntPtr componentData, IntPtr dataSize);
+
+    [DllImport(DllName)]
+    internal static extern void Entity_SetComponentProperty(IntPtr scene, uint entityId, string componentName,
+        string propertyName, IntPtr valueData);
+
+    [DllImport(DllName)]
+    internal static extern void Entity_GetComponentProperty(IntPtr scene, uint entityId, string componentName,
+        string propertyName, IntPtr valueData);
 
     [DllImport(DllName, CharSet = CharSet.Ansi)]
     internal static extern void Logger_Log(LumaLogLevel level, string message);
@@ -195,61 +204,65 @@ internal static class Native
 
     #region AudioManager
 
-    
-    
-    
-    
-    
     [DllImport(DllName)]
     public static extern uint AudioManager_Play(PlayDesc desc);
 
-    
-    
-    
-    
+
     [DllImport(DllName)]
     public static extern void AudioManager_Stop(uint voiceId);
 
-    
-    
-    
+
     [DllImport(DllName)]
     public static extern void AudioManager_StopAll();
 
-    
-    
-    
-    
-    
+
     [DllImport(DllName)]
     [return: MarshalAs(UnmanagedType.I1)]
     public static extern bool AudioManager_IsFinished(uint voiceId);
 
-    
-    
-    
-    
-    
+
     [DllImport(DllName)]
     public static extern void AudioManager_SetVolume(uint voiceId, float volume);
 
-    
-    
-    
-    
-    
+
     [DllImport(DllName)]
     public static extern void AudioManager_SetLoop(uint voiceId, [MarshalAs(UnmanagedType.I1)] bool loop);
 
-    
-    
-    
-    
-    
-    
-    
+
     [DllImport(DllName)]
     public static extern void AudioManager_SetVoicePosition(uint voiceId, float x, float y, float z);
 
     #endregion
+
+    [DllImport(DllName)]
+    internal static extern void TextComponent_SetText(IntPtr scene, uint entityId, string text);
+
+    [DllImport(DllName)]
+    internal static extern IntPtr TextComponent_GetText(IntPtr scene, uint entityId); 
+
+    [DllImport(DllName)]
+    internal static extern void TextComponent_SetName(IntPtr scene, uint entityId, string name);
+
+    [DllImport(DllName)]
+    internal static extern IntPtr TextComponent_GetName(IntPtr scene, uint entityId); 
+
+    [DllImport(DllName)]
+    internal static extern int PolygonCollider_GetVertexCount(IntPtr scene, uint entityId);
+
+    [DllImport(DllName)]
+    internal static extern void PolygonCollider_GetVertices(IntPtr scene, uint entityId, [Out] Vector2[] outVertices);
+
+    [DllImport(DllName)]
+    internal static extern void PolygonCollider_SetVertices(IntPtr scene, uint entityId, [In] Vector2[] vertices,
+        int count);
+
+    [DllImport(DllName)]
+    internal static extern int EdgeCollider_GetVertexCount(IntPtr scene, uint entityId);
+
+    [DllImport(DllName)]
+    internal static extern void EdgeCollider_GetVertices(IntPtr scene, uint entityId, [Out] Vector2[] outVertices);
+
+    [DllImport(DllName)]
+    internal static extern void EdgeCollider_SetVertices(IntPtr scene, uint entityId, [In] Vector2[] vertices,
+        int count);
 }

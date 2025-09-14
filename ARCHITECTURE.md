@@ -1,7 +1,5 @@
 # Luma 引擎 - 架构设计详解
 
-本文档详细阐述了 Luma 引擎的核心架构和主要系统的数据流图。
-
 [返回主文档 (Return to Main Document)](README.md)
 
 ---
@@ -72,7 +70,7 @@ graph TD
     Editor --> SceneRenderer
     Runtime --> SceneRenderer
     SceneRenderer --> Registry
-````
+```
 
 -----
 
@@ -192,18 +190,26 @@ style F fill: #ffecb3
 
 ```mermaid
 graph TD
-subgraph "🖼️ 编辑器渲染循环"
-A[🚀 开始帧] --> B[🎭 场景视图渲染]
-B --> C[🔧 设置视口参数]
-C --> D[📦 提取渲染数据]
-D --> E[🎨 生成渲染包]
-E --> F[⚡ 批处理优化]
-F --> G[🖌️ 执行绘制命令]
-G --> H[🖥️ UI 界面渲染]
-H --> I[📺 呈现最终画面]
+subgraph "⚙️ 模拟线程"
+Sim_A[物理/AI/脚本/动画<br/>Systems Update] --> Sim_B[更新 ECS 数据];
+Sim_B --> Sim_C["SceneRenderer:<br/>遍历 ECS, 提取 Renderable 数据"];
+Sim_C --> Sim_D[RenderableManager.SubmitFrame<br/>将一整帧的 Renderable 数据<br/>原子性提交到后台缓冲区];
 end
 
-style I fill: #e8f5e8
+subgraph "🔗 线程同步与数据插值"
+SyncPoint[RenderableManager<br/>持有过去两帧的完整状态 Sₙ₋₁, Sₙ];
+end
+
+subgraph "🎨 渲染线程"
+Render_A["GetInterpolationData<br/>根据当前时间计算 Alpha<br/>插值 Sₙ₋₁ 和 Sₙ, 生成最终变换"];
+Render_A --> Render_B["SceneRenderer:<br/>将插值数据打包成 RenderPackets"];
+Render_B --> Render_C["RenderSystem:<br/>对 Packets 进行批处理 Batching"];
+Render_C --> Render_D["GraphicsBackend:<br/>将批处理转换为图形 API 调用 Draw Calls"];
+Render_D --> Render_E[GPU 渲染];
+end
+
+Sim_D -- "线程安全写入" --> SyncPoint;
+SyncPoint -- "线程安全读取与复制" --> Render_A;
 ```
 
 ### 🧩 Tilemap 系统 (Tilemap System)
@@ -226,14 +232,14 @@ graph TD
 
 ```mermaid
 graph TD
-    subgraph "🎮 游戏逻辑 (C# / C++)"
+    subgraph "🎮 游戏逻辑 C# / C++"
         A["系统请求播放声音"]
     end
 
-    subgraph "🎧 音频管理器 (主线程)"
+    subgraph "🎧 音频管理器 主线程"
         B{"Play(soundRequest)"}
         C["创建 Voice 实例"]
-        D["将 Voice 添加到<br/>活动列表 (线程安全)"]
+        D["将 Voice 添加到<br/>活动列表 线程安全"]
     end
 
     subgraph "🔊 音频线程回调"

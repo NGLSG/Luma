@@ -4,9 +4,11 @@
 #include <Loaders/AudioLoader.h>
 
 #include "AnimationControllerComponent.h"
+#include "ColliderComponent.h"
 #include "PhysicsSystem.h"
 #include "SceneManager.h"
 #include "SIMDWrapper.h"
+#include "TextComponent.h"
 #include "Resources/RuntimeAsset/RuntimeScene.h"
 #include "Components/ComponentRegistry.h"
 #include "Event/JobSystem.h"
@@ -94,13 +96,14 @@ LUMA_API void Entity_RemoveComponent(LumaSceneHandle scene, LumaEntityHandle ent
 }
 
 LUMA_API void Entity_SetComponent(LumaSceneHandle scene, LumaEntityHandle entity, const char* componentName,
-                                  void* componentData)
+                                  void* componentData, size_t dataSize)
 {
     if (!scene || !componentData) return;
 
     auto* registration = ComponentRegistry::GetInstance().Get(componentName);
     auto* runtimeScene = AsScene(scene);
 
+    
     if (!registration || !registration->has || !registration->get_raw_ptr ||
         !registration->has(runtimeScene->GetRegistry(), (entt::entity)entity))
     {
@@ -110,9 +113,10 @@ LUMA_API void Entity_SetComponent(LumaSceneHandle scene, LumaEntityHandle entity
     void* dest = registration->get_raw_ptr(runtimeScene->GetRegistry(), (entt::entity)entity);
     if (!dest) return;
 
-    size_t componentSize = registration->size;
-    if (componentSize == 0) return;
-    memcpy(dest, componentData, componentSize);
+    
+    if (dataSize == 0) return;
+    memcpy(dest, componentData, dataSize);
+
     EventBus::GetInstance().Publish(ComponentUpdatedEvent{
         runtimeScene->GetRegistry(), (entt::entity)entity
     });
@@ -816,4 +820,158 @@ LUMA_API void AudioManager_SetLoop(uint32_t voiceId, bool loop)
 LUMA_API void AudioManager_SetVoicePosition(uint32_t voiceId, float x, float y, float z)
 {
     AudioManager::GetInstance().SetVoicePosition(voiceId, x, y, z);
+}
+
+LUMA_API void Entity_SetComponentProperty(LumaSceneHandle scene, LumaEntityHandle entity, const char* componentName,
+                                          const char* propertyName, void* valueData)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !valueData) return;
+
+    const auto* compReg = ComponentRegistry::GetInstance().Get(componentName);
+    if (!compReg) return;
+
+    const auto& propIt = compReg->properties.find(propertyName);
+    if (propIt != compReg->properties.end() && propIt->second.set_from_raw_ptr)
+    {
+        
+        propIt->second.set_from_raw_ptr(runtimeScene->GetRegistry(), (entt::entity)entity, valueData);
+
+        EventBus::GetInstance().Publish(ComponentUpdatedEvent{
+            runtimeScene->GetRegistry(), (entt::entity)entity
+        });
+    }
+}
+
+LUMA_API void Entity_GetComponentProperty(LumaSceneHandle scene, LumaEntityHandle entity, const char* componentName,
+                                          const char* propertyName, void* valueData)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !valueData) return;
+
+    const auto* compReg = ComponentRegistry::GetInstance().Get(componentName);
+    if (!compReg) return;
+
+    const auto& propIt = compReg->properties.find(propertyName);
+    if (propIt != compReg->properties.end() && propIt->second.get_to_raw_ptr)
+    {
+        propIt->second.get_to_raw_ptr(runtimeScene->GetRegistry(), (entt::entity)entity, valueData);
+    }
+}
+
+LUMA_API const char* TextComponent_GetText(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene) return "";
+
+    const auto& comp = runtimeScene->GetRegistry().get<ECS::TextComponent>((entt::entity)entity);
+    return comp.text.c_str();
+}
+
+LUMA_API const char* TextComponent_GetName(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene) return "";
+
+    const auto& comp = runtimeScene->GetRegistry().get<ECS::TextComponent>((entt::entity)entity);
+    return comp.name.c_str();
+}
+
+LUMA_API void TextComponent_SetName(LumaSceneHandle scene, LumaEntityHandle entity, const char* name)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !name) return;
+
+    auto& comp = runtimeScene->GetRegistry().get<ECS::TextComponent>((entt::entity)entity);
+    comp.name = name;
+
+    EventBus::GetInstance().Publish(ComponentUpdatedEvent{
+        runtimeScene->GetRegistry(), (entt::entity)entity
+    });
+}
+
+LUMA_API void TextComponent_SetText(LumaSceneHandle scene, LumaEntityHandle entity, const char* text)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !text) return;
+
+    auto& comp = runtimeScene->GetRegistry().get<ECS::TextComponent>((entt::entity)entity);
+    comp.text = text; 
+
+    EventBus::GetInstance().Publish(ComponentUpdatedEvent{
+        runtimeScene->GetRegistry(), (entt::entity)entity
+    });
+}
+
+LUMA_API int PolygonCollider_GetVertexCount(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene) return 0;
+    const auto& comp = runtimeScene->GetRegistry().get<ECS::PolygonColliderComponent>((entt::entity)entity);
+    return static_cast<int>(comp.vertices.size());
+}
+
+LUMA_API void PolygonCollider_GetVertices(LumaSceneHandle scene, LumaEntityHandle entity, Vector2f_CAPI* outVertices)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !outVertices) return;
+    const auto& comp = runtimeScene->GetRegistry().get<ECS::PolygonColliderComponent>((entt::entity)entity);
+    
+    for (size_t i = 0; i < comp.vertices.size(); ++i)
+    {
+        outVertices[i] = {comp.vertices[i].x, comp.vertices[i].y};
+    }
+}
+
+LUMA_API void PolygonCollider_SetVertices(LumaSceneHandle scene, LumaEntityHandle entity, const Vector2f_CAPI* vertices,
+                                          int count)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !vertices) return;
+    auto& comp = runtimeScene->GetRegistry().get<ECS::PolygonColliderComponent>((entt::entity)entity);
+
+    comp.vertices.clear();
+    comp.vertices.reserve(count);
+    for (int i = 0; i < count; ++i)
+    {
+        comp.vertices.emplace_back(vertices[i].x, vertices[i].y);
+    }
+    comp.isDirty = true; 
+}
+
+
+
+LUMA_API int EdgeCollider_GetVertexCount(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene) return 0;
+    const auto& comp = runtimeScene->GetRegistry().get<ECS::EdgeColliderComponent>((entt::entity)entity);
+    return static_cast<int>(comp.vertices.size());
+}
+
+LUMA_API void EdgeCollider_GetVertices(LumaSceneHandle scene, LumaEntityHandle entity, Vector2f_CAPI* outVertices)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !outVertices) return;
+    const auto& comp = runtimeScene->GetRegistry().get<ECS::EdgeColliderComponent>((entt::entity)entity);
+    for (size_t i = 0; i < comp.vertices.size(); ++i)
+    {
+        outVertices[i] = {comp.vertices[i].x, comp.vertices[i].y};
+    }
+}
+
+LUMA_API void EdgeCollider_SetVertices(LumaSceneHandle scene, LumaEntityHandle entity, const Vector2f_CAPI* vertices,
+                                       int count)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !vertices) return;
+    auto& comp = runtimeScene->GetRegistry().get<ECS::EdgeColliderComponent>((entt::entity)entity);
+
+    comp.vertices.clear();
+    comp.vertices.reserve(count);
+    for (int i = 0; i < count; ++i)
+    {
+        comp.vertices.emplace_back(vertices[i].x, vertices[i].y);
+    }
+    comp.isDirty = true;
 }

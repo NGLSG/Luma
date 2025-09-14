@@ -58,13 +58,13 @@ typedef enum
  */
 struct PlayDesc_CAPI
 {
-    AssetHandle audioHandle;   ///< 音频资源的句柄。
-    bool loop;                 ///< 是否循环。
-    float volume;              ///< 音量。
-    bool spatial;              ///< 是否启用空间音频。
+    AssetHandle audioHandle; ///< 音频资源的句柄。
+    bool loop; ///< 是否循环。
+    float volume; ///< 音量。
+    bool spatial; ///< 是否启用空间音频。
     float sourceX, sourceY, sourceZ; ///< 音源世界坐标。
-    float minDistance;         ///< 最小衰减距离。
-    float maxDistance;         ///< 最大衰减距离。
+    float minDistance; ///< 最小衰减距离。
+    float maxDistance; ///< 最大衰减距离。
 };
 
 #ifdef __cplusplus
@@ -114,7 +114,16 @@ LUMA_API void Entity_RemoveComponent(LumaSceneHandle scene, LumaEntityHandle ent
  * @param componentData 指向组件新数据的指针。
  */
 LUMA_API void Entity_SetComponent(LumaSceneHandle scene, LumaEntityHandle entity, const char* componentName,
-                                  void* componentData);
+                                  void* componentData, size_t dataSize);
+
+LUMA_API void Entity_SetComponentProperty(LumaSceneHandle scene, LumaEntityHandle entity,
+                                          const char* componentName, const char* propertyName, void* valueData);
+
+/**
+ * @brief 从 C++ 获取一个组件的特定属性值到 C#。
+ */
+LUMA_API void Entity_GetComponentProperty(LumaSceneHandle scene, LumaEntityHandle entity,
+                                          const char* componentName, const char* propertyName, void* valueData);
 
 /**
  * @brief 定义Luma日志的级别。
@@ -589,6 +598,34 @@ LUMA_API void AudioManager_SetLoop(uint32_t voiceId, bool loop);
  * @param x, y, z 新的世界坐标。
  */
 LUMA_API void AudioManager_SetVoicePosition(uint32_t voiceId, float x, float y, float z);
+
+LUMA_API void TextComponent_SetText(LumaSceneHandle scene, LumaEntityHandle entity, const char* text);
+
+LUMA_API void TextComponent_SetName(LumaSceneHandle scene, LumaEntityHandle entity, const char* name);
+
+// --- 为 TextComponent 的 string 类型属性创建专属 Getters ---
+
+// 注意: Getters 返回的 const char* 指针生命周期很短，C# 必须立刻使用并复制，不能长期持有。
+// 这是 C-API 中返回字符串的常见做法。
+LUMA_API const char* TextComponent_GetText(LumaSceneHandle scene, LumaEntityHandle entity);
+
+LUMA_API const char* TextComponent_GetName(LumaSceneHandle scene, LumaEntityHandle entity);
+
+LUMA_API int PolygonCollider_GetVertexCount(LumaSceneHandle scene, LumaEntityHandle entity);
+
+LUMA_API void PolygonCollider_GetVertices(LumaSceneHandle scene, LumaEntityHandle entity, Vector2f_CAPI* outVertices);
+
+LUMA_API void PolygonCollider_SetVertices(LumaSceneHandle scene, LumaEntityHandle entity, const Vector2f_CAPI* vertices,
+                                          int count);
+
+// --- EdgeColliderComponent C-API (与 PolygonCollider 类似) ---
+
+LUMA_API int EdgeCollider_GetVertexCount(LumaSceneHandle scene, LumaEntityHandle entity);
+
+LUMA_API void EdgeCollider_GetVertices(LumaSceneHandle scene, LumaEntityHandle entity, Vector2f_CAPI* outVertices);
+
+LUMA_API void EdgeCollider_SetVertices(LumaSceneHandle scene, LumaEntityHandle entity, const Vector2f_CAPI* vertices,
+                                       int count);
 #ifdef __cplusplus
 }
 #endif

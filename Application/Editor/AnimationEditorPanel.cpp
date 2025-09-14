@@ -7,6 +7,7 @@
 #include "../Resources/RuntimeAsset/RuntimeScene.h"
 #include "AssetManager.h"
 #include "ComponentRegistry.h"
+#include "Profiler.h"
 #include "SceneManager.h"
 #include "Sprite.h"
 #include "Input/Keyboards.h"
@@ -22,6 +23,7 @@ void AnimationEditorPanel::Initialize(EditorContext* context)
 
 void AnimationEditorPanel::Update(float deltaTime)
 {
+    PROFILE_FUNCTION();
     if (!m_isVisible)
         return;
 
@@ -1707,6 +1709,7 @@ void AnimationEditorPanel::drawEventEditor()
 
 void AnimationEditorPanel::Draw()
 {
+    PROFILE_FUNCTION();
     if (!m_isVisible) return;
     if (m_requestFocus)
     {

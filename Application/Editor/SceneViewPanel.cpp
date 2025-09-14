@@ -335,17 +335,14 @@ void SceneViewPanel::Draw()
 
 
             m_context->graphicsBackend->SetActiveRenderTarget(m_sceneViewTarget);
-            std::vector<RenderPacket> renderQueue = RenderableManager::GetInstance().GetInterpolationData(0.5f);
-            PROFILE_SCOPE("SceneRenderer::Submit");
+            std::vector<RenderPacket> renderQueue = m_context->renderQueue;
+            for (const auto& packet : renderQueue)
             {
-                for (const auto& packet : renderQueue)
-                {
-                    m_context->engineContext->renderSystem->Submit(packet);
-                }
-                m_context->engineContext->renderSystem->Flush();
-                m_context->graphicsBackend->Submit();
-                m_context->graphicsBackend->SetActiveRenderTarget(nullptr);
+                m_context->engineContext->renderSystem->Submit(packet);
             }
+            m_context->engineContext->renderSystem->Flush();
+            m_context->graphicsBackend->Submit();
+            m_context->graphicsBackend->SetActiveRenderTarget(nullptr);
 
 
             ImTextureID textureId = m_context->imguiRenderer->GetOrCreateTextureIdFor(m_sceneViewTarget->GetTexture());

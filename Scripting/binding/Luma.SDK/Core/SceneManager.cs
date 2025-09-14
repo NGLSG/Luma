@@ -3,17 +3,8 @@ using System.Runtime.InteropServices;
 
 namespace Luma.SDK;
 
-
-
-
 public static class SceneManager
 {
-    
-    
-    
-    
-    
-    
     public static bool LoadScene(AssetHandle sceneHandle)
     {
         if (sceneHandle.AssetType != AssetType.Scene || !sceneHandle.IsValid())
@@ -25,12 +16,7 @@ public static class SceneManager
         return Native.SceneManager_LoadScene(sceneHandle.AssetGuid.ToString());
     }
 
-    
-    
-    
-    
-    
-    
+
     public static void LoadSceneAsync(AssetHandle sceneHandle)
     {
         if (sceneHandle.AssetType != AssetType.Scene || !sceneHandle.IsValid())
@@ -42,9 +28,7 @@ public static class SceneManager
         Native.SceneManager_LoadSceneAsync(sceneHandle.AssetGuid.ToString());
     }
 
-    
-    
-    
+
     public static Scene CurrentScene
     {
         get
@@ -65,10 +49,6 @@ public static class SceneManager
     }
 }
 
-
-
-
-
 public readonly struct Scene
 {
     public Guid Guid { get; }
@@ -86,6 +66,13 @@ public readonly struct Scene
     {
         if (!IsValid()) return new Entity(0, IntPtr.Zero);
         uint entityId = Native.Scene_FindGameObjectByGuid(ScenePtr, guid.ToString());
+        return new Entity(entityId, ScenePtr);
+    }
+
+    public Entity CreateEntity(string name = "New Entity")
+    {
+        if (!IsValid()) return new Entity(0, IntPtr.Zero);
+        uint entityId = Native.Scene_CreateGameObject(ScenePtr, name);
         return new Entity(entityId, ScenePtr);
     }
 }
