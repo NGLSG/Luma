@@ -75,7 +75,7 @@ namespace Systems
 
         if (isPointInViewport(mouseWorldPos, transform, scrollView.viewportSize))
         {
-            for (const auto& event : context.frameEvents)
+            for (const auto& event : context.frameEvents.GetView())
             {
                 if (event.type == SDL_EVENT_MOUSE_WHEEL)
                 {

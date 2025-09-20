@@ -293,13 +293,10 @@ public:
      */
     void Reverse()
     {
-        if constexpr (!std::is_trivially_destructible_v<T>)
-        {
-            for (size_t i = 0; i < m_currentIndex; ++i)
-            {
-                m_data[i].~T();
-            }
-        }
+        // Reset arena for the new frame while preserving capacity.
+        // Use clear() so non-trivial types are properly destroyed and will be
+        // reconstructed on the next Allocate() via resize().
+        m_data.clear();
         m_currentIndex = 0;
     }
 };

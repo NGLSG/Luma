@@ -230,6 +230,15 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     const auto& prevFrameRenderables_copy = prevFrameSnapshot ? *prevFrameSnapshot : kEmpty;
     const auto& currFrameRenderables_copy = currFrameSnapshot ? *currFrameSnapshot : kEmpty;
 
+    
+    if (m_lastBuiltPrevFrame == prevFrameSnapshot &&
+        m_lastBuiltCurrFrame == currFrameSnapshot &&
+        m_lastBuiltPrevTime == prevStateTime_copy &&
+        m_lastBuiltCurrTime == currStateTime_copy)
+    {
+        return m_packetBuffers[m_activeBufferIndex];
+    }
+
 
     float alpha = 0.0f;
     auto renderTime = std::chrono::steady_clock::now();
@@ -248,9 +257,12 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
     alpha = std::clamp(alpha, 0.0f, 1.0f);
 
-    m_renderPackets.clear();
-    m_transformArena->Reverse();
-    m_textArena->Reverse();
+    
+    const int buildIndex = (m_activeBufferIndex ^ 1);
+    auto& outPackets = m_packetBuffers[buildIndex];
+    outPackets.clear();
+    m_transformArenas[buildIndex]->Reverse();
+    m_textArenas[buildIndex]->Reverse();
     m_spriteGroupIndices.clear();
     m_textGroupIndices.clear();
     m_spriteBatchGroups.clear();
@@ -259,7 +271,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
     if (currFrameRenderables_copy.empty())
     {
-        return m_renderPackets;
+        return outPackets;
     }
 
 
@@ -397,7 +409,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
     PROFILE_SCOPE("Stage 3: Packing & Sorting");
 
-    m_renderPackets.reserve(m_spriteBatchGroups.size() + m_textBatchGroups.size());
+    outPackets.reserve(m_spriteBatchGroups.size() + m_textBatchGroups.size());
 
 
     for (const auto& group : m_spriteBatchGroups)
@@ -405,10 +417,10 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         const size_t count = group.transforms.size();
         if (count == 0) continue;
 
-        RenderableTransform* transformBuffer = m_transformArena->Allocate(count);
+        RenderableTransform* transformBuffer = m_transformArenas[buildIndex]->Allocate(count);
         std::memcpy(transformBuffer, group.transforms.data(), count * sizeof(RenderableTransform));
 
-        m_renderPackets.emplace_back(RenderPacket{
+        outPackets.emplace_back(RenderPacket{
             .zIndex = group.zIndex,
             .batchData = SpriteBatch{
                 .material = group.material, .image = sk_ref_sp(group.image), .sourceRect = group.sourceRect,
@@ -424,16 +436,16 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         const size_t count = group.transforms.size();
         if (count == 0) continue;
 
-        RenderableTransform* transformBuffer = m_transformArena->Allocate(count);
+        RenderableTransform* transformBuffer = m_transformArenas[buildIndex]->Allocate(count);
         std::memcpy(transformBuffer, group.transforms.data(), count * sizeof(RenderableTransform));
 
-        std::string* textBuffer = m_textArena->Allocate(count);
-        for (size_t i = 0; i < count; ++i)
-        {
-            new(&textBuffer[i]) std::string(group.texts[i]);
+        
+        std::string* textBuffer = m_textArenas[buildIndex]->Allocate(count);
+        for (size_t i = 0; i < count; ++i) {
+            textBuffer[i] = group.texts[i];
         }
 
-        m_renderPackets.emplace_back(RenderPacket{
+        outPackets.emplace_back(RenderPacket{
             .zIndex = group.zIndex,
             .batchData = TextBatch{
                 .typeface = sk_ref_sp(group.typeface), .fontSize = group.fontSize, .color = group.color,
@@ -444,12 +456,19 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     }
 
 
-    std::ranges::sort(m_renderPackets, [](const RenderPacket& a, const RenderPacket& b)
+    std::ranges::sort(outPackets, [](const RenderPacket& a, const RenderPacket& b)
     {
         return a.zIndex < b.zIndex;
     });
 
-    return m_renderPackets;
+    
+    m_activeBufferIndex = buildIndex;
+    
+    m_lastBuiltPrevFrame = std::move(prevFrameSnapshot);
+    m_lastBuiltCurrFrame = std::move(currFrameSnapshot);
+    m_lastBuiltPrevTime = prevStateTime_copy;
+    m_lastBuiltCurrTime = currStateTime_copy;
+    return outPackets;
 }
 
 RenderableManager::RenderableManager()

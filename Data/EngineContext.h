@@ -1,6 +1,7 @@
 #ifndef ENGINECONTEXT_H
 #define ENGINECONTEXT_H
 #include "CommandQueue.h"
+#include "DynamicArray.h"
 #include "SDL3/SDL_events.h"
 class SceneRenderer;
 class RuntimeTextureManager;
@@ -47,7 +48,7 @@ struct EngineContext
     ECS::RectF sceneViewRect; ///< 场景视图的矩形区域。
     bool isSceneViewFocused = false; ///< 场景视图是否获得焦点。
     ApplicationMode appMode = ApplicationMode::Editor; ///< 应用程序当前运行模式。
-    std::vector<SDL_Event> frameEvents; ///< 当前帧的所有SDL事件。
+    DynamicArray<SDL_Event> frameEvents; ///< 当前帧的所有SDL事件。
     float interpolationAlpha = 1.0f; /// < 用于插值计算的alpha值。
     CommandQueue deferredCommands; ///< 延迟命令队列，用于线程安全的命令执行。
 };

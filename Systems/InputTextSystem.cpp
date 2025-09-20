@@ -39,9 +39,7 @@ namespace Systems
         focusedEntity = entt::null;
     }
 
-    
-    
-    
+
     void InputTextSystem::OnUpdate(RuntimeScene* scene, float deltaTime, EngineContext& context)
     {
         auto& registry = scene->GetRegistry();
@@ -49,7 +47,7 @@ namespace Systems
         entt::entity newlyFocused = entt::null;
         bool clickOccurredOnNothing = false;
 
-        
+
         auto clickView = registry.view<PointerClickEvent, ECS::InputTextComponent>();
         for (auto entity : clickView)
         {
@@ -62,7 +60,7 @@ namespace Systems
                 newlyFocused = entity;
             }
         }
-        for (const auto& event : context.frameEvents)
+        for (const auto& event : context.frameEvents.GetView())
         {
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
             {
@@ -91,18 +89,16 @@ namespace Systems
                 OnFocusLost(scene, focusedEntity, context);
             }
         }
-        
 
 
         if (registry.valid(focusedEntity))
         {
-            
             handleActiveInput(scene, focusedEntity, context);
 
             auto& inputText = registry.get<ECS::InputTextComponent>(focusedEntity);
             auto& transform = registry.get<ECS::TransformComponent>(focusedEntity);
 
-            
+
             inputText.cursorBlinkTimer += deltaTime;
             if (inputText.cursorBlinkTimer >= CURSOR_BLINK_RATE)
             {
@@ -110,19 +106,16 @@ namespace Systems
                 inputText.isCursorVisible = !inputText.isCursorVisible;
             }
 
-            
+
             if (inputText.isFocused && inputText.isCursorVisible && context.renderSystem)
             {
-                
                 if (inputText.text.typeface)
                 {
                     SkFont font(inputText.text.typeface, inputText.text.fontSize);
                     SkFontMetrics metrics;
                     font.getMetrics(&metrics);
 
-                    
 
-                    
                     std::string textBeforeCursor = std::string(inputText.inputBuffer).substr(
                         0, inputText.cursorPosition);
                     std::string fullText = std::string(inputText.inputBuffer);
@@ -136,11 +129,10 @@ namespace Systems
                     font.measureText(fullText.c_str(), fullText.size(), SkTextEncoding::kUTF8, &fullTextBounds);
                     float fullTextWidth = fullTextBounds.width();
 
-                    
-                    
+
                     float localCursorX = widthBeforeCursor;
 
-                    
+
                     float s = sinf(transform.rotation);
                     float c = cosf(transform.rotation);
                     float worldOffsetX = localCursorX * c * transform.scale.x;
@@ -149,14 +141,14 @@ namespace Systems
                     float finalCenterX = transform.position.x + worldOffsetX;
                     float finalCenterY = transform.position.y + worldOffsetY;
 
-                    
+
                     float cursorHeight = (metrics.fDescent - metrics.fAscent) * transform.scale.y;
                     SkPoint cursorTopLeft = {
                         finalCenterX,
-                        finalCenterY - cursorHeight / 2.0f 
+                        finalCenterY - cursorHeight / 2.0f
                     };
 
-                    
+
                     context.renderSystem->DrawCursor(cursorTopLeft, cursorHeight, inputText.text.color);
                 }
             }
@@ -180,11 +172,11 @@ namespace Systems
         focusedEntity = entity;
         inputText.isFocused = true;
 
-        
+
         inputText.isCursorVisible = true;
         inputText.cursorBlinkTimer = 0.0f;
 
-        
+
 #ifdef _WIN32
         strncpy_s(inputText.inputBuffer, sizeof(inputText.inputBuffer),
                   inputText.text.text.c_str(), _TRUNCATE);
@@ -193,7 +185,7 @@ namespace Systems
         inputText.inputBuffer[sizeof(inputText.inputBuffer) - 1] = '\0';
 #endif
 
-        
+
         inputText.cursorPosition = strlen(inputText.inputBuffer);
         inputText.lastText = inputText.text.text;
 
@@ -209,7 +201,7 @@ namespace Systems
         if (!inputText || !inputText->isFocused) return;
 
         inputText->isFocused = false;
-        
+
         inputText->isCursorVisible = false;
 
         std::string newText = inputText->inputBuffer;
@@ -229,17 +221,14 @@ namespace Systems
         }
     }
 
-    
-    
-    
-    
+
     void InputTextSystem::handleActiveInput(RuntimeScene* scene, entt::entity entity, EngineContext& context)
     {
         auto& registry = scene->GetRegistry();
         auto& inputText = registry.get<ECS::InputTextComponent>(entity);
         auto& transform = registry.get<ECS::TransformComponent>(entity);
 
-        
+
         if (context.window)
         {
             auto cameraProps = scene->GetCameraProperties();
@@ -247,7 +236,7 @@ namespace Systems
                                 ? context.sceneViewRect
                                 : ECS::RectF{0, 0, cameraProps.viewport.width(), cameraProps.viewport.height()};
 
-            
+
             float width = 100.0f;
             float height = 20.0f;
             if (auto* sprite = registry.try_get<ECS::SpriteComponent>(entity))
@@ -274,15 +263,14 @@ namespace Systems
 
         if (inputText.isReadOnly)
         {
-            return; 
+            return;
         }
 
-        
+
         std::string currentText(inputText.inputBuffer);
 
-        for (const auto& event : context.frameEvents)
+        for (const auto& event : context.frameEvents.GetView())
         {
-            
             if (event.type == SDL_EVENT_TEXT_INPUT)
             {
                 std::string inputTextStr = event.text.text;
@@ -294,12 +282,11 @@ namespace Systems
                     textChanged = true;
                 }
             }
-            
+
             else if (event.type == SDL_EVENT_KEY_DOWN)
             {
                 switch (event.key.key)
                 {
-                
                 case SDLK_BACKSPACE:
                     if (inputText.cursorPosition > 0)
                     {
@@ -309,7 +296,7 @@ namespace Systems
                     }
                     break;
 
-                
+
                 case SDLK_DELETE:
                     if (inputText.cursorPosition < currentText.length())
                     {
@@ -318,7 +305,7 @@ namespace Systems
                     }
                     break;
 
-                
+
                 case SDLK_LEFT:
                     if (inputText.cursorPosition > 0)
                     {
@@ -327,7 +314,7 @@ namespace Systems
                     }
                     break;
 
-                
+
                 case SDLK_RIGHT:
                     if (inputText.cursorPosition < currentText.length())
                     {
@@ -336,7 +323,7 @@ namespace Systems
                     }
                     break;
 
-                
+
                 case SDLK_HOME:
                     if (inputText.cursorPosition > 0)
                     {
@@ -345,7 +332,7 @@ namespace Systems
                     }
                     break;
 
-                
+
                 case SDLK_END:
                     if (inputText.cursorPosition < currentText.length())
                     {
@@ -354,14 +341,14 @@ namespace Systems
                     }
                     break;
 
-                
+
                 case SDLK_RETURN:
                 case SDLK_KP_ENTER:
                     invokeSubmitEvent(scene, inputText.onSubmitTargets, inputText.inputBuffer);
                     OnFocusLost(scene, entity, context);
-                    return; 
+                    return;
 
-                
+
                 case SDLK_ESCAPE:
 #ifdef _WIN32
                     strncpy_s(inputText.inputBuffer, sizeof(inputText.inputBuffer),
@@ -371,7 +358,7 @@ namespace Systems
                     inputText.inputBuffer[sizeof(inputText.inputBuffer) - 1] = '\0';
 #endif
                     OnFocusLost(scene, entity, context);
-                    return; 
+                    return;
 
                 default:
                     break;
@@ -379,7 +366,7 @@ namespace Systems
             }
         }
 
-        
+
         if (textChanged)
         {
             inputText.text.text = currentText;
@@ -387,13 +374,13 @@ namespace Systems
             strncpy_s(inputText.inputBuffer, sizeof(inputText.inputBuffer),
                       currentText.c_str(), _TRUNCATE);
 #else
-            
+
             strncpy(inputText.inputBuffer, currentText.c_str(), sizeof(inputText.inputBuffer) - 1);
             inputText.inputBuffer[sizeof(inputText.inputBuffer) - 1] = '\0';
 #endif
         }
 
-        
+
         if (textChanged || cursorMoved)
         {
             inputText.isCursorVisible = true;

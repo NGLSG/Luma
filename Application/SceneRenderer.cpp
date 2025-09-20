@@ -18,6 +18,10 @@ void SceneRenderer::Extract(entt::registry& registry, std::vector<RenderPacket>&
 
     outQueue.clear();
     m_transformArena->Reverse();
+    
+    
+    if (m_textArena)
+        m_textArena->Reverse();
 
 
     m_spriteGroupIndices.clear();
@@ -292,7 +296,8 @@ void SceneRenderer::Extract(entt::registry& registry, std::vector<RenderPacket>&
             std::string* textBuffer = m_textArena->Allocate(count);
             for (size_t i = 0; i < count; ++i)
             {
-                new(&textBuffer[i]) std::string(std::move(const_cast<std::string&>(group.texts[i])));
+                
+                textBuffer[i] = group.texts[i];
             }
 
             outQueue.emplace_back(RenderPacket{

@@ -38,7 +38,10 @@ void ApplicationBase::Run()
     {
         Keyboard::GetInstance().ProcessEvent(event);
         LumaCursor::GetInstance().ProcessEvent(event);
-        m_context.frameEvents.push_back(event);
+        m_context.frameEvents.Modify([&](auto& events)
+        {
+            events.PushBack(event);
+        });
     });
     m_context.window = m_window.get();
 
@@ -57,7 +60,7 @@ void ApplicationBase::Run()
 
         Keyboard::GetInstance().Update();
         LumaCursor::GetInstance().Update();
-        m_context.frameEvents.clear();
+        m_context.frameEvents.Clear();
         m_window->PollEvents();
         if (m_window->ShouldClose())
         {
