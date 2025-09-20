@@ -269,21 +269,17 @@ void RenderSystem::Flush()
     if (!canvas) return;
 
 
-    if (pImpl->clipRect.has_value())
+    bool hasClip = pImpl->clipRect.has_value();
+    if (hasClip)
     {
         const SkRect& viewport = *pImpl->clipRect;
-
-
         canvas->save();
-
-
         canvas->clipRect(viewport);
-
-
         canvas->translate(viewport.fLeft, viewport.fTop);
     }
     canvas->save();
-    Clear(Camera::GetInstance().m_properties.clearColor);
+    
+    canvas->clear(Camera::GetInstance().m_properties.clearColor);
     Camera::GetInstance().ApplyTo(canvas);
 
     pImpl->DrawAllSpriteBatches(canvas);
@@ -295,6 +291,10 @@ void RenderSystem::Flush()
     pImpl->DrawAllShaderBatches(canvas);
     pImpl->DrawAllCursorBatches(canvas);
     canvas->restore();
+    if (hasClip)
+    {
+        canvas->restore();
+    }
 
     pImpl->ClearBatches();
 }

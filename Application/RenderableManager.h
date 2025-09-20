@@ -20,7 +20,9 @@ public:
     RenderableManager();
 
 private:
-    std::array<std::vector<Renderable>, 3> buffers;
+    // Double-buffered immutable frame snapshots
+    std::shared_ptr<std::vector<Renderable>> m_prevFrame;
+    std::shared_ptr<std::vector<Renderable>> m_currFrame;
     std::mutex mutex;
 
     std::unique_ptr<FrameArena<RenderableTransform>> m_transformArena = std::make_unique<FrameArena<

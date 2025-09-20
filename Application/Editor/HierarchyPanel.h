@@ -135,7 +135,7 @@ private:
     float itemHeight; ///< 每个层级项的高度。
 
 
-    static constexpr int MAX_VISIBLE_NODES = 16; ///< 同时显示的最大可见节点数。
+    static constexpr int MAX_VISIBLE_NODES = 32; ///< 同时显示的最大可见节点数（硬上限）。
     static constexpr float NODE_HEIGHT = 20.0f; ///< 单个节点在UI中的高度。
 
 
@@ -146,6 +146,9 @@ private:
     int totalNodeCount; ///< 缓存中所有节点的总数。
     int visibleNodeCount; ///< 当前可见节点的总数。
     float lastBuildTime; ///< 上次重建缓存的时间。
+
+    // 搜索
+    char m_searchBuffer[256] = {0}; ///< 名称检索缓冲区。
 };
 
 #endif

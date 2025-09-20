@@ -748,7 +748,7 @@ void ToolbarPanel::drawFpsDisplay()
                                         m_context->lastUps,
                                         m_context->updateLatency);
 
-    
+
     const float textWidth = ImGui::CalcTextSize(statsText.c_str()).x;
     const float rightPadding = ImGui::GetStyle().FramePadding.x * 2;
     ImGui::SameLine(ImGui::GetWindowWidth() - textWidth - rightPadding);
@@ -823,10 +823,10 @@ void ToolbarPanel::play()
 {
     if (m_context->editorState != EditorState::Editing) return;
 
-    
+
     auto switchToPlayMode = [ctx = m_context]()
     {
-        if (ctx->editorState == EditorState::Playing) return; 
+        if (ctx->editorState == EditorState::Playing) return;
 
         ctx->editorState = EditorState::Playing;
         ctx->engineContext->appMode = ApplicationMode::PIE;
@@ -852,7 +852,7 @@ void ToolbarPanel::play()
         LogInfo("已通过命令队列安全进入播放模式。");
     };
 
-    
+
     m_context->engineContext->deferredCommands.Push(switchToPlayMode);
 }
 

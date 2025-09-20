@@ -57,6 +57,16 @@ namespace
             auto prevIt = prevFrameStart;
             auto currIt = currFrameStart;
 
+            
+            if (currIt != currFrameEnd)
+            {
+                auto firstId = currIt->entityId;
+                while (prevIt != prevFrameEnd && prevIt->entityId < firstId)
+                {
+                    ++prevIt;
+                }
+            }
+
 
             while (currIt != currFrameEnd)
             {
@@ -94,6 +104,9 @@ namespace
                     interpolatedTransform.scale = {resultScale[0], resultScale[1]};
                     interpolatedTransform.rotation =
                         Lerp(prevIt->transform.rotation, currIt->transform.rotation, alpha);
+
+                    
+                    ++prevIt;
                 }
 
 
@@ -125,6 +138,7 @@ namespace
                             group.filterQuality = spriteData.filterQuality;
                             group.wrapMode = spriteData.wrapMode;
                             group.ppuScaleFactor = spriteData.ppuScaleFactor;
+                            group.transforms.reserve(32);
                         }
                         else
                         {
@@ -157,6 +171,8 @@ namespace
                             group.color = textData.color;
                             group.alignment = static_cast<TextAlignment>(textData.alignment);
                             group.zIndex = currIt->zIndex;
+                            group.transforms.reserve(16);
+                            group.texts.reserve(16);
                         }
                         else
                         {
@@ -183,16 +199,12 @@ void RenderableManager::SubmitFrame(std::vector<Renderable>&& frameData)
 {
     std::scoped_lock lk(mutex);
 
+    
+    auto newFrame = std::make_shared<std::vector<Renderable>>(std::move(frameData));
 
-    buffers[2] = std::move(frameData);
-
-
-    buffers[0].swap(buffers[1]);
-    buffers[1].swap(buffers[2]);
-
-
-    buffers[2].clear();
-
+    
+    m_prevFrame = std::move(m_currFrame);
+    m_currFrame = std::move(newFrame);
 
     m_prevStateTime = m_currStateTime;
     m_currStateTime = std::chrono::steady_clock::now();
@@ -202,17 +214,21 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 {
     PROFILE_SCOPE("RenderableManager::GetInterpolationData - Total");
 
-    std::vector<Renderable> prevFrameRenderables_copy;
-    std::vector<Renderable> currFrameRenderables_copy;
+    std::shared_ptr<std::vector<Renderable>> prevFrameSnapshot;
+    std::shared_ptr<std::vector<Renderable>> currFrameSnapshot;
     std::chrono::steady_clock::time_point prevStateTime_copy, currStateTime_copy;
 
     {
         std::scoped_lock lk(mutex);
-        prevFrameRenderables_copy = buffers[0];
-        currFrameRenderables_copy = buffers[1];
+        prevFrameSnapshot = m_prevFrame;   
+        currFrameSnapshot = m_currFrame;   
         prevStateTime_copy = m_prevStateTime;
         currStateTime_copy = m_currStateTime;
     }
+
+    static const std::vector<Renderable> kEmpty;
+    const auto& prevFrameRenderables_copy = prevFrameSnapshot ? *prevFrameSnapshot : kEmpty;
+    const auto& currFrameRenderables_copy = currFrameSnapshot ? *currFrameSnapshot : kEmpty;
 
 
     float alpha = 0.0f;
@@ -269,32 +285,70 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     size_t totalSize = currFrameRenderables_copy.size();
     size_t chunkSize = (totalSize + numJobs - 1) / numJobs;
 
-    for (int i = 0; i < numJobs; ++i)
+    
+    std::vector<std::pair<size_t, size_t>> segments;
+    segments.reserve(numJobs);
+    size_t pos = 0;
+    while (pos < totalSize)
     {
-        size_t start = i * chunkSize;
-        size_t end = std::min(start + chunkSize, totalSize);
+        size_t end = std::min(pos + chunkSize, totalSize);
+        if (end < totalSize)
+        {
+            auto eid = currFrameRenderables_copy[end - 1].entityId;
+            while (end < totalSize && currFrameRenderables_copy[end].entityId == eid)
+            {
+                ++end;
+            }
+        }
+        segments.emplace_back(pos, end);
+        pos = end;
+    }
 
-        if (start >= end) continue;
+    
+    int segCount = static_cast<int>(segments.size());
+    threadResults.resize(segCount);
+    for (int si = 0; si < segCount; ++si)
+    {
+        size_t start = segments[si].first;
+        size_t end = segments[si].second;
 
+        
+        size_t chunkItems = end - start;
+        auto& tr = threadResults[si];
+        tr.spriteGroupIndices.reserve(static_cast<size_t>(std::max<size_t>(8, chunkItems / 4)));
+        tr.textGroupIndices.reserve(static_cast<size_t>(std::max<size_t>(4, chunkItems / 8)));
+        tr.spriteBatchGroups.reserve(static_cast<size_t>(std::max<size_t>(8, chunkItems / 4)));
+        tr.textBatchGroups.reserve(static_cast<size_t>(std::max<size_t>(4, chunkItems / 8)));
 
         jobs.emplace_back(
             prevFrameRenderables_copy.data(), prevFrameRenderables_copy.data() + prevFrameRenderables_copy.size(),
             currFrameRenderables_copy.data() + start, currFrameRenderables_copy.data() + end,
             alpha,
-            &threadResults[i]
+            &tr
         );
 
         jobHandles.push_back(jobSystem.Schedule(&jobs.back()));
     }
     JobSystem::CompleteAll(jobHandles);
 
+    
+    size_t totalSpriteGroups = 0;
+    size_t totalTextGroups = 0;
+    for (const auto& r : threadResults)
+    {
+        totalSpriteGroups += r.spriteBatchGroups.size();
+        totalTextGroups += r.textBatchGroups.size();
+    }
+    m_spriteBatchGroups.reserve(m_spriteBatchGroups.size() + totalSpriteGroups);
+    m_textBatchGroups.reserve(m_textBatchGroups.size() + totalTextGroups);
+
 
     PROFILE_SCOPE("Stage 2: Serial Merge");
 
 
-    for (const auto& result : threadResults)
+    for (auto& result : threadResults)
     {
-        for (const auto& threadGroup : result.spriteBatchGroups)
+        for (auto& threadGroup : result.spriteBatchGroups)
         {
             FastSpriteBatchKey key(threadGroup.image, threadGroup.material, threadGroup.color,
                                    static_cast<ECS::FilterQuality>(threadGroup.filterQuality),
@@ -305,7 +359,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
             {
                 size_t newIndex = m_spriteBatchGroups.size();
                 m_spriteGroupIndices[key] = newIndex;
-                m_spriteBatchGroups.push_back(threadGroup);
+                m_spriteBatchGroups.push_back(std::move(threadGroup));
             }
             else
             {
@@ -317,9 +371,9 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     }
 
 
-    for (const auto& result : threadResults)
+    for (auto& result : threadResults)
     {
-        for (const auto& threadGroup : result.textBatchGroups)
+        for (auto& threadGroup : result.textBatchGroups)
         {
             FastTextBatchKey key(threadGroup.typeface, threadGroup.fontSize, threadGroup.alignment, threadGroup.color);
 
@@ -328,7 +382,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
             {
                 size_t newIndex = m_textBatchGroups.size();
                 m_textGroupIndices[key] = newIndex;
-                m_textBatchGroups.push_back(threadGroup);
+                m_textBatchGroups.push_back(std::move(threadGroup));
             }
             else
             {

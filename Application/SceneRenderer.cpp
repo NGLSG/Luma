@@ -388,8 +388,22 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             const auto& tilemap = view.get<const ECS::TilemapComponent>(entity);
             const auto& renderer = view.get<const ECS::TilemapRendererComponent>(entity);
 
-            for (const auto& [coord, resolvedTile] : tilemap.runtimeTileCache)
+            
+            std::vector<ECS::Vector2i> coords;
+            coords.reserve(tilemap.runtimeTileCache.size());
+            for (const auto& kv : tilemap.runtimeTileCache)
             {
+                coords.push_back(kv.first);
+            }
+            std::sort(coords.begin(), coords.end(), [](const ECS::Vector2i& a, const ECS::Vector2i& b)
+            {
+                if (a.x != b.x) return a.x < b.x;
+                return a.y < b.y;
+            });
+
+            for (const auto& coord : coords)
+            {
+                const auto& resolvedTile = tilemap.runtimeTileCache.at(coord);
                 if (std::holds_alternative<SpriteTileData>(resolvedTile.data))
                 {
                     const Guid& tileAssetGuid = resolvedTile.sourceTileAsset.assetGuid;
@@ -479,6 +493,11 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
     if (!renderables.empty())
     {
         
+        std::stable_sort(renderables.begin(), renderables.end(), [](const Renderable& a, const Renderable& b)
+        {
+            return static_cast<uint32_t>(a.entityId) < static_cast<uint32_t>(b.entityId);
+        });
+
         RenderableManager::GetInstance().SubmitFrame(std::move(renderables));
     }
 }

@@ -12,6 +12,9 @@
 
 #include "PopupManager.h"
 #include "RelationshipComponent.h"
+#include "JobSystem.h"
+#include <cctype>
+#include <memory>
 
 void HierarchyPanel::Initialize(EditorContext* context)
 {
@@ -146,9 +149,11 @@ void HierarchyPanel::Draw()
     }
 #endif
 
+    
+    ImGui::InputTextWithHint("##HierarchySearch", "搜索名称…", m_searchBuffer, sizeof(m_searchBuffer));
+    ImGui::Separator();
 
     drawSceneCamera();
-
 
     drawVirtualizedGameObjects();
 
@@ -210,14 +215,64 @@ void HierarchyPanel::drawVirtualizedGameObjects()
     ImGui::BeginChild("HierarchyScrollRegion", ImVec2(0, 0), false, ImGuiWindowFlags_None);
 
 
+    
+    if (m_searchBuffer[0] != '\0')
+    {
+        
+        std::string q = m_searchBuffer;
+        auto tolower_ascii = [](unsigned char c){ return static_cast<char>(std::tolower(c)); };
+        std::string qlower = q; std::transform(qlower.begin(), qlower.end(), qlower.begin(), tolower_ascii);
+
+        std::vector<int> matches;
+        matches.reserve(128);
+        for (int i = 0; i < static_cast<int>(hierarchyCache.size()); ++i)
+        {
+            const auto& name = hierarchyCache[i].displayName;
+            std::string nlower = name; std::transform(nlower.begin(), nlower.end(), nlower.begin(), tolower_ascii);
+            if (nlower.find(qlower) != std::string::npos)
+            {
+                matches.push_back(i);
+            }
+        }
+
+        int total = static_cast<int>(matches.size());
+        int drawCount = std::min(total, MAX_VISIBLE_NODES);
+
+        if (total == 0)
+        {
+            ImGui::TextDisabled("未找到匹配项");
+        }
+        else
+        {
+            ImGui::Text("匹配 %d 个，显示前 %d 个", total, drawCount);
+            ImGui::Separator();
+            for (int i = 0; i < drawCount; ++i)
+            {
+                int nodeIdx = matches[i];
+                const auto& node = hierarchyCache[nodeIdx];
+                bool selected = std::find(m_context->selectionList.begin(), m_context->selectionList.end(), node.objectGuid) != m_context->selectionList.end();
+                if (ImGui::Selectable(node.displayName.c_str(), selected))
+                {
+                    expandPathToObject(node.objectGuid);
+                    selectSingleGameObject(node.objectGuid);
+                    m_context->objectToFocusInHierarchy = node.objectGuid;
+                }
+            }
+        }
+        ImGui::EndChild();
+        return;
+    }
+
+    
     if (visibleNodeCount == 0)
     {
         drawDropSeparator(0);
     }
     else
     {
+        int cappedCount = std::min(visibleNodeCount, MAX_VISIBLE_NODES);
         ImGuiListClipper clipper;
-        clipper.Begin(visibleNodeCount, itemHeight);
+        clipper.Begin(cappedCount, itemHeight);
 
         while (clipper.Step())
         {
@@ -226,15 +281,12 @@ void HierarchyPanel::drawVirtualizedGameObjects()
                 drawDropSeparator(0);
             }
 
-
             for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
             {
                 int nodeIndex = visibleNodeIndices[i];
                 if (nodeIndex < static_cast<int>(hierarchyCache.size()))
                 {
                     drawVirtualizedNode(hierarchyCache[nodeIndex], nodeIndex);
-
-
                     drawDropSeparator(i + 1);
                 }
             }
@@ -675,16 +727,195 @@ void HierarchyPanel::buildHierarchyCache()
 
     if (!m_context->activeScene) return;
 
-
-    auto& rootGameObjects = m_context->activeScene->GetRootGameObjects();
-    for (auto& gameObject : rootGameObjects)
+    
+    std::vector<Guid> rootGuids;
     {
-        if (gameObject.IsValid())
+        auto& roots = m_context->activeScene->GetRootGameObjects();
+        rootGuids.reserve(roots.size());
+        for (auto& go : roots)
         {
-            buildNodeRecursive(gameObject, 0, true);
+            if (go.IsValid()) rootGuids.push_back(go.GetGuid());
         }
     }
 
+    
+    struct BuildJob : public IJob
+    {
+        EditorContext* ctx;
+        Guid rootGuid;
+        const std::unordered_map<Guid, bool>* expandedStates;
+        std::vector<HierarchyPanel::HierarchyNode>* out;
+        int startDepth = 0;
+        bool startVisible = true;
+
+        static void BuildRec(EditorContext* ctx,
+                             const std::unordered_map<Guid, bool>* expandedStates,
+                             RuntimeGameObject& go,
+                             int depth,
+                             bool parentVisible,
+                             std::vector<HierarchyPanel::HierarchyNode>& out)
+        {
+            if (!go.IsValid()) return;
+
+            auto children = go.GetChildren();
+            bool hasChildren = !children.empty();
+
+            HierarchyPanel::HierarchyNode node(go.GetGuid(), go.GetName(), depth, hasChildren);
+            node.isVisible = parentVisible;
+            out.push_back(std::move(node));
+
+            bool isExpanded = true;
+            if (expandedStates)
+            {
+                auto it = expandedStates->find(go.GetGuid());
+                if (it != expandedStates->end()) isExpanded = it->second;
+            }
+
+            if (hasChildren && isExpanded)
+            {
+                bool childrenVisible = parentVisible && isExpanded;
+                for (auto& child : children)
+                {
+                    if (child.IsValid())
+                    {
+                        BuildRec(ctx, expandedStates, child, depth + 1, childrenVisible, out);
+                    }
+                }
+            }
+        }
+
+        void Execute() override
+        {
+            if (!ctx || !ctx->activeScene || !out) return;
+            RuntimeGameObject root = ctx->activeScene->FindGameObjectByGuid(rootGuid);
+            if (!root.IsValid()) return;
+            out->clear();
+            out->reserve(64);
+            BuildRec(ctx, expandedStates, root, startDepth, startVisible, *out);
+        }
+    };
+
+    size_t rootCount = rootGuids.size();
+    std::vector<std::vector<HierarchyPanel::HierarchyNode>> partialResults(rootCount);
+
+    auto& jobSystem = JobSystem::GetInstance();
+    std::vector<JobHandle> handles;
+    handles.reserve(rootCount);
+
+    
+    int threadCount = std::max(1, jobSystem.GetThreadCount());
+    bool useParallel = (rootCount > 1) && (threadCount > 1);
+
+    if (useParallel)
+    {
+        std::vector<std::unique_ptr<BuildJob>> jobs;
+        jobs.reserve(rootCount);
+        for (size_t i = 0; i < rootCount; ++i)
+        {
+            auto job = std::make_unique<BuildJob>();
+            job->ctx = m_context;
+            job->rootGuid = rootGuids[i];
+            job->expandedStates = &expandedStates;
+            job->out = &partialResults[i];
+            job->startDepth = 0;
+            job->startVisible = true;
+            handles.emplace_back(jobSystem.Schedule(job.get()));
+            jobs.push_back(std::move(job));
+        }
+        JobSystem::CompleteAll(handles);
+    }
+    else
+    {
+        
+        if (rootCount == 1 && threadCount > 1)
+        {
+            RuntimeGameObject root = m_context->activeScene->FindGameObjectByGuid(rootGuids[0]);
+            if (root.IsValid())
+            {
+                auto children = root.GetChildren();
+                bool hasChildren = !children.empty();
+
+                
+                std::vector<HierarchyPanel::HierarchyNode> childResults;
+                partialResults[0].clear();
+                partialResults[0].reserve(64);
+                HierarchyPanel::HierarchyNode rootNode(root.GetGuid(), root.GetName(), 0, hasChildren);
+                rootNode.isVisible = true;
+                partialResults[0].push_back(std::move(rootNode));
+
+                bool isExpanded = true;
+                auto it = expandedStates.find(root.GetGuid());
+                if (it != expandedStates.end()) isExpanded = it->second;
+
+                if (hasChildren && isExpanded)
+                {
+                    
+                    std::vector<Guid> childGuids;
+                    childGuids.reserve(children.size());
+                    for (auto& c : children) if (c.IsValid()) childGuids.push_back(c.GetGuid());
+
+                    std::vector<std::unique_ptr<BuildJob>> childJobs;
+                    std::vector<JobHandle> childHandles;
+                    childJobs.reserve(childGuids.size());
+                    childHandles.reserve(childGuids.size());
+
+                    std::vector<std::vector<HierarchyPanel::HierarchyNode>> perChild(childGuids.size());
+                    for (size_t ci = 0; ci < childGuids.size(); ++ci)
+                    {
+                        auto job = std::make_unique<BuildJob>();
+                        job->ctx = m_context;
+                        job->rootGuid = childGuids[ci];
+                        job->expandedStates = &expandedStates;
+                        job->out = &perChild[ci];
+                        job->startDepth = 1;
+                        job->startVisible = true;
+                        childHandles.emplace_back(jobSystem.Schedule(job.get()));
+                        childJobs.push_back(std::move(job));
+                    }
+                    JobSystem::CompleteAll(childHandles);
+
+                    
+                    size_t totalPerChild = 0; for (auto& v : perChild) totalPerChild += v.size();
+                    partialResults[0].reserve(partialResults[0].size() + totalPerChild);
+                    for (auto& v : perChild)
+                    {
+                        if (!v.empty())
+                        {
+                            partialResults[0].insert(partialResults[0].end(), std::make_move_iterator(v.begin()),
+                                                     std::make_move_iterator(v.end()));
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            
+            for (size_t i = 0; i < rootCount; ++i)
+            {
+                RuntimeGameObject root = m_context->activeScene->FindGameObjectByGuid(rootGuids[i]);
+                if (!root.IsValid()) continue;
+                partialResults[i].clear();
+                partialResults[i].reserve(64);
+                BuildJob::BuildRec(m_context, &expandedStates, root, 0, true, partialResults[i]);
+            }
+        }
+    }
+
+    
+    size_t totalNodes = 0;
+    for (auto& vec : partialResults) totalNodes += vec.size();
+    hierarchyCache.reserve(totalNodes);
+    for (auto& vec : partialResults)
+    {
+        if (!vec.empty())
+        {
+            hierarchyCache.insert(hierarchyCache.end(), std::make_move_iterator(vec.begin()),
+                                  std::make_move_iterator(vec.end()));
+        }
+    }
+
+    totalNodeCount = static_cast<int>(hierarchyCache.size());
     updateNodeVisibility();
 
     auto endTime = std::chrono::steady_clock::now();
