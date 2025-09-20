@@ -10,6 +10,7 @@
 #include <include/core/SkRect.h>
 #include <include/effects/SkRuntimeEffect.h>
 
+#include "include/core/SkCanvas.h"
 #include "include/core/SkM44.h"
 #include "include/core/SkTypeface.h"
 
@@ -312,6 +313,11 @@ struct LineBatch
     size_t pointCount; ///< 批次中线段顶点的数量。
 };
 
+struct RawDrawBatch
+{
+    LumaEvent<SkCanvas*> drawFunc; ///< 自定义绘制函数。
+    int zIndex = 0; ///< 渲染顺序的Z-index值。
+};
 
 /**
  * @brief 渲染包结构体。
@@ -329,6 +335,7 @@ struct RenderPacket
         LineBatch,
         InstanceBatch,
         ShaderBatch,
-        TextBatch
+        TextBatch,
+        RawDrawBatch
     > batchData; ///< 包含具体批次数据的变体。
 };

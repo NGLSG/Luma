@@ -91,6 +91,12 @@ public:
      */
     void Submit(const ShaderBatch& batch);
 
+    /**
+     * @brief 提交一个原始绘制批次进行渲染。
+     * @param batch 要提交的原始绘制批次。
+     */
+    void Submit(const RawDrawBatch& batch);
+
 
     /**
      * @brief 提交一个渲染包进行渲染。

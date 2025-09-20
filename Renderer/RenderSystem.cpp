@@ -71,6 +71,7 @@ public:
     std::vector<CircleBatch> circleBatches;
     std::vector<LineBatch> lineBatches;
     std::vector<ShaderBatch> shaderBatches;
+    std::vector<RawDrawBatch> rawDrawBatches;
     std::vector<CursorPrimitive> cursorPrimitives;
 
     std::vector<SkPoint> positions;
@@ -109,6 +110,7 @@ public:
         circleBatches.reserve(32);
         lineBatches.reserve(32);
         shaderBatches.reserve(32);
+        rawDrawBatches.reserve(16);
         cursorPrimitives.reserve(16);
     }
 
@@ -123,6 +125,7 @@ public:
         lineBatches.clear();
         shaderBatches.clear();
         cursorPrimitives.clear();
+        rawDrawBatches.clear();
     }
 
 
@@ -134,6 +137,7 @@ public:
     void DrawAllLineBatches(SkCanvas* canvas);
     void DrawAllShaderBatches(SkCanvas* canvas);
     void DrawAllCursorBatches(SkCanvas* canvas);
+    void DrawAllRawDrawBatches(SkCanvas* canvas);
 
 private:
     enum class TextAlignment
@@ -222,6 +226,14 @@ void RenderSystem::Submit(const ShaderBatch& batch)
     }
 }
 
+void RenderSystem::Submit(const RawDrawBatch& batch)
+{
+    if (batch.drawFunc)
+    {
+        pImpl->rawDrawBatches.push_back(batch);
+    }
+}
+
 void RenderSystem::DrawCursor(const SkPoint& position, float height, const SkColor4f& color)
 {
     pImpl->cursorPrimitives.emplace_back(CursorPrimitive{position, height, color});
@@ -278,7 +290,7 @@ void RenderSystem::Flush()
         canvas->translate(viewport.fLeft, viewport.fTop);
     }
     canvas->save();
-    
+
     canvas->clear(Camera::GetInstance().m_properties.clearColor);
     Camera::GetInstance().ApplyTo(canvas);
 
@@ -290,6 +302,7 @@ void RenderSystem::Flush()
     pImpl->DrawAllLineBatches(canvas);
     pImpl->DrawAllShaderBatches(canvas);
     pImpl->DrawAllCursorBatches(canvas);
+    pImpl->DrawAllRawDrawBatches(canvas);
     canvas->restore();
     if (hasClip)
     {
@@ -958,4 +971,16 @@ void RenderSystem::RenderSystemImpl::DrawAllCursorBatches(SkCanvas* canvas)
 
 
     flushCursorDrawCall();
+}
+
+void RenderSystem::RenderSystemImpl::DrawAllRawDrawBatches(SkCanvas* canvas)
+{
+    if (rawDrawBatches.empty()) return;
+    for (const auto& batch : rawDrawBatches)
+    {
+        if (batch.drawFunc)
+        {
+            batch.drawFunc(canvas);
+        }
+    }
 }
