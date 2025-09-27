@@ -209,67 +209,61 @@ struct RenderableTransform
 
 /**
  * @brief 精灵批次结构体。
- *
- * 包含渲染一个或多个精灵所需的所有信息。
  */
 struct SpriteBatch
 {
-    const Material* material = nullptr; ///< 材质指针，可为空。
-    sk_sp<SkImage> image; ///< 要渲染的图像。
-    SkRect sourceRect; ///< 图像中要渲染的源矩形。
-    SkColor4f color = SkColors::kWhite; ///< 精灵的颜色。
-    const RenderableTransform* transforms = nullptr; ///< 变换数组的指针。
-    int filterQuality = 0; ///< 图像过滤质量。
-    int wrapMode = 0; ///< 图像环绕模式。
-    float ppuScaleFactor; ///< 每像素单位缩放因子。
-    size_t count; ///< 批次中精灵的数量。
+    const Material* material = nullptr;
+    sk_sp<SkImage> image;
+    SkRect sourceRect;
+    SkColor4f color = SkColors::kWhite;
+    SkPoint anchor = {0.0f, 0.0f}; // 新增锚点
+    const RenderableTransform* transforms = nullptr;
+    int filterQuality = 0;
+    int wrapMode = 0;
+    float ppuScaleFactor;
+    size_t count;
 };
-
 
 /**
  * @brief 实例批次结构体。
- *
- * 包含渲染多个实例所需的所有信息，通常用于图集。
  */
 struct InstanceBatch
 {
-    sk_sp<SkImage> atlasImage; ///< 图集图像。
-    const SkRect* sourceRects; ///< 源矩形数组的指针。
-    const RenderableTransform* transforms; ///< 变换数组的指针。
-    SkColor4f color = SkColors::kWhite; ///< 实例的颜色。
-    int filterQuality = 0; ///< 图像过滤质量。
-    int wrapMode = 0; ///< 图像环绕模式。
-    size_t count; ///< 批次中实例的数量。
+    sk_sp<SkImage> atlasImage;
+    const SkRect* sourceRects;
+    const RenderableTransform* transforms;
+    SkPoint anchor = {0.0f, 0.0f}; // 新增锚点 (假设同一批次实例锚点相同)
+    SkColor4f color = SkColors::kWhite;
+    int filterQuality = 0;
+    int wrapMode = 0;
+    size_t count;
 };
 
 /**
  * @brief 文本批次结构体。
- *
- * 包含渲染一个或多个文本字符串所需的所有信息。
  */
 struct TextBatch
 {
-    sk_sp<SkTypeface> typeface; ///< 字体类型。
-    float fontSize; ///< 字体大小。
-    SkColor4f color = SkColors::kWhite; ///< 文本颜色。
-    const std::string* texts; ///< 文本字符串数组的指针。
-    int alignment = 0; ///< 文本对齐方式。
-    const RenderableTransform* transforms; ///< 变换数组的指针。
-    size_t count; ///< 批次中文本字符串的数量。
+    sk_sp<SkTypeface> typeface;
+    float fontSize;
+    SkColor4f color = SkColors::kWhite;
+    const std::string* texts;
+    int alignment = 0;
+    SkPoint anchor = {0.0f, 0.0f}; // 新增锚点
+    const RenderableTransform* transforms;
+    size_t count;
 };
-
 
 /**
  * @brief 矩形批次结构体。
- *
- * 包含渲染一个或多个矩形所需的所有信息。
  */
 struct RectBatch
 {
-    SkSize size; ///< 矩形的大小。
-    SkColor4f color; ///< 矩形的颜色。
-    const RenderableTransform* transforms; ///< 变换数组的指针。
-    size_t count; ///< 批次中矩形的数量。
+    SkSize size;
+    SkColor4f color;
+    SkPoint anchor = {0.0f, 0.0f}; // 新增锚点
+    const RenderableTransform* transforms;
+    size_t count;
 };
 
 

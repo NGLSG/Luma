@@ -843,8 +843,9 @@ void ToolbarPanel::play()
         playScene->AddSystem<Systems::ScrollViewSystem>();
         playScene->AddSystem<Systems::ScriptingSystem>();
         playScene->AddSystem<Systems::AnimationSystem>();
-        SceneManager::GetInstance().SetCurrentScene(playScene);
         
+        SceneManager::GetInstance().SetCurrentScene(playScene);
+
         playScene->Activate(*ctx->engineContext);
         ctx->activeScene = playScene;
 

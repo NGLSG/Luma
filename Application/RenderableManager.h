@@ -1,54 +1,96 @@
 #ifndef LUMAENGINE_RENDERABLEMANAGER_H
 #define LUMAENGINE_RENDERABLEMANAGER_H
 
-#include <mutex>
 #include <array>
-#include <vector>
 #include <unordered_map>
 #include <memory>
+#include <atomic>
+#include <chrono>
+#include <vector>
 #include "Renderable.h"
 #include "SceneRenderer.h"
-
+#include "DynamicArray.h"
 
 class RenderableManager : public LazySingleton<RenderableManager>
 {
 public:
     friend class LazySingleton<RenderableManager>;
+
+    /**
+     * @brief 提交新的帧数据（DynamicArray版本）
+     * @param frameData 帧渲染数据
+     */
+    void SubmitFrame(DynamicArray<Renderable>&& frameData);
+
+    /**
+     * @brief 提交新的帧数据（vector重载版本）
+     * @param frameData 帧渲染数据
+     */
     void SubmitFrame(std::vector<Renderable>&& frameData);
+
+    /**
+     * @brief 获取插值后的渲染数据
+     * @return 渲染包数组
+     * @details 当其中一帧为空时，会选择正常帧作为基准，不进行插值
+     */
     const std::vector<RenderPacket>& GetInterpolationData();
 
     RenderableManager();
 
 private:
-    std::shared_ptr<std::vector<Renderable>> m_prevFrame;
-    std::shared_ptr<std::vector<Renderable>> m_currFrame;
-    std::mutex mutex;
+    // 帧数据存储，使用DynamicArray的无锁特性
+    DynamicArray<Renderable> prevFrame;
+    DynamicArray<Renderable> currFrame;
 
-    std::array<std::unique_ptr<FrameArena<RenderableTransform>>, 2> m_transformArenas = {
+    // 使用原子操作来管理帧切换状态
+    std::atomic<bool> isUpdatingFrames{false};
+
+    // 双缓冲内存分配器
+    std::array<std::unique_ptr<FrameArena<RenderableTransform>>, 2> transformArenas = {
         std::make_unique<FrameArena<RenderableTransform>>(100000),
         std::make_unique<FrameArena<RenderableTransform>>(100000)
     };
-    std::array<std::unique_ptr<FrameArena<std::string>>, 2> m_textArenas = {
+    std::array<std::unique_ptr<FrameArena<std::string>>, 2> textArenas = {
         std::make_unique<FrameArena<std::string>>(4096),
         std::make_unique<FrameArena<std::string>>(4096)
     };
-    std::array<std::vector<RenderPacket>, 2> m_packetBuffers;
-    int m_activeBufferIndex = 0;
 
-    std::shared_ptr<std::vector<Renderable>> m_lastBuiltPrevFrame;
-    std::shared_ptr<std::vector<Renderable>> m_lastBuiltCurrFrame;
-    std::chrono::steady_clock::time_point m_lastBuiltPrevTime;
-    std::chrono::steady_clock::time_point m_lastBuiltCurrTime;
+    // 使用vector存储渲染包
+    std::array<std::vector<RenderPacket>, 2> packetBuffers;
+    std::atomic<int> activeBufferIndex{0};
 
-    std::unordered_map<FastSpriteBatchKey, size_t> m_spriteGroupIndices;
-    std::unordered_map<FastTextBatchKey, size_t> m_textGroupIndices;
+    // 缓存检查用的时间戳（使用原子操作）
+    std::atomic<std::chrono::steady_clock::time_point> lastBuiltPrevTime;
+    std::atomic<std::chrono::steady_clock::time_point> lastBuiltCurrTime;
+    std::atomic<uint64_t> lastBuiltPrevFrameVersion{0};
+    std::atomic<uint64_t> lastBuiltCurrFrameVersion{0};
 
-    std::vector<SceneRenderer::BatchGroup> m_spriteBatchGroups;
-    std::vector<SceneRenderer::BatchGroup> m_textBatchGroups;
+    // 批次分组索引（这些在单线程构建阶段使用，不需要线程安全）
+    std::unordered_map<FastSpriteBatchKey, size_t> spriteGroupIndices;
+    std::unordered_map<FastTextBatchKey, size_t> textGroupIndices;
 
-    std::chrono::steady_clock::time_point m_prevStateTime;
-    std::chrono::steady_clock::time_point m_currStateTime;
+    // 批次组存储
+    std::vector<SceneRenderer::BatchGroup> spriteBatchGroups;
+    std::vector<SceneRenderer::BatchGroup> textBatchGroups;
+
+    // 时间戳（使用原子操作）
+    std::atomic<std::chrono::steady_clock::time_point> prevStateTime;
+    std::atomic<std::chrono::steady_clock::time_point> currStateTime;
+
+    // 帧版本号，用于缓存检查
+    std::atomic<uint64_t> prevFrameVersion{0};
+    std::atomic<uint64_t> currFrameVersion{0};
+
+    /**
+     * @brief 检查是否需要重新构建渲染数据
+     * @return true 如果需要重新构建
+     */
+    bool needsRebuild() const;
+
+    /**
+     * @brief 更新缓存状态
+     */
+    void updateCacheState();
 };
-
 
 #endif //LUMAENGINE_RENDERABLEMANAGER_H

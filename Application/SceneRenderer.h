@@ -337,7 +337,7 @@ public:
         int wrapMode; ///< 环绕模式。
         float ppuScaleFactor; ///< 每像素单位缩放因子。
         std::vector<std::string> texts; ///< 文本字符串列表。
-
+        SkPoint anchor; /// < 锚点。
         SkImage* image = nullptr; ///< 图像指针。
         const Material* material = nullptr; ///< 材质指针。
         ECS::Color color; ///< 颜色。

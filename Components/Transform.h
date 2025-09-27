@@ -8,18 +8,24 @@
 namespace ECS
 {
     /**
-     * @brief 表示实体在世界空间中的变换信息（位置、旋转、缩放）。
+     * @brief 表示实体在世界空间中的变换信息（位置、旋转、缩放、锚点）。
      * 继承自 IComponent，使其可以作为实体组件。
      */
     struct TransformComponent : IComponent
     {
-        Vector2f position = {0.0f, 0.0f}; ///< 世界空间中的位置。
-        float rotation = 0.0f; ///< 世界空间中的旋转角度（以弧度或度为单位，取决于具体实现）。
+        Vector2f position = {0.0f, 0.0f}; ///< 世界空间中锚点的位置。
+        float rotation = 0.0f; ///< 世界空间中的旋转角度（弧度）。
         Vector2f scale = 1.0f; ///< 世界空间中的缩放。
+
+        /// <summary>
+        /// 锚点，决定了变换作用的基准点。
+        /// 使用归一化坐标，(0,0) 代表左上角，(0.5,0.5) 代表中心，(1,1) 代表右下角。
+        /// </summary>
+        Vector2f anchor = {0.0f, 0.0f};
+
         Vector2f localPosition = {0.0f, 0.0f}; ///< 相对于父级的局部位置。
         float localRotation = 0.0f; ///< 相对于父级的局部旋转角度。
         Vector2f localScale = 1.0f; ///< 相对于父级的局部缩放。
-
 
         /**
          * @brief 默认构造函数，初始化为默认变换值。
@@ -70,6 +76,7 @@ namespace YAML
             node["position"] = transform.position;
             node["rotation"] = transform.rotation;
             node["scale"] = transform.scale;
+            node["anchor"] = transform.anchor; // 新增锚点序列化
             return node;
         }
 
@@ -87,6 +94,10 @@ namespace YAML
             transform.position = node["position"].as<ECS::Vector2f>();
             transform.rotation = node["rotation"].as<float>();
             transform.scale = node["scale"].as<ECS::Vector2f>();
+            if (node["anchor"]) // 兼容旧格式
+            {
+                transform.anchor = node["anchor"].as<ECS::Vector2f>();
+            }
             return true;
         }
     };
@@ -103,6 +114,7 @@ REGISTRY
         .property("position", &ECS::TransformComponent::position) ///< 注册位置属性。
         .property("rotation", &ECS::TransformComponent::rotation) ///< 注册旋转属性。
         .property("scale", &ECS::TransformComponent::scale) ///< 注册缩放属性。
+        .property("anchor", &ECS::TransformComponent::anchor) ///< 注册锚点属性。
         .property("localPosition", &ECS::TransformComponent::localPosition, false) ///< 注册局部位置属性，不可序列化。
         .property("localRotation", &ECS::TransformComponent::localRotation, false) ///< 注册局部旋转属性，不可序列化。
         .property("localScale", &ECS::TransformComponent::localScale, false); ///< 注册局部缩放属性，不可序列化。
