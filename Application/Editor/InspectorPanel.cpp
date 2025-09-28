@@ -420,7 +420,7 @@ void InspectorPanel::drawComponents(RuntimeGameObject& gameObject)
 
     for (const auto& componentName : componentRegistry.GetAllRegisteredNames())
     {
-        if (componentName == "Transform")
+        if (componentName == "TransformComponent")
         {
             auto& transform = registry.get<ECS::TransformComponent>(entityHandle);
             bool hasParent = gameObject.HasComponent<ECS::ParentComponent>();

@@ -504,16 +504,16 @@ public:
      */
     DynamicArray(DynamicArray&& other) noexcept
     {
-       // 将 'other' 的状态转移给我们
-       std::copy(std::begin(other.m_buffers), std::end(other.m_buffers), std::begin(m_buffers));
-       m_readBuffer.store(other.m_readBuffer.load(std::memory_order_relaxed), std::memory_order_relaxed);
-       m_writeBuffer = other.m_writeBuffer;
-       m_readyBuffer = other.m_readyBuffer;
+        // 将 'other' 的状态转移给我们
+        std::copy(std::begin(other.m_buffers), std::end(other.m_buffers), std::begin(m_buffers));
+        m_readBuffer.store(other.m_readBuffer.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        m_writeBuffer = other.m_writeBuffer;
+        m_readyBuffer = other.m_readyBuffer;
 
-       // 将 'other' 置于一个有效的空状态，防止其析构函数释放我们已接管的资源
-       std::fill(std::begin(other.m_buffers), std::end(other.m_buffers), nullptr);
-       other.m_writeBuffer = nullptr;
-       other.m_readyBuffer = nullptr;
+        // 将 'other' 置于一个有效的空状态，防止其析构函数释放我们已接管的资源
+        std::fill(std::begin(other.m_buffers), std::end(other.m_buffers), nullptr);
+        other.m_writeBuffer = nullptr;
+        other.m_readyBuffer = nullptr;
     }
 
     /**
@@ -720,6 +720,25 @@ public:
         m_writerLock.clear(std::memory_order_release);
     }
 
+    DynamicArray& operator=(std::vector<T>&& vec)
+    {
+        ClearAndModify([&vec](auto& proxy)
+        {
+            proxy.Reserve(vec.size());
+            for (auto&& item : vec)
+            {
+                proxy.PushBack(std::move(item));
+            }
+        });
+        return *this;
+    }
+
+    std::vector<T> ToStdVector() const
+    {
+        View view = GetView();
+        return std::vector<T>(view.begin(), view.end());
+    }
+
 private:
     /**
     * @brief 交换两个 DynamicArray 实例的内容。
@@ -738,6 +757,7 @@ private:
         swap(first.m_readyBuffer, second.m_readyBuffer);
         // 锁状态不应被交换
     }
+
     Buffer* m_buffers[3]; ///< 三缓冲区指针
     std::atomic<Buffer*> m_readBuffer; ///< 当前只读缓冲区
     Buffer* m_writeBuffer; ///< 当前写缓冲区
