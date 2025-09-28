@@ -2,12 +2,18 @@
 
 #include <AudioManager.h>
 #include <Loaders/AudioLoader.h>
+#include <algorithm>
+#include <array>
+#include <utility>
+#include <cstring>
 
 #include "AnimationControllerComponent.h"
 #include "ColliderComponent.h"
+#include "UIComponents.h"
 #include "PhysicsSystem.h"
 #include "SceneManager.h"
 #include "SIMDWrapper.h"
+#include "TagComponent.h"
 #include "TextComponent.h"
 #include "Resources/RuntimeAsset/RuntimeScene.h"
 #include "Components/ComponentRegistry.h"
@@ -41,6 +47,46 @@ static inline RuntimeAnimationController* GetController(LumaSceneHandle scene, L
         return nullptr;
     }
     return acc->runtimeController.get();
+}
+
+static inline void PublishComponentUpdated(RuntimeScene* runtimeScene, LumaEntityHandle entity)
+{
+    if (!runtimeScene) return;
+
+    EventBus::GetInstance().Publish(ComponentUpdatedEvent{
+        runtimeScene->GetRegistry(), (entt::entity)entity
+    });
+}
+
+static inline Guid_CAPI ToGuidCAPI(const Guid& guid)
+{
+    Guid_CAPI result{};
+    const auto& bytes = guid.GetBytes();
+    std::memcpy(&result, bytes.data(), bytes.size());
+    return result;
+}
+
+static inline Guid FromGuidCAPI(const Guid_CAPI& guid)
+{
+    std::array<uint8_t, 16> bytes{};
+    std::memcpy(bytes.data(), &guid, bytes.size());
+    return Guid(bytes);
+}
+
+static inline SerializableEventTarget_CAPI ToSerializableEventTargetCAPI(const ECS::SerializableEventTarget& target)
+{
+    SerializableEventTarget_CAPI result{};
+    result.targetEntityGuid = ToGuidCAPI(target.targetEntityGuid);
+    result.targetComponentName = target.targetComponentName.c_str();
+    result.targetMethodName = target.targetMethodName.c_str();
+    return result;
+}
+
+template <typename TComponent>
+static inline TComponent* TryGetComponent(RuntimeScene* runtimeScene, LumaEntityHandle entity)
+{
+    if (!runtimeScene) return nullptr;
+    return runtimeScene->GetRegistry().try_get<TComponent>((entt::entity)entity);
 }
 
 
@@ -103,7 +149,7 @@ LUMA_API void Entity_SetComponent(LumaSceneHandle scene, LumaEntityHandle entity
     auto* registration = ComponentRegistry::GetInstance().Get(componentName);
     auto* runtimeScene = AsScene(scene);
 
-    
+
     if (!registration || !registration->has || !registration->get_raw_ptr ||
         !registration->has(runtimeScene->GetRegistry(), (entt::entity)entity))
     {
@@ -113,7 +159,7 @@ LUMA_API void Entity_SetComponent(LumaSceneHandle scene, LumaEntityHandle entity
     void* dest = registration->get_raw_ptr(runtimeScene->GetRegistry(), (entt::entity)entity);
     if (!dest) return;
 
-    
+
     if (dataSize == 0) return;
     memcpy(dest, componentData, dataSize);
 
@@ -834,7 +880,6 @@ LUMA_API void Entity_SetComponentProperty(LumaSceneHandle scene, LumaEntityHandl
     const auto& propIt = compReg->properties.find(propertyName);
     if (propIt != compReg->properties.end() && propIt->second.set_from_raw_ptr)
     {
-        
         propIt->second.set_from_raw_ptr(runtimeScene->GetRegistry(), (entt::entity)entity, valueData);
 
         EventBus::GetInstance().Publish(ComponentUpdatedEvent{
@@ -896,11 +941,288 @@ LUMA_API void TextComponent_SetText(LumaSceneHandle scene, LumaEntityHandle enti
     if (!runtimeScene || !text) return;
 
     auto& comp = runtimeScene->GetRegistry().get<ECS::TextComponent>((entt::entity)entity);
-    comp.text = text; 
+    comp.text = text;
 
     EventBus::GetInstance().Publish(ComponentUpdatedEvent{
         runtimeScene->GetRegistry(), (entt::entity)entity
     });
+}
+
+LUMA_API const char* TagComponent_GetName(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene) return "";
+
+    const auto* comp = runtimeScene->GetRegistry().try_get<ECS::TagComponent>((entt::entity)entity);
+    if (!comp) return "";
+
+    return comp->tag.c_str();
+}
+
+LUMA_API void TagComponent_SetName(LumaSceneHandle scene, LumaEntityHandle entity, const char* name)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene) return;
+
+    auto* comp = runtimeScene->GetRegistry().try_get<ECS::TagComponent>((entt::entity)entity);
+    if (!comp) return;
+
+    comp->tag = name ? name : "";
+    PublishComponentUpdated(runtimeScene, entity);
+}
+
+LUMA_API const char* InputTextComponent_GetText(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene) return "";
+
+    auto* comp = TryGetComponent<ECS::InputTextComponent>(runtimeScene, entity);
+    if (!comp) return "";
+
+    return comp->text.text.c_str();
+}
+
+LUMA_API void InputTextComponent_SetText(LumaSceneHandle scene, LumaEntityHandle entity, const char* text)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene) return;
+
+    auto* comp = TryGetComponent<ECS::InputTextComponent>(runtimeScene, entity);
+    if (!comp) return;
+
+    const char* safeText = text ? text : "";
+    comp->text.text = safeText;
+    std::strncpy(comp->inputBuffer, comp->text.text.c_str(), sizeof(comp->inputBuffer) - 1);
+    comp->inputBuffer[sizeof(comp->inputBuffer) - 1] = '\0';
+    comp->lastText = comp->text.text;
+    comp->cursorPosition = std::min(comp->cursorPosition, comp->text.text.size());
+    comp->cursorBlinkTimer = 0.0f;
+    comp->isCursorVisible = true;
+
+    PublishComponentUpdated(runtimeScene, entity);
+}
+
+LUMA_API const char* InputTextComponent_GetPlaceholder(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene) return "";
+
+    auto* comp = TryGetComponent<ECS::InputTextComponent>(runtimeScene, entity);
+    if (!comp) return "";
+
+    return comp->placeholder.text.c_str();
+}
+
+LUMA_API void InputTextComponent_SetPlaceholder(LumaSceneHandle scene, LumaEntityHandle entity, const char* text)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene) return;
+
+    auto* comp = TryGetComponent<ECS::InputTextComponent>(runtimeScene, entity);
+    if (!comp) return;
+
+    const char* safeText = text ? text : "";
+    comp->placeholder.text = safeText;
+
+    PublishComponentUpdated(runtimeScene, entity);
+}
+
+LUMA_API int ButtonComponent_GetOnClickTargetCount(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    auto* comp = TryGetComponent<ECS::ButtonComponent>(runtimeScene, entity);
+    if (!comp) return 0;
+    return static_cast<int>(comp->onClickTargets.size());
+}
+
+LUMA_API bool ButtonComponent_GetOnClickTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                               SerializableEventTarget_CAPI* outTarget)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !outTarget) return false;
+
+    auto* comp = TryGetComponent<ECS::ButtonComponent>(runtimeScene, entity);
+    if (!comp) return false;
+
+    if (index < 0 || index >= static_cast<int>(comp->onClickTargets.size())) return false;
+
+    *outTarget = ToSerializableEventTargetCAPI(comp->onClickTargets[static_cast<size_t>(index)]);
+    return true;
+}
+
+LUMA_API void ButtonComponent_ClearOnClickTargets(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    auto* comp = TryGetComponent<ECS::ButtonComponent>(runtimeScene, entity);
+    if (!runtimeScene || !comp || comp->onClickTargets.empty()) return;
+
+    comp->onClickTargets.clear();
+    PublishComponentUpdated(runtimeScene, entity);
+}
+
+LUMA_API void ButtonComponent_AddOnClickTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                               const char* componentName, const char* methodName)
+{
+    auto* runtimeScene = AsScene(scene);
+    auto* comp = TryGetComponent<ECS::ButtonComponent>(runtimeScene, entity);
+    if (!runtimeScene || !comp) return;
+
+    ECS::SerializableEventTarget target;
+    target.targetEntityGuid = FromGuidCAPI(targetGuid);
+    target.targetComponentName = componentName ? componentName : "";
+    target.targetMethodName = methodName ? methodName : "";
+
+    comp->onClickTargets.emplace_back(std::move(target));
+    PublishComponentUpdated(runtimeScene, entity);
+}
+
+LUMA_API int InputTextComponent_GetOnTextChangedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    auto* comp = TryGetComponent<ECS::InputTextComponent>(runtimeScene, entity);
+    if (!comp) return 0;
+    return static_cast<int>(comp->onTextChangedTargets.size());
+}
+
+LUMA_API bool InputTextComponent_GetOnTextChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                        SerializableEventTarget_CAPI* outTarget)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !outTarget) return false;
+
+    auto* comp = TryGetComponent<ECS::InputTextComponent>(runtimeScene, entity);
+    if (!comp) return false;
+
+    if (index < 0 || index >= static_cast<int>(comp->onTextChangedTargets.size())) return false;
+
+    *outTarget = ToSerializableEventTargetCAPI(comp->onTextChangedTargets[static_cast<size_t>(index)]);
+    return true;
+}
+
+LUMA_API void InputTextComponent_ClearOnTextChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    auto* comp = TryGetComponent<ECS::InputTextComponent>(runtimeScene, entity);
+    if (!runtimeScene || !comp || comp->onTextChangedTargets.empty()) return;
+
+    comp->onTextChangedTargets.clear();
+    PublishComponentUpdated(runtimeScene, entity);
+}
+
+LUMA_API void InputTextComponent_AddOnTextChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                        Guid_CAPI targetGuid, const char* componentName,
+                                                        const char* methodName)
+{
+    auto* runtimeScene = AsScene(scene);
+    auto* comp = TryGetComponent<ECS::InputTextComponent>(runtimeScene, entity);
+    if (!runtimeScene || !comp) return;
+
+    ECS::SerializableEventTarget target;
+    target.targetEntityGuid = FromGuidCAPI(targetGuid);
+    target.targetComponentName = componentName ? componentName : "";
+    target.targetMethodName = methodName ? methodName : "";
+
+    comp->onTextChangedTargets.emplace_back(std::move(target));
+    PublishComponentUpdated(runtimeScene, entity);
+}
+
+LUMA_API int InputTextComponent_GetOnSubmitTargetCount(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    auto* comp = TryGetComponent<ECS::InputTextComponent>(runtimeScene, entity);
+    if (!comp) return 0;
+    return static_cast<int>(comp->onSubmitTargets.size());
+}
+
+LUMA_API bool InputTextComponent_GetOnSubmitTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                   SerializableEventTarget_CAPI* outTarget)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !outTarget) return false;
+
+    auto* comp = TryGetComponent<ECS::InputTextComponent>(runtimeScene, entity);
+    if (!comp) return false;
+
+    if (index < 0 || index >= static_cast<int>(comp->onSubmitTargets.size())) return false;
+
+    *outTarget = ToSerializableEventTargetCAPI(comp->onSubmitTargets[static_cast<size_t>(index)]);
+    return true;
+}
+
+LUMA_API void InputTextComponent_ClearOnSubmitTargets(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    auto* comp = TryGetComponent<ECS::InputTextComponent>(runtimeScene, entity);
+    if (!runtimeScene || !comp || comp->onSubmitTargets.empty()) return;
+
+    comp->onSubmitTargets.clear();
+    PublishComponentUpdated(runtimeScene, entity);
+}
+
+LUMA_API void InputTextComponent_AddOnSubmitTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                   const char* componentName, const char* methodName)
+{
+    auto* runtimeScene = AsScene(scene);
+    auto* comp = TryGetComponent<ECS::InputTextComponent>(runtimeScene, entity);
+    if (!runtimeScene || !comp) return;
+
+    ECS::SerializableEventTarget target;
+    target.targetEntityGuid = FromGuidCAPI(targetGuid);
+    target.targetComponentName = componentName ? componentName : "";
+    target.targetMethodName = methodName ? methodName : "";
+
+    comp->onSubmitTargets.emplace_back(std::move(target));
+    PublishComponentUpdated(runtimeScene, entity);
+}
+
+LUMA_API int ScrollViewComponent_GetOnScrollChangedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    auto* comp = TryGetComponent<ECS::ScrollViewComponent>(runtimeScene, entity);
+    if (!comp) return 0;
+    return static_cast<int>(comp->onScrollChangedTargets.size());
+}
+
+LUMA_API bool ScrollViewComponent_GetOnScrollChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                           SerializableEventTarget_CAPI* outTarget)
+{
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene || !outTarget) return false;
+
+    auto* comp = TryGetComponent<ECS::ScrollViewComponent>(runtimeScene, entity);
+    if (!comp) return false;
+
+    if (index < 0 || index >= static_cast<int>(comp->onScrollChangedTargets.size())) return false;
+
+    *outTarget = ToSerializableEventTargetCAPI(comp->onScrollChangedTargets[static_cast<size_t>(index)]);
+    return true;
+}
+
+LUMA_API void ScrollViewComponent_ClearOnScrollChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto* runtimeScene = AsScene(scene);
+    auto* comp = TryGetComponent<ECS::ScrollViewComponent>(runtimeScene, entity);
+    if (!runtimeScene || !comp || comp->onScrollChangedTargets.empty()) return;
+
+    comp->onScrollChangedTargets.clear();
+    PublishComponentUpdated(runtimeScene, entity);
+}
+
+LUMA_API void ScrollViewComponent_AddOnScrollChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                           Guid_CAPI targetGuid, const char* componentName,
+                                                           const char* methodName)
+{
+    auto* runtimeScene = AsScene(scene);
+    auto* comp = TryGetComponent<ECS::ScrollViewComponent>(runtimeScene, entity);
+    if (!runtimeScene || !comp) return;
+
+    ECS::SerializableEventTarget target;
+    target.targetEntityGuid = FromGuidCAPI(targetGuid);
+    target.targetComponentName = componentName ? componentName : "";
+    target.targetMethodName = methodName ? methodName : "";
+
+    comp->onScrollChangedTargets.emplace_back(std::move(target));
+    PublishComponentUpdated(runtimeScene, entity);
 }
 
 LUMA_API int PolygonCollider_GetVertexCount(LumaSceneHandle scene, LumaEntityHandle entity)
@@ -916,7 +1238,7 @@ LUMA_API void PolygonCollider_GetVertices(LumaSceneHandle scene, LumaEntityHandl
     auto* runtimeScene = AsScene(scene);
     if (!runtimeScene || !outVertices) return;
     const auto& comp = runtimeScene->GetRegistry().get<ECS::PolygonColliderComponent>((entt::entity)entity);
-    
+
     for (size_t i = 0; i < comp.vertices.size(); ++i)
     {
         outVertices[i] = {comp.vertices[i].x, comp.vertices[i].y};
@@ -936,9 +1258,8 @@ LUMA_API void PolygonCollider_SetVertices(LumaSceneHandle scene, LumaEntityHandl
     {
         comp.vertices.emplace_back(vertices[i].x, vertices[i].y);
     }
-    comp.isDirty = true; 
+    comp.isDirty = true;
 }
-
 
 
 LUMA_API int EdgeCollider_GetVertexCount(LumaSceneHandle scene, LumaEntityHandle entity)

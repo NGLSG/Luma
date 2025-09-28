@@ -392,17 +392,24 @@ void Editor::Render()
     {
         PROFILE_SCOPE("UI::Update");
 
-        AssetManager::GetInstance().Update(1.f / m_context.currentFps);
+        {
+            PROFILE_SCOPE("UI::AssetManager::Update");
+            AssetManager::GetInstance().Update(1.f / m_context.currentFps);
+        }
+
         for (auto& panel : m_panels)
         {
             if (panel->IsVisible())
             {
+                std::string scope = std::string("UI::Panel::Update: ") + panel->GetPanelName();
+                PROFILE_SCOPE(scope.c_str());
                 panel->Update(1.f / m_context.currentFps);
             }
         }
     }
 
 
+    RenderableManager::GetInstance().SetExternalAlpha(m_context.interpolationAlpha);
     m_editorContext.renderQueue = RenderableManager::GetInstance().GetInterpolationData();
     auto currentTime = std::chrono::steady_clock::now();
     float deltaTime = std::chrono::duration<float>(currentTime - m_editorContext.lastFrameTime).count();
@@ -426,6 +433,8 @@ void Editor::Render()
         {
             if (panel->IsVisible())
             {
+                std::string scope = std::string("UI::Panel::Draw: ") + panel->GetPanelName();
+                PROFILE_SCOPE(scope.c_str());
                 panel->Draw();
             }
         }

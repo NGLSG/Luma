@@ -84,14 +84,42 @@ namespace YAML
         {
             if (!node.IsMap()) return false;
 
-            if (node["Scripts"])
+            if (auto scriptsNode = node["Scripts"])
             {
-                rhs.scripts = node["Scripts"].as<std::vector<ScriptClassMetadata>>();
+                if (scriptsNode.IsSequence())
+                {
+                    rhs.scripts = scriptsNode.as<std::vector<ScriptClassMetadata>>();
+                }
+                else if (scriptsNode.IsNull())
+                {
+                    rhs.scripts.clear();
+                }
+                else
+                {
+                    // Unexpected shape; treat as parse failure
+                    return false;
+                }
             }
 
-            if (node["AvailableTypes"])
+            if (auto typesNode = node["AvailableTypes"])
             {
-                rhs.availableTypes = node["AvailableTypes"].as<std::vector<std::string>>();
+                if (typesNode.IsSequence())
+                {
+                    rhs.availableTypes = typesNode.as<std::vector<std::string>>();
+                }
+                else if (typesNode.IsNull())
+                {
+                    rhs.availableTypes.clear();
+                }
+                else if (typesNode.IsScalar())
+                {
+                    // Gracefully handle a single string
+                    rhs.availableTypes = {typesNode.as<std::string>()};
+                }
+                else
+                {
+                    return false;
+                }
             }
 
             return true;

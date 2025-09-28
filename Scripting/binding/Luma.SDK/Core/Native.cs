@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 
 namespace Luma.SDK;
@@ -26,8 +26,7 @@ public struct RaycastHit
     public readonly Vector2 Normal;
     public readonly float Fraction;
 }
-
-internal static class Native
+internal static class Native
 {
     private const string DllName = "LumaEngine";
 
@@ -238,13 +237,31 @@ internal static class Native
     internal static extern void TextComponent_SetText(IntPtr scene, uint entityId, string text);
 
     [DllImport(DllName)]
-    internal static extern IntPtr TextComponent_GetText(IntPtr scene, uint entityId); 
+    internal static extern IntPtr TextComponent_GetText(IntPtr scene, uint entityId);
 
     [DllImport(DllName)]
     internal static extern void TextComponent_SetName(IntPtr scene, uint entityId, string name);
 
     [DllImport(DllName)]
-    internal static extern IntPtr TextComponent_GetName(IntPtr scene, uint entityId); 
+    internal static extern IntPtr TextComponent_GetName(IntPtr scene, uint entityId);
+
+    [DllImport(DllName)]
+    internal static extern IntPtr TagComponent_GetName(IntPtr scene, uint entityId);
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern void TagComponent_SetName(IntPtr scene, uint entityId, string name);
+
+    [DllImport(DllName)]
+    internal static extern IntPtr InputTextComponent_GetText(IntPtr scene, uint entityId);
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern void InputTextComponent_SetText(IntPtr scene, uint entityId, string text);
+
+    [DllImport(DllName)]
+    internal static extern IntPtr InputTextComponent_GetPlaceholder(IntPtr scene, uint entityId);
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern void InputTextComponent_SetPlaceholder(IntPtr scene, uint entityId, string text);
 
     [DllImport(DllName)]
     internal static extern int PolygonCollider_GetVertexCount(IntPtr scene, uint entityId);
@@ -266,3 +283,8 @@ internal static class Native
     internal static extern void EdgeCollider_SetVertices(IntPtr scene, uint entityId, [In] Vector2[] vertices,
         int count);
 }
+
+
+
+
+

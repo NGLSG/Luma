@@ -13,6 +13,10 @@
 #include "RelationshipComponent.h"
 #include "Transform.h"
 #include "ScriptComponent.h"
+#include "../TagManager.h"
+#include "TagComponent.h"
+#include "../TagManager.h"
+#include "TagComponent.h"
 
 void InspectorPanel::Initialize(EditorContext* context)
 {
@@ -325,6 +329,88 @@ void InspectorPanel::drawGameObjectName(RuntimeGameObject& gameObject)
         m_context->objectToFocusInHierarchy = gameObject.GetGuid();
     }
     ImGui::PopItemWidth();
+
+    // Tag editing (system-level, like Name)
+    if (m_context->activeScene)
+    {
+        auto& registry = m_context->activeScene->GetRegistry();
+        auto entity = static_cast<entt::entity>(gameObject);
+        if (!registry.any_of<ECS::TagComponent>(entity))
+        {
+            gameObject.AddComponent<ECS::TagComponent>();
+        }
+        auto& tagComp = registry.get<ECS::TagComponent>(entity);
+
+        std::vector<std::string> tags = TagManager::GetAllTags();
+        if (tags.empty())
+        {
+            TagManager::EnsureDefaults();
+            tags = TagManager::GetAllTags();
+        }
+
+        int currentIndex = -1;
+        for (int i = 0; i < (int)tags.size(); ++i)
+        {
+            if (tags[i] == tagComp.tag) { currentIndex = i; break; }
+        }
+
+        ImGui::Text("标签");
+        ImGui::SameLine();
+        const char* preview = (currentIndex >= 0 && currentIndex < (int)tags.size()) ? tags[currentIndex].c_str() : "(未设置)";
+        if (ImGui::BeginCombo("##TagDropdownTop", preview))
+        {
+            // Top controls: add/delete inside dropdown
+            static char newTagBuf[64] = {0};
+            ImGui::InputTextWithHint("##NewTagInCombo", "新建标签名", newTagBuf, sizeof(newTagBuf));
+            ImGui::SameLine();
+            if (ImGui::SmallButton("添加"))
+            {
+                std::string nt = newTagBuf;
+                if (!nt.empty())
+                {
+                    TagManager::AddTag(nt);
+                    memset(newTagBuf, 0, sizeof(newTagBuf));
+                    tags = TagManager::GetAllTags();
+                }
+            }
+            ImGui::SameLine();
+            bool canDelete = (currentIndex >= 0 && currentIndex < (int)tags.size() && tags[currentIndex] != std::string("Unknown"));
+            if (!canDelete) ImGui::BeginDisabled();
+            if (ImGui::SmallButton("删除当前"))
+            {
+                std::string toDel = (currentIndex >= 0 && currentIndex < (int)tags.size()) ? tags[currentIndex] : std::string();
+                if (!toDel.empty())
+                {
+                    TagManager::RemoveTag(toDel);
+                    if (tagComp.tag == toDel)
+                    {
+                        m_context->uiCallbacks->onValueChanged.Invoke();
+                        tagComp.tag = "Unknown";
+                    }
+                    tags = TagManager::GetAllTags();
+                    currentIndex = -1;
+                    for (int i = 0; i < (int)tags.size(); ++i) if (tags[i] == tagComp.tag) { currentIndex = i; break; }
+                }
+            }
+            if (!canDelete) ImGui::EndDisabled();
+
+            ImGui::Separator();
+            for (int n = 0; n < (int)tags.size(); ++n)
+            {
+                bool selected = (n == currentIndex);
+                if (ImGui::Selectable(tags[n].c_str(), selected))
+                {
+                    if (tagComp.tag != tags[n])
+                    {
+                        m_context->uiCallbacks->onValueChanged.Invoke();
+                        tagComp.tag = tags[n];
+                    }
+                }
+                if (selected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+    }
 }
 
 void InspectorPanel::drawBatchGameObjectName(std::vector<RuntimeGameObject>& selectedObjects)
@@ -446,6 +532,12 @@ void InspectorPanel::drawComponents(RuntimeGameObject& gameObject)
                                                              *m_context->uiCallbacks);
                     CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("Scale", transform.localScale,
                                                                      *m_context->uiCallbacks);
+                    if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("Anchor", transform.anchor, *m_context->uiCallbacks))
+                    {
+                        // clamp to [0,1]
+                        transform.anchor.x = std::clamp(transform.anchor.x, 0.0f, 1.0f);
+                        transform.anchor.y = std::clamp(transform.anchor.y, 0.0f, 1.0f);
+                    }
                 }
                 else
                 {
@@ -453,6 +545,11 @@ void InspectorPanel::drawComponents(RuntimeGameObject& gameObject)
                                                                      *m_context->uiCallbacks);
                     CustomDrawing::WidgetDrawer<float>::Draw("Rotation", transform.rotation, *m_context->uiCallbacks);
                     CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("Scale", transform.scale, *m_context->uiCallbacks);
+                    if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("Anchor", transform.anchor, *m_context->uiCallbacks))
+                    {
+                        transform.anchor.x = std::clamp(transform.anchor.x, 0.0f, 1.0f);
+                        transform.anchor.y = std::clamp(transform.anchor.y, 0.0f, 1.0f);
+                    }
                 }
             }
             continue;
@@ -460,6 +557,11 @@ void InspectorPanel::drawComponents(RuntimeGameObject& gameObject)
 
         if (componentName == "ScriptComponent" || componentName == "ScriptsComponent")
         {
+            continue;
+        }
+        if (componentName == "TagComponent")
+        {
+            // Tag rendered at top with Name; skip separate header
             continue;
         }
 
@@ -990,12 +1092,84 @@ void InspectorPanel::drawComponentHeader(const std::string& componentName, const
 
     if (isHeaderOpen)
     {
-        for (const auto& [propName, propInfo] : compInfo->properties)
+        if (componentName == "TagComponent")
         {
-            if (propInfo.draw_ui && propInfo.isExposedInEditor)
+            auto& tagComp = registry.get<ECS::TagComponent>(entityHandle);
+
+            std::vector<std::string> tags = TagManager::GetAllTags();
+            int currentIndex = -1;
+            for (int i = 0; i < (int)tags.size(); ++i)
             {
-                m_context->uiCallbacks->SelectedGuids = getCurrentSelectionGuids();
-                propInfo.draw_ui(propName, registry, entityHandle, *m_context->uiCallbacks);
+                if (tags[i] == tagComp.tag) { currentIndex = i; break; }
+            }
+            if (currentIndex == -1)
+            {
+                TagManager::EnsureDefaults();
+                tags = TagManager::GetAllTags();
+                for (int i = 0; i < (int)tags.size(); ++i) if (tags[i] == tagComp.tag) { currentIndex = i; break; }
+            }
+
+            ImGui::Text("标签"); ImGui::SameLine();
+            const char* preview = (currentIndex >= 0 && currentIndex < (int)tags.size()) ? tags[currentIndex].c_str() : "(未设置)";
+            if (ImGui::BeginCombo("##TagDropdown", preview))
+            {
+                for (int n = 0; n < (int)tags.size(); n++)
+                {
+                    bool selected = (n == currentIndex);
+                    if (ImGui::Selectable(tags[n].c_str(), selected))
+                    {
+                        if (tagComp.tag != tags[n])
+                        {
+                            m_context->uiCallbacks->onValueChanged.Invoke();
+                            tagComp.tag = tags[n];
+                        }
+                    }
+                    if (selected) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::SameLine();
+            static char newTagBuf[64] = {0};
+            ImGui::SetNextItemWidth(150);
+            ImGui::InputTextWithHint("##NewTag", "新建标签名", newTagBuf, sizeof(newTagBuf));
+            ImGui::SameLine();
+            if (ImGui::Button("添加"))
+            {
+                std::string nt = newTagBuf;
+                if (!nt.empty())
+                {
+                    TagManager::AddTag(nt);
+                    memset(newTagBuf, 0, sizeof(newTagBuf));
+                }
+            }
+            ImGui::SameLine();
+            bool canDelete = currentIndex >= 0 && tags[currentIndex] != std::string("Unknown");
+            if (!canDelete) ImGui::BeginDisabled();
+            if (ImGui::Button("删除当前"))
+            {
+                std::string toDel = (currentIndex >= 0 && currentIndex < (int)tags.size()) ? tags[currentIndex] : std::string();
+                if (!toDel.empty())
+                {
+                    TagManager::RemoveTag(toDel);
+                    if (tagComp.tag == toDel)
+                    {
+                        m_context->uiCallbacks->onValueChanged.Invoke();
+                        tagComp.tag = "Unknown";
+                    }
+                }
+            }
+            if (!canDelete) ImGui::EndDisabled();
+        }
+        else
+        {
+            for (const auto& [propName, propInfo] : compInfo->properties)
+            {
+                if (propInfo.draw_ui && propInfo.isExposedInEditor)
+                {
+                    m_context->uiCallbacks->SelectedGuids = getCurrentSelectionGuids();
+                    propInfo.draw_ui(propName, registry, entityHandle, *m_context->uiCallbacks);
+                }
             }
         }
     }

@@ -14,6 +14,44 @@ using json = nlohmann::json;
 
 namespace
 {
+    // Merge adjacent sibling nodes that share the same name to avoid duplicate rows like two consecutive "Update".
+    static void CompactAdjacentDuplicates(ProfileNode& node)
+    {
+        // Recurse first to compact children of each child
+        for (auto& child : node.children)
+        {
+            CompactAdjacentDuplicates(*child);
+        }
+
+        if (node.children.empty()) return;
+
+        std::vector<std::unique_ptr<ProfileNode>> compacted;
+        compacted.reserve(node.children.size());
+
+        for (auto& current : node.children)
+        {
+            if (!compacted.empty() && compacted.back()->name == current->name)
+            {
+                // Merge current into the last compacted node
+                auto& last = compacted.back();
+                last->timeMilliseconds += current->timeMilliseconds;
+                last->memoryDeltaBytes += current->memoryDeltaBytes;
+                last->callCount += current->callCount;
+
+                // Append children of current to last (preserve order)
+                for (auto& grandChild : current->children)
+                {
+                    last->children.push_back(std::move(grandChild));
+                }
+            }
+            else
+            {
+                compacted.push_back(std::move(current));
+            }
+        }
+
+        node.children = std::move(compacted);
+    }
     void AggregateNodeData(const ProfileNode& node, std::unordered_map<std::string, std::pair<float, int>>& aggregated)
     {
         if (node.name.rfind("线程", 0) != 0)
@@ -198,6 +236,9 @@ void Profiler::sampleAndStore()
             threadNode->timeMilliseconds += child->timeMilliseconds;
             threadNode->children.push_back(std::move(child));
         }
+
+        // Compact duplicate adjacent entries to reduce visual duplication (e.g., two consecutive Update scopes)
+        CompactAdjacentDuplicates(*threadNode);
         totalTime += threadNode->timeMilliseconds;
         mergedRoot->children.push_back(std::move(threadNode));
 

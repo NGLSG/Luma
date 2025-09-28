@@ -202,6 +202,14 @@ public:
      */
     static TargetPlatform StringToPlatform(const std::string& platformStr);
 
+    // ---------------- Tags ----------------
+public:
+    const std::vector<std::string>& GetTags() const { return m_tags; }
+    void SetTags(const std::vector<std::string>& tags) { m_tags = tags; EnsureDefaultTags(); }
+    void AddTag(const std::string& tag);
+    void RemoveTag(const std::string& tag);
+    void EnsureDefaultTags();
+
 private:
     ProjectSettings() = default;
     ~ProjectSettings() override = default;
@@ -221,6 +229,9 @@ private:
     TargetPlatform m_targetPlatform = TargetPlatform::Current; ///< 目标构建平台。
 
     std::filesystem::path m_projectFilePath; ///< 当前项目文件的路径。
+
+    // Project-wide tags used by TagComponent dropdown in Inspector
+    std::vector<std::string> m_tags;
 };
 
 #endif

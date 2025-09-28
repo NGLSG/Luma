@@ -12,6 +12,7 @@ struct DirectoryNode
     std::string name; ///< 目录的名称。
     std::map<std::string, std::unique_ptr<DirectoryNode>> subdirectories; ///< 子目录的映射。
     std::vector<AssetMetadata> assets; ///< 该目录下的资产元数据列表。
+    bool scanned = false; ///< 是否已扫描（仅扫描当前目录的直接子项与资产）。
 };
 
 /**
@@ -103,7 +104,7 @@ private:
     /// 触发层级面板更新。
     void triggerHierarchyUpdate();
     /// 递归绘制目录节点。
-    void drawDirectoryNode(const DirectoryNode& node);
+    void drawDirectoryNode(DirectoryNode& node);
     /// 绘制资产浏览器上下文菜单。
     void drawAssetBrowserContextMenu();
     /// 绘制资产项目的上下文菜单。
@@ -112,12 +113,14 @@ private:
     void drawConfirmDeleteAssetsPopupContent();
 
 
-    /// 构建资产树。
+    /// 构建资产树（轻量，构建根并按需扫描）。
     void buildAssetTree();
-    /// 递归构建目录树。
-    void buildDirectoryTreeRecursive(DirectoryNode* parentNode);
+    /// 扫描指定目录节点（仅当前目录，非递归）。
+    void scanDirectoryNode(DirectoryNode* parentNode);
     /// 根据路径查找目录节点。
     DirectoryNode* findNodeByPath(const std::filesystem::path& path);
+    /// 确保给定相对路径对应的树节点沿途均已加载。
+    void ensurePathLoaded(const std::filesystem::path& path);
 
 
     /// 创建新资产。

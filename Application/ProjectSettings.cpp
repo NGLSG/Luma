@@ -24,6 +24,13 @@ namespace YAML
             node["TargetHeight"] = rhs.GetTargetHeight();
             node["IsBorderless"] = rhs.IsBorderless();
             node["EnableConsole"] = rhs.IsConsoleEnabled();
+            // Serialize tags
+            if (!rhs.GetTags().empty())
+            {
+                Node tagsNode;
+                for (const auto& t : rhs.GetTags()) tagsNode.push_back(t);
+                node["Tags"] = tagsNode;
+            }
             return node;
         }
 
@@ -44,6 +51,14 @@ namespace YAML
             rhs.SetTargetHeight(node["TargetHeight"].as<int>(720));
             rhs.SetBorderless(node["IsBorderless"].as<bool>(false));
             rhs.SetConsoleEnabled(node["EnableConsole"].as<bool>(false));
+
+            // Tags
+            std::vector<std::string> tags;
+            if (node["Tags"] && node["Tags"].IsSequence())
+            {
+                tags = node["Tags"].as<std::vector<std::string>>();
+            }
+            rhs.SetTags(tags);
 
             return true;
         }
@@ -71,6 +86,7 @@ void ProjectSettings::Save()
 void ProjectSettings::LoadInRuntime()
 {
     LoadWithCrypto("ProjectSettings.lproj");
+    EnsureDefaultTags();
 }
 
 void ProjectSettings::Load(const std::filesystem::path& filePath)
@@ -86,6 +102,7 @@ void ProjectSettings::Load(const std::filesystem::path& filePath)
     {
         YAML::Node data = YAML::LoadFile(filePath.string());
         YAML::convert<ProjectSettings>::decode(data, *this);
+        EnsureDefaultTags();
     }
     catch (const YAML::Exception& e)
     {
@@ -104,6 +121,34 @@ void ProjectSettings::Save(const std::filesystem::path& filePath)
     std::ofstream fout(filePath);
     fout << emitter.c_str();
     fout.close();
+}
+
+void ProjectSettings::AddTag(const std::string& tag)
+{
+    if (tag.empty()) return;
+    if (std::find(m_tags.begin(), m_tags.end(), tag) == m_tags.end())
+    {
+        m_tags.push_back(tag);
+    }
+}
+
+void ProjectSettings::RemoveTag(const std::string& tag)
+{
+    std::erase(m_tags, tag);
+}
+
+void ProjectSettings::EnsureDefaultTags()
+{
+    auto ensure = [&](const char* t)
+    {
+        if (std::find(m_tags.begin(), m_tags.end(), std::string(t)) == m_tags.end())
+        {
+            m_tags.emplace_back(t);
+        }
+    };
+    ensure("Unknown");
+    ensure("Player");
+    ensure("Ground");
 }
 
 std::filesystem::path ProjectSettings::GetProjectRoot() const

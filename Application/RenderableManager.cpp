@@ -219,16 +219,34 @@ namespace
 
 void RenderableManager::SubmitFrame(DynamicArray<Renderable>&& frameData)
 {
-    
+    // Ensure single writer semantics for frame swap
     while (isUpdatingFrames.exchange(true, std::memory_order_acquire)) {
-        
+        // spin
     }
 
-    
-    prevFrame = std::move(currFrame);
-    currFrame = std::move(frameData);
+    // Safely snapshot current frame into prevFrame without invalidating any active readers
+    {
+        auto currView = currFrame.GetView();
+        prevFrame.ClearAndModify([&](auto& proxy) {
+            proxy.Reserve(currView.Size());
+            for (size_t i = 0; i < currView.Size(); ++i) {
+                proxy.PushBack(currView[i]);
+            }
+        });
+    }
 
-    
+    // Safely publish the new frame into currFrame without freeing buffers held by readers
+    {
+        auto newView = frameData.GetView();
+        currFrame.ClearAndModify([&](auto& proxy) {
+            proxy.Reserve(newView.Size());
+            for (size_t i = 0; i < newView.Size(); ++i) {
+                proxy.PushBack(newView[i]);
+            }
+        });
+    }
+
+    // Update timing/versioning for interpolation
     prevStateTime.store(currStateTime.load(std::memory_order_relaxed), std::memory_order_relaxed);
     currStateTime.store(std::chrono::steady_clock::now(), std::memory_order_relaxed);
 
@@ -285,18 +303,27 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     float alpha = 0.0f;
     if (shouldInterpolate)
     {
-        auto renderTime = std::chrono::steady_clock::now();
-        auto prevTime = prevStateTime.load(std::memory_order_relaxed);
-        auto currTime = currStateTime.load(std::memory_order_relaxed);
-
-        auto stateDuration = std::chrono::duration<float>(currTime - prevTime);
-        auto renderDuration = std::chrono::duration<float>(renderTime - currTime);
-
-        if (stateDuration.count() > 0.0f)
+        // 优先使用外部主循环计算的 alpha（更稳定，避免操作系统调度抖动）
+        float ext = m_externalAlpha.load(std::memory_order_relaxed);
+        if (ext >= 0.0f && ext <= 1.0f)
         {
-            alpha = renderDuration.count() / stateDuration.count();
+            alpha = ext;
         }
-        alpha = std::clamp(alpha, 0.0f, 1.0f);
+        else
+        {
+            auto renderTime = std::chrono::steady_clock::now();
+            auto prevTime = prevStateTime.load(std::memory_order_relaxed);
+            auto currTime = currStateTime.load(std::memory_order_relaxed);
+
+            auto stateDuration = std::chrono::duration<float>(currTime - prevTime);
+            auto renderDuration = std::chrono::duration<float>(renderTime - currTime);
+
+            if (stateDuration.count() > 0.0f)
+            {
+                alpha = renderDuration.count() / stateDuration.count();
+            }
+            alpha = std::clamp(alpha, 0.0f, 1.0f);
+        }
     }
 
     const int buildIndex = (activeBufferIndex.load(std::memory_order_relaxed) ^ 1);

@@ -13,6 +13,7 @@
 #include "glm/detail/type_quat.hpp"
 #include "glm/gtx/matrix_decompose.hpp"
 #include "Components/ComponentRegistry.h"
+#include "../Utils/Logger.h"
 
 RuntimeGameObject::RuntimeGameObject(entt::entity handle, RuntimeScene* scene)
     : m_entityHandle(handle), m_scene(scene)
@@ -143,6 +144,18 @@ std::unordered_map<std::string, const ComponentRegistration*> RuntimeGameObject:
 void RuntimeGameObject::SetParent(RuntimeGameObject parent)
 {
     if (!IsValid()) return;
+
+    if (parent == *this)
+    {
+        LogWarn("SetParent: attempt to set an object as its own parent. Ignored.");
+        return;
+    }
+
+    if (parent.IsValid() && parent.IsDescendantOf(*this))
+    {
+        LogWarn("SetParent: attempt to create cyclic hierarchy (new parent is a descendant). Ignored.");
+        return;
+    }
 
     if (HasComponent<ECS::ParentComponent>())
     {

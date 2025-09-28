@@ -34,6 +34,15 @@ struct Vector2f_CAPI
 };
 
 /**
+ * @brief GUID 的 C-API 表示。
+ */
+struct Guid_CAPI
+{
+    uint64_t data1; ///< GUID 高位。
+    uint64_t data2; ///< GUID 低位。
+};
+
+/**
  * @brief C-API 版本的物理命中结果结构体。
  */
 struct RayCastResult_CAPI
@@ -52,6 +61,16 @@ typedef enum
     ForceMode_Force,
     ForceMode_Impulse
 } ForceMode_CAPI;
+
+/**
+ * @brief 可序列化事件目标的 C-API 表示。
+ */
+struct SerializableEventTarget_CAPI
+{
+    Guid_CAPI targetEntityGuid; ///< 目标实体 GUID。
+    const char* targetComponentName; ///< 目标组件名称。
+    const char* targetMethodName; ///< 目标方法名。
+};
 
 /**
  * @brief AudioManager::PlayDesc 的 C-API 兼容版本。
@@ -610,6 +629,42 @@ LUMA_API void TextComponent_SetName(LumaSceneHandle scene, LumaEntityHandle enti
 LUMA_API const char* TextComponent_GetText(LumaSceneHandle scene, LumaEntityHandle entity);
 
 LUMA_API const char* TextComponent_GetName(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API const char* TagComponent_GetName(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void TagComponent_SetName(LumaSceneHandle scene, LumaEntityHandle entity, const char* name);
+LUMA_API const char* InputTextComponent_GetText(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void InputTextComponent_SetText(LumaSceneHandle scene, LumaEntityHandle entity, const char* text);
+LUMA_API const char* InputTextComponent_GetPlaceholder(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void InputTextComponent_SetPlaceholder(LumaSceneHandle scene, LumaEntityHandle entity, const char* text);
+
+LUMA_API int ButtonComponent_GetOnClickTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool ButtonComponent_GetOnClickTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                               SerializableEventTarget_CAPI* outTarget);
+LUMA_API void ButtonComponent_ClearOnClickTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void ButtonComponent_AddOnClickTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                               const char* componentName, const char* methodName);
+
+LUMA_API int InputTextComponent_GetOnTextChangedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool InputTextComponent_GetOnTextChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                        SerializableEventTarget_CAPI* outTarget);
+LUMA_API void InputTextComponent_ClearOnTextChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void InputTextComponent_AddOnTextChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                        Guid_CAPI targetGuid, const char* componentName,
+                                                        const char* methodName);
+
+LUMA_API int InputTextComponent_GetOnSubmitTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool InputTextComponent_GetOnSubmitTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                   SerializableEventTarget_CAPI* outTarget);
+LUMA_API void InputTextComponent_ClearOnSubmitTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void InputTextComponent_AddOnSubmitTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                   const char* componentName, const char* methodName);
+
+LUMA_API int ScrollViewComponent_GetOnScrollChangedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool ScrollViewComponent_GetOnScrollChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                           SerializableEventTarget_CAPI* outTarget);
+LUMA_API void ScrollViewComponent_ClearOnScrollChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void ScrollViewComponent_AddOnScrollChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                           Guid_CAPI targetGuid, const char* componentName,
+                                                           const char* methodName);
 
 LUMA_API int PolygonCollider_GetVertexCount(LumaSceneHandle scene, LumaEntityHandle entity);
 

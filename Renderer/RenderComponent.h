@@ -216,7 +216,6 @@ struct SpriteBatch
     sk_sp<SkImage> image;
     SkRect sourceRect;
     SkColor4f color = SkColors::kWhite;
-    SkPoint anchor = {0.0f, 0.0f}; // 新增锚点
     const RenderableTransform* transforms = nullptr;
     int filterQuality = 0;
     int wrapMode = 0;
@@ -232,7 +231,6 @@ struct InstanceBatch
     sk_sp<SkImage> atlasImage;
     const SkRect* sourceRects;
     const RenderableTransform* transforms;
-    SkPoint anchor = {0.0f, 0.0f}; // 新增锚点 (假设同一批次实例锚点相同)
     SkColor4f color = SkColors::kWhite;
     int filterQuality = 0;
     int wrapMode = 0;
@@ -249,7 +247,6 @@ struct TextBatch
     SkColor4f color = SkColors::kWhite;
     const std::string* texts;
     int alignment = 0;
-    SkPoint anchor = {0.0f, 0.0f}; // 新增锚点
     const RenderableTransform* transforms;
     size_t count;
 };
@@ -261,7 +258,6 @@ struct RectBatch
 {
     SkSize size;
     SkColor4f color;
-    SkPoint anchor = {0.0f, 0.0f}; // 新增锚点
     const RenderableTransform* transforms;
     size_t count;
 };

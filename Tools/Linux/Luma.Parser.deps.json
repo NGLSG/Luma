@@ -15,13 +15,7 @@
           "Luma.Parser.dll": {}
         }
       },
-      "Microsoft.CodeAnalysis.Analyzers/3.11.0": {},
       "Microsoft.CodeAnalysis.Common/4.14.0": {
-        "dependencies": {
-          "Microsoft.CodeAnalysis.Analyzers": "3.11.0",
-          "System.Collections.Immutable": "9.0.0",
-          "System.Reflection.Metadata": "9.0.0"
-        },
         "runtime": {
           "lib/net9.0/Microsoft.CodeAnalysis.dll": {
             "assemblyVersion": "4.14.0.0",
@@ -72,10 +66,7 @@
       },
       "Microsoft.CodeAnalysis.CSharp/4.14.0": {
         "dependencies": {
-          "Microsoft.CodeAnalysis.Analyzers": "3.11.0",
-          "Microsoft.CodeAnalysis.Common": "4.14.0",
-          "System.Collections.Immutable": "9.0.0",
-          "System.Reflection.Metadata": "9.0.0"
+          "Microsoft.CodeAnalysis.Common": "4.14.0"
         },
         "runtime": {
           "lib/net9.0/Microsoft.CodeAnalysis.CSharp.dll": {
@@ -124,9 +115,7 @@
             "locale": "zh-Hant"
           }
         }
-      },
-      "System.Collections.Immutable/9.0.0": {},
-      "System.Reflection.Metadata/9.0.0": {}
+      }
     }
   },
   "libraries": {
@@ -134,13 +123,6 @@
       "type": "project",
       "serviceable": false,
       "sha512": ""
-    },
-    "Microsoft.CodeAnalysis.Analyzers/3.11.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-v/EW3UE8/lbEYHoC2Qq7AR/DnmvpgdtAMndfQNmpuIMx/Mto8L5JnuCfdBYtgvalQOtfNCnxFejxuRrryvUTsg==",
-      "path": "microsoft.codeanalysis.analyzers/3.11.0",
-      "hashPath": "microsoft.codeanalysis.analyzers.3.11.0.nupkg.sha512"
     },
     "Microsoft.CodeAnalysis.Common/4.14.0": {
       "type": "package",
@@ -155,20 +137,6 @@
       "sha512": "sha512-568a6wcTivauIhbeWcCwfWwIn7UV7MeHEBvFB2uzGIpM2OhJ4eM/FZ8KS0yhPoNxnSpjGzz7x7CIjTxhslojQA==",
       "path": "microsoft.codeanalysis.csharp/4.14.0",
       "hashPath": "microsoft.codeanalysis.csharp.4.14.0.nupkg.sha512"
-    },
-    "System.Collections.Immutable/9.0.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-QhkXUl2gNrQtvPmtBTQHb0YsUrDiDQ2QS09YbtTTiSjGcf7NBqtYbrG/BE06zcBPCKEwQGzIv13IVdXNOSub2w==",
-      "path": "system.collections.immutable/9.0.0",
-      "hashPath": "system.collections.immutable.9.0.0.nupkg.sha512"
-    },
-    "System.Reflection.Metadata/9.0.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-ANiqLu3DxW9kol/hMmTWbt3414t9ftdIuiIU7j80okq2YzAueo120M442xk1kDJWtmZTqWQn7wHDvMRipVOEOQ==",
-      "path": "system.reflection.metadata/9.0.0",
-      "hashPath": "system.reflection.metadata.9.0.0.nupkg.sha512"
     }
   }
 }

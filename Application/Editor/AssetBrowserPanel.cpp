@@ -163,6 +163,7 @@ void AssetBrowserPanel::drawToolbar()
             if (parentNode)
             {
                 m_context->currentAssetDirectory = parentNode;
+                m_pathToExpand = parentPath; // 同步展开左侧树
             }
         }
         ImGui::SameLine();
@@ -187,6 +188,11 @@ void AssetBrowserPanel::drawDirectoryTree()
 {
     if (m_context->assetTreeRoot)
     {
+        // 若有路径请求展开，先确保沿途节点已加载
+        if (!m_pathToExpand.empty())
+        {
+            ensurePathLoaded(m_pathToExpand);
+        }
         drawDirectoryNode(*m_context->assetTreeRoot);
     }
 
@@ -340,6 +346,10 @@ void AssetBrowserPanel::ProcessDoubleClick(const Item& item)
 void AssetBrowserPanel::drawAssetContentView()
 {
     if (!m_context->currentAssetDirectory) return;
+    if (!m_context->currentAssetDirectory->scanned)
+    {
+        scanDirectoryNode(m_context->currentAssetDirectory);
+    }
     static AssetHandle s_draggedAssetHandle;
     static std::vector<AssetHandle> s_draggedAssetHandlesMulti;
     bool contentItemClicked = false;
@@ -944,7 +954,7 @@ void AssetBrowserPanel::triggerHierarchyUpdate()
 }
 
 
-void AssetBrowserPanel::drawDirectoryNode(const DirectoryNode& node)
+void AssetBrowserPanel::drawDirectoryNode(DirectoryNode& node)
 {
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
     if (&node == m_context->currentAssetDirectory)
@@ -952,7 +962,8 @@ void AssetBrowserPanel::drawDirectoryNode(const DirectoryNode& node)
         flags |= ImGuiTreeNodeFlags_Selected;
     }
 
-    if (node.subdirectories.empty())
+    // 若已扫描且没有子目录，则渲染为叶子节点
+    if (node.scanned && node.subdirectories.empty())
     {
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
     }
@@ -988,7 +999,7 @@ void AssetBrowserPanel::drawDirectoryNode(const DirectoryNode& node)
 
     if (ImGui::IsItemClicked())
     {
-        m_context->currentAssetDirectory = const_cast<DirectoryNode*>(&node);
+        m_context->currentAssetDirectory = &node;
     }
 
 
@@ -1015,6 +1026,10 @@ void AssetBrowserPanel::drawDirectoryNode(const DirectoryNode& node)
 
     if (nodeOpen && !(flags & ImGuiTreeNodeFlags_Leaf))
     {
+        if (!node.scanned)
+        {
+            scanDirectoryNode(&node);
+        }
         std::vector<const DirectoryNode*> sortedSubdirs;
         for (const auto& pair : node.subdirectories)
         {
@@ -1027,7 +1042,8 @@ void AssetBrowserPanel::drawDirectoryNode(const DirectoryNode& node)
 
         for (const auto* subNode : sortedSubdirs)
         {
-            drawDirectoryNode(*subNode);
+            // const_cast 安全：draw 过程中不会改变路径，但可能触发懒加载的子节点构建
+            drawDirectoryNode(*const_cast<DirectoryNode*>(subNode));
         }
         ImGui::TreePop();
     }
@@ -1105,31 +1121,21 @@ void AssetBrowserPanel::buildAssetTree()
     m_context->assetTreeRoot = std::make_unique<DirectoryNode>();
     m_context->assetTreeRoot->path = "";
     m_context->assetTreeRoot->name = "Assets";
-
-    try
-    {
-        buildDirectoryTreeRecursive(m_context->assetTreeRoot.get());
-    }
-    catch (const std::exception& e)
-    {
-        LogError("构建目录树失败: {}", e.what());
-    }
-
-
-    const auto& allAssets = assetManager.GetAssetDatabase();
-    for (const auto& [guidStr, metadata] : allAssets)
-    {
-        std::filesystem::path parentPath = metadata.assetPath.parent_path();
-        DirectoryNode* parentNode = findNodeByPath(parentPath);
-        if (parentNode)
-        {
-            parentNode->assets.push_back(metadata);
-        }
-    }
+    m_context->assetTreeRoot->scanned = false;
+    // 仅扫描根的直接子目录和文件，避免全量递归
+    scanDirectoryNode(m_context->assetTreeRoot.get());
 }
 
-void AssetBrowserPanel::buildDirectoryTreeRecursive(DirectoryNode* parentNode)
+void AssetBrowserPanel::scanDirectoryNode(DirectoryNode* parentNode)
 {
+    if (!parentNode) return;
+    if (parentNode->scanned)
+    {
+        return; // 已扫描过，不重复开销
+    }
+    parentNode->subdirectories.clear();
+    parentNode->assets.clear();
+
     std::filesystem::path absoluteParentPath = AssetManager::GetInstance().GetAssetsRootPath() / parentNode->path;
 
     std::error_code ec;
@@ -1167,16 +1173,30 @@ void AssetBrowserPanel::buildDirectoryTreeRecursive(DirectoryNode* parentNode)
             auto newNode = std::make_unique<DirectoryNode>();
             newNode->path = parentNode->path / dirName;
             newNode->name = dirName;
-
-            buildDirectoryTreeRecursive(newNode.get());
+            newNode->scanned = false; // 懒加载子目录
 
             parentNode->subdirectories[dirName] = std::move(newNode);
         }
         else
         {
-            if (ec) ec.clear();
+            if (ec)
+            {
+                ec.clear();
+                continue;
+            }
+            // 非目录：尝试获取该文件的资产元数据（若存在）
+            std::filesystem::path relPath = std::filesystem::relative(entry.path(), AssetManager::GetInstance().GetAssetsRootPath());
+            if (relPath.extension() == ".meta")
+            {
+                continue; // 跳过 .meta 文件
+            }
+            if (const AssetMetadata* meta = AssetManager::GetInstance().GetMetadata(relPath))
+            {
+                parentNode->assets.push_back(*meta);
+            }
         }
     }
+    parentNode->scanned = true;
 }
 
 DirectoryNode* AssetBrowserPanel::findNodeByPath(const std::filesystem::path& path)
@@ -1195,17 +1215,41 @@ DirectoryNode* AssetBrowserPanel::findNodeByPath(const std::filesystem::path& pa
         std::string partStr = part.string();
         if (partStr == ".") continue;
 
-        auto it = currentNode->subdirectories.find(partStr);
-        if (it != currentNode->subdirectories.end())
+        if (!currentNode->scanned)
         {
-            currentNode = it->second.get();
+            scanDirectoryNode(currentNode);
         }
-        else
+        auto it = currentNode->subdirectories.find(partStr);
+        if (it == currentNode->subdirectories.end())
         {
+            // 未找到，路径可能不存在
             return nullptr;
         }
+        currentNode = it->second.get();
     }
     return currentNode;
+}
+
+void AssetBrowserPanel::ensurePathLoaded(const std::filesystem::path& path)
+{
+    if (!m_context->assetTreeRoot) return;
+    DirectoryNode* current = m_context->assetTreeRoot.get();
+    for (const auto& part : path)
+    {
+        std::string partStr = part.string();
+        if (partStr == ".") continue;
+        if (!current->scanned)
+        {
+            scanDirectoryNode(current);
+        }
+        auto it = current->subdirectories.find(partStr);
+        if (it == current->subdirectories.end())
+        {
+            // 子目录不存在，停止
+            return;
+        }
+        current = it->second.get();
+    }
 }
 
 void AssetBrowserPanel::createNewAsset(AssetType type)

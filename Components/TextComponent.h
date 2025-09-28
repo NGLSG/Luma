@@ -238,9 +238,24 @@ namespace CustomDrawing
         {
             bool changed = false;
             ImGui::PushID(component.name.c_str());
-            std::string headerLabel = "TextComponent (" + component.name + ")";
-            bool openHeader = ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
-            if (openHeader)
+
+            // If a label is provided (i.e., drawn as a property inside another component),
+            // render as a TreeNode instead of a top-level CollapsingHeader to clarify hierarchy.
+            bool open = true;
+            bool useTree = !label.empty();
+            if (useTree)
+            {
+                std::string nodeLabel = label;
+                if (!component.name.empty()) nodeLabel += std::string(" ( ") + component.name + ")";
+                open = ImGui::TreeNodeEx(nodeLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+            }
+            else
+            {
+                std::string headerLabel = "TextComponent (" + component.name + ")";
+                open = ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+            }
+
+            if (open)
             {
                 if (WidgetDrawer<std::string>::Draw("Text", component.text, callbacks))
                 {
@@ -268,6 +283,10 @@ namespace CustomDrawing
                 }
             }
 
+            if (useTree && open)
+            {
+                ImGui::TreePop();
+            }
             ImGui::PopID();
 
             return changed;

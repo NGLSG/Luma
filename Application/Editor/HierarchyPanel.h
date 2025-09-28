@@ -64,6 +64,11 @@ public:
      */
     void CopySelectedGameObjects();
     /**
+     * @brief 复制指定的一组游戏对象（忽略当前选择）。
+     * @param guids 要复制的对象 GUID 列表。
+     */
+    void CopyGameObjects(const std::vector<Guid>& guids);
+    /**
      * @brief 将剪贴板中的游戏对象粘贴到指定父对象下。
      * @param parent 作为新游戏对象父级的运行时游戏对象，如果为nullptr则粘贴为根对象。
      */

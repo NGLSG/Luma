@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Runtime.InteropServices;
 using Luma.SDK.Components;
@@ -25,6 +25,16 @@ public readonly struct Entity
             return Marshal.PtrToStringAnsi(namePtr);
         }
         set => Native.GameObject_SetName(ScenePtr, Id, value);
+    }
+
+    public string Tag
+    {
+        get
+        {
+            IntPtr tagPtr = Native.TagComponent_GetName(ScenePtr, Id);
+            return tagPtr == IntPtr.Zero ? string.Empty : Marshal.PtrToStringAnsi(tagPtr) ?? string.Empty;
+        }
+        set => Native.TagComponent_SetName(ScenePtr, Id, value ?? string.Empty);
     }
 
     public Entity Parent
@@ -403,3 +413,5 @@ public readonly struct Entity
         }
     }
 }
+
+

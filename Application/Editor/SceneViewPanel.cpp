@@ -51,7 +51,24 @@ static bool IsPointInSprite(const ECS::Vector2f& worldPoint, const ECS::Transfor
     if (halfWidth <= 0 || halfHeight <= 0) return false;
 
 
-    ECS::Vector2f localPoint = worldPoint - transform.position;
+    // Compute anchored center (position is anchor point)
+    float width = halfWidth * 2.0f;
+    float height = halfHeight * 2.0f;
+    ECS::Vector2f anchorOffset = {
+        (0.5f - transform.anchor.x) * width * transform.scale.x,
+        (0.5f - transform.anchor.y) * height * transform.scale.y
+    };
+
+    if (std::abs(transform.rotation) > 0.001f)
+    {
+        const float sinRot = sinf(transform.rotation);
+        const float cosRot = cosf(transform.rotation);
+        float tempX = anchorOffset.x;
+        anchorOffset.x = anchorOffset.x * cosRot - anchorOffset.y * sinRot;
+        anchorOffset.y = tempX * sinRot + anchorOffset.y * cosRot;
+    }
+
+    ECS::Vector2f localPoint = worldPoint - (transform.position + anchorOffset);
 
 
     if (transform.rotation != 0.0f)
@@ -710,12 +727,27 @@ void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS:
     }
 
 
+    // Compute anchored center offset in world space
+    ECS::Vector2f anchorOffset = {
+        (0.5f - transform.anchor.x) * width,
+        (0.5f - transform.anchor.y) * height
+    };
+
+    if (std::abs(transform.rotation) > 0.001f)
+    {
+        const float sinR2 = sinf(transform.rotation);
+        const float cosR2 = cosf(transform.rotation);
+        float tempX = anchorOffset.x;
+        anchorOffset.x = anchorOffset.x * cosR2 - anchorOffset.y * sinR2;
+        anchorOffset.y = tempX * sinR2 + anchorOffset.y * cosR2;
+    }
+
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
 
     for (const auto& corner : worldCorners)
     {
-        ECS::Vector2f worldPos = transform.position + corner;
+        ECS::Vector2f worldPos = transform.position + anchorOffset + corner;
         ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, worldPos);
         screenCorners.push_back(screenPos);
     }
@@ -1032,9 +1064,23 @@ void SceneViewPanel::drawScrollViewSelectionOutline(ImDrawList* drawList, const 
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
 
+    // Anchor offset (position is anchor point)
+    ECS::Vector2f anchorOffset = {
+        (0.5f - transform.anchor.x) * viewportWidth * transform.scale.x,
+        (0.5f - transform.anchor.y) * viewportHeight * transform.scale.y
+    };
+    if (std::abs(transform.rotation) > 0.001f)
+    {
+        const float sinR2 = sinf(transform.rotation);
+        const float cosR2 = cosf(transform.rotation);
+        float tempX = anchorOffset.x;
+        anchorOffset.x = anchorOffset.x * cosR2 - anchorOffset.y * sinR2;
+        anchorOffset.y = tempX * sinR2 + anchorOffset.y * cosR2;
+    }
+
     for (const auto& corner : worldCorners)
     {
-        ECS::Vector2f worldPos = transform.position + corner;
+        ECS::Vector2f worldPos = transform.position + anchorOffset + corner;
         ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, worldPos);
         screenCorners.push_back(screenPos);
     }
@@ -1090,7 +1136,7 @@ void SceneViewPanel::drawScrollViewSelectionOutline(ImDrawList* drawList, const 
 
         for (const auto& corner : contentCorners)
         {
-            ECS::Vector2f worldPos = transform.position + corner;
+            ECS::Vector2f worldPos = transform.position + anchorOffset + corner;
             ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, worldPos);
             contentScreenCorners.push_back(screenPos);
         }
@@ -1122,6 +1168,12 @@ void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::T
         {localBounds.fLeft, localBounds.fBottom}
     };
 
+    // Compute anchor pivot in local coordinates relative to bounds
+    const float localW = localBounds.width();
+    const float localH = localBounds.height();
+    const float pivotLocalX = localBounds.fLeft + transform.anchor.x * localW;
+    const float pivotLocalY = localBounds.fTop + transform.anchor.y * localH;
+
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
 
@@ -1130,6 +1182,10 @@ void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::T
 
     for (auto corner : localCorners)
     {
+        // shift by anchor pivot first
+        corner.x -= pivotLocalX;
+        corner.y -= pivotLocalY;
+
         corner.x *= transform.scale.x;
         corner.y *= transform.scale.y;
 
@@ -1170,6 +1226,12 @@ void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const E
         {localBounds.fLeft, localBounds.fBottom}
     };
 
+    // Compute anchor pivot in local coordinates relative to bounds
+    const float localW2 = localBounds.width();
+    const float localH2 = localBounds.height();
+    const float pivotLocalX2 = localBounds.fLeft + transform.anchor.x * localW2;
+    const float pivotLocalY2 = localBounds.fTop + transform.anchor.y * localH2;
+
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
 
@@ -1178,6 +1240,10 @@ void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const E
 
     for (auto corner : localCorners)
     {
+        // shift by anchor pivot
+        corner.x -= pivotLocalX2;
+        corner.y -= pivotLocalY2;
+
         corner.x *= transform.scale.x;
         corner.y *= transform.scale.y;
 

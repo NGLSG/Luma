@@ -37,6 +37,10 @@ public:
 
     RenderableManager();
 
+    // 外部设置插值因子（优先级高于内部基于时间的估算）。
+    // 传入范围应为 [0,1]。传入其他值将忽略并使用内部计算。
+    void SetExternalAlpha(float a) { m_externalAlpha.store(a, std::memory_order_relaxed); }
+
 private:
     // 帧数据存储，使用DynamicArray的无锁特性
     DynamicArray<Renderable> prevFrame;
@@ -80,6 +84,9 @@ private:
     // 帧版本号，用于缓存检查
     std::atomic<uint64_t> prevFrameVersion{0};
     std::atomic<uint64_t> currFrameVersion{0};
+
+    // 可选：外部驱动的插值 alpha（来自主循环 accumulator/fixed dt），默认 -1 表示未启用
+    std::atomic<float> m_externalAlpha{-1.0f};
 
     /**
      * @brief 检查是否需要重新构建渲染数据

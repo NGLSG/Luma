@@ -69,7 +69,7 @@ void ApplicationBase::Run()
         m_context.inputState = m_window->GetInputState();
 
 
-        const float fixedDeltaTime = 1.0f / m_config.SimulationFPS;
+        const float fixedDeltaTime = 1.0f / static_cast<float>(m_config.SimulationFPS);
         accumulator += frameTime;
         m_context.interpolationAlpha = static_cast<float>(accumulator / fixedDeltaTime);
         if (accumulator >= fixedDeltaTime)
@@ -94,18 +94,12 @@ void ApplicationBase::Run()
 void ApplicationBase::simulationLoop()
 {
     const std::chrono::duration<double> fixedDeltaTime(1.0 / m_config.SimulationFPS);
-
     auto nextFrameTime = std::chrono::high_resolution_clock::now();
-
     while (m_isRunning)
     {
         nextFrameTime += std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(fixedDeltaTime);
         m_context.deferredCommands.Execute();
-
-
         Update(static_cast<float>(fixedDeltaTime.count()));
-
-
         std::this_thread::sleep_until(nextFrameTime);
     }
 }

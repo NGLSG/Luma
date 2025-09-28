@@ -603,7 +603,15 @@ void HierarchyPanel::drawVirtualizedNode(const HierarchyNode& node, int virtualI
 
         if (ImGui::MenuItem("复制"))
         {
-            CopySelectedGameObjects();
+            // 在节点上下文菜单中，复制当前节点，避免误复制其他已选中的对象
+            CopyGameObjects(std::vector<Guid>{node.objectGuid});
+        }
+        if (m_context->selectionList.size() > 1)
+        {
+            if (ImGui::MenuItem("复制所选"))
+            {
+                CopySelectedGameObjects();
+            }
         }
 
         if (ImGui::MenuItem("删除"))
@@ -1284,14 +1292,23 @@ void HierarchyPanel::CopySelectedGameObjects()
     if (!m_context->activeScene) return;
     if (m_context->selectionList.empty()) return;
 
-    std::vector<Data::PrefabNode> clipboardData;
+    CopyGameObjects(m_context->selectionList);
+}
 
-    for (const auto& objGuid : m_context->selectionList)
+void HierarchyPanel::CopyGameObjects(const std::vector<Guid>& guids)
+{
+    if (!m_context->activeScene) return;
+    if (guids.empty()) return;
+
+    std::vector<Data::PrefabNode> clipboardData;
+    clipboardData.reserve(guids.size());
+
+    for (const auto& guid : guids)
     {
-        RuntimeGameObject selectedObject = m_context->activeScene->FindGameObjectByGuid(objGuid);
-        if (selectedObject.IsValid())
+        RuntimeGameObject go = m_context->activeScene->FindGameObjectByGuid(guid);
+        if (go.IsValid())
         {
-            clipboardData.push_back(selectedObject.SerializeToPrefabData());
+            clipboardData.push_back(go.SerializeToPrefabData());
         }
     }
 

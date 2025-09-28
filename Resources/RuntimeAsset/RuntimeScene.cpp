@@ -380,7 +380,8 @@ RuntimeGameObject RuntimeScene::CreateHierarchyFromNode(const Data::PrefabNode& 
     auto& compRegistry = ComponentRegistry::GetInstance();
     for (const auto& [compName, compData] : node.components)
     {
-        if (compName == "IDComponent")
+        // Skip identity and relationship components; hierarchy is driven by PrefabNode::children
+        if (compName == "IDComponent" || compName == "ParentComponent" || compName == "ChildrenComponent")
         {
             continue;
         }

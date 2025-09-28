@@ -337,7 +337,6 @@ public:
         int wrapMode; ///< 环绕模式。
         float ppuScaleFactor; ///< 每像素单位缩放因子。
         std::vector<std::string> texts; ///< 文本字符串列表。
-        SkPoint anchor; /// < 锚点。
         SkImage* image = nullptr; ///< 图像指针。
         const Material* material = nullptr; ///< 材质指针。
         ECS::Color color; ///< 颜色。
@@ -349,8 +348,7 @@ public:
 private:
     std::unique_ptr<FrameArena<RenderableTransform>> m_transformArena = std::make_unique<FrameArena<
         RenderableTransform>>(100000); ///< 用于存储可渲染变换的帧竞技场。
-    std::unique_ptr<FrameArena<std::string>> m_textArena = std::make_unique<FrameArena<std::string>>(4096);
-    ///< 用于存储文本字符串的帧竞技场。
+    std::unique_ptr<FrameArena<std::string>> m_textArena = std::make_unique<FrameArena<std::string>>(4096);///< 用于存储文本字符串的帧竞技场。
 
     std::unordered_map<FastSpriteBatchKey, size_t> m_spriteGroupIndices; ///< 精灵批处理键到组索引的映射。
     std::unordered_map<FastTextBatchKey, size_t> m_textGroupIndices; ///< 文本批处理键到组索引的映射。
