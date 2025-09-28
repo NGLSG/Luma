@@ -176,6 +176,13 @@ private:
      */
     void drawVariablesEditor(std::vector<CustomVariable>& variables, const char* id);
     /**
+     * @brief 模型管理器：批量添加/选择可用模型，并可从下拉选择覆盖当前 model。
+     * @param model 绑定的默认模型字段。
+     * @param supportedModels 可用模型列表。
+     * @param id UI唯一ID前缀。
+     */
+    void drawModelManager(std::string& model, std::vector<std::string>& supportedModels, const char* id);
+    /**
      * @brief 创建一个默认规则。
      * @return 默认的自定义规则。
      */
@@ -259,6 +266,16 @@ private:
      * @return 过滤后的文本。
      */
     std::string filterUnintendTags(const std::string& rawText);
+
+    // ===== 权限与工具调用审批 =====
+    enum class PermissionLevel { Chat = 0, Agent = 1, AgentFull = 2 };
+    PermissionLevel m_permissionLevel = PermissionLevel::Chat; ///< 当前权限等级
+    bool m_showToolApprovalModal = false; ///< 是否显示工具调用审批弹窗
+    bool m_hasPendingToolCalls = false; ///< 是否有待审批的工具调用
+    nlohmann::json m_pendingToolCalls; ///< 待审批的工具调用（{"tool_calls": [...] }）
+    void drawToolApprovalPopup(); ///< 绘制并处理工具调用审批弹窗
+    void executePendingToolCalls(); ///< 执行已审批的工具调用
+    void denyPendingToolCalls(const std::string& reason); ///< 拒绝工具调用并反馈给AI
 };
 
 #endif

@@ -220,6 +220,8 @@ struct Configure
 {
     bool enableAuth = false; ///< 是否启用认证。
     UserInfo admin = {"admin", "null", "123456", 999}; ///< 管理员用户信息。
+    // 0=Chat, 1=Agent, 2=AgentFull
+    int permissionLevel = 0; ///< AI 面板权限等级（0=Chat,1=Agent,2=AgentFull）。
     OpenAIBotCreateInfo openAi; ///< OpenAI 机器人配置。
     ClaudeBotCreateInfo claude; ///< Claude 机器人配置。
     GeminiBotCreateInfo gemini; ///< Gemini 机器人配置。
@@ -989,6 +991,7 @@ namespace YAML
             Node node;
             node["enableAuth"] = config.enableAuth;
             node["admin"] = config.admin;
+            node["permissionLevel"] = config.permissionLevel;
             node["openAi"] = config.openAi;
             node["claude"] = config.claude;
             node["gemini"] = config.gemini;
@@ -1021,6 +1024,9 @@ namespace YAML
             if (node["admin"])
             {
                 config.admin = node["admin"].as<UserInfo>();
+            }
+            if (node["permissionLevel"]) {
+                config.permissionLevel = node["permissionLevel"].as<int>();
             }
             if (node["claudeAPI"])
             {

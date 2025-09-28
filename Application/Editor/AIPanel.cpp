@@ -6,9 +6,27 @@
 #include "../Utils/Logger.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <filesystem>
+#include <regex>
+#include <sstream>
+#include <optional>
+#include <algorithm>
+#include <unordered_map>
 
 #include "ProjectSettings.h"
 #include "RuntimeAsset/RuntimeScene.h"
+#include "../SceneManager.h"
+
+#include "AnimationSystem.h"
+#include "AudioSystem.h"
+#include "ButtonSystem.h"
+#include "InputTextSystem.h"
+#include "ScrollViewSystem.h"
+#include "../Systems/HydrateResources.h"
+#include "../Systems/TransformSystem.h"
+#include "../Systems/PhysicsSystem.h"
+#include "../Systems/InteractionSystem.h"
+#include "../Systems/ScriptingSystem.h"
 AIPanel::AIPanel() = default;
 
 AIPanel::~AIPanel() = default;
@@ -44,6 +62,17 @@ void AIPanel::Initialize(EditorContext* context)
     initializeAITools();
     initializeBots();
     initializeMarkdown();
+
+    
+    switch (m_config.permissionLevel)
+    {
+    case 1: m_permissionLevel = PermissionLevel::Agent;
+        break;
+    case 2: m_permissionLevel = PermissionLevel::AgentFull;
+        break;
+    default: m_permissionLevel = PermissionLevel::Chat;
+        break;
+    }
 }
 
 
@@ -106,30 +135,74 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
 {
     LogInfo("AI请求执行工具（过程对用户隐藏）...");
 
+    
+    nlohmann::json responseJson;
+    try { responseJson = nlohmann::json::parse(aiResponse); }
+    catch (const std::exception& e)
+    {
+        nlohmann::json toolResults;
+        toolResults["tool_results"] = nlohmann::json::array({
+            {
+                {"function_name", "system_error"},
+                {"result", {{"success", false}, {"error", std::string("Invalid tool_calls JSON: ") + e.what()}}}
+            }
+        });
+        auto& bot = m_bots.at(m_currentBotKey);
+        m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        bot->SubmitAsync(toolResults.dump(2), m_lastRequestTimestamp, Role::User, m_currentConversation);
+        return;
+    }
+
+    
+    if (m_permissionLevel == PermissionLevel::Chat)
+    {
+        
+        nlohmann::json toolResults;
+        toolResults["tool_results"] = nlohmann::json::array();
+        for (const auto& call : responseJson["tool_calls"])
+        {
+            std::string functionName = call.value("function_name", "unknown");
+            toolResults["tool_results"].push_back({
+                {"function_name", functionName},
+                {"result", {{"success", false}, {"error", "Permission denied: Chat mode forbids tool calls."}}}
+            });
+        }
+        auto& bot = m_bots.at(m_currentBotKey);
+        m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        bot->SubmitAsync(toolResults.dump(2), m_lastRequestTimestamp, Role::User, m_currentConversation);
+        return;
+    }
+
+    if (m_permissionLevel == PermissionLevel::Agent)
+    {
+        
+        m_pendingToolCalls = nlohmann::json::object();
+        m_pendingToolCalls["tool_calls"] = responseJson["tool_calls"];
+        m_hasPendingToolCalls = true;
+        m_showToolApprovalModal = true;
+        return;
+    }
+
+    
     nlohmann::json toolResults;
     toolResults["tool_results"] = nlohmann::json::array();
-
     try
     {
-        nlohmann::json responseJson = nlohmann::json::parse(aiResponse);
         for (const auto& call : responseJson["tool_calls"])
         {
             std::string functionName = call["function_name"];
             const AITool* tool = AIToolRegistry::GetInstance().GetTool(functionName);
-
             if (tool)
             {
                 nlohmann::json result = tool->execute(*m_context, call["arguments"]);
-                toolResults["tool_results"].push_back({
-                    {"function_name", functionName},
-                    {"result", result}
-                });
+                toolResults["tool_results"].push_back({{"function_name", functionName}, {"result", result}});
             }
             else
             {
                 toolResults["tool_results"].push_back({
-                    {"function_name", functionName},
-                    {"result", {{"success", false}, {"error", "Tool not found."}}}
+                    {"function_name", functionName}, {"result", {{"success", false}, {"error", "Tool not found."}}}
                 });
             }
         }
@@ -137,21 +210,14 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
     catch (const std::exception& e)
     {
         toolResults["tool_results"].push_back({
-            {"function_name", "system_error"},
-            {"result", {{"success", false}, {"error", e.what()}}}
+            {"function_name", "system_error"}, {"result", {{"success", false}, {"error", e.what()}}}
         });
     }
-
-
-    std::string toolResultString = toolResults.dump(2);
-
 
     auto& bot = m_bots.at(m_currentBotKey);
     m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-
-
-    bot->SubmitAsync(toolResultString, m_lastRequestTimestamp, Role::User, m_currentConversation);
+    bot->SubmitAsync(toolResults.dump(2), m_lastRequestTimestamp, Role::User, m_currentConversation);
 }
 
 void AIPanel::synchronizeAndSaveHistory()
@@ -195,6 +261,25 @@ void AIPanel::Draw()
             ImGui::EndChild();
             ImGui::SameLine();
             ImGui::BeginChild("ChatArea", ImVec2(0, 0));
+            
+            {
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 6));
+                ImGui::Text("权限:");
+                ImGui::SameLine();
+                const char* permItems[] = {"Chat", "Agent", "Agent(Full)"};
+                int permIndex = (m_permissionLevel == PermissionLevel::Chat)
+                                    ? 0
+                                    : (m_permissionLevel == PermissionLevel::Agent ? 1 : 2);
+                if (ImGui::Combo("##perm", &permIndex, permItems, IM_ARRAYSIZE(permItems)))
+                {
+                    m_permissionLevel = (permIndex == 0)
+                                            ? PermissionLevel::Chat
+                                            : (permIndex == 1 ? PermissionLevel::Agent : PermissionLevel::AgentFull);
+                    m_config.permissionLevel = permIndex;
+                }
+                ImGui::PopStyleVar();
+                ImGui::Separator();
+            }
             drawChatPanel();
             ImGui::EndChild();
         }
@@ -204,6 +289,9 @@ void AIPanel::Draw()
         }
     }
     ImGui::End();
+
+    
+    drawToolApprovalPopup();
 }
 
 
@@ -560,6 +648,23 @@ void AIPanel::drawSettingsPanel()
     ImGui::Separator();
 
     ImGui::BeginChild("SettingsRegion");
+    
+    if (ImGui::CollapsingHeader("权限设置", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        const char* permItems[] = {"Chat", "Agent", "Agent(Full)"};
+        int permIndex = (m_permissionLevel == PermissionLevel::Chat)
+                            ? 0
+                            : (m_permissionLevel == PermissionLevel::Agent ? 1 : 2);
+        if (ImGui::Combo("AI 权限等级", &permIndex, permItems, IM_ARRAYSIZE(permItems)))
+        {
+            m_permissionLevel = (permIndex == 0)
+                                    ? PermissionLevel::Chat
+                                    : (permIndex == 1 ? PermissionLevel::Agent : PermissionLevel::AgentFull);
+            m_config.permissionLevel = permIndex;
+        }
+        ImGui::TextDisabled("Chat: 禁止工具调用 | Agent: 需要审批 | Agent(Full): 直接执行");
+        ImGui::Separator();
+    }
 
 
     auto drawCustomGptSettings = [this](const char* title, GPTLikeCreateInfo& gptConfig)
@@ -589,13 +694,12 @@ void AIPanel::drawSettingsPanel()
         else
         {
             ImGui::InputText("API密钥", &gptConfig.api_key, ImGuiInputTextFlags_Password);
-            ImGui::InputText("默认模型", &gptConfig.model);
             ImGui::InputText("API主机", &gptConfig.apiHost);
             ImGui::InputText("API路径", &gptConfig.apiPath);
-        }
 
-        ImGui::Separator();
-        drawSupportedModelsEditor(gptConfig.supportedModels, (std::string(title) + "_models").c_str());
+            ImGui::Separator();
+            drawModelManager(gptConfig.model, gptConfig.supportedModels, title);
+        }
 
         ImGui::PopID();
     };
@@ -623,33 +727,30 @@ void AIPanel::drawSettingsPanel()
     if (ImGui::CollapsingHeader("OpenAI"))
     {
         ImGui::InputText("API密钥##OpenAI", &m_config.openAi.api_key, ImGuiInputTextFlags_Password);
-        ImGui::InputText("默认模型##OpenAI", &m_config.openAi.model);
         ImGui::InputText("API端点##OpenAI", &m_config.openAi._endPoint);
         ImGui::Checkbox("使用网页代理##OpenAI", &m_config.openAi.useWebProxy);
         ImGui::InputText("代理地址##OpenAI", &m_config.openAi.proxy);
 
         ImGui::Separator();
-        drawSupportedModelsEditor(m_config.openAi.supportedModels, "OpenAI_models");
+        drawModelManager(m_config.openAi.model, m_config.openAi.supportedModels, "OpenAI");
     }
 
     if (ImGui::CollapsingHeader("Claude API"))
     {
         ImGui::InputText("API密钥##ClaudeAPI", &m_config.claudeAPI.apiKey, ImGuiInputTextFlags_Password);
-        ImGui::InputText("默认模型##ClaudeAPI", &m_config.claudeAPI.model);
         ImGui::InputText("API端点##ClaudeAPI", &m_config.claudeAPI._endPoint);
 
         ImGui::Separator();
-        drawSupportedModelsEditor(m_config.claudeAPI.supportedModels, "ClaudeAPI_models");
+        drawModelManager(m_config.claudeAPI.model, m_config.claudeAPI.supportedModels, "ClaudeAPI");
     }
 
     if (ImGui::CollapsingHeader("Gemini"))
     {
         ImGui::InputText("API密钥##Gemini", &m_config.gemini._apiKey, ImGuiInputTextFlags_Password);
-        ImGui::InputText("默认模型##Gemini", &m_config.gemini.model);
         ImGui::InputText("API端点##Gemini", &m_config.gemini._endPoint);
 
         ImGui::Separator();
-        drawSupportedModelsEditor(m_config.gemini.supportedModels, "Gemini_models");
+        drawModelManager(m_config.gemini.model, m_config.gemini.supportedModels, "Gemini");
     }
 
 
@@ -703,6 +804,129 @@ void AIPanel::drawSettingsPanel()
     }
 
     ImGui::EndChild();
+}
+
+
+void AIPanel::drawToolApprovalPopup()
+{
+    if (!m_showToolApprovalModal || !m_hasPendingToolCalls) return;
+    ImGui::OpenPopup("工具调用审批");
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(640, 420), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("工具调用审批", nullptr, ImGuiWindowFlags_NoResize))
+    {
+        ImGui::Text("AI 请求执行以下工具:");
+        ImGui::Separator();
+        try
+        {
+            const auto& calls = m_pendingToolCalls["tool_calls"];
+            for (size_t i = 0; i < calls.size(); ++i)
+            {
+                const auto& c = calls[i];
+                std::string fname = c.value("function_name", "");
+                std::string args = c["arguments"].dump(2);
+                ImGui::Text("%zu) %s", i + 1, fname.c_str());
+                ImGui::PushTextWrapPos();
+                ImGui::TextDisabled("%s", args.c_str());
+                ImGui::PopTextWrapPos();
+                ImGui::Separator();
+            }
+        }
+        catch (...)
+        {
+            ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "解析工具调用失败。");
+        }
+
+        if (ImGui::Button("批准", ImVec2(120, 0)))
+        {
+            executePendingToolCalls();
+            m_showToolApprovalModal = false;
+            m_hasPendingToolCalls = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("拒绝", ImVec2(120, 0)))
+        {
+            denyPendingToolCalls("User denied permission");
+            m_showToolApprovalModal = false;
+            m_hasPendingToolCalls = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("取消", ImVec2(120, 0)))
+        {
+            
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void AIPanel::executePendingToolCalls()
+{
+    if (!m_hasPendingToolCalls) return;
+    nlohmann::json toolResults;
+    toolResults["tool_results"] = nlohmann::json::array();
+    try
+    {
+        const auto& calls = m_pendingToolCalls["tool_calls"];
+        for (const auto& call : calls)
+        {
+            std::string functionName = call.value("function_name", "");
+            const AITool* tool = AIToolRegistry::GetInstance().GetTool(functionName);
+            if (tool)
+            {
+                nlohmann::json result = tool->execute(*m_context, call["arguments"]);
+                toolResults["tool_results"].push_back({{"function_name", functionName}, {"result", result}});
+            }
+            else
+            {
+                toolResults["tool_results"].push_back({
+                    {"function_name", functionName}, {"result", {{"success", false}, {"error", "Tool not found."}}}
+                });
+            }
+        }
+    }
+    catch (const std::exception& e)
+    {
+        toolResults["tool_results"].push_back({
+            {"function_name", "system_error"}, {"result", {{"success", false}, {"error", e.what()}}}
+        });
+    }
+
+    auto& bot = m_bots.at(m_currentBotKey);
+    m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    bot->SubmitAsync(toolResults.dump(2), m_lastRequestTimestamp, Role::User, m_currentConversation);
+}
+
+void AIPanel::denyPendingToolCalls(const std::string& reason)
+{
+    nlohmann::json toolResults;
+    toolResults["tool_results"] = nlohmann::json::array();
+    try
+    {
+        const auto& calls = m_pendingToolCalls["tool_calls"];
+        for (const auto& call : calls)
+        {
+            std::string functionName = call.value("function_name", "");
+            toolResults["tool_results"].push_back({
+                {"function_name", functionName}, {"result", {{"success", false}, {"error", reason}}}
+            });
+        }
+    }
+    catch (...)
+    {
+        toolResults["tool_results"].push_back({
+            {"function_name", "system_error"},
+            {"result", {{"success", false}, {"error", "Invalid pending tool_calls payload"}}}
+        });
+    }
+    auto& bot = m_bots.at(m_currentBotKey);
+    m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    bot->SubmitAsync(toolResults.dump(2), m_lastRequestTimestamp, Role::User, m_currentConversation);
 }
 
 
@@ -1147,6 +1371,111 @@ void AIPanel::drawVariablesEditor(std::vector<CustomVariable>& variables, const 
 }
 
 
+void AIPanel::drawModelManager(std::string& model, std::vector<std::string>& supportedModels, const char* id)
+{
+    ImGui::PushID(id);
+
+    
+    ImGui::Text("默认模型（输入用于检索）");
+    ImGui::InputText("##DefaultModel", &model);
+    ImGui::Separator();
+
+    
+    ImGui::Text("可用模型（筛选后）");
+    std::vector<const char*> items;
+    items.reserve(supportedModels.size());
+    std::vector<int> mapIndex; 
+    mapIndex.reserve(supportedModels.size());
+
+    std::string ql = model; 
+    std::transform(ql.begin(), ql.end(), ql.begin(), ::tolower);
+    for (int i = 0; i < (int)supportedModels.size(); ++i)
+    {
+        const std::string& m = supportedModels[i];
+        if (!ql.empty())
+        {
+            std::string ml = m; std::transform(ml.begin(), ml.end(), ml.begin(), ::tolower);
+            if (ml.find(ql) == std::string::npos) continue;
+        }
+        items.push_back(m.c_str());
+        mapIndex.push_back(i);
+    }
+    int current = -1;
+    if (!model.empty())
+    {
+        
+        for (int i = 0; i < (int)items.size(); ++i)
+        {
+            if (supportedModels[mapIndex[i]] == model) { current = i; break; }
+        }
+    }
+    
+    int height = (int)std::min<size_t>(items.size(), 4);
+    if (ImGui::ListBox("##AvailableModels", &current, items.data(), (int)items.size(), height))
+    {
+        if (current >= 0 && current < (int)mapIndex.size())
+        {
+            model = supportedModels[mapIndex[current]];
+        }
+    }
+
+    
+    int globalIndex = (current >= 0 && current < (int)mapIndex.size()) ? mapIndex[current] : -1;
+    ImGui::BeginDisabled(globalIndex < 0);
+    if (ImGui::Button("删除选中"))
+    {
+        if (globalIndex >= 0 && globalIndex < (int)supportedModels.size())
+        {
+            supportedModels.erase(supportedModels.begin() + globalIndex);
+            
+            current = -1;
+        }
+    }
+    ImGui::EndDisabled();
+
+    ImGui::Separator();
+
+    
+    ImGui::Text("批量添加（换行或分号分隔）");
+    static std::unordered_map<std::string, std::string> s_batchBuf; 
+    std::string key = std::string("batch_") + id;
+    std::string& buf = s_batchBuf[key];
+    ImGui::InputTextMultiline("##BatchAdd", &buf, ImVec2(-1, 80));
+    if (ImGui::Button("添加到可用模型"))
+    {
+        auto addOne = [&](const std::string& raw)
+        {
+            std::string s = raw;
+            
+            auto notSpace = [](unsigned char c){ return !std::isspace(c); };
+            s.erase(s.begin(), std::find_if(s.begin(), s.end(), notSpace));
+            s.erase(std::find_if(s.rbegin(), s.rend(), notSpace).base(), s.end());
+            if (s.empty()) return;
+            if (std::find(supportedModels.begin(), supportedModels.end(), s) == supportedModels.end())
+                supportedModels.push_back(s);
+        };
+        std::string tmp = buf;
+        
+        std::vector<std::string> parts;
+        size_t start = 0; size_t pos;
+        while ((pos = tmp.find(';', start)) != std::string::npos)
+        {
+            parts.push_back(tmp.substr(start, pos - start));
+            start = pos + 1;
+        }
+        parts.push_back(tmp.substr(start));
+        for (auto& p : parts)
+        {
+            std::stringstream ss(p);
+            std::string line;
+            while (std::getline(ss, line)) { addOne(line); }
+        }
+        buf.clear();
+    }
+
+    ImGui::PopID();
+}
+
 CustomRule AIPanel::createDefaultRule()
 {
     CustomRule rule;
@@ -1452,6 +1781,472 @@ C# Scripting Example
             }
         };
         registry.RegisterTool(createScriptTool);
+    }
+
+    // ===== 文件系统工具 =====
+    {
+        AITool listFilesTool;
+        listFilesTool.name = "ListProjectFiles";
+        listFilesTool.description = "列出项目目录中的文件和/或目录。";
+        listFilesTool.parameters = {
+            {"relativePath", "string", "相对于项目根目录的子路径。可选，默认为空字符串。", false},
+            {"recursive", "boolean", "是否递归遍历。默认 true。", false},
+            {"includeDirs", "boolean", "是否包含目录项。默认 false。", false},
+            {"maxResults", "number", "最多返回的项数。可选。", false}
+        };
+        listFilesTool.execute = [](EditorContext& context, const nlohmann::json& args) -> nlohmann::json
+        {
+            try
+            {
+                auto root = ProjectSettings::GetInstance().GetProjectRoot();
+                std::string rel = args.value("relativePath", std::string(""));
+                bool recursive = args.value("recursive", true);
+                bool includeDirs = args.value("includeDirs", false);
+                int maxResults = args.value("maxResults", 0);
+                std::filesystem::path base = rel.empty() ? root : (root / rel);
+                if (!std::filesystem::exists(base))
+                {
+                    return {{"success", false}, {"error", "Base path not found."}};
+                }
+                nlohmann::json items = nlohmann::json::array();
+                auto pushItem = [&](const std::filesystem::directory_entry& e)
+                {
+                    std::error_code ec;
+                    auto relp = std::filesystem::relative(e.path(), root, ec);
+                    std::string p = ec ? e.path().string() : relp.generic_string();
+                    std::string type = e.is_directory() ? "dir" : "file";
+                    items.push_back({{"path", p}, {"type", type}});
+                };
+                if (recursive)
+                {
+                    for (auto it = std::filesystem::recursive_directory_iterator(base);
+                         it != std::filesystem::recursive_directory_iterator(); ++it)
+                    {
+                        const auto& e = *it;
+                        if (e.is_directory()) { if (includeDirs) { pushItem(e); } }
+                        else if (e.is_regular_file()) { pushItem(e); }
+                        if (maxResults > 0 && items.size() >= static_cast<size_t>(maxResults)) break;
+                    }
+                }
+                else
+                {
+                    for (auto it = std::filesystem::directory_iterator(base);
+                         it != std::filesystem::directory_iterator(); ++it)
+                    {
+                        const auto& e = *it;
+                        if (e.is_directory()) { if (includeDirs) { pushItem(e); } }
+                        else if (e.is_regular_file()) { pushItem(e); }
+                        if (maxResults > 0 && items.size() >= static_cast<size_t>(maxResults)) break;
+                    }
+                }
+                return {{"success", true}, {"items", items}};
+            }
+            catch (const std::exception& e)
+            {
+                return {{"success", false}, {"error", e.what()}};
+            }
+        };
+        registry.RegisterTool(listFilesTool);
+    }
+
+    {
+        AITool searchByRegex;
+        searchByRegex.name = "SearchFilesByRegex";
+        searchByRegex.description = "用正则匹配文件路径（相对项目根路径）。";
+        searchByRegex.parameters = {
+            {"pattern", "string", "ECMAScript 正则表达式。", true},
+            {"relativePath", "string", "起始子目录，默认空。", false},
+            {"recursive", "boolean", "是否递归，默认 true。", false},
+            {"caseSensitive", "boolean", "大小写敏感，默认 false。", false},
+            {"maxResults", "number", "最多匹配文件数。", false}
+        };
+        searchByRegex.execute = [](EditorContext& context, const nlohmann::json& args) -> nlohmann::json
+        {
+            try
+            {
+                auto root = ProjectSettings::GetInstance().GetProjectRoot();
+                std::string pattern = args.at("pattern").get<std::string>();
+                std::string rel = args.value("relativePath", std::string(""));
+                bool recursive = args.value("recursive", true);
+                bool caseSensitive = args.value("caseSensitive", false);
+                int maxResults = args.value("maxResults", 0);
+                std::regex_constants::syntax_option_type opts = std::regex_constants::ECMAScript;
+                if (!caseSensitive) opts = (std::regex_constants::syntax_option_type)(opts |
+                    std::regex_constants::icase);
+                std::regex re(pattern, opts);
+                std::filesystem::path base = rel.empty() ? root : (root / rel);
+                if (!std::filesystem::exists(base))
+                {
+                    return {{"success", false}, {"error", "Base path not found."}};
+                }
+                nlohmann::json items = nlohmann::json::array();
+                auto handle = [&](const std::filesystem::directory_entry& e)
+                {
+                    std::error_code ec;
+                    auto relp = std::filesystem::relative(e.path(), root, ec);
+                    std::string p = ec ? e.path().string() : relp.generic_string();
+                    if (std::regex_search(p, re))
+                    {
+                        items.push_back({{"path", p}});
+                    }
+                };
+                if (recursive)
+                {
+                    for (auto it = std::filesystem::recursive_directory_iterator(base);
+                         it != std::filesystem::recursive_directory_iterator(); ++it)
+                    {
+                        if (it->is_regular_file()) { handle(*it); }
+                        if (maxResults > 0 && items.size() >= static_cast<size_t>(maxResults)) break;
+                    }
+                }
+                else
+                {
+                    for (auto it = std::filesystem::directory_iterator(base);
+                         it != std::filesystem::directory_iterator(); ++it)
+                    {
+                        if (it->is_regular_file()) { handle(*it); }
+                        if (maxResults > 0 && items.size() >= static_cast<size_t>(maxResults)) break;
+                    }
+                }
+                return {{"success", true}, {"items", items}};
+            }
+            catch (const std::exception& e)
+            {
+                return {{"success", false}, {"error", e.what()}};
+            }
+        };
+        registry.RegisterTool(searchByRegex);
+    }
+
+    {
+        AITool searchInFiles;
+        searchInFiles.name = "SearchInFiles";
+        searchInFiles.description = "查找包含关键字的文本文件，返回匹配行。";
+        searchInFiles.parameters = {
+            {"keyword", "string", "要查找的关键字。", true},
+            {"relativePath", "string", "起始目录，相对于项目根目录。", false},
+            {"fileRegex", "string", "限制文件路径的正则表达式。", false},
+            {"caseSensitive", "boolean", "是否大小写敏感，默认 true。", false},
+            {"maxMatchesPerFile", "number", "每个文件最多匹配行数，默认 5。", false},
+            {"maxFiles", "number", "最多返回匹配文件数，默认 50。", false}
+        };
+        searchInFiles.execute = [](EditorContext& context, const nlohmann::json& args) -> nlohmann::json
+        {
+            try
+            {
+                auto root = ProjectSettings::GetInstance().GetProjectRoot();
+                std::string keyword = args.at("keyword").get<std::string>();
+                std::string rel = args.value("relativePath", std::string(""));
+                std::string fileRegex = args.value("fileRegex", std::string(""));
+                bool caseSensitive = args.value("caseSensitive", true);
+                int maxMatchesPerFile = args.value("maxMatchesPerFile", 5);
+                int maxFiles = args.value("maxFiles", 50);
+                std::regex_constants::syntax_option_type opts = std::regex_constants::ECMAScript;
+                if (!caseSensitive) opts = (std::regex_constants::syntax_option_type)(opts |
+                    std::regex_constants::icase);
+                std::optional<std::regex> fileRe;
+                if (!fileRegex.empty()) fileRe = std::regex(fileRegex, opts);
+                std::filesystem::path base = rel.empty() ? root : (root / rel);
+                if (!std::filesystem::exists(base))
+                {
+                    return {{"success", false}, {"error", "Base path not found."}};
+                }
+                nlohmann::json results = nlohmann::json::array();
+                auto shouldSkipExt = [](const std::filesystem::path& p)
+                {
+                    static const char* exts[] = {
+                        ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".dds", ".ktx", ".astc", ".ogg", ".mp3", ".wav",
+                        ".ttf", ".otf", ".exe", ".dll", ".bin", ".pak", ".fbx", ".glb", ".gltf"
+                    };
+                    std::string e = p.extension().string();
+                    std::transform(e.begin(), e.end(), e.begin(), ::tolower);
+                    for (auto* s : exts) { if (e == s) return true; }
+                    return false;
+                };
+                auto handleFile = [&](const std::filesystem::path& p)
+                {
+                    if (shouldSkipExt(p)) return;
+                    std::error_code ec;
+                    auto relp = std::filesystem::relative(p, root, ec);
+                    std::string relStr = ec ? p.string() : relp.generic_string();
+                    if (fileRe && !std::regex_search(relStr, *fileRe)) return;
+                    std::ifstream fin(p);
+                    if (!fin.is_open()) return;
+                    std::string line;
+                    int lineNo = 0;
+                    int matched = 0;
+                    nlohmann::json fileMatches = nlohmann::json::array();
+                    std::string keyLower = keyword;
+                    std::transform(keyLower.begin(), keyLower.end(), keyLower.begin(), ::tolower);
+                    while (std::getline(fin, line))
+                    {
+                        ++lineNo;
+                        std::string cmp = line;
+                        if (!caseSensitive)
+                        {
+                            std::transform(cmp.begin(), cmp.end(), cmp.begin(), ::tolower);
+                        }
+                        if (cmp.find(caseSensitive ? keyword : keyLower) != std::string::npos)
+                        {
+                            std::string snippet = line;
+                            if (snippet.size() > 200) snippet = snippet.substr(0, 200);
+                            fileMatches.push_back({{"line", lineNo}, {"text", snippet}});
+                            if (++matched >= maxMatchesPerFile) break;
+                        }
+                    }
+                    if (!fileMatches.empty())
+                    {
+                        results.push_back({{"path", relStr}, {"matches", fileMatches}});
+                    }
+                };
+                for (auto it = std::filesystem::recursive_directory_iterator(base);
+                     it != std::filesystem::recursive_directory_iterator(); ++it)
+                {
+                    if (it->is_regular_file())
+                    {
+                        handleFile(it->path());
+                        if (maxFiles > 0 && results.size() >= static_cast<size_t>(maxFiles)) break;
+                    }
+                }
+                return {{"success", true}, {"results", results}};
+            }
+            catch (const std::exception& e)
+            {
+                return {{"success", false}, {"error", e.what()}};
+            }
+        };
+        registry.RegisterTool(searchInFiles);
+    }
+
+    {
+        AITool readFileTool;
+        readFileTool.name = "ReadFile";
+        readFileTool.description = "读取项目内的文件内容（按 maxBytes 截断）。";
+        readFileTool.parameters = {
+            {"relativePath", "string", "相对于项目根目录的路径。", true},
+            {"maxBytes", "number", "最大读取字节数，默认 65536。", false}
+        };
+        readFileTool.execute = [](EditorContext& context, const nlohmann::json& args) -> nlohmann::json
+        {
+            try
+            {
+                auto root = ProjectSettings::GetInstance().GetProjectRoot();
+                std::string rel = args.at("relativePath").get<std::string>();
+                size_t maxBytes = static_cast<size_t>(args.value("maxBytes", 65536));
+                std::filesystem::path p = root / rel;
+                if (!std::filesystem::exists(p) || !std::filesystem::is_regular_file(p))
+                    return {{"success", false}, {"error", "File not found."}};
+                std::ifstream fin(p, std::ios::binary);
+                if (!fin.is_open()) return {{"success", false}, {"error", "Open file failed."}};
+                std::string data;
+                data.resize(maxBytes);
+                fin.read(data.data(), static_cast<std::streamsize>(maxBytes));
+                std::streamsize n = fin.gcount();
+                data.resize(static_cast<size_t>(n));
+                return {{"success", true}, {"content", data}, {"bytes", static_cast<uint64_t>(n)}};
+            }
+            catch (const std::exception& e)
+            {
+                return {{"success", false}, {"error", e.what()}};
+            }
+        };
+        registry.RegisterTool(readFileTool);
+    }
+
+    // ===== 项目与目录信息 =====
+    {
+        AITool projInfo;
+        projInfo.name = "GetProjectInfo";
+        projInfo.description = "获取项目根路径与 Assets 路径（相对/绝对）。";
+        projInfo.parameters = {};
+        projInfo.execute = [](EditorContext& ctx, const nlohmann::json&) -> nlohmann::json
+        {
+            auto root = ProjectSettings::GetInstance().GetProjectRoot();
+            auto assets = ProjectSettings::GetInstance().GetAssetsDirectory();
+            return {
+                {"success", true},
+                {"projectRoot", root.generic_string()},
+                {"assetsDir", assets.generic_string()}
+            };
+        };
+        registry.RegisterTool(projInfo);
+    }
+
+    {
+        AITool getDir;
+        getDir.name = "GetDirectoryEntries";
+        getDir.description = "获取指定文件夹的直接子项（非递归），支持返回文件/目录。";
+        getDir.parameters = {
+            {"relativePath", "string", "相对于项目根目录的路径，空表示根目录。", false},
+            {"includeDirs", "boolean", "是否包含目录项，默认 true。", false},
+            {"includeFiles", "boolean", "是否包含文件项，默认 true。", false},
+            {"maxResults", "number", "最多返回的项数，可选。", false}
+        };
+        getDir.execute = [](EditorContext& ctx, const nlohmann::json& args) -> nlohmann::json
+        {
+            try
+            {
+                auto root = ProjectSettings::GetInstance().GetProjectRoot();
+                std::string rel = args.value("relativePath", std::string(""));
+                bool includeDirs = args.value("includeDirs", true);
+                bool includeFiles = args.value("includeFiles", true);
+                int maxResults = args.value("maxResults", 0);
+                std::filesystem::path base = rel.empty() ? root : (root / rel);
+                if (!std::filesystem::exists(base) || !std::filesystem::is_directory(base))
+                    return {{"success", false}, {"error", "Directory not found."}};
+                nlohmann::json items = nlohmann::json::array();
+                for (auto it = std::filesystem::directory_iterator(base);
+                     it != std::filesystem::directory_iterator(); ++it)
+                {
+                    const auto& e = *it;
+                    if (e.is_directory() && includeDirs)
+                    {
+                        std::error_code ec;
+                        auto relp = std::filesystem::relative(e.path(), root, ec);
+                        items.push_back({{"name", e.path().filename().generic_string()}, {"path", (ec? e.path() : relp).generic_string()}, {"type", "dir"}});
+                    }
+                    else if (e.is_regular_file() && includeFiles)
+                    {
+                        std::error_code ec;
+                        auto relp = std::filesystem::relative(e.path(), root, ec);
+                        items.push_back({{"name", e.path().filename().generic_string()}, {"path", (ec? e.path() : relp).generic_string()}, {"type", "file"}});
+                    }
+                    if (maxResults > 0 && items.size() >= static_cast<size_t>(maxResults)) break;
+                }
+                return {{"success", true}, {"items", items}};
+            }
+            catch (const std::exception& e)
+            {
+                return {{"success", false}, {"error", e.what()}};
+            }
+        };
+        registry.RegisterTool(getDir);
+    }
+
+    // ===== 引擎控制工具 =====
+    {
+        AITool enterPlay;
+        enterPlay.name = "EnterPlayMode";
+        enterPlay.description = "进入播放模式 (PIE)。";
+        enterPlay.parameters = {};
+        enterPlay.execute = [](EditorContext& ctx, const nlohmann::json&) -> nlohmann::json
+        {
+            try
+            {
+                if (ctx.editorState != EditorState::Editing)
+                    return {{"success", false}, {"error", "Already not in Editing."}};
+                auto switchToPlayMode = [c = &ctx]()
+                {
+                    if (c->editorState == EditorState::Playing) return;
+                    c->editorState = EditorState::Playing;
+                    c->engineContext->appMode = ApplicationMode::PIE;
+                    c->editingScene = c->activeScene;
+                    sk_sp<RuntimeScene> playScene = c->editingScene->CreatePlayModeCopy();
+                    playScene->AddEssentialSystem<Systems::HydrateResources>();
+                    playScene->AddEssentialSystem<Systems::TransformSystem>();
+                    playScene->AddSystem<Systems::PhysicsSystem>();
+                    playScene->AddSystem<Systems::AudioSystem>();
+                    playScene->AddSystem<Systems::InteractionSystem>();
+                    playScene->AddSystem<Systems::ButtonSystem>();
+                    playScene->AddSystem<Systems::InputTextSystem>();
+                    playScene->AddSystem<Systems::ScrollViewSystem>();
+                    playScene->AddSystem<Systems::ScriptingSystem>();
+                    playScene->AddSystem<Systems::AnimationSystem>();
+                    SceneManager::GetInstance().SetCurrentScene(playScene);
+                    playScene->Activate(*c->engineContext);
+                    c->activeScene = playScene;
+                };
+                ctx.engineContext->deferredCommands.Push(switchToPlayMode);
+                return {{"success", true}};
+            }
+            catch (const std::exception& e)
+            {
+                return {{"success", false}, {"error", e.what()}};
+            }
+        };
+        registry.RegisterTool(enterPlay);
+    }
+
+    {
+        AITool exitPlay;
+        exitPlay.name = "ExitPlayMode";
+        exitPlay.description = "退出播放模式。";
+        exitPlay.parameters = {};
+        exitPlay.execute = [](EditorContext& ctx, const nlohmann::json&) -> nlohmann::json
+        {
+            try
+            {
+                if (ctx.editorState == EditorState::Editing)
+                    return {{"success", false}, {"error", "Not in Play mode."}};
+                auto stopLambda = [c = &ctx]()
+                {
+                    if (c->editorState == EditorState::Playing) { c->editorState = EditorState::Paused; }
+                    c->editorState = EditorState::Editing;
+                    c->engineContext->appMode = ApplicationMode::Editor;
+                    c->activeScene.reset();
+                    c->activeScene = c->editingScene;
+                    SceneManager::GetInstance().SetCurrentScene(c->activeScene);
+                    c->editingScene.reset();
+                };
+                ctx.engineContext->deferredCommands.Push(stopLambda);
+                return {{"success", true}};
+            }
+            catch (const std::exception& e)
+            {
+                return {{"success", false}, {"error", e.what()}};
+            }
+        };
+        registry.RegisterTool(exitPlay);
+    }
+
+    {
+        AITool togglePause;
+        togglePause.name = "TogglePause";
+        togglePause.description = "切换暂停/继续。";
+        togglePause.parameters = {};
+        togglePause.execute = [](EditorContext& ctx, const nlohmann::json&) -> nlohmann::json
+        {
+            if (ctx.editorState == EditorState::Playing)
+            {
+                ctx.editorState = EditorState::Paused;
+                return {{"success", true}, {"state", "Paused"}};
+            }
+            else if (ctx.editorState == EditorState::Paused)
+            {
+                ctx.editorState = EditorState::Playing;
+                return {{"success", true}, {"state", "Playing"}};
+            }
+            return {{"success", false}, {"error", "Only available in Play/Pause."}};
+        };
+        registry.RegisterTool(togglePause);
+    }
+
+    {
+        AITool saveSceneTool;
+        saveSceneTool.name = "SaveScene";
+        saveSceneTool.description = "保存当前场景。";
+        saveSceneTool.parameters = {};
+        saveSceneTool.execute = [](EditorContext& ctx, const nlohmann::json&) -> nlohmann::json
+        {
+            try
+            {
+                bool ok = false;
+                if (ctx.activeScene && ctx.activeScene->GetGuid().Valid())
+                {
+                    ok = SceneManager::GetInstance().SaveScene(ctx.activeScene);
+                }
+                else
+                {
+                    return {{"success", false}, {"error", "Scene has no valid GUID."}};
+                }
+                return {{"success", ok}};
+            }
+            catch (const std::exception& e)
+            {
+                return {{"success", false}, {"error", e.what()}};
+            }
+        };
+        registry.RegisterTool(saveSceneTool);
     }
 
     std::string toolManifest = registry.GetToolsManifestAsJson().dump(2);
