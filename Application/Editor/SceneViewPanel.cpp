@@ -51,7 +51,7 @@ static bool IsPointInSprite(const ECS::Vector2f& worldPoint, const ECS::Transfor
     if (halfWidth <= 0 || halfHeight <= 0) return false;
 
 
-    // Compute anchored center (position is anchor point)
+    
     float width = halfWidth * 2.0f;
     float height = halfHeight * 2.0f;
     ECS::Vector2f anchorOffset = {
@@ -480,13 +480,6 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
                                           outlineThickness);
             hasVisualRepresentation = true;
         }
-        else if (gameObject.HasComponent<ECS::ScrollViewComponent>())
-        {
-            const auto& scrollViewComp = gameObject.GetComponent<ECS::ScrollViewComponent>();
-            drawScrollViewSelectionOutline(drawList, transform, scrollViewComp, outlineColor, fillColor,
-                                           outlineThickness);
-            hasVisualRepresentation = true;
-        }
 
 
         if (!hasVisualRepresentation)
@@ -727,7 +720,7 @@ void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS:
     }
 
 
-    // Compute anchored center offset in world space
+    
     ECS::Vector2f anchorOffset = {
         (0.5f - transform.anchor.x) * width,
         (0.5f - transform.anchor.y) * height
@@ -1024,133 +1017,6 @@ void SceneViewPanel::drawDashedLine(ImDrawList* drawList, const ImVec2& start, c
     }
 }
 
-void SceneViewPanel::drawScrollViewSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
-                                                    const ECS::ScrollViewComponent& scrollViewComp, ImU32 outlineColor,
-                                                    ImU32 fillColor, float thickness)
-{
-    float viewportWidth = scrollViewComp.viewportSize.x;
-    float viewportHeight = scrollViewComp.viewportSize.y;
-
-
-    viewportWidth *= transform.scale.x;
-    viewportHeight *= transform.scale.y;
-
-    float halfWidth = viewportWidth * 0.5f;
-    float halfHeight = viewportHeight * 0.5f;
-
-
-    std::vector<ECS::Vector2f> worldCorners = {
-        {-halfWidth, -halfHeight},
-        {halfWidth, -halfHeight},
-        {halfWidth, halfHeight},
-        {-halfWidth, halfHeight}
-    };
-
-
-    if (std::abs(transform.rotation) > 0.001f)
-    {
-        const float sinR = sinf(transform.rotation);
-        const float cosR = cosf(transform.rotation);
-
-        for (auto& corner : worldCorners)
-        {
-            float tempX = corner.x;
-            corner.x = corner.x * cosR - corner.y * sinR;
-            corner.y = tempX * sinR + corner.y * cosR;
-        }
-    }
-
-
-    std::vector<ImVec2> screenCorners;
-    screenCorners.reserve(4);
-
-    // Anchor offset (position is anchor point)
-    ECS::Vector2f anchorOffset = {
-        (0.5f - transform.anchor.x) * viewportWidth * transform.scale.x,
-        (0.5f - transform.anchor.y) * viewportHeight * transform.scale.y
-    };
-    if (std::abs(transform.rotation) > 0.001f)
-    {
-        const float sinR2 = sinf(transform.rotation);
-        const float cosR2 = cosf(transform.rotation);
-        float tempX = anchorOffset.x;
-        anchorOffset.x = anchorOffset.x * cosR2 - anchorOffset.y * sinR2;
-        anchorOffset.y = tempX * sinR2 + anchorOffset.y * cosR2;
-    }
-
-    for (const auto& corner : worldCorners)
-    {
-        ECS::Vector2f worldPos = transform.position + anchorOffset + corner;
-        ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, worldPos);
-        screenCorners.push_back(screenPos);
-    }
-
-
-    drawList->AddConvexPolyFilled(screenCorners.data(), 4, fillColor);
-
-
-    for (int i = 0; i < 4; ++i)
-    {
-        int nextI = (i + 1) % 4;
-        drawList->AddLine(screenCorners[i], screenCorners[nextI], outlineColor, thickness);
-    }
-
-
-    if (scrollViewComp.contentSize.x > scrollViewComp.viewportSize.x ||
-        scrollViewComp.contentSize.y > scrollViewComp.viewportSize.y)
-    {
-        float contentWidth = scrollViewComp.contentSize.x * transform.scale.x;
-        float contentHeight = scrollViewComp.contentSize.y * transform.scale.y;
-
-        float contentHalfWidth = contentWidth * 0.5f;
-        float contentHalfHeight = contentHeight * 0.5f;
-
-
-        float scrollOffsetX = -scrollViewComp.scrollPosition.x * transform.scale.x;
-        float scrollOffsetY = -scrollViewComp.scrollPosition.y * transform.scale.y;
-
-        std::vector<ECS::Vector2f> contentCorners = {
-            {scrollOffsetX - contentHalfWidth, scrollOffsetY - contentHalfHeight},
-            {scrollOffsetX + contentHalfWidth, scrollOffsetY - contentHalfHeight},
-            {scrollOffsetX + contentHalfWidth, scrollOffsetY + contentHalfHeight},
-            {scrollOffsetX - contentHalfWidth, scrollOffsetY + contentHalfHeight}
-        };
-
-
-        if (std::abs(transform.rotation) > 0.001f)
-        {
-            const float sinR = sinf(transform.rotation);
-            const float cosR = cosf(transform.rotation);
-
-            for (auto& corner : contentCorners)
-            {
-                float tempX = corner.x;
-                corner.x = corner.x * cosR - corner.y * sinR;
-                corner.y = tempX * sinR + corner.y * cosR;
-            }
-        }
-
-
-        std::vector<ImVec2> contentScreenCorners;
-        contentScreenCorners.reserve(4);
-
-        for (const auto& corner : contentCorners)
-        {
-            ECS::Vector2f worldPos = transform.position + anchorOffset + corner;
-            ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, worldPos);
-            contentScreenCorners.push_back(screenPos);
-        }
-
-
-        ImU32 contentOutlineColor = IM_COL32(255, 165, 0, 128);
-        for (int i = 0; i < 4; ++i)
-        {
-            int nextI = (i + 1) % 4;
-            drawDashedLine(drawList, contentScreenCorners[i], contentScreenCorners[nextI],
-                           contentOutlineColor, thickness * 0.5f, 5.0f);
-        }
-    }
-}
 
 void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                               const ECS::TextComponent& textComp, ImU32 outlineColor,
@@ -1168,7 +1034,7 @@ void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::T
         {localBounds.fLeft, localBounds.fBottom}
     };
 
-    // Compute anchor pivot in local coordinates relative to bounds
+    
     const float localW = localBounds.width();
     const float localH = localBounds.height();
     const float pivotLocalX = localBounds.fLeft + transform.anchor.x * localW;
@@ -1182,7 +1048,7 @@ void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::T
 
     for (auto corner : localCorners)
     {
-        // shift by anchor pivot first
+        
         corner.x -= pivotLocalX;
         corner.y -= pivotLocalY;
 
@@ -1226,7 +1092,7 @@ void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const E
         {localBounds.fLeft, localBounds.fBottom}
     };
 
-    // Compute anchor pivot in local coordinates relative to bounds
+    
     const float localW2 = localBounds.width();
     const float localH2 = localBounds.height();
     const float pivotLocalX2 = localBounds.fLeft + transform.anchor.x * localW2;
@@ -1240,7 +1106,7 @@ void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const E
 
     for (auto corner : localCorners)
     {
-        // shift by anchor pivot
+        
         corner.x -= pivotLocalX2;
         corner.y -= pivotLocalY2;
 

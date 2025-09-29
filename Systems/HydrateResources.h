@@ -8,7 +8,7 @@ namespace Systems
     /**
      * @brief 资源水合与更新处理系统。
      *
-     * 该系统负责在资源（如精灵、脚本、文本等）更新时进行相应的处理。
+     * 该系统负责在组件附加或其资源句柄改变时，加载实际的资源数据（如纹理、字体、脚本元数据等）。
      */
     class HydrateResources final : public ISystem
     {
@@ -36,35 +36,42 @@ namespace Systems
 
     private:
         /**
-         * @brief 当精灵组件更新时调用。
+         * @brief 当精灵组件更新时调用，加载纹理和材质。
          * @param registry ECS注册表。
          * @param entity 发生更新的实体。
          */
         void OnSpriteUpdated(entt::registry& registry, entt::entity entity);
 
         /**
-         * @brief 当脚本组件更新时调用。
+         * @brief 当脚本组件更新时调用，加载C#脚本元数据。
          * @param registry ECS注册表。
          * @param entity 发生更新的实体。
          */
         void OnScriptUpdated(entt::registry& registry, entt::entity entity);
 
         /**
-         * @brief 当文本组件更新时调用。
+         * @brief 当文本组件更新时调用，加载字体。
          * @param registry ECS注册表。
          * @param entity 发生更新的实体。
          */
         void OnTextUpdated(entt::registry& registry, entt::entity entity);
 
         /**
-         * @brief 当输入文本组件更新时调用。
+         * @brief 当输入文本组件更新时调用，加载字体和背景图像。
          * @param registry ECS注册表。
          * @param entity 发生更新的实体。
          */
         void OnInputTextUpdated(entt::registry& registry, entt::entity entity);
 
         /**
-         * @brief 当瓦片地图组件更新时调用。
+         * @brief 当按钮组件更新时调用，加载背景图像。
+         * @param registry ECS注册表。
+         * @param entity 发生更新的实体。
+         */
+        void OnButtonUpdated(entt::registry& registry, entt::entity entity);
+
+        /**
+         * @brief 当瓦片地图组件更新时调用，解析瓦片、生成碰撞体等。
          * @param registry ECS注册表。
          * @param entity 发生更新的实体。
          */
@@ -76,4 +83,4 @@ namespace Systems
     };
 }
 
-#endif
+#endif // HYDRATERESOURCES_H

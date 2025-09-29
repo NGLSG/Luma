@@ -7,6 +7,9 @@
 #include "RenderComponent.h"
 #include "Profiler.h"
 #include "SIMDWrapper.h"
+#include "include/core/SkColorFilter.h"
+#include "include/core/SkFont.h"
+#include "include/core/SkFontMetrics.h"
 
 inline float Lerp(float a, float b, float t)
 {
@@ -19,9 +22,10 @@ namespace
     {
         std::unordered_map<FastSpriteBatchKey, size_t> spriteGroupIndices;
         std::unordered_map<FastTextBatchKey, size_t> textGroupIndices;
-        
+
         std::vector<SceneRenderer::BatchGroup> spriteBatchGroups;
         std::vector<SceneRenderer::BatchGroup> textBatchGroups;
+        std::vector<RenderPacket> rawDrawPackets;
     };
 
     class InterpolationAndBatchJob : public IJob
@@ -32,7 +36,7 @@ namespace
         const Renderable* currFrameStart;
         const Renderable* currFrameEnd;
         float alpha;
-        bool shouldInterpolate; 
+        bool shouldInterpolate;
 
         ThreadLocalBatchResult* result;
         InterpolationAndBatchJob() = default;
@@ -54,14 +58,12 @@ namespace
             auto prevIt = prevFrameStart;
             auto currIt = currFrameStart;
 
-            
             if (!shouldInterpolate)
             {
                 processCurrentFrameOnly();
                 return;
             }
 
-            
             if (currIt != currFrameEnd)
             {
                 auto firstId = currIt->entityId;
@@ -114,7 +116,6 @@ namespace
         }
 
     private:
-        
         void processCurrentFrameOnly()
         {
             auto currIt = currFrameStart;
@@ -125,7 +126,6 @@ namespace
             }
         }
 
-        
         void processRenderable(const Renderable* currIt, const ECS::TransformComponent& transform)
         {
             std::visit([&, this](auto&& arg)
@@ -139,11 +139,181 @@ namespace
                 {
                     processTextData(currIt, transform, arg);
                 }
+                else if constexpr (std::is_same_v<T, RawButtonRenderData>)
+                {
+                    processButtonData(currIt, transform, arg);
+                }
+                else if constexpr (std::is_same_v<T, RawInputTextRenderData>)
+                {
+                    processInputTextData(currIt, transform, arg);
+                }
             }, currIt->data);
         }
 
+        void processButtonData(const Renderable* currIt, const ECS::TransformComponent& transform,
+                               const RawButtonRenderData& buttonData)
+        {
+            RawDrawBatch batch;
+            batch.zIndex = currIt->zIndex;
+
+            batch.drawFunc.AddListener(
+                [
+                    trans = transform,
+                    data = buttonData
+                ]
+            (SkCanvas* canvas)
+                {
+                    if (!canvas) return;
+
+                    ECS::RectF worldRect = data.rect;
+                    worldRect.x = trans.position.x - data.rect.Width() * 0.5f;
+                    worldRect.y = trans.position.y - data.rect.Height() * 0.5f;
+
+                    ECS::Color tintColor;
+                    switch (data.currentState)
+                    {
+                    case ECS::ButtonState::Hovered: tintColor = data.hoverColor;
+                        break;
+                    case ECS::ButtonState::Pressed: tintColor = data.pressedColor;
+                        break;
+                    case ECS::ButtonState::Disabled: tintColor = data.disabledColor;
+                        break;
+                    case ECS::ButtonState::Normal:
+                    default: tintColor = data.normalColor;
+                        break;
+                    }
+
+                    SkPaint paint;
+                    paint.setAntiAlias(true);
+                    SkRect skRect = SkRect::MakeXYWH(worldRect.x, worldRect.y, worldRect.Width(), worldRect.Height());
+
+                    if (data.backgroundImage)
+                    {
+                        paint.setColorFilter(SkColorFilters::Blend(tintColor, SkBlendMode::kModulate));
+                        canvas->save();
+                        canvas->clipRRect(SkRRect::MakeRectXY(skRect, data.roundness, data.roundness), true);
+                        canvas->drawImageRect(
+                            data.backgroundImage,
+                            skRect,
+                            SkSamplingOptions(SkFilterMode::kLinear)
+                        );
+                        canvas->restore();
+                    }
+                    else
+                    {
+                        paint.setColor4f({tintColor.r, tintColor.g, tintColor.b, tintColor.a}, nullptr);
+                        canvas->drawRRect(SkRRect::MakeRectXY(skRect, data.roundness, data.roundness), paint);
+                    }
+                }
+            );
+
+            result->rawDrawPackets.emplace_back(RenderPacket{
+                .zIndex = batch.zIndex,
+                .batchData = std::move(batch)
+            });
+        }
+
+        void processInputTextData(const Renderable* currIt, const ECS::TransformComponent& transform,
+                                  const RawInputTextRenderData& inputTextData)
+        {
+            RawDrawBatch batch;
+            batch.zIndex = currIt->zIndex;
+
+            batch.drawFunc.AddListener(
+                [
+                    trans = transform,
+                    data = inputTextData
+                ]
+            (SkCanvas* canvas)
+                {
+                    if (!canvas) return;
+
+                    ECS::RectF worldRect = data.rect;
+                    worldRect.x = trans.position.x - data.rect.Width() * 0.5f;
+                    worldRect.y = trans.position.y - data.rect.Height() * 0.5f;
+
+                    SkPaint paint;
+                    paint.setAntiAlias(true);
+                    SkRect skRect = SkRect::MakeXYWH(worldRect.x, worldRect.y, worldRect.Width(), worldRect.Height());
+
+                    ECS::Color bgColor = data.isReadOnly
+                                             ? data.readOnlyBackgroundColor
+                                             : (data.isFocused
+                                                    ? data.focusedBackgroundColor
+                                                    : data.normalBackgroundColor);
+
+                    if (data.backgroundImage)
+                    {
+                        paint.setColorFilter(SkColorFilters::Blend(bgColor, SkBlendMode::kModulate));
+                        canvas->save();
+                        canvas->clipRRect(SkRRect::MakeRectXY(skRect, data.roundness, data.roundness), true);
+                        canvas->drawImageRect(data.backgroundImage, skRect, SkSamplingOptions(SkFilterMode::kLinear));
+                        canvas->restore();
+                    }
+                    else
+                    {
+                        paint.setColor4f({bgColor.r, bgColor.g, bgColor.b, bgColor.a});
+                        canvas->drawRRect(SkRRect::MakeRectXY(skRect, data.roundness, data.roundness), paint);
+                    }
+
+                    bool isShowingPlaceholder = data.inputBuffer.empty() && !data.isFocused;
+                    const auto& textToDrawData = isShowingPlaceholder ? data.placeholder : data.text;
+
+                    if (!textToDrawData.typeface) return;
+
+                    SkFont font(textToDrawData.typeface, textToDrawData.fontSize);
+                    SkFontMetrics metrics;
+                    font.getMetrics(&metrics);
+                    float textY = worldRect.y + worldRect.Height() / 2.0f - (metrics.fAscent + metrics.fDescent) / 2.0f;
+
+                    std::string displayText = isShowingPlaceholder
+                                                  ? textToDrawData.text
+                                                  : (data.isPasswordField
+                                                         ? std::string(data.inputBuffer.length(), '*')
+                                                         : data.inputBuffer);
+
+                    SkPaint textPaint;
+                    textPaint.setColor4f({
+                        textToDrawData.color.r, textToDrawData.color.g, textToDrawData.color.b, textToDrawData.color.a
+                    });
+
+                    canvas->save();
+                    canvas->clipRect(skRect);
+                    canvas->drawString(displayText.c_str(), worldRect.x + 5.0f, textY, font, textPaint);
+
+                    if (data.isFocused && data.isCursorVisible)
+                    {
+                        const std::string& textForMeasurement = data.isPasswordField ? displayText : data.inputBuffer;
+                        const size_t safeCursorPos = std::min<size_t>(data.cursorPosition, textForMeasurement.length());
+                        std::string textBeforeCursor = textForMeasurement.substr(0, safeCursorPos);
+
+                        SkRect bounds{};
+                        font.measureText(textBeforeCursor.c_str(), textBeforeCursor.size(), SkTextEncoding::kUTF8,
+                                         &bounds);
+
+                        float cursorX = worldRect.x + 5.0f + bounds.width();
+
+                        SkPaint cursorPaint;
+                        cursorPaint.setColor4f({
+                            data.cursorColor.r, data.cursorColor.g, data.cursorColor.b, data.cursorColor.a
+                        });
+                        cursorPaint.setStrokeWidth(1.0f);
+
+                        canvas->drawLine(cursorX, textY + metrics.fAscent, cursorX, textY + metrics.fDescent,
+                                         cursorPaint);
+                    }
+                    canvas->restore();
+                }
+            );
+
+            result->rawDrawPackets.emplace_back(RenderPacket{
+                .zIndex = batch.zIndex,
+                .batchData = std::move(batch)
+            });
+        }
+
         void processSpriteData(const Renderable* currIt, const ECS::TransformComponent& transform,
-                              const SpriteRenderData& spriteData)
+                               const SpriteRenderData& spriteData)
         {
             FastSpriteBatchKey key(spriteData.image, spriteData.material, spriteData.color,
                                    static_cast<ECS::FilterQuality>(spriteData.filterQuality),
@@ -180,7 +350,7 @@ namespace
         }
 
         void processTextData(const Renderable* currIt, const ECS::TransformComponent& transform,
-                            const TextRenderData& textData)
+                             const TextRenderData& textData)
         {
             FastTextBatchKey key(const_cast<SkTypeface*>(textData.typeface), textData.fontSize,
                                  static_cast<TextAlignment>(textData.alignment), textData.color);
@@ -219,34 +389,34 @@ namespace
 
 void RenderableManager::SubmitFrame(DynamicArray<Renderable>&& frameData)
 {
-    // Ensure single writer semantics for frame swap
-    while (isUpdatingFrames.exchange(true, std::memory_order_acquire)) {
-        // spin
+    while (isUpdatingFrames.exchange(true, std::memory_order_acquire))
+    {
     }
 
-    // Safely snapshot current frame into prevFrame without invalidating any active readers
     {
         auto currView = currFrame.GetView();
-        prevFrame.ClearAndModify([&](auto& proxy) {
+        prevFrame.ClearAndModify([&](auto& proxy)
+        {
             proxy.Reserve(currView.Size());
-            for (size_t i = 0; i < currView.Size(); ++i) {
+            for (size_t i = 0; i < currView.Size(); ++i)
+            {
                 proxy.PushBack(currView[i]);
             }
         });
     }
 
-    // Safely publish the new frame into currFrame without freeing buffers held by readers
     {
         auto newView = frameData.GetView();
-        currFrame.ClearAndModify([&](auto& proxy) {
+        currFrame.ClearAndModify([&](auto& proxy)
+        {
             proxy.Reserve(newView.Size());
-            for (size_t i = 0; i < newView.Size(); ++i) {
+            for (size_t i = 0; i < newView.Size(); ++i)
+            {
                 proxy.PushBack(newView[i]);
             }
         });
     }
 
-    // Update timing/versioning for interpolation
     prevStateTime.store(currStateTime.load(std::memory_order_relaxed), std::memory_order_relaxed);
     currStateTime.store(std::chrono::steady_clock::now(), std::memory_order_relaxed);
 
@@ -258,11 +428,12 @@ void RenderableManager::SubmitFrame(DynamicArray<Renderable>&& frameData)
 
 void RenderableManager::SubmitFrame(std::vector<Renderable>&& frameData)
 {
-    
     DynamicArray<Renderable> dynamicFrameData;
-    dynamicFrameData.ClearAndModify([&frameData](auto& proxy) {
+    dynamicFrameData.ClearAndModify([&frameData](auto& proxy)
+    {
         proxy.Reserve(frameData.size());
-        for (auto&& renderable : frameData) {
+        for (auto&& renderable : frameData)
+        {
             proxy.EmplaceBack(std::move(renderable));
         }
     });
@@ -272,18 +443,18 @@ void RenderableManager::SubmitFrame(std::vector<Renderable>&& frameData)
 
 const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 {
-    PROFILE_SCOPE("RenderableManager::GetInterpolationData - Total");
+    while (isUpdatingFrames.load(std::memory_order_acquire))
+    {
+    }
 
-    
     if (!needsRebuild())
     {
         return packetBuffers[activeBufferIndex.load(std::memory_order_relaxed)];
     }
 
-    
     auto prevFrameView = prevFrame.GetView();
     auto currFrameView = currFrame.GetView();
-    
+
     bool hasPrevFrame = !prevFrameView.IsEmpty();
     bool hasCurrFrame = !currFrameView.IsEmpty();
 
@@ -303,7 +474,6 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     float alpha = 0.0f;
     if (shouldInterpolate)
     {
-        // 优先使用外部主循环计算的 alpha（更稳定，避免操作系统调度抖动）
         float ext = m_externalAlpha.load(std::memory_order_relaxed);
         if (ext >= 0.0f && ext <= 1.0f)
         {
@@ -342,8 +512,6 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         updateCacheState();
         return outPackets;
     }
-
-    PROFILE_SCOPE("Stage 1: Parallel Interpolation & Batching");
 
     auto& jobSystem = JobSystem::GetInstance();
     int numJobs = jobSystem.GetThreadCount();
@@ -387,7 +555,6 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         size_t start = segments[si].first;
         size_t end = segments[si].second;
 
-        
         const Renderable* prevStart = nullptr;
         const Renderable* prevEnd = nullptr;
         const Renderable* currStart = nullptr;
@@ -402,7 +569,6 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         }
         else
         {
-            
             currStart = baseFrameView.Data() + start;
             currEnd = baseFrameView.Data() + end;
         }
@@ -424,7 +590,6 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     }
     JobSystem::CompleteAll(jobHandles);
 
-    
     size_t totalSpriteGroups = 0;
     size_t totalTextGroups = 0;
     for (const auto& result : threadResults)
@@ -436,9 +601,6 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     spriteBatchGroups.reserve(totalSpriteGroups);
     textBatchGroups.reserve(totalTextGroups);
 
-    PROFILE_SCOPE("Stage 2: Serial Merge");
-
-    
     for (const auto& result : threadResults)
     {
         for (const auto& threadGroup : result.spriteBatchGroups)
@@ -464,13 +626,12 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         }
     }
 
-    
     for (const auto& result : threadResults)
     {
         for (const auto& threadGroup : result.textBatchGroups)
         {
             FastTextBatchKey key(threadGroup.typeface, threadGroup.fontSize,
-                                threadGroup.alignment, threadGroup.color);
+                                 threadGroup.alignment, threadGroup.color);
 
             auto it = textGroupIndices.find(key);
             if (it == textGroupIndices.end())
@@ -486,17 +647,14 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
                                               threadGroup.transforms.begin(),
                                               threadGroup.transforms.end());
                 masterGroup.texts.insert(masterGroup.texts.end(),
-                                        threadGroup.texts.begin(),
-                                        threadGroup.texts.end());
+                                         threadGroup.texts.begin(),
+                                         threadGroup.texts.end());
             }
         }
     }
 
-    PROFILE_SCOPE("Stage 3: Packing & Sorting");
-
     outPackets.reserve(spriteBatchGroups.size() + textBatchGroups.size());
 
-    
     for (const auto& group : spriteBatchGroups)
     {
         const size_t count = group.transforms.size();
@@ -521,7 +679,6 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         });
     }
 
-    
     for (const auto& group : textBatchGroups)
     {
         const size_t count = group.transforms.size();
@@ -531,7 +688,8 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         std::memcpy(transformBuffer, group.transforms.data(), count * sizeof(RenderableTransform));
 
         std::string* textBuffer = textArenas[buildIndex]->Allocate(count);
-        for (size_t j = 0; j < count; ++j) {
+        for (size_t j = 0; j < count; ++j)
+        {
             textBuffer[j] = group.texts[j];
         }
 
@@ -549,8 +707,16 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         });
     }
 
-    
-    std::ranges::sort(outPackets, [](const RenderPacket& a, const RenderPacket& b) {
+    for (const auto& result : threadResults)
+    {
+        if (!result.rawDrawPackets.empty())
+        {
+            outPackets.insert(outPackets.end(), result.rawDrawPackets.begin(), result.rawDrawPackets.end());
+        }
+    }
+
+    std::ranges::sort(outPackets, [](const RenderPacket& a, const RenderPacket& b)
+    {
         return a.zIndex < b.zIndex;
     });
 
@@ -576,9 +742,9 @@ bool RenderableManager::needsRebuild() const
     auto currentCurrVersion = currFrameVersion.load(std::memory_order_relaxed);
 
     return lastBuiltPrevTime.load(std::memory_order_relaxed) != currentPrevTime ||
-           lastBuiltCurrTime.load(std::memory_order_relaxed) != currentCurrTime ||
-           lastBuiltPrevFrameVersion.load(std::memory_order_relaxed) != currentPrevVersion ||
-           lastBuiltCurrFrameVersion.load(std::memory_order_relaxed) != currentCurrVersion;
+        lastBuiltCurrTime.load(std::memory_order_relaxed) != currentCurrTime ||
+        lastBuiltPrevFrameVersion.load(std::memory_order_relaxed) != currentPrevVersion ||
+        lastBuiltCurrFrameVersion.load(std::memory_order_relaxed) != currentCurrVersion;
 }
 
 void RenderableManager::updateCacheState()

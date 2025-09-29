@@ -269,6 +269,20 @@ namespace ECS
         operator SkColor4f() const { return {r, g, b, a}; }
 
         /**
+         * @brief 将 Color 转换为 SkColor (ARGB格式)
+         * @return 转换后的 SkColor
+         */
+        operator SkColor() const
+        {
+            return SkColorSetARGB(
+                static_cast<uint8_t>(std::clamp(a, 0.0f, 1.0f) * 255.0f),
+                static_cast<uint8_t>(std::clamp(r, 0.0f, 1.0f) * 255.0f),
+                static_cast<uint8_t>(std::clamp(g, 0.0f, 1.0f) * 255.0f),
+                static_cast<uint8_t>(std::clamp(b, 0.0f, 1.0f) * 255.0f)
+            );
+        }
+
+        /**
          * @brief 将颜色转换为 uint32_t (ARGB格式)
          * @return uint32_t 表示的颜色值
          */

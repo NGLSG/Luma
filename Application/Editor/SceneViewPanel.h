@@ -223,18 +223,6 @@ private:
     void drawDashedLine(ImDrawList* drawList, const ImVec2& start, const ImVec2& end, ImU32 color, float thickness,
                         float dashSize);
     /**
-     * @brief 绘制滚动视图的选中轮廓。
-     * @param drawList ImGui绘图列表。
-     * @param transform 滚动视图所属的变换组件。
-     * @param scrollViewComp 滚动视图组件。
-     * @param outlineColor 轮廓颜色。
-     * @param fillColor 填充颜色。
-     * @param thickness 轮廓线粗细。
-     */
-    void drawScrollViewSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
-                                        const ECS::ScrollViewComponent& scrollViewComp, ImU32 outlineColor,
-                                        ImU32 fillColor, float thickness);
-    /**
      * @brief 绘制输入文本框的选中轮廓。
      * @param drawList ImGui绘图列表。
      * @param transform 输入文本框所属的变换组件。

@@ -1,3 +1,4 @@
+
 #include "ApplicationBase.h"
 #include "Window.h"
 #include "../Renderer/GraphicsBackend.h"
@@ -5,7 +6,9 @@
 #include <SDL3/SDL.h>
 #include <chrono>
 #include <stdexcept>
+#include <vector> 
 
+#include "ImGuiRenderer.h"
 #include "imgui_node_editor.h"
 #include "JobSystem.h"
 #include "Profiler.h"
@@ -38,49 +41,45 @@ void ApplicationBase::Run()
     {
         Keyboard::GetInstance().ProcessEvent(event);
         LumaCursor::GetInstance().ProcessEvent(event);
+
         m_context.frameEvents.Modify([&](auto& events)
         {
             events.PushBack(event);
         });
     });
+
     m_context.window = m_window.get();
-
-
     m_simulationThread = std::thread(&ApplicationBase::simulationLoop, this);
-
-
     auto lastFrameTime = std::chrono::high_resolution_clock::now();
-    double accumulator = 0.0;
 
     while (m_isRunning)
     {
         auto currentTime = std::chrono::high_resolution_clock::now();
         double frameTime = std::chrono::duration<double>(currentTime - lastFrameTime).count();
         lastFrameTime = currentTime;
-
-        Keyboard::GetInstance().Update();
-        LumaCursor::GetInstance().Update();
         m_context.frameEvents.Clear();
         m_window->PollEvents();
         if (m_window->ShouldClose())
         {
             m_isRunning = false;
         }
+        m_context.commandsForRender.Execute();
+
+        Keyboard::GetInstance().Update();
+        LumaCursor::GetInstance().Update();
         m_context.inputState = m_window->GetInputState();
-
-
+        static double accumulator = 0.0;
         const float fixedDeltaTime = 1.0f / static_cast<float>(m_config.SimulationFPS);
         accumulator += frameTime;
-        m_context.interpolationAlpha = static_cast<float>(accumulator / fixedDeltaTime);
+        m_context.interpolationAlpha = static_cast<float>(std::clamp(accumulator / fixedDeltaTime, 0.0, 1.0));
         if (accumulator >= fixedDeltaTime)
         {
-            accumulator -= fixedDeltaTime;
+            accumulator = fmod(accumulator, fixedDeltaTime);
         }
 
         Render();
         Profiler::GetInstance().Update();
     }
-
 
     if (m_simulationThread.joinable())
     {
@@ -95,14 +94,19 @@ void ApplicationBase::simulationLoop()
 {
     const std::chrono::duration<double> fixedDeltaTime(1.0 / m_config.SimulationFPS);
     auto nextFrameTime = std::chrono::high_resolution_clock::now();
+
+
     while (m_isRunning)
     {
-        nextFrameTime += std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(fixedDeltaTime);
-        m_context.deferredCommands.Execute();
+        m_context.commandsForSim.Execute();
+
         Update(static_cast<float>(fixedDeltaTime.count()));
+
+        nextFrameTime += std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(fixedDeltaTime);
         std::this_thread::sleep_until(nextFrameTime);
     }
 }
+
 
 void ApplicationBase::InitializeCoreSystems()
 {

@@ -87,6 +87,91 @@ struct AssetHandle
     {
         return AssetHandle(guid);
     }
+
+    static AssetHandle UnknownHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::Unknown);
+    }
+
+    static AssetHandle TextureHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::Texture);
+    }
+
+    static AssetHandle MaterialHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::Material);
+    }
+
+    static AssetHandle CSharpScriptHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::CSharpScript);
+    }
+
+    static AssetHandle SceneHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::Scene);
+    }
+
+    static AssetHandle PrefabHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::Prefab);
+    }
+
+    static AssetHandle AudioHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::Audio);
+    }
+
+    static AssetHandle VideoHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::Video);
+    }
+
+    static AssetHandle AnimationClipHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::AnimationClip);
+    }
+
+    static AssetHandle AnimationControllerHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::AnimationController);
+    }
+
+    static AssetHandle PhysicsMaterialHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::PhysicsMaterial);
+    }
+
+    static AssetHandle LocalGameObjectHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::LocalGameObject);
+    }
+
+    static AssetHandle BlueprintHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::Blueprint);
+    }
+
+    static AssetHandle TileHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::Tile);
+    }
+
+    static AssetHandle TilesetHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::Tileset);
+    }
+
+    static AssetHandle RuleTileHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::RuleTile);
+    }
+
+    static AssetHandle FontHandle(const Guid& guid = Guid::Invalid())
+    {
+        return AssetHandle(guid, AssetType::Font);
+    }
 };
 
 namespace YAML

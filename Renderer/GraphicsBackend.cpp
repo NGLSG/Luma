@@ -194,6 +194,57 @@ wgpu::Texture GraphicsBackend::LoadTextureFromFile(const std::string& filename)
     return texture;
 }
 
+wgpu::Texture GraphicsBackend::LoadTextureFromData(const unsigned char* data, size_t size)
+{
+    int width, height, channels;
+    unsigned char* imgData = stbi_load_from_memory(data, static_cast<int>(size), &width, &height, &channels,
+                                                   STBI_rgb_alpha);
+
+    if (!imgData)
+    {
+        LogError("Failed to load texture from data.");
+        return nullptr;
+    }
+
+    channels = 4;
+
+    wgpu::TextureDescriptor textureDesc;
+    textureDesc.size = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1};
+    textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+    textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+    textureDesc.mipLevelCount = 1;
+    textureDesc.sampleCount = 1;
+    textureDesc.dimension = wgpu::TextureDimension::e2D;
+
+    wgpu::Texture texture = device.CreateTexture(&textureDesc);
+    if (!texture)
+    {
+        LogError("Failed to create WGPU texture from data.");
+        stbi_image_free(imgData);
+        return nullptr;
+    }
+
+    wgpu::TexelCopyTextureInfo destination;
+    destination.texture = texture;
+    destination.mipLevel = 0;
+    destination.origin = {0, 0, 0};
+    destination.aspect = wgpu::TextureAspect::All;
+
+    wgpu::TexelCopyBufferLayout dataLayout;
+    dataLayout.offset = 0;
+    dataLayout.bytesPerRow = static_cast<uint32_t>(width * channels);
+    dataLayout.rowsPerImage = static_cast<uint32_t>(height);
+
+    wgpu::Extent3D writeSize = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1};
+
+    device.GetQueue().WriteTexture(&destination, imgData,
+                                   static_cast<size_t>(width * height * channels),
+                                   &dataLayout, &writeSize);
+
+    stbi_image_free(imgData);
+    return texture;
+}
+
 wgpu::Surface GraphicsBackend::CreateSurface(const GraphicsBackendOptions& options,
                                              const std::unique_ptr<dawn::native::Instance>& dawnInstance)
 {

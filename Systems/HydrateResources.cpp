@@ -26,81 +26,35 @@ namespace Systems
         m_context = &context;
         auto& registry = scene->GetRegistry();
 
+        
+        auto processEntity = [this, &registry](entt::entity entity)
+        {
+            if (registry.all_of<ECS::SpriteComponent>(entity)) OnSpriteUpdated(registry, entity);
+            if (registry.all_of<ECS::ScriptsComponent>(entity)) OnScriptUpdated(registry, entity);
+            if (registry.all_of<ECS::TextComponent>(entity)) OnTextUpdated(registry, entity);
+            if (registry.all_of<ECS::ButtonComponent>(entity)) OnButtonUpdated(registry, entity);
+            if (registry.all_of<ECS::InputTextComponent>(entity)) OnInputTextUpdated(registry, entity);
+            if (registry.all_of<ECS::TilemapComponent>(entity)) OnTilemapUpdated(registry, entity);
+        };
 
         m_listeners.push_back(EventBus::GetInstance().Subscribe<ComponentUpdatedEvent>(
-            [this](const ComponentUpdatedEvent& event)
+            [this, processEntity](const ComponentUpdatedEvent& event)
             {
-                if (event.registry.all_of<ECS::SpriteComponent>(event.entity))
-                {
-                    OnSpriteUpdated(event.registry, event.entity);
-                }
-                if (event.registry.all_of<ECS::ScriptsComponent>(event.entity))
-                {
-                    OnScriptUpdated(event.registry, event.entity);
-                }
-                if (event.registry.all_of<ECS::TextComponent>(event.entity))
-                {
-                    OnTextUpdated(event.registry, event.entity);
-                }
-                if (event.registry.all_of<ECS::InputTextComponent>(event.entity))
-                {
-                    OnInputTextUpdated(event.registry, event.entity);
-                }
-                if (event.registry.all_of<ECS::TilemapComponent>(event.entity))
-                {
-                    OnTilemapUpdated(event.registry, event.entity);
-                }
+                processEntity(event.entity);
             }));
 
         m_listeners.push_back(EventBus::GetInstance().Subscribe<GameObjectCreatedEvent>(
-            [this](const GameObjectCreatedEvent& event)
+            [this, processEntity](const GameObjectCreatedEvent& event)
             {
-                if (event.registry.all_of<ECS::SpriteComponent>(event.entity))
-                {
-                    OnSpriteUpdated(event.registry, event.entity);
-                }
-                if (event.registry.all_of<ECS::ScriptsComponent>(event.entity))
-                {
-                    OnScriptUpdated(event.registry, event.entity);
-                }
-                if (event.registry.all_of<ECS::TextComponent>(event.entity))
-                {
-                    OnTextUpdated(event.registry, event.entity);
-                }
-                if (event.registry.all_of<ECS::InputTextComponent>(event.entity))
-                {
-                    OnInputTextUpdated(event.registry, event.entity);
-                }
-                if (event.registry.all_of<ECS::TilemapComponent>(event.entity))
-                {
-                    OnTilemapUpdated(event.registry, event.entity);
-                }
+                processEntity(event.entity);
             }));
 
         m_listeners.push_back(EventBus::GetInstance().Subscribe<ComponentAddedEvent>(
-            [this](const ComponentAddedEvent& event)
+            [this, processEntity](const ComponentAddedEvent& event)
             {
-                if (event.registry.all_of<ECS::SpriteComponent>(event.entity))
-                {
-                    OnSpriteUpdated(event.registry, event.entity);
-                }
-                if (event.registry.all_of<ECS::ScriptsComponent>(event.entity))
-                {
-                    OnScriptUpdated(event.registry, event.entity);
-                }
-                if (event.registry.all_of<ECS::TextComponent>(event.entity))
-                {
-                    OnTextUpdated(event.registry, event.entity);
-                }
-                if (event.registry.all_of<ECS::InputTextComponent>(event.entity))
-                {
-                    OnInputTextUpdated(event.registry, event.entity);
-                }
-                if (event.registry.all_of<ECS::TilemapComponent>(event.entity))
-                {
-                    OnTilemapUpdated(event.registry, event.entity);
-                }
+                processEntity(event.entity);
             }));
+
         m_listeners.push_back(EventBus::GetInstance().Subscribe<CSharpScriptRebuiltEvent>(
             [this](const CSharpScriptRebuiltEvent& event)
             {
@@ -112,31 +66,10 @@ namespace Systems
                 }
             }));
 
-
-        auto spriteView = registry.view<ECS::SpriteComponent>();
-        for (auto entity : spriteView)
+        
+        for (auto entity : registry.storage<entt::entity>())
         {
-            OnSpriteUpdated(registry, entity);
-        }
-        auto scriptView = registry.view<ECS::ScriptsComponent>();
-        for (auto entity : scriptView)
-        {
-            OnScriptUpdated(registry, entity);
-        }
-        auto textView = registry.view<ECS::TextComponent>();
-        for (auto entity : textView)
-        {
-            OnTextUpdated(registry, entity);
-        }
-        auto inputTextView = registry.view<ECS::InputTextComponent>();
-        for (auto entity : inputTextView)
-        {
-            OnInputTextUpdated(registry, entity);
-        }
-        auto tilemapView = registry.view<ECS::TilemapComponent>();
-        for (auto entity : tilemapView)
-        {
-            OnTilemapUpdated(registry, entity);
+            processEntity(entity);
         }
     }
 
@@ -163,46 +96,60 @@ namespace Systems
         TextureLoader textureLoader(*m_context->graphicsBackend);
         MaterialLoader materialLoader;
 
-
-        if (sprite.textureHandle.Valid())
+        if (sprite.textureHandle.Valid() && (!sprite.image || sprite.lastSpriteHandle != sprite.textureHandle))
         {
-            if (!sprite.image || sprite.lastSpriteHandle != sprite.textureHandle)
+            sprite.image = textureLoader.LoadAsset(sprite.textureHandle.assetGuid);
+            if (sprite.image)
             {
-                sprite.image = textureLoader.LoadAsset(sprite.textureHandle.assetGuid);
-                if (sprite.image)
-                {
-                    sprite.sourceRect = {
-                        0, 0, (float)sprite.image->getImage()->width(), (float)sprite.image->getImage()->height()
-                    };
-                    sprite.lastSpriteHandle = sprite.textureHandle;
-                }
-                else
-                {
-                    LogError("Failed to load texture with GUID: {}", sprite.textureHandle.assetGuid.ToString());
-                }
+                sprite.sourceRect = {
+                    0, 0, (float)sprite.image->getImage()->width(), (float)sprite.image->getImage()->height()
+                };
             }
+            else
+            {
+                LogError("Failed to load texture with GUID: {}", sprite.textureHandle.assetGuid.ToString());
+            }
+            sprite.lastSpriteHandle = sprite.textureHandle;
         }
-        else
+        else if (!sprite.textureHandle.Valid())
         {
             sprite.image.reset();
         }
 
-
-        if (sprite.materialHandle.Valid())
+        if (sprite.materialHandle.Valid() && (!sprite.material || sprite.lastMaterialHandle != sprite.materialHandle))
         {
-            if (!sprite.material || sprite.lastMaterialHandle != sprite.materialHandle)
+            sprite.material = materialLoader.LoadAsset(sprite.materialHandle.assetGuid);
+            if (!sprite.material)
             {
-                sprite.material = materialLoader.LoadAsset(sprite.materialHandle.assetGuid);
-                if (!sprite.material)
-                {
-                    LogError("Failed to load material with GUID: {}", sprite.materialHandle.assetGuid.ToString());
-                }
-                sprite.lastMaterialHandle = sprite.materialHandle;
+                LogError("Failed to load material with GUID: {}", sprite.materialHandle.assetGuid.ToString());
             }
+            sprite.lastMaterialHandle = sprite.materialHandle;
         }
-        else
+        else if (!sprite.materialHandle.Valid())
         {
             sprite.material.reset();
+        }
+    }
+
+    void HydrateResources::OnButtonUpdated(entt::registry& registry, entt::entity entity)
+    {
+        if (!m_context || !m_context->graphicsBackend) return;
+        auto& button = registry.get<ECS::ButtonComponent>(entity);
+
+        if (button.backgroundImage.Valid() && (!button.backgroundImageTexture || button.backgroundImageTexture->
+            GetSourceGuid() != button.backgroundImage.assetGuid))
+        {
+            TextureLoader textureLoader(*m_context->graphicsBackend);
+            button.backgroundImageTexture = textureLoader.LoadAsset(button.backgroundImage.assetGuid);
+            if (!button.backgroundImageTexture)
+            {
+                LogError("Failed to load button background image with GUID: {}",
+                         button.backgroundImage.assetGuid.ToString());
+            }
+        }
+        else if (!button.backgroundImage.Valid())
+        {
+            button.backgroundImageTexture.reset();
         }
     }
 
@@ -212,26 +159,23 @@ namespace Systems
 
         for (auto& script : scriptsComp.scripts)
         {
-            if (script.scriptAsset.Valid())
+            if (script.scriptAsset.Valid() && (!script.metadata || script.lastScriptAsset != script.scriptAsset))
             {
-                if (!script.metadata || script.lastScriptAsset != script.scriptAsset)
+                CSharpScriptLoader loader;
+                sk_sp<RuntimeCSharpScript> scriptAsset = loader.LoadAsset(script.scriptAsset.assetGuid);
+                if (scriptAsset)
                 {
-                    CSharpScriptLoader loader;
-                    sk_sp<RuntimeCSharpScript> scriptAsset = loader.LoadAsset(script.scriptAsset.assetGuid);
-                    if (scriptAsset)
-                    {
-                        script.lastScriptAsset = script.scriptAsset;
-                        script.metadata = &scriptAsset->GetMetadata();
-                    }
-                    else
-                    {
-                        LogError("Failed to load script asset with GUID: {}",
-                                 script.scriptAsset.assetGuid.ToString());
-                        script.metadata = nullptr;
-                    }
+                    script.metadata = &scriptAsset->GetMetadata();
                 }
+                else
+                {
+                    LogError("Failed to load script asset with GUID: {}",
+                             script.scriptAsset.assetGuid.ToString());
+                    script.metadata = nullptr;
+                }
+                script.lastScriptAsset = script.scriptAsset;
             }
-            else
+            else if (!script.scriptAsset.Valid())
             {
                 script.metadata = nullptr;
             }
@@ -241,20 +185,17 @@ namespace Systems
     void HydrateResources::OnTextUpdated(entt::registry& registry, entt::entity entity)
     {
         auto& text = registry.get<ECS::TextComponent>(entity);
-        if (text.fontHandle.Valid())
+        if (text.fontHandle.Valid() && (!text.typeface || text.lastFontHandle != text.fontHandle))
         {
-            if (!text.typeface || text.lastFontHandle != text.fontHandle)
+            FontLoader loader;
+            text.typeface = loader.LoadAsset(text.fontHandle.assetGuid);
+            if (!text.typeface)
             {
-                FontLoader loader;
-                text.typeface = loader.LoadAsset(text.fontHandle.assetGuid);
-                if (!text.typeface)
-                {
-                    LogError("Failed to load font with GUID: {}", text.fontHandle.assetGuid.ToString());
-                }
-                text.lastFontHandle = text.fontHandle;
+                LogError("Failed to load font with GUID: {}", text.fontHandle.assetGuid.ToString());
             }
+            text.lastFontHandle = text.fontHandle;
         }
-        else
+        else if (!text.fontHandle.Valid())
         {
             text.typeface.reset();
             text.lastFontHandle = {};
@@ -264,50 +205,62 @@ namespace Systems
     void HydrateResources::OnInputTextUpdated(entt::registry& registry, entt::entity entity)
     {
         auto& inputText = registry.get<ECS::InputTextComponent>(entity);
-        FontLoader loader;
+        FontLoader fontLoader;
 
-
+        
         ECS::TextComponent& text = inputText.text;
-        if (text.fontHandle.Valid())
+        if (text.fontHandle.Valid() && (!text.typeface || text.lastFontHandle != text.fontHandle))
         {
-            if (!text.typeface || text.lastFontHandle != text.fontHandle)
+            text.typeface = fontLoader.LoadAsset(text.fontHandle.assetGuid);
+            if (!text.typeface)
             {
-                text.typeface = loader.LoadAsset(text.fontHandle.assetGuid);
-                if (!text.typeface)
-                {
-                    LogError("Failed to load font for InputText with GUID: {}", text.fontHandle.assetGuid.ToString());
-                }
-                text.lastFontHandle = text.fontHandle;
+                LogError("Failed to load font for InputText with GUID: {}", text.fontHandle.assetGuid.ToString());
             }
+            text.lastFontHandle = text.fontHandle;
         }
-        else
+        else if (!text.fontHandle.Valid())
         {
             text.typeface.reset();
             text.lastFontHandle = {};
         }
 
-
+        
         ECS::TextComponent& placeholder = inputText.placeholder;
-        if (placeholder.fontHandle.Valid())
+        if (placeholder.fontHandle.Valid() && (!placeholder.typeface || placeholder.lastFontHandle !=
+            placeholder.fontHandle))
         {
-            if (!placeholder.typeface || placeholder.lastFontHandle != placeholder.fontHandle)
+            placeholder.typeface = fontLoader.LoadAsset(placeholder.fontHandle.assetGuid);
+            if (!placeholder.typeface)
             {
-                placeholder.typeface = loader.LoadAsset(placeholder.fontHandle.assetGuid);
-                if (!placeholder.typeface)
-                {
-                    LogError("Failed to load font for InputText placeholder with GUID: {}",
-                             placeholder.fontHandle.assetGuid.ToString());
-                }
-                placeholder.lastFontHandle = placeholder.fontHandle;
+                LogError("Failed to load font for InputText placeholder with GUID: {}",
+                         placeholder.fontHandle.assetGuid.ToString());
             }
+            placeholder.lastFontHandle = placeholder.fontHandle;
         }
-        else
+        else if (!placeholder.fontHandle.Valid())
         {
             placeholder.typeface.reset();
             placeholder.lastFontHandle = {};
         }
-    }
 
+        
+        if (!m_context || !m_context->graphicsBackend) return;
+        if (inputText.backgroundImage.Valid() && (!inputText.backgroundImageTexture || inputText.backgroundImageTexture
+            ->GetSourceGuid() != inputText.backgroundImage.assetGuid))
+        {
+            TextureLoader textureLoader(*m_context->graphicsBackend);
+            inputText.backgroundImageTexture = textureLoader.LoadAsset(inputText.backgroundImage.assetGuid);
+            if (!inputText.backgroundImageTexture)
+            {
+                LogError("Failed to load InputText background image with GUID: {}",
+                         inputText.backgroundImage.assetGuid.ToString());
+            }
+        }
+        else if (!inputText.backgroundImage.Valid())
+        {
+            inputText.backgroundImageTexture.reset();
+        }
+    }
 
     void HydrateResources::OnTilemapUpdated(entt::registry& registry, entt::entity entity)
     {
@@ -322,7 +275,6 @@ namespace Systems
         TileLoader tileLoader;
         RuleTileLoader ruleTileLoader;
 
-
         std::unordered_set<Guid> requiredTileGuids;
         std::unordered_set<Guid> requiredRuleTileGuids;
 
@@ -334,7 +286,6 @@ namespace Systems
         {
             if (handle.Valid()) requiredRuleTileGuids.insert(handle.assetGuid);
         }
-
 
         for (const auto& guid : requiredRuleTileGuids)
         {
@@ -350,7 +301,6 @@ namespace Systems
                 }
             }
         }
-
 
         std::unordered_map<Guid, sk_sp<RuntimeTile>> loadedTiles;
         if (registry.all_of<ECS::TilemapRendererComponent>(entity))
@@ -395,10 +345,8 @@ namespace Systems
             }
         }
 
-
         tilemap.runtimeTileCache.clear();
         std::unordered_set<ECS::Vector2i, ECS::Vector2iHash> requiredPrefabCoords;
-
 
         for (const auto& [coord, handle] : tilemap.normalTiles)
         {
@@ -415,7 +363,6 @@ namespace Systems
                 }
             }
         }
-
 
         for (const auto& [coord, handle] : tilemap.ruleTiles)
         {
@@ -473,7 +420,6 @@ namespace Systems
             }
         }
 
-
         std::vector<ECS::Vector2i> coordsToDelete;
         for (const auto& [coord, guid] : tilemap.instantiatedPrefabs)
         {
@@ -517,7 +463,6 @@ namespace Systems
             auto& tilemapCollider = registry.get<ECS::TilemapColliderComponent>(entity);
             tilemapCollider.generatedChains.clear();
 
-
             auto isSolid = [&](const ECS::Vector2i& coord) -> bool
             {
                 auto it = tilemap.runtimeTileCache.find(coord);
@@ -525,7 +470,6 @@ namespace Systems
                 {
                     return false;
                 }
-
 
                 return std::visit([](const auto& tileData) -> bool
                 {
@@ -538,12 +482,10 @@ namespace Systems
                 }, it->second.data);
             };
 
-
             std::unordered_map<ECS::Vector2f, std::vector<ECS::Vector2f>, ECS::Vector2fHash> edgeGraph;
 
             const float cellWidth = tilemap.cellSize.x;
             const float cellHeight = tilemap.cellSize.y;
-
 
             for (const auto& [coord, cachedTile] : tilemap.runtimeTileCache)
             {
@@ -556,12 +498,10 @@ namespace Systems
                     {coord.x + 1, coord.y}
                 };
 
-
                 ECS::Vector2f topLeft = {coord.x * cellWidth, coord.y * cellHeight};
                 ECS::Vector2f topRight = {(coord.x + 1) * cellWidth, coord.y * cellHeight};
                 ECS::Vector2f bottomLeft = {coord.x * cellWidth, (coord.y + 1) * cellHeight};
                 ECS::Vector2f bottomRight = {(coord.x + 1) * cellWidth, (coord.y + 1) * cellHeight};
-
 
                 if (!isSolid(neighbors[0]))
                 {
@@ -588,7 +528,6 @@ namespace Systems
                 }
             }
 
-
             while (!edgeGraph.empty())
             {
                 std::vector<ECS::Vector2f> newChain;
@@ -610,7 +549,6 @@ namespace Systems
                     ECS::Vector2f nextPoint = neighbors.back();
                     neighbors.pop_back();
 
-
                     auto& neighborsOfNext = edgeGraph.at(nextPoint);
                     auto backEdgeIt = std::find(neighborsOfNext.begin(), neighborsOfNext.end(), currentPoint);
                     if (backEdgeIt != neighborsOfNext.end())
@@ -631,7 +569,6 @@ namespace Systems
                     tilemapCollider.generatedChains.push_back(newChain);
                 }
             }
-
 
             tilemapCollider.isDirty = true;
         }

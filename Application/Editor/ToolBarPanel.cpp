@@ -13,7 +13,6 @@
 #include "Profiler.h"
 #include "ProjectSettings.h"
 #include "ScriptMetadataRegistry.h"
-#include "ScrollViewSystem.h"
 #include "../Utils/PCH.h"
 #include "../SceneManager.h"
 #include "../Resources/Managers/RuntimeTextureManager.h"
@@ -771,14 +770,27 @@ void ToolbarPanel::updateFps()
 
 void ToolbarPanel::newScene()
 {
-    m_context->activeScene = sk_make_sp<RuntimeScene>();
-    m_context->activeScene->SetName("NewScene");
-    m_context->activeScene->AddEssentialSystem<Systems::HydrateResources>();
-    m_context->activeScene->AddEssentialSystem<Systems::TransformSystem>();
-    m_context->activeScene->Activate(*m_context->engineContext);
-    SceneManager::GetInstance().SetCurrentScene(m_context->activeScene);
-    m_context->selectionType = SelectionType::NA;
-    m_context->selectionList = {};
+    if (!m_context || !m_context->engineContext)
+    {
+        LogError("无法创建新场景：EditorContext 未初始化。");
+        return;
+    }
+
+    auto queueNewScene = [ctx = m_context]()
+    {
+        sk_sp<RuntimeScene> newScene = sk_make_sp<RuntimeScene>();
+        newScene->SetName("NewScene");
+        newScene->AddEssentialSystem<Systems::HydrateResources>();
+        newScene->AddEssentialSystem<Systems::TransformSystem>();
+        newScene->Activate(*ctx->engineContext);
+
+        SceneManager::GetInstance().SetCurrentScene(newScene);
+        ctx->activeScene = newScene;
+        ctx->selectionType = SelectionType::NA;
+        ctx->selectionList.clear();
+    };
+
+    m_context->engineContext->commandsForSim.Push(queueNewScene);
 }
 
 void ToolbarPanel::saveScene()
@@ -840,7 +852,6 @@ void ToolbarPanel::play()
         playScene->AddSystem<Systems::InteractionSystem>();
         playScene->AddSystem<Systems::ButtonSystem>();
         playScene->AddSystem<Systems::InputTextSystem>();
-        playScene->AddSystem<Systems::ScrollViewSystem>();
         playScene->AddSystem<Systems::ScriptingSystem>();
         playScene->AddSystem<Systems::AnimationSystem>();
         
@@ -854,20 +865,36 @@ void ToolbarPanel::play()
     };
 
 
-    m_context->engineContext->deferredCommands.Push(switchToPlayMode);
+    m_context->engineContext->commandsForSim.Push(switchToPlayMode);
 }
 
 void ToolbarPanel::stop()
 {
     if (m_context->editorState == EditorState::Editing) return;
-    pause();
-    m_context->editorState = EditorState::Editing;
-    m_context->engineContext->appMode = ApplicationMode::Editor;
-    m_context->activeScene.reset();
-    m_context->activeScene = m_context->editingScene;
-    SceneManager::GetInstance().SetCurrentScene(m_context->activeScene);
-    m_context->editingScene.reset();
-    LogInfo("退出播放模式。");
+    if (!m_context->engineContext)
+    {
+        LogError("无法退出播放模式：EngineContext 不可用。");
+        return;
+    }
+
+    auto stopCommand = [ctx = m_context]()
+    {
+        if (ctx->editorState == EditorState::Playing)
+        {
+            ctx->editorState = EditorState::Paused;
+            LogInfo("执行已暂停。");
+        }
+
+        ctx->editorState = EditorState::Editing;
+        ctx->engineContext->appMode = ApplicationMode::Editor;
+        ctx->activeScene.reset();
+        ctx->activeScene = ctx->editingScene;
+        SceneManager::GetInstance().SetCurrentScene(ctx->activeScene);
+        ctx->editingScene.reset();
+        LogInfo("退出播放模式。");
+    };
+
+    m_context->engineContext->commandsForSim.Push(stopCommand);
 }
 
 void ToolbarPanel::pause()
@@ -1246,3 +1273,4 @@ bool ToolbarPanel::runScriptCompilationLogicForPackaging(std::string& statusMess
         return false;
     }
 }
+

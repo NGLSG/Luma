@@ -9,7 +9,6 @@
 #include "InteractionSystem.h"
 #include "PhysicsSystem.h"
 #include "ScriptingSystem.h"
-#include "ScrollViewSystem.h"
 #include "TransformSystem.h"
 #include "../Resources/AssetManager.h"
 #include "../Resources/Managers/RuntimeSceneManager.h"
@@ -84,7 +83,6 @@ sk_sp<RuntimeScene> SceneManager::LoadScene(const Guid& guid)
         newScene->AddSystem<Systems::AudioSystem>();
         newScene->AddSystem<Systems::ButtonSystem>();
         newScene->AddSystem<Systems::InputTextSystem>();
-        newScene->AddSystem<Systems::ScrollViewSystem>();
         newScene->AddSystem<Systems::ScriptingSystem>();
         newScene->AddSystem<Systems::AnimationSystem>();
         newScene->Activate(*m_context);
@@ -121,7 +119,6 @@ void SceneManager::Update(EngineContext& engineCtx)
                 loadedScene->AddSystem<Systems::AudioSystem>();
                 loadedScene->AddSystem<Systems::ButtonSystem>();
                 loadedScene->AddSystem<Systems::InputTextSystem>();
-                loadedScene->AddSystem<Systems::ScrollViewSystem>();
                 loadedScene->AddSystem<Systems::ScriptingSystem>();
                 loadedScene->AddSystem<Systems::AnimationSystem>();
             }

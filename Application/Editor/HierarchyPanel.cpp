@@ -119,19 +119,33 @@ void HierarchyPanel::Draw()
                 return;
             }
 
+            if (!m_context || !m_context->engineContext)
+            {
+                LogError("无法退出Prefab编辑模式：EditorContext 未初始化。");
+                ImGui::End();
+                return;
+            }
 
-            m_context->editingMode = EditingMode::Scene;
-            m_context->editingPrefabGuid = Guid();
+            auto restoreSceneCommand = [this, ctx = m_context]()
+            {
+                ctx->editingMode = EditingMode::Scene;
+                ctx->editingPrefabGuid = Guid();
 
+                ctx->activeScene.reset();
+                ctx->activeScene = ctx->sceneBeforePrefabEdit;
 
-            m_context->activeScene.reset();
+                if (!ctx->activeScene)
+                {
+                    LogWarn("返回场景时，原场景数据为空。");
+                }
 
+                SceneManager::GetInstance().SetCurrentScene(ctx->activeScene);
+                ctx->sceneBeforePrefabEdit.reset();
 
-            m_context->activeScene = m_context->sceneBeforePrefabEdit;
-            SceneManager::GetInstance().SetCurrentScene(m_context->activeScene);
-            m_context->sceneBeforePrefabEdit.reset();
+                this->clearSelection();
+            };
 
-            clearSelection();
+            m_context->engineContext->commandsForSim.Push(restoreSceneCommand);
             needsRebuildCache = true;
         }
         ImGui::Separator();
@@ -603,7 +617,7 @@ void HierarchyPanel::drawVirtualizedNode(const HierarchyNode& node, int virtualI
 
         if (ImGui::MenuItem("复制"))
         {
-            // 在节点上下文菜单中，复制当前节点，避免误复制其他已选中的对象
+            
             CopyGameObjects(std::vector<Guid>{node.objectGuid});
         }
         if (m_context->selectionList.size() > 1)

@@ -633,7 +633,8 @@ public:
 
         std::swap(m_writeBuffer, m_readyBuffer);
 
-        // 直接在干净的 Write Buffer 上操作，不清空会保留上次的数据
+        Buffer* oldReadBuffer = m_readBuffer.load(std::memory_order_relaxed);
+
         m_writeBuffer->m_size = 0;
 
         Proxy writerProxy(m_writeBuffer);
@@ -641,7 +642,7 @@ public:
 
         m_readBuffer.store(m_writeBuffer, std::memory_order_release);
 
-        m_readyBuffer = m_readBuffer.load(std::memory_order_relaxed); // 旧的 Read Buffer 直接丢弃，用新的替换
+        m_readyBuffer = oldReadBuffer;
 
         m_writerLock.clear(std::memory_order_release);
     }
@@ -699,25 +700,9 @@ public:
      */
     void Clear()
     {
-        while (m_writerLock.test_and_set(std::memory_order_acquire))
+        ClearAndModify([](auto& proxy)
         {
-            /* spin */
-        }
-
-        while (m_readyBuffer->m_refCount.load(std::memory_order_acquire) > 0)
-        {
-            /* spin */
-        }
-
-        std::swap(m_writeBuffer, m_readyBuffer);
-
-        m_writeBuffer->m_size = 0;
-
-        m_readBuffer.store(m_writeBuffer, std::memory_order_release);
-
-        m_readyBuffer = m_readBuffer.load(std::memory_order_relaxed); // 旧的 Read Buffer 直接丢弃，用新的替换
-
-        m_writerLock.clear(std::memory_order_release);
+        });
     }
 
     DynamicArray& operator=(std::vector<T>&& vec)

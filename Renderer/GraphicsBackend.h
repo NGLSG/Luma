@@ -299,6 +299,8 @@ public:
      * @return 加载的 WebGPU 纹理。
      */
     wgpu::Texture LoadTextureFromFile(const std::string& filename);
+
+    wgpu::Texture LoadTextureFromData(const unsigned char* data, size_t size);
 };
 
 #endif

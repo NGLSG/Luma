@@ -213,18 +213,6 @@ namespace Systems
             }
         }
 
-        auto scrollViewView = registry.view<ECS::TransformComponent, ECS::ScrollViewComponent>();
-        for (auto entity : scrollViewView)
-        {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
-                continue;
-            const auto& scrollView = scrollViewView.get<ECS::ScrollViewComponent>(entity);
-            const auto& transform = scrollViewView.get<ECS::TransformComponent>(entity);
-            if (isPointInRectUI(worldMousePos, transform, scrollView.viewportSize))
-            {
-                candidates.emplace_back(entity, 1000);
-            }
-        }
 
 
         auto spriteView = registry.view<ECS::TransformComponent, ECS::SpriteComponent>();

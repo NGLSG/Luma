@@ -11,7 +11,6 @@
 #include "PreferenceSettings.h"
 #include "ProjectSettings.h"
 #include "RuleTile.h"
-#include "ScrollViewSystem.h"
 #include "Tileset.h"
 #include "Window.h"
 #include "Resources/AssetManager.h"
@@ -163,7 +162,7 @@ void AssetBrowserPanel::drawToolbar()
             if (parentNode)
             {
                 m_context->currentAssetDirectory = parentNode;
-                m_pathToExpand = parentPath; // 同步展开左侧树
+                m_pathToExpand = parentPath; 
             }
         }
         ImGui::SameLine();
@@ -188,7 +187,7 @@ void AssetBrowserPanel::drawDirectoryTree()
 {
     if (m_context->assetTreeRoot)
     {
-        // 若有路径请求展开，先确保沿途节点已加载
+        
         if (!m_pathToExpand.empty())
         {
             ensurePathLoaded(m_pathToExpand);
@@ -962,7 +961,7 @@ void AssetBrowserPanel::drawDirectoryNode(DirectoryNode& node)
         flags |= ImGuiTreeNodeFlags_Selected;
     }
 
-    // 若已扫描且没有子目录，则渲染为叶子节点
+    
     if (node.scanned && node.subdirectories.empty())
     {
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
@@ -1042,7 +1041,7 @@ void AssetBrowserPanel::drawDirectoryNode(DirectoryNode& node)
 
         for (const auto* subNode : sortedSubdirs)
         {
-            // const_cast 安全：draw 过程中不会改变路径，但可能触发懒加载的子节点构建
+            
             drawDirectoryNode(*const_cast<DirectoryNode*>(subNode));
         }
         ImGui::TreePop();
@@ -1122,7 +1121,7 @@ void AssetBrowserPanel::buildAssetTree()
     m_context->assetTreeRoot->path = "";
     m_context->assetTreeRoot->name = "Assets";
     m_context->assetTreeRoot->scanned = false;
-    // 仅扫描根的直接子目录和文件，避免全量递归
+    
     scanDirectoryNode(m_context->assetTreeRoot.get());
 }
 
@@ -1131,7 +1130,7 @@ void AssetBrowserPanel::scanDirectoryNode(DirectoryNode* parentNode)
     if (!parentNode) return;
     if (parentNode->scanned)
     {
-        return; // 已扫描过，不重复开销
+        return; 
     }
     parentNode->subdirectories.clear();
     parentNode->assets.clear();
@@ -1173,7 +1172,7 @@ void AssetBrowserPanel::scanDirectoryNode(DirectoryNode* parentNode)
             auto newNode = std::make_unique<DirectoryNode>();
             newNode->path = parentNode->path / dirName;
             newNode->name = dirName;
-            newNode->scanned = false; // 懒加载子目录
+            newNode->scanned = false; 
 
             parentNode->subdirectories[dirName] = std::move(newNode);
         }
@@ -1184,11 +1183,11 @@ void AssetBrowserPanel::scanDirectoryNode(DirectoryNode* parentNode)
                 ec.clear();
                 continue;
             }
-            // 非目录：尝试获取该文件的资产元数据（若存在）
+            
             std::filesystem::path relPath = std::filesystem::relative(entry.path(), AssetManager::GetInstance().GetAssetsRootPath());
             if (relPath.extension() == ".meta")
             {
-                continue; // 跳过 .meta 文件
+                continue; 
             }
             if (const AssetMetadata* meta = AssetManager::GetInstance().GetMetadata(relPath))
             {
@@ -1222,7 +1221,7 @@ DirectoryNode* AssetBrowserPanel::findNodeByPath(const std::filesystem::path& pa
         auto it = currentNode->subdirectories.find(partStr);
         if (it == currentNode->subdirectories.end())
         {
-            // 未找到，路径可能不存在
+            
             return nullptr;
         }
         currentNode = it->second.get();
@@ -1245,7 +1244,7 @@ void AssetBrowserPanel::ensurePathLoaded(const std::filesystem::path& path)
         auto it = current->subdirectories.find(partStr);
         if (it == current->subdirectories.end())
         {
-            // 子目录不存在，停止
+            
             return;
         }
         current = it->second.get();

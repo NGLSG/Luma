@@ -21,7 +21,6 @@
 #include "AudioSystem.h"
 #include "ButtonSystem.h"
 #include "InputTextSystem.h"
-#include "ScrollViewSystem.h"
 #include "../Systems/HydrateResources.h"
 #include "../Systems/TransformSystem.h"
 #include "../Systems/PhysicsSystem.h"
@@ -2149,14 +2148,13 @@ C# Scripting Example
                     playScene->AddSystem<Systems::InteractionSystem>();
                     playScene->AddSystem<Systems::ButtonSystem>();
                     playScene->AddSystem<Systems::InputTextSystem>();
-                    playScene->AddSystem<Systems::ScrollViewSystem>();
                     playScene->AddSystem<Systems::ScriptingSystem>();
                     playScene->AddSystem<Systems::AnimationSystem>();
                     SceneManager::GetInstance().SetCurrentScene(playScene);
                     playScene->Activate(*c->engineContext);
                     c->activeScene = playScene;
                 };
-                ctx.engineContext->deferredCommands.Push(switchToPlayMode);
+                ctx.engineContext->commandsForSim.Push(switchToPlayMode);
                 return {{"success", true}};
             }
             catch (const std::exception& e)
@@ -2188,7 +2186,7 @@ C# Scripting Example
                     SceneManager::GetInstance().SetCurrentScene(c->activeScene);
                     c->editingScene.reset();
                 };
-                ctx.engineContext->deferredCommands.Push(stopLambda);
+                ctx.engineContext->commandsForSim.Push(stopLambda);
                 return {{"success", true}};
             }
             catch (const std::exception& e)
