@@ -7,7 +7,10 @@
 #include <memory>
 #include <map>
 #include <chrono>
+#include <cstdint>
 #include <unordered_map>
+#include <optional>
+#include <nlohmann/json.hpp>
 
 #include "AITool.h"
 #include "imgui.h"
@@ -76,6 +79,21 @@ private:
         std::string providerName; ///< 模型提供商的名称。
         std::string modelName; ///< 模型的内部名称。
         std::string botKey; ///< 关联的聊天机器人键。
+    };
+
+    struct ToolCallEntry
+    {
+        std::string functionName; ///< 工具名称。
+        nlohmann::json arguments; ///< 调用时的参数。
+        std::optional<nlohmann::json> result; ///< 工具执行结果。
+    };
+
+    struct ToolInvocationLog
+    {
+        int messageIndex = -1; ///< 关联的消息索引。
+        std::vector<ToolCallEntry> calls; ///< 工具调用列表。
+        uint64_t timestamp = 0; ///< 触发时间戳。
+        std::string rawRequest; ///< 原始的 tool_calls JSON。
     };
 
     /**
@@ -220,6 +238,9 @@ private:
     uint64_t m_lastRequestTimestamp = 0; ///< 上次请求的时间戳。
     bool m_scrollToBottom = false; ///< 指示是否需要滚动到聊天底部。
     std::string m_streamBuffer; ///< AI流式响应的缓冲区。
+
+    std::vector<ToolInvocationLog> m_toolInvocationLogs; ///< 记录工具调用的日志。
+    int m_pendingToolLogIndex = -1; ///< 待审批工具调用关联的日志索引。
 
     std::map<std::string, std::unique_ptr<ChatBot>> m_bots; ///< 存储所有聊天机器人的映射。
     std::vector<AvailableModel> m_availableModels; ///< 可用的AI模型列表。

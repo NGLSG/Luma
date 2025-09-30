@@ -38,22 +38,133 @@ namespace
         if (!data.isImage)
         {
             std::string url(data.link, data.linkLength);
-
             Utils::OpenBrowserAt(url);
         }
     }
+
+    void markdownFormatCallback(const ImGui::MarkdownFormatInfo& info, bool start)
+    {
+        if (info.type == ImGui::MarkdownFormatType::HEADING)
+        {
+            constexpr float kHeadingScales[ImGui::MarkdownConfig::NUMHEADINGS] = {1.25f, 1.15f, 1.05f};
+            int level = info.level;
+            level = std::max(1, std::min(level, ImGui::MarkdownConfig::NUMHEADINGS));
+            if (start)
+            {
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, ImGui::GetStyle().ItemSpacing.y * 1.35f));
+                ImGui::SetWindowFontScale(kHeadingScales[level - 1]);
+            }
+            else
+            {
+                ImGui::SetWindowFontScale(1.0f);
+                ImGui::PopStyleVar();
+            }
+        }
+    }
+
+    std::string trim_copy(const std::string& value)
+    {
+        auto begin = value.find_first_not_of(" \t\r\n");
+        if (begin == std::string::npos) return {};
+        auto end = value.find_last_not_of(" \t\r\n");
+        return value.substr(begin, end - begin + 1);
+    }
+
+    std::string to_lower_copy(std::string value)
+    {
+        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return value;
+    }
+
+    struct MarkdownSection
+    {
+        std::string title;
+        std::string body;
+        bool collapsible = false;
+        bool defaultOpen = true;
+        bool isSummary = false;
+    };
+
+    std::vector<MarkdownSection> parseAssistantSections(const std::string& content)
+    {
+        std::vector<MarkdownSection> sections;
+        std::string currentTitle;
+        std::string currentBody;
+        std::istringstream stream(content);
+        std::string line;
+
+        auto flush = [&]()
+        {
+            std::string trimmedBody = trim_copy(currentBody);
+            std::string trimmedTitle = trim_copy(currentTitle);
+            if (trimmedTitle.empty() && trimmedBody.empty())
+            {
+                return;
+            }
+
+            MarkdownSection section;
+            section.title = trimmedTitle;
+            section.body = trimmedBody;
+            std::string lowerTitle = to_lower_copy(section.title);
+            section.isSummary = !section.title.empty() && (lowerTitle.find("summary") != std::string::npos || lowerTitle.find("总结") != std::string::npos || lowerTitle.find("汇总") != std::string::npos);
+            bool isThinking = !section.title.empty() && (lowerTitle.find("thinking") != std::string::npos || lowerTitle.find("思考") != std::string::npos || lowerTitle.find("推理") != std::string::npos);
+            bool isTool = !section.title.empty() && (lowerTitle.find("tool") != std::string::npos || lowerTitle.find("工具") != std::string::npos);
+            section.collapsible = !section.isSummary && !section.title.empty();
+            if (isThinking)
+            {
+                section.defaultOpen = false;
+            }
+            else if (isTool)
+            {
+                section.defaultOpen = true;
+            }
+            sections.push_back(std::move(section));
+
+            currentTitle.clear();
+            currentBody.clear();
+        };
+
+        while (std::getline(stream, line))
+        {
+            if (!line.empty() && line.back() == '\r')
+            {
+                line.pop_back();
+            }
+
+            if (line.rfind("## ", 0) == 0)
+            {
+                flush();
+                currentTitle = line.substr(3);
+            }
+            else
+            {
+                if (!currentBody.empty())
+                {
+                    currentBody += '\n';
+                }
+                currentBody += line;
+            }
+        }
+        flush();
+
+        return sections;
+    }
+
+    void renderMarkdownBlock(const std::string& text, float wrapWidth, ImGui::MarkdownConfig& config)
+    {
+        if (text.empty()) return;
+        float startX = ImGui::GetCursorPosX();
+        ImGui::PushTextWrapPos(startX + wrapWidth);
+        ImGui::Markdown(text.c_str(), text.length(), config);
+        ImGui::PopTextWrapPos();
+    }
 }
-
-
 void AIPanel::initializeMarkdown()
 {
     m_markdownConfig = ImGui::MarkdownConfig();
-
-
     m_markdownConfig.linkCallback = markdownLinkCallback;
+    m_markdownConfig.formatCallback = markdownFormatCallback;
 }
-
-
 void AIPanel::Initialize(EditorContext* context)
 {
     m_context = context;
@@ -134,9 +245,11 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
 {
     LogInfo("AI请求执行工具（过程对用户隐藏）...");
 
-    
     nlohmann::json responseJson;
-    try { responseJson = nlohmann::json::parse(aiResponse); }
+    try
+    {
+        responseJson = nlohmann::json::parse(aiResponse);
+    }
     catch (const std::exception& e)
     {
         nlohmann::json toolResults;
@@ -153,19 +266,54 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
         return;
     }
 
-    
-    if (m_permissionLevel == PermissionLevel::Chat)
+    if (!responseJson.contains("tool_calls") || !responseJson["tool_calls"].is_array())
     {
-        
-        nlohmann::json toolResults;
-        toolResults["tool_results"] = nlohmann::json::array();
+        LogError("AI 响应缺少有效的 tool_calls 字段。");
+        return;
+    }
+
+    m_pendingToolLogIndex = -1;
+
+    ToolInvocationLog* currentLog = nullptr;
+    {
+        ToolInvocationLog logEntry;
+        logEntry.messageIndex = (m_toolCallMessageIndex == static_cast<size_t>(-1)) ? -1 : static_cast<int>(m_toolCallMessageIndex);
+        logEntry.timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        logEntry.rawRequest = aiResponse;
+
         for (const auto& call : responseJson["tool_calls"])
         {
-            std::string functionName = call.value("function_name", "unknown");
-            toolResults["tool_results"].push_back({
-                {"function_name", functionName},
-                {"result", {{"success", false}, {"error", "Permission denied: Chat mode forbids tool calls."}}}
-            });
+            ToolCallEntry callEntry;
+            callEntry.functionName = call.value("function_name", "unknown");
+            callEntry.arguments = call.contains("arguments") ? call["arguments"] : nlohmann::json::object();
+            logEntry.calls.push_back(std::move(callEntry));
+        }
+
+        m_toolInvocationLogs.push_back(std::move(logEntry));
+        currentLog = &m_toolInvocationLogs.back();
+    }
+
+    auto recordResult = [&](size_t index, const nlohmann::json& result)
+    {
+        if (!currentLog) return;
+        if (index < currentLog->calls.size())
+        {
+            currentLog->calls[index].result = result;
+        }
+    };
+
+    if (m_permissionLevel == PermissionLevel::Chat)
+    {
+        nlohmann::json toolResults;
+        toolResults["tool_results"] = nlohmann::json::array();
+        const auto& calls = responseJson["tool_calls"];
+        for (size_t i = 0; i < calls.size(); ++i)
+        {
+            std::string functionName = calls[i].value("function_name", "unknown");
+            nlohmann::json result = {{"success", false}, {"error", "Permission denied: Chat mode forbids tool calls."}};
+            toolResults["tool_results"].push_back({{"function_name", functionName}, {"result", result}});
+            recordResult(i, result);
         }
         auto& bot = m_bots.at(m_currentBotKey);
         m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -176,41 +324,59 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
 
     if (m_permissionLevel == PermissionLevel::Agent)
     {
-        
         m_pendingToolCalls = nlohmann::json::object();
         m_pendingToolCalls["tool_calls"] = responseJson["tool_calls"];
         m_hasPendingToolCalls = true;
         m_showToolApprovalModal = true;
+        if (currentLog)
+        {
+            m_pendingToolLogIndex = static_cast<int>(m_toolInvocationLogs.size()) - 1;
+        }
         return;
     }
 
-    
     nlohmann::json toolResults;
     toolResults["tool_results"] = nlohmann::json::array();
+    const auto& calls = responseJson["tool_calls"];
     try
     {
-        for (const auto& call : responseJson["tool_calls"])
+        for (size_t i = 0; i < calls.size(); ++i)
         {
-            std::string functionName = call["function_name"];
+            const auto& call = calls[i];
+            std::string functionName = call.value("function_name", "unknown");
+            nlohmann::json arguments = call.contains("arguments") ? call["arguments"] : nlohmann::json::object();
+            if (currentLog && i < currentLog->calls.size())
+            {
+                currentLog->calls[i].arguments = arguments;
+            }
+
             const AITool* tool = AIToolRegistry::GetInstance().GetTool(functionName);
             if (tool)
             {
-                nlohmann::json result = tool->execute(*m_context, call["arguments"]);
+                nlohmann::json result = tool->execute(*m_context, arguments);
                 toolResults["tool_results"].push_back({{"function_name", functionName}, {"result", result}});
+                recordResult(i, result);
             }
             else
             {
-                toolResults["tool_results"].push_back({
-                    {"function_name", functionName}, {"result", {{"success", false}, {"error", "Tool not found."}}}
-                });
+                nlohmann::json result = {{"success", false}, {"error", "Tool not found."}};
+                toolResults["tool_results"].push_back({{"function_name", functionName}, {"result", result}});
+                recordResult(i, result);
             }
         }
     }
     catch (const std::exception& e)
     {
-        toolResults["tool_results"].push_back({
-            {"function_name", "system_error"}, {"result", {{"success", false}, {"error", e.what()}}}
-        });
+        nlohmann::json result = {{"success", false}, {"error", e.what()}};
+        toolResults["tool_results"].push_back({{"function_name", "system_error"}, {"result", result}});
+        if (currentLog)
+        {
+            ToolCallEntry errorEntry;
+            errorEntry.functionName = "system_error";
+            errorEntry.arguments = nlohmann::json::object();
+            errorEntry.result = result;
+            currentLog->calls.push_back(std::move(errorEntry));
+        }
     }
 
     auto& bot = m_bots.at(m_currentBotKey);
@@ -407,10 +573,9 @@ void AIPanel::drawChatPanel()
 {
     ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 80.0f);
 
-
     const char* current_model = (m_selectedModelIndex >= 0 && m_selectedModelIndex < m_availableModels.size())
-                                    ? m_availableModels[m_selectedModelIndex].displayName.c_str()
-                                    : "选择模型";
+                                ? m_availableModels[m_selectedModelIndex].displayName.c_str()
+                                : "选择模型";
 
     if (ImGui::BeginCombo("##选择模型", current_model))
     {
@@ -431,21 +596,18 @@ void AIPanel::drawChatPanel()
     ImGui::PopItemWidth();
     ImGui::SameLine();
 
-
     ImGui::BeginDisabled(m_messages.empty() || m_isWaitingForResponse);
     if (ImGui::Button("重置会话"))
     {
         if (!m_currentBotKey.empty() && m_bots.count(m_currentBotKey))
         {
             auto& bot = m_bots.at(m_currentBotKey);
-
-
             bot->Reset();
             bot->Save(m_currentConversation);
 
-
             m_messages.clear();
-
+            m_toolInvocationLogs.clear();
+            m_pendingToolLogIndex = -1;
 
             memset(m_inputBuffer, 0, sizeof(m_inputBuffer));
             m_streamBuffer.clear();
@@ -457,31 +619,129 @@ void AIPanel::drawChatPanel()
 
     ImGui::Separator();
 
-
     ImGui::BeginChild("ConversationHistory", ImVec2(0, -ImGui::GetTextLineHeightWithSpacing() * 5));
     float four_char_margin = ImGui::CalcTextSize("    ").x;
     float content_width = ImGui::GetContentRegionAvail().x;
 
-    for (const auto& msg : m_messages)
+    for (int msgIndex = 0; msgIndex < static_cast<int>(m_messages.size()); ++msgIndex)
     {
+        auto& msg = m_messages[msgIndex];
         float bubble_max_width = content_width * 0.85f;
-        ImVec2 text_size = ImGui::CalcTextSize(msg.content.c_str(), nullptr, false, bubble_max_width);
 
+        ImGui::PushID(msgIndex);
         if (msg.role == "user")
         {
+            ImVec2 text_size = ImGui::CalcTextSize(msg.content.c_str(), nullptr, false, bubble_max_width);
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + content_width - text_size.x - four_char_margin);
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.9f, 1.0f, 1.0f));
+            renderMarkdownBlock(msg.content, bubble_max_width, m_markdownConfig);
+            ImGui::PopStyleColor();
         }
         else
         {
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + four_char_margin / 4.f);
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 1.0f, 0.9f, 1.0f));
-        }
 
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + bubble_max_width);
-        ImGui::Markdown(msg.content.c_str(), msg.content.length(), m_markdownConfig);
-        ImGui::PopTextWrapPos();
-        ImGui::PopStyleColor();
+            auto sections = parseAssistantSections(msg.content);
+            if (sections.empty())
+            {
+                renderMarkdownBlock(msg.content, bubble_max_width, m_markdownConfig);
+            }
+            else
+            {
+                for (size_t secIdx = 0; secIdx < sections.size(); ++secIdx)
+                {
+                    const auto& section = sections[secIdx];
+                    bool hasBody = !section.body.empty();
+                    if (section.title.empty())
+                    {
+                        if (hasBody) renderMarkdownBlock(section.body, bubble_max_width, m_markdownConfig);
+                        continue;
+                    }
+
+                    if (section.collapsible)
+                    {
+                        ImGuiTreeNodeFlags flags = section.defaultOpen ? ImGuiTreeNodeFlags_DefaultOpen : 0;
+                        ImGui::PushID((msgIndex << 8) + static_cast<int>(secIdx));
+                        if (ImGui::CollapsingHeader(section.title.c_str(), flags))
+                        {
+                            if (hasBody) renderMarkdownBlock(section.body, bubble_max_width, m_markdownConfig);
+                        }
+                        ImGui::PopID();
+                    }
+                    else
+                    {
+                        float originalScale = ImGui::GetFontSize() / ImGui::GetIO().FontGlobalScale;
+                        ImGui::SetWindowFontScale(1.1f);
+                        ImGui::TextUnformatted(section.title.c_str());
+                        ImGui::SetWindowFontScale(originalScale);
+                        if (hasBody) renderMarkdownBlock(section.body, bubble_max_width, m_markdownConfig);
+                    }
+                    ImGui::Spacing();
+                }
+            }
+
+            std::vector<ToolInvocationLog*> messageLogs;
+            for (auto& log : m_toolInvocationLogs)
+            {
+                if (log.messageIndex == msgIndex)
+                {
+                    messageLogs.push_back(&log);
+                }
+            }
+
+            for (size_t logIdx = 0; logIdx < messageLogs.size(); ++logIdx)
+            {
+                const auto& log = *messageLogs[logIdx];
+                for (size_t callIdx = 0; callIdx < log.calls.size(); ++callIdx)
+                {
+                    const auto& call = log.calls[callIdx];
+                    std::string headerLabel = "工具步骤 " + std::to_string(callIdx + 1) + " - " + call.functionName;
+                    bool hasResult = call.result.has_value();
+                    if (!hasResult)
+                    {
+                        headerLabel += " (待执行)";
+                    }
+                    ImGui::PushID((msgIndex << 16) + static_cast<int>((logIdx << 8) + callIdx));
+                    ImGuiTreeNodeFlags flags = hasResult ? ImGuiTreeNodeFlags_DefaultOpen : 0;
+                    if (ImGui::CollapsingHeader(headerLabel.c_str(), flags))
+                    {
+                        bool success = hasResult && call.result->contains("success") && call.result->value("success", false);
+                        ImVec4 statusColor = hasResult
+                            ? (success ? ImVec4(0.4f, 0.9f, 0.4f, 1.0f) : ImVec4(0.95f, 0.5f, 0.4f, 1.0f))
+                            : ImVec4(0.9f, 0.9f, 0.4f, 1.0f);
+                        const char* statusText = hasResult ? (success ? "成功" : "失败") : "待执行";
+                        ImGui::TextColored(statusColor, "状态: %s", statusText);
+
+                        if (!call.arguments.empty())
+                        {
+                            std::string argsText = call.arguments.dump(2);
+                            ImGui::TextDisabled("参数:");
+                            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + bubble_max_width);
+                            ImGui::TextUnformatted(argsText.c_str());
+                            ImGui::PopTextWrapPos();
+                        }
+
+                        if (hasResult)
+                        {
+                            std::string resultText = call.result->dump(2);
+                            ImGui::TextDisabled("结果:");
+                            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + bubble_max_width);
+                            ImGui::TextUnformatted(resultText.c_str());
+                            ImGui::PopTextWrapPos();
+                        }
+                        else
+                        {
+                            ImGui::TextDisabled("结果: 等待执行...");
+                        }
+                    }
+                    ImGui::PopID();
+                }
+            }
+
+            ImGui::PopStyleColor();
+        }
+        ImGui::PopID();
         ImGui::Dummy(ImVec2(0.0f, 12.0f));
     }
 
@@ -493,7 +753,6 @@ void AIPanel::drawChatPanel()
     ImGui::EndChild();
     ImGui::Separator();
 
-
     ImGui::PushItemWidth(-80);
     if (ImGui::InputTextMultiline("##Input", m_inputBuffer, sizeof(m_inputBuffer),
                                   ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 3.5f),
@@ -504,7 +763,6 @@ void AIPanel::drawChatPanel()
             submitMessage();
         }
     }
-
 
     if (ImGui::BeginDragDropTarget())
     {
@@ -539,7 +797,6 @@ void AIPanel::drawChatPanel()
     ImGui::PopItemWidth();
     ImGui::SameLine();
 
-
     ImGui::BeginGroup();
     {
         ImGui::BeginDisabled(m_isWaitingForResponse || m_currentBotKey.empty());
@@ -565,9 +822,7 @@ void AIPanel::drawSupportedModelsEditor(std::vector<std::string>& supportedModel
 {
     ImGui::PushID(id);
 
-
     ImGui::Text("支持的模型列表：");
-
 
     int modelToDelete = -1;
     for (int i = 0; i < supportedModels.size(); ++i)
@@ -587,7 +842,6 @@ void AIPanel::drawSupportedModelsEditor(std::vector<std::string>& supportedModel
         supportedModels.erase(supportedModels.begin() + modelToDelete);
     }
 
-
     static char newModelBuffer[256] = "";
     ImGui::InputTextWithHint("##NewModel", "输入新模型名称...", newModelBuffer, sizeof(newModelBuffer));
     ImGui::SameLine();
@@ -604,7 +858,6 @@ void AIPanel::drawSupportedModelsEditor(std::vector<std::string>& supportedModel
     ImGui::PopID();
 }
 
-
 void AIPanel::drawLlamaConfigEditor(LLamaCreateInfo& llamaConfig, const char* id)
 {
     ImGui::PushID(id);
@@ -618,14 +871,11 @@ void AIPanel::drawLlamaConfigEditor(LLamaCreateInfo& llamaConfig, const char* id
     ImGui::PopID();
 }
 
-
 void AIPanel::resetToDefaults()
 {
     m_config = Configure();
     LogInfo("AI面板配置已重置为默认值。");
 }
-
-
 void AIPanel::drawSettingsPanel()
 {
     if (ImGui::Button("保存"))
@@ -865,67 +1115,118 @@ void AIPanel::drawToolApprovalPopup()
 void AIPanel::executePendingToolCalls()
 {
     if (!m_hasPendingToolCalls) return;
+    ToolInvocationLog* currentLog = nullptr;
+    if (m_pendingToolLogIndex >= 0 && m_pendingToolLogIndex < static_cast<int>(m_toolInvocationLogs.size()))
+    {
+        currentLog = &m_toolInvocationLogs[m_pendingToolLogIndex];
+    }
+
     nlohmann::json toolResults;
     toolResults["tool_results"] = nlohmann::json::array();
     try
     {
         const auto& calls = m_pendingToolCalls["tool_calls"];
-        for (const auto& call : calls)
+        for (size_t i = 0; i < calls.size(); ++i)
         {
+            const auto& call = calls[i];
             std::string functionName = call.value("function_name", "");
+            nlohmann::json arguments = call.contains("arguments") ? call["arguments"] : nlohmann::json::object();
             const AITool* tool = AIToolRegistry::GetInstance().GetTool(functionName);
+            if (currentLog && i < currentLog->calls.size())
+            {
+                currentLog->calls[i].arguments = arguments;
+            }
             if (tool)
             {
-                nlohmann::json result = tool->execute(*m_context, call["arguments"]);
+                nlohmann::json result = tool->execute(*m_context, arguments);
                 toolResults["tool_results"].push_back({{"function_name", functionName}, {"result", result}});
+                if (currentLog && i < currentLog->calls.size())
+                {
+                    currentLog->calls[i].result = result;
+                }
             }
             else
             {
-                toolResults["tool_results"].push_back({
-                    {"function_name", functionName}, {"result", {{"success", false}, {"error", "Tool not found."}}}
-                });
+                nlohmann::json result = {{"success", false}, {"error", "Tool not found."}};
+                toolResults["tool_results"].push_back({{"function_name", functionName}, {"result", result}});
+                if (currentLog && i < currentLog->calls.size())
+                {
+                    currentLog->calls[i].result = result;
+                }
             }
         }
     }
     catch (const std::exception& e)
     {
-        toolResults["tool_results"].push_back({
-            {"function_name", "system_error"}, {"result", {{"success", false}, {"error", e.what()}}}
-        });
+        nlohmann::json result = {{"success", false}, {"error", e.what()}};
+        toolResults["tool_results"].push_back({{"function_name", "system_error"}, {"result", result}});
+        if (currentLog)
+        {
+            ToolCallEntry errorEntry;
+            errorEntry.functionName = "system_error";
+            errorEntry.arguments = nlohmann::json::object();
+            errorEntry.result = result;
+            currentLog->calls.push_back(std::move(errorEntry));
+        }
     }
 
     auto& bot = m_bots.at(m_currentBotKey);
     m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     bot->SubmitAsync(toolResults.dump(2), m_lastRequestTimestamp, Role::User, m_currentConversation);
+    m_pendingToolLogIndex = -1;
+    m_hasPendingToolCalls = false;
+    m_pendingToolCalls.clear();
 }
+
 
 void AIPanel::denyPendingToolCalls(const std::string& reason)
 {
     nlohmann::json toolResults;
     toolResults["tool_results"] = nlohmann::json::array();
+    ToolInvocationLog* currentLog = nullptr;
+    if (m_pendingToolLogIndex >= 0 && m_pendingToolLogIndex < static_cast<int>(m_toolInvocationLogs.size()))
+    {
+        currentLog = &m_toolInvocationLogs[m_pendingToolLogIndex];
+    }
     try
     {
         const auto& calls = m_pendingToolCalls["tool_calls"];
-        for (const auto& call : calls)
+        for (size_t i = 0; i < calls.size(); ++i)
         {
+            const auto& call = calls[i];
             std::string functionName = call.value("function_name", "");
-            toolResults["tool_results"].push_back({
-                {"function_name", functionName}, {"result", {{"success", false}, {"error", reason}}}
-            });
+            nlohmann::json result = {{"success", false}, {"error", reason}};
+            toolResults["tool_results"].push_back({{"function_name", functionName}, {"result", result}});
+            if (currentLog && i < currentLog->calls.size())
+            {
+                currentLog->calls[i].result = result;
+            }
         }
     }
     catch (...)
     {
+        nlohmann::json result = {{"success", false}, {"error", "Invalid pending tool_calls payload"}};
         toolResults["tool_results"].push_back({
             {"function_name", "system_error"},
-            {"result", {{"success", false}, {"error", "Invalid pending tool_calls payload"}}}
+            {"result", result}
         });
+        if (currentLog)
+        {
+            ToolCallEntry errorEntry;
+            errorEntry.functionName = "system_error";
+            errorEntry.arguments = nlohmann::json::object();
+            errorEntry.result = result;
+            currentLog->calls.push_back(std::move(errorEntry));
+        }
     }
     auto& bot = m_bots.at(m_currentBotKey);
     m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     bot->SubmitAsync(toolResults.dump(2), m_lastRequestTimestamp, Role::User, m_currentConversation);
+    m_pendingToolLogIndex = -1;
+    m_hasPendingToolCalls = false;
+    m_pendingToolCalls.clear();
 }
 
 
@@ -1558,6 +1859,8 @@ Core Rules & Behavior
 5. Clarification Seeking: If a user's request is ambiguous, incomplete, or cannot be fulfilled with your available tools (and not covered by rule 3 or 4), you MUST ask for clarification. DO NOT invent tools, parameters, or guess values.
 6. Language Discipline: You MUST respond in the same language as the user's last message. You MUST NOT switch languages unless explicitly commanded to.
 7. Workflow Adherence: For any engine modification, you MUST strictly follow the multi-turn "Read-Modify-Write" pattern as demonstrated in the workflow example. There are no exceptions.
+8. Project Grounding: When the user's request relates to this Luma Engine project or its assets, proactively inspect the relevant source files with the provided tools before responding. Base your explanation strictly on what you verify; never fabricate APIs or behavior.
+9. Toolchain Termination: After each tool response, decide autonomously whether additional tool calls are necessary. Stop the workflow as soon as the objective is fulfilled and deliver the final report promptly.
 
 Response Format (MANDATORY & STRICT)
 
@@ -1569,6 +1872,11 @@ Your response must conform to one of two types:
     - The root JSON object MUST contain a single key: "tool_calls".
     - The value of "tool_calls" MUST be an array of one or more tool call objects.
     - Each object in the array MUST contain exactly two keys: "function_name" (string) and "arguments" (object).
+
+For plain-text responses, structure the content using Markdown sections in the following order:
+- ## Thinking (keep concise; omit only when no reasoning is required)
+- ## Tool Results (include only when tools were invoked; for each call provide a bullet that lists the function name, key arguments, and the observed result)
+- ## Summary (always present; this is the final answer for the user)
 
 Absolute Prohibitions (IMPORTANT)
 
@@ -2052,7 +2360,6 @@ C# Scripting Example
         registry.RegisterTool(readFileTool);
     }
 
-    // ===== 项目与目录信息 =====
     {
         AITool projInfo;
         projInfo.name = "GetProjectInfo";
@@ -2122,7 +2429,6 @@ C# Scripting Example
         registry.RegisterTool(getDir);
     }
 
-    // ===== 引擎控制工具 =====
     {
         AITool enterPlay;
         enterPlay.name = "EnterPlayMode";
@@ -2850,6 +3156,8 @@ void AIPanel::loadConversation(const std::string& name)
 
     m_currentConversation = name;
     m_messages.clear();
+    m_toolInvocationLogs.clear();
+    m_pendingToolLogIndex = -1;
 
     auto& bot = m_bots.at(m_currentBotKey);
     bot->Load(name);
