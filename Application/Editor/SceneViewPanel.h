@@ -192,6 +192,19 @@ private:
     void drawSpriteSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                     const ECS::SpriteComponent& sprite, ImU32 outlineColor, ImU32 fillColor,
                                     float thickness);
+
+    /**
+     * @brief 绘制按钮组件的选中轮廓。
+     * @param drawList ImGui绘图列表。
+     * @param transform 按钮所属的变换组件。
+     * @param buttonComp 按钮组件。
+     * @param outlineColor 轮廓颜色。
+     * @param fillColor 填充颜色。
+     * @param thickness 轮廓线粗细。
+     */
+    void drawButtonSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                    const ECS::ButtonComponent& buttonComp, ImU32 outlineColor, ImU32 fillColor,
+                                    float thickness);
     /**
      * @brief 绘制胶囊碰撞体的轮廓。
      * @param drawList ImGui绘图列表。
@@ -210,7 +223,8 @@ private:
      * @param gameObject 运行时游戏对象。
      * @param transform 碰撞体所属的变换组件。
      */
-    void drawColliderEditHandles(ImDrawList* drawList, RuntimeGameObject& gameObject, const ECS::TransformComponent& transform);
+    void drawColliderEditHandles(ImDrawList* drawList, RuntimeGameObject& gameObject,
+                                 const ECS::TransformComponent& transform);
     /**
      * @brief 绘制虚线。
      * @param drawList ImGui绘图列表。
@@ -255,7 +269,8 @@ private:
      * @param labelBgColor 标签背景颜色。
      * @param labelTextColor 标签文本颜色。
      */
-    void drawEmptyObjectSelection(ImDrawList* drawList, const ECS::TransformComponent& transform, const std::string& objectName,
+    void drawEmptyObjectSelection(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                  const std::string& objectName,
                                   ImU32 outlineColor, ImU32 labelBgColor, ImU32 labelTextColor);
     /**
      * @brief 绘制对象名称标签。
@@ -265,7 +280,8 @@ private:
      * @param labelBgColor 标签背景颜色。
      * @param labelTextColor 标签文本颜色。
      */
-    void drawObjectNameLabel(ImDrawList* drawList, const ECS::TransformComponent& transform, const std::string& objectName,
+    void drawObjectNameLabel(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                             const std::string& objectName,
                              ImU32 labelBgColor, ImU32 labelTextColor);
 
 

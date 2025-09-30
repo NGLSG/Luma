@@ -330,7 +330,7 @@ void InspectorPanel::drawGameObjectName(RuntimeGameObject& gameObject)
     }
     ImGui::PopItemWidth();
 
-    // Tag editing (system-level, like Name)
+
     if (m_context->activeScene)
     {
         auto& registry = m_context->activeScene->GetRegistry();
@@ -351,15 +351,20 @@ void InspectorPanel::drawGameObjectName(RuntimeGameObject& gameObject)
         int currentIndex = -1;
         for (int i = 0; i < (int)tags.size(); ++i)
         {
-            if (tags[i] == tagComp.tag) { currentIndex = i; break; }
+            if (tags[i] == tagComp.tag)
+            {
+                currentIndex = i;
+                break;
+            }
         }
 
         ImGui::Text("标签");
         ImGui::SameLine();
-        const char* preview = (currentIndex >= 0 && currentIndex < (int)tags.size()) ? tags[currentIndex].c_str() : "(未设置)";
+        const char* preview = (currentIndex >= 0 && currentIndex < (int)tags.size())
+                                  ? tags[currentIndex].c_str()
+                                  : "(未设置)";
         if (ImGui::BeginCombo("##TagDropdownTop", preview))
         {
-            // Top controls: add/delete inside dropdown
             static char newTagBuf[64] = {0};
             ImGui::InputTextWithHint("##NewTagInCombo", "新建标签名", newTagBuf, sizeof(newTagBuf));
             ImGui::SameLine();
@@ -374,11 +379,14 @@ void InspectorPanel::drawGameObjectName(RuntimeGameObject& gameObject)
                 }
             }
             ImGui::SameLine();
-            bool canDelete = (currentIndex >= 0 && currentIndex < (int)tags.size() && tags[currentIndex] != std::string("Unknown"));
+            bool canDelete = (currentIndex >= 0 && currentIndex < (int)tags.size() && tags[currentIndex] !=
+                std::string("Unknown"));
             if (!canDelete) ImGui::BeginDisabled();
             if (ImGui::SmallButton("删除当前"))
             {
-                std::string toDel = (currentIndex >= 0 && currentIndex < (int)tags.size()) ? tags[currentIndex] : std::string();
+                std::string toDel = (currentIndex >= 0 && currentIndex < (int)tags.size())
+                                        ? tags[currentIndex]
+                                        : std::string();
                 if (!toDel.empty())
                 {
                     TagManager::RemoveTag(toDel);
@@ -389,7 +397,11 @@ void InspectorPanel::drawGameObjectName(RuntimeGameObject& gameObject)
                     }
                     tags = TagManager::GetAllTags();
                     currentIndex = -1;
-                    for (int i = 0; i < (int)tags.size(); ++i) if (tags[i] == tagComp.tag) { currentIndex = i; break; }
+                    for (int i = 0; i < (int)tags.size(); ++i) if (tags[i] == tagComp.tag)
+                    {
+                        currentIndex = i;
+                        break;
+                    }
                 }
             }
             if (!canDelete) ImGui::EndDisabled();
@@ -532,9 +544,9 @@ void InspectorPanel::drawComponents(RuntimeGameObject& gameObject)
                                                              *m_context->uiCallbacks);
                     CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("Scale", transform.localScale,
                                                                      *m_context->uiCallbacks);
-                    if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("Anchor", transform.anchor, *m_context->uiCallbacks))
+                    if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw(
+                        "Anchor", transform.anchor, *m_context->uiCallbacks))
                     {
-                        // clamp to [0,1]
                         transform.anchor.x = std::clamp(transform.anchor.x, 0.0f, 1.0f);
                         transform.anchor.y = std::clamp(transform.anchor.y, 0.0f, 1.0f);
                     }
@@ -545,7 +557,8 @@ void InspectorPanel::drawComponents(RuntimeGameObject& gameObject)
                                                                      *m_context->uiCallbacks);
                     CustomDrawing::WidgetDrawer<float>::Draw("Rotation", transform.rotation, *m_context->uiCallbacks);
                     CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("Scale", transform.scale, *m_context->uiCallbacks);
-                    if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("Anchor", transform.anchor, *m_context->uiCallbacks))
+                    if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw(
+                        "Anchor", transform.anchor, *m_context->uiCallbacks))
                     {
                         transform.anchor.x = std::clamp(transform.anchor.x, 0.0f, 1.0f);
                         transform.anchor.y = std::clamp(transform.anchor.y, 0.0f, 1.0f);
@@ -561,7 +574,6 @@ void InspectorPanel::drawComponents(RuntimeGameObject& gameObject)
         }
         if (componentName == "TagComponent")
         {
-            // Tag rendered at top with Name; skip separate header
             continue;
         }
 
@@ -931,11 +943,13 @@ void InspectorPanel::drawBatchComponentHeader(const std::string& componentName, 
         }
         else
         {
-            for (const auto& [propName, propInfo] : compInfo->properties)
+            
+            for (const auto& propInfo : compInfo->properties)
             {
                 if (propInfo.draw_ui && propInfo.isExposedInEditor)
                 {
-                    drawBatchProperty(propName, propInfo, compInfo, selectedObjects);
+                    
+                    drawBatchProperty(propInfo.name, propInfo, compInfo, selectedObjects);
                 }
             }
         }
@@ -1100,17 +1114,28 @@ void InspectorPanel::drawComponentHeader(const std::string& componentName, const
             int currentIndex = -1;
             for (int i = 0; i < (int)tags.size(); ++i)
             {
-                if (tags[i] == tagComp.tag) { currentIndex = i; break; }
+                if (tags[i] == tagComp.tag)
+                {
+                    currentIndex = i;
+                    break;
+                }
             }
             if (currentIndex == -1)
             {
                 TagManager::EnsureDefaults();
                 tags = TagManager::GetAllTags();
-                for (int i = 0; i < (int)tags.size(); ++i) if (tags[i] == tagComp.tag) { currentIndex = i; break; }
+                for (int i = 0; i < (int)tags.size(); ++i) if (tags[i] == tagComp.tag)
+                {
+                    currentIndex = i;
+                    break;
+                }
             }
 
-            ImGui::Text("标签"); ImGui::SameLine();
-            const char* preview = (currentIndex >= 0 && currentIndex < (int)tags.size()) ? tags[currentIndex].c_str() : "(未设置)";
+            ImGui::Text("标签");
+            ImGui::SameLine();
+            const char* preview = (currentIndex >= 0 && currentIndex < (int)tags.size())
+                                      ? tags[currentIndex].c_str()
+                                      : "(未设置)";
             if (ImGui::BeginCombo("##TagDropdown", preview))
             {
                 for (int n = 0; n < (int)tags.size(); n++)
@@ -1148,7 +1173,9 @@ void InspectorPanel::drawComponentHeader(const std::string& componentName, const
             if (!canDelete) ImGui::BeginDisabled();
             if (ImGui::Button("删除当前"))
             {
-                std::string toDel = (currentIndex >= 0 && currentIndex < (int)tags.size()) ? tags[currentIndex] : std::string();
+                std::string toDel = (currentIndex >= 0 && currentIndex < (int)tags.size())
+                                        ? tags[currentIndex]
+                                        : std::string();
                 if (!toDel.empty())
                 {
                     TagManager::RemoveTag(toDel);
@@ -1163,12 +1190,14 @@ void InspectorPanel::drawComponentHeader(const std::string& componentName, const
         }
         else
         {
-            for (const auto& [propName, propInfo] : compInfo->properties)
+            
+            for (const auto& propInfo : compInfo->properties)
             {
                 if (propInfo.draw_ui && propInfo.isExposedInEditor)
                 {
                     m_context->uiCallbacks->SelectedGuids = getCurrentSelectionGuids();
-                    propInfo.draw_ui(propName, registry, entityHandle, *m_context->uiCallbacks);
+                    
+                    propInfo.draw_ui(propInfo.name, registry, entityHandle, *m_context->uiCallbacks);
                 }
             }
         }

@@ -14,6 +14,7 @@
 
 namespace Systems
 {
+    
     static ECS::Vector2f screenToWorldCentered(const ECS::Vector2f& globalScreenPos,
                                                const Camera::CamProperties& cameraProps,
                                                const ECS::RectF& viewport)
@@ -21,22 +22,22 @@ namespace Systems
         const float localX = globalScreenPos.x - viewport.x;
         const float localY = globalScreenPos.y - viewport.y;
 
-
+        
         const float centeredX = localX - (viewport.z / 2.0f);
         const float centeredY = localY - (viewport.w / 2.0f);
 
-
+        
         const float unzoomedX = centeredX / cameraProps.zoom;
         const float unzoomedY = centeredY / cameraProps.zoom;
 
-
+        
         const float worldX = unzoomedX + cameraProps.position.x();
         const float worldY = unzoomedY + cameraProps.position.y();
 
         return {worldX, worldY};
     }
 
-
+    
     static bool isPointInSprite(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
                                 const ECS::SpriteComponent& sprite)
     {
@@ -51,7 +52,7 @@ namespace Systems
 
         if (halfWidth <= 0 || halfHeight <= 0) return false;
 
-
+        
         ECS::Vector2f localPoint = worldPoint - transform.position;
         if (transform.rotation != 0.0f)
         {
@@ -64,12 +65,12 @@ namespace Systems
         localPoint.x /= transform.scale.x;
         localPoint.y /= transform.scale.y;
 
-
+        
         return (localPoint.x >= -halfWidth && localPoint.x <= halfWidth &&
             localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
     }
 
-
+    
     static bool isPointInRectUI(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
                                 const ECS::Vector2f& size)
     {
@@ -78,7 +79,7 @@ namespace Systems
 
         if (halfWidth <= 0 || halfHeight <= 0) return false;
 
-
+        
         ECS::Vector2f localPoint = worldPoint - transform.position;
         if (transform.rotation != 0.0f)
         {
@@ -91,7 +92,7 @@ namespace Systems
         localPoint.x /= transform.scale.x;
         localPoint.y /= transform.scale.y;
 
-
+        
         return (localPoint.x >= -halfWidth && localPoint.x <= halfWidth &&
             localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
     }
@@ -107,10 +108,10 @@ namespace Systems
     {
         auto& registry = scene->GetRegistry();
 
-
+        
         registry.clear<PointerEnterEvent, PointerExitEvent, PointerDownEvent, PointerUpEvent, PointerClickEvent>();
 
-
+        
         if (context.appMode == ApplicationMode::Editor)
         {
             return;
@@ -124,18 +125,18 @@ namespace Systems
         auto cameraProps = scene->GetCameraProperties();
         ECS::RectF viewportRect;
 
+        
         if (context.appMode == ApplicationMode::PIE)
         {
             viewportRect = context.sceneViewRect;
-
-
+            
             if (globalMousePos.x >= viewportRect.x && globalMousePos.x <= (viewportRect.x + viewportRect.z) &&
                 globalMousePos.y >= viewportRect.y && globalMousePos.y <= (viewportRect.y + viewportRect.w))
             {
                 canInteract = true;
             }
         }
-        else
+        else 
         {
             viewportRect = {0.0f, 0.0f, cameraProps.viewport.width(), cameraProps.viewport.height()};
             canInteract = true;
@@ -148,7 +149,6 @@ namespace Systems
             currentHoveredEntity = performGeometricPicking(registry, worldMousePos);
         }
 
-
         handleHoverEvents(registry, currentHoveredEntity);
         handleClickEvents(registry, input);
     }
@@ -158,34 +158,28 @@ namespace Systems
     {
         std::vector<std::pair<entt::entity, int>> candidates;
 
-
+        
         auto buttonView = registry.view<ECS::TransformComponent, ECS::ButtonComponent>();
         for (auto entity : buttonView)
         {
             if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
                 continue;
+
             const auto& button = buttonView.get<ECS::ButtonComponent>(entity);
             if (!button.Enable) continue;
+
             const auto& transform = buttonView.get<ECS::TransformComponent>(entity);
-            ECS::Vector2f buttonSize = {100.0f, 30.0f};
-            if (auto* sprite = registry.try_get<ECS::SpriteComponent>(entity))
-            {
-                if (sprite->image)
-                {
-                    buttonSize.x = sprite->sourceRect.Width() > 0
-                                       ? sprite->sourceRect.Width()
-                                       : sprite->image->getImage()->width();
-                    buttonSize.y = sprite->sourceRect.Height() > 0
-                                       ? sprite->sourceRect.Height()
-                                       : sprite->image->getImage()->height();
-                }
-            }
+            
+            const ECS::Vector2f buttonSize = {button.rect.z, button.rect.w};
+
             if (isPointInRectUI(worldMousePos, transform, buttonSize))
             {
-                candidates.emplace_back(entity, 1000);
+                
+                candidates.emplace_back(entity, button.zIndex);
             }
         }
 
+        
         auto inputTextView = registry.view<ECS::TransformComponent, ECS::InputTextComponent>();
         for (auto entity : inputTextView)
         {
@@ -193,35 +187,33 @@ namespace Systems
                 continue;
             const auto& inputText = inputTextView.get<ECS::InputTextComponent>(entity);
             if (!inputText.Enable) continue;
+
             const auto& transform = inputTextView.get<ECS::TransformComponent>(entity);
-            ECS::Vector2f inputSize = {200.0f, 25.0f};
-            if (auto* sprite = registry.try_get<ECS::SpriteComponent>(entity))
-            {
-                if (sprite->image)
-                {
-                    inputSize.x = sprite->sourceRect.Width() > 0
-                                      ? sprite->sourceRect.Width()
-                                      : sprite->image->getImage()->width();
-                    inputSize.y = sprite->sourceRect.Height() > 0
-                                      ? sprite->sourceRect.Height()
-                                      : sprite->image->getImage()->height();
-                }
-            }
+            
+            const ECS::Vector2f inputSize = {inputText.rect.z, inputText.rect.w};
+
             if (isPointInRectUI(worldMousePos, transform, inputSize))
             {
-                candidates.emplace_back(entity, 1000);
+                
+                candidates.emplace_back(entity, inputText.zIndex);
             }
         }
 
 
-
+        
         auto spriteView = registry.view<ECS::TransformComponent, ECS::SpriteComponent>();
         for (auto entity : spriteView)
         {
+            
+            if (registry.any_of<ECS::ButtonComponent, ECS::InputTextComponent>(entity))
+            {
+                continue;
+            }
+
             if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
                 continue;
             const auto& sprite = spriteView.get<ECS::SpriteComponent>(entity);
-            if (!sprite.image->getImage()) continue;
+            if (!sprite.image || !sprite.image->getImage()) continue;
             const auto& transform = spriteView.get<ECS::TransformComponent>(entity);
             if (isPointInSprite(worldMousePos, transform, sprite))
             {
@@ -234,16 +226,17 @@ namespace Systems
             return entt::null;
         }
 
-
+        
         std::ranges::sort(candidates, [](const auto& a, const auto& b)
         {
             if (a.second != b.second)
             {
-                return a.second > b.second;
+                return a.second > b.second; 
             }
-            return a.first > b.first;
+            return a.first > b.first; 
         });
 
+        
         return candidates[0].first;
     }
 
@@ -251,10 +244,12 @@ namespace Systems
     {
         if (currentHoveredEntity != m_hoveredEntity)
         {
+            
             if (registry.valid(m_hoveredEntity))
             {
                 registry.emplace<PointerExitEvent>(m_hoveredEntity);
             }
+            
             if (registry.valid(currentHoveredEntity))
             {
                 registry.emplace<PointerEnterEvent>(currentHoveredEntity);
@@ -267,6 +262,7 @@ namespace Systems
     {
         bool isLeftMouseDownThisFrame = inputState.isLeftMouseDown;
 
+        
         if (isLeftMouseDownThisFrame && !m_wasLeftMouseDownLastFrame)
         {
             if (registry.valid(m_hoveredEntity))
@@ -275,6 +271,7 @@ namespace Systems
                 m_pressedEntity = m_hoveredEntity;
             }
         }
+            
         else if (!isLeftMouseDownThisFrame && m_wasLeftMouseDownLastFrame)
         {
             if (registry.valid(m_pressedEntity))
@@ -282,7 +279,7 @@ namespace Systems
                 registry.emplace<PointerUpEvent>(m_pressedEntity);
             }
 
-
+            
             if (registry.valid(m_hoveredEntity) && m_hoveredEntity == m_pressedEntity)
             {
                 registry.emplace<PointerClickEvent>(m_hoveredEntity);

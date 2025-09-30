@@ -877,10 +877,16 @@ LUMA_API void Entity_SetComponentProperty(LumaSceneHandle scene, LumaEntityHandl
     const auto* compReg = ComponentRegistry::GetInstance().Get(componentName);
     if (!compReg) return;
 
-    const auto& propIt = compReg->properties.find(propertyName);
-    if (propIt != compReg->properties.end() && propIt->second.set_from_raw_ptr)
+    
+    const auto& props = compReg->properties;
+    auto propIt = std::find_if(props.begin(), props.end(),
+                             [&](const PropertyRegistration& prop) {
+                                 return prop.name == propertyName;
+                             });
+
+    if (propIt != props.end() && propIt->set_from_raw_ptr)
     {
-        propIt->second.set_from_raw_ptr(runtimeScene->GetRegistry(), (entt::entity)entity, valueData);
+        propIt->set_from_raw_ptr(runtimeScene->GetRegistry(), (entt::entity)entity, valueData);
 
         EventBus::GetInstance().Publish(ComponentUpdatedEvent{
             runtimeScene->GetRegistry(), (entt::entity)entity
@@ -897,13 +903,18 @@ LUMA_API void Entity_GetComponentProperty(LumaSceneHandle scene, LumaEntityHandl
     const auto* compReg = ComponentRegistry::GetInstance().Get(componentName);
     if (!compReg) return;
 
-    const auto& propIt = compReg->properties.find(propertyName);
-    if (propIt != compReg->properties.end() && propIt->second.get_to_raw_ptr)
+    
+    const auto& props = compReg->properties;
+    auto propIt = std::find_if(props.begin(), props.end(),
+                             [&](const PropertyRegistration& prop) {
+                                 return prop.name == propertyName;
+                             });
+
+    if (propIt != props.end() && propIt->get_to_raw_ptr)
     {
-        propIt->second.get_to_raw_ptr(runtimeScene->GetRegistry(), (entt::entity)entity, valueData);
+        propIt->get_to_raw_ptr(runtimeScene->GetRegistry(), (entt::entity)entity, valueData);
     }
 }
-
 LUMA_API const char* TextComponent_GetText(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* runtimeScene = AsScene(scene);

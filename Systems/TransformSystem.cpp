@@ -43,8 +43,7 @@ namespace Systems
 
             if (!visiting.insert(entity).second)
             {
-                /*LogWarn("TransformSystem: detected cycle at entity {}. Skipping to prevent recursion.",
-                        static_cast<uint32_t>(entity));*/
+                
                 return;
             }
 
@@ -93,7 +92,7 @@ namespace Systems
                     glm::quat rotationQuat;
                     glm::decompose(worldMatrix, scaleVec, rotationQuat, translationVec, skew, perspective);
 
-                    // Compose world from parent + local to keep compatibility
+                    
                     transform.position = {
                         transform.localPosition.x + parentTransform.position.x,
                         transform.localPosition.y + parentTransform.position.y

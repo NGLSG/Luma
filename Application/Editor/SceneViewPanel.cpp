@@ -221,6 +221,55 @@ static bool isPointInText(const ECS::Vector2f& worldPoint, const ECS::TransformC
     return scaledBounds.contains(localPoint.x, localPoint.y);
 }
 
+
+static bool isPointInButton(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
+                            const ECS::ButtonComponent& button)
+{
+    const float width = button.rect.Width();
+    const float height = button.rect.Height();
+
+    if (width <= 0 || height <= 0) return false;
+
+    
+    ECS::Vector2f anchorOffset = {
+        (0.5f - transform.anchor.x) * width * transform.scale.x,
+        (0.5f - transform.anchor.y) * height * transform.scale.y
+    };
+
+    if (std::abs(transform.rotation) > 0.001f)
+    {
+        const float sinRot = sinf(transform.rotation);
+        const float cosRot = cosf(transform.rotation);
+        float tempX = anchorOffset.x;
+        anchorOffset.x = anchorOffset.x * cosRot - anchorOffset.y * sinRot;
+        anchorOffset.y = tempX * sinRot + anchorOffset.y * cosRot;
+    }
+
+    
+    ECS::Vector2f localPoint = worldPoint - (transform.position + anchorOffset);
+
+    
+    if (transform.rotation != 0.0f)
+    {
+        const float sinR = sinf(-transform.rotation);
+        const float cosR = cosf(-transform.rotation);
+        float tempX = localPoint.x;
+        localPoint.x = localPoint.x * cosR - localPoint.y * sinR;
+        localPoint.y = tempX * sinR + localPoint.y * cosR;
+    }
+
+    
+    localPoint.x /= transform.scale.x;
+    localPoint.y /= transform.scale.y;
+
+    
+    const float halfWidth = width * 0.5f;
+    const float halfHeight = height * 0.5f;
+
+    return (localPoint.x >= -halfWidth && localPoint.x <= halfWidth &&
+        localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
+}
+
 entt::entity SceneViewPanel::findEntityByTransform(const ECS::TransformComponent& targetTransform)
 {
     auto& registry = m_context->activeScene->GetRegistry();
@@ -457,7 +506,6 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
                                        outlineThickness);
             hasVisualRepresentation = true;
         }
-
         else if (gameObject.HasComponent<ECS::SpriteComponent>())
         {
             const auto& sprite = gameObject.GetComponent<ECS::SpriteComponent>();
@@ -466,6 +514,13 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
                 drawSpriteSelectionOutline(drawList, transform, sprite, outlineColor, fillColor, outlineThickness);
                 hasVisualRepresentation = true;
             }
+        }
+        
+        else if (gameObject.HasComponent<ECS::ButtonComponent>())
+        {
+            const auto& buttonComp = gameObject.GetComponent<ECS::ButtonComponent>();
+            drawButtonSelectionOutline(drawList, transform, buttonComp, outlineColor, fillColor, outlineThickness);
+            hasVisualRepresentation = true;
         }
         else if (gameObject.HasComponent<ECS::TextComponent>())
         {
@@ -756,6 +811,66 @@ void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS:
     }
 }
 
+
+void SceneViewPanel::drawButtonSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                                const ECS::ButtonComponent& buttonComp, ImU32 outlineColor,
+                                                ImU32 fillColor, float thickness)
+{
+    const float width = buttonComp.rect.Width() * transform.scale.x;
+    const float height = buttonComp.rect.Height() * transform.scale.y;
+
+    const float halfWidth = width * 0.5f;
+    const float halfHeight = height * 0.5f;
+
+    
+    std::vector<ECS::Vector2f> corners = {
+        {-halfWidth, -halfHeight}, {halfWidth, -halfHeight},
+        {halfWidth, halfHeight}, {-halfWidth, halfHeight}
+    };
+
+    
+    if (std::abs(transform.rotation) > 0.001f)
+    {
+        const float sinR = sinf(transform.rotation);
+        const float cosR = cosf(transform.rotation);
+        for (auto& corner : corners)
+        {
+            float tempX = corner.x;
+            corner.x = corner.x * cosR - corner.y * sinR;
+            corner.y = tempX * sinR + corner.y * cosR;
+        }
+    }
+
+    
+    ECS::Vector2f anchorOffset = {
+        (0.5f - transform.anchor.x) * width,
+        (0.5f - transform.anchor.y) * height
+    };
+
+    
+    if (std::abs(transform.rotation) > 0.001f)
+    {
+        const float sinR = sinf(transform.rotation);
+        const float cosR = cosf(transform.rotation);
+        float tempX = anchorOffset.x;
+        anchorOffset.x = anchorOffset.x * cosR - anchorOffset.y * sinR;
+        anchorOffset.y = tempX * sinR + anchorOffset.y * cosR;
+    }
+
+    std::vector<ImVec2> screenCorners;
+    screenCorners.reserve(4);
+
+    
+    for (const auto& corner : corners)
+    {
+        ECS::Vector2f worldPos = transform.position + anchorOffset + corner;
+        screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
+    }
+
+    drawList->AddConvexPolyFilled(screenCorners.data(), 4, fillColor);
+    drawList->AddPolyline(screenCorners.data(), 4, outlineColor, ImDrawFlags_Closed, thickness);
+}
+
 void SceneViewPanel::drawCapsuleColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                 const ECS::CapsuleColliderComponent& capsuleCollider,
                                                 ImU32 outlineColor,
@@ -1027,42 +1142,57 @@ void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::T
     const SkRect localBounds = GetLocalTextBounds(textComp);
     if (localBounds.isEmpty()) return;
 
-    std::vector<ECS::Vector2f> localCorners = {
-        {localBounds.fLeft, localBounds.fTop},
-        {localBounds.fRight, localBounds.fTop},
-        {localBounds.fRight, localBounds.fBottom},
-        {localBounds.fLeft, localBounds.fBottom}
+    
+    const float width = localBounds.width() * transform.scale.x;
+    const float height = localBounds.height() * transform.scale.y;
+
+    const float halfWidth = width * 0.5f;
+    const float halfHeight = height * 0.5f;
+
+    
+    std::vector<ECS::Vector2f> corners = {
+        {-halfWidth, -halfHeight},
+        {halfWidth, -halfHeight},
+        {halfWidth, halfHeight},
+        {-halfWidth, halfHeight}
     };
 
     
-    const float localW = localBounds.width();
-    const float localH = localBounds.height();
-    const float pivotLocalX = localBounds.fLeft + transform.anchor.x * localW;
-    const float pivotLocalY = localBounds.fTop + transform.anchor.y * localH;
-
-    std::vector<ImVec2> screenCorners;
-    screenCorners.reserve(4);
-
-    const float sinR = sinf(transform.rotation);
-    const float cosR = cosf(transform.rotation);
-
-    for (auto corner : localCorners)
+    if (std::abs(transform.rotation) > 0.001f)
     {
-        
-        corner.x -= pivotLocalX;
-        corner.y -= pivotLocalY;
-
-        corner.x *= transform.scale.x;
-        corner.y *= transform.scale.y;
-
-        if (std::abs(transform.rotation) > 0.001f)
+        const float sinR = sinf(transform.rotation);
+        const float cosR = cosf(transform.rotation);
+        for (auto& corner : corners)
         {
             float tempX = corner.x;
             corner.x = corner.x * cosR - corner.y * sinR;
             corner.y = tempX * sinR + corner.y * cosR;
         }
+    }
 
-        ECS::Vector2f worldPos = transform.position + corner;
+    
+    ECS::Vector2f anchorOffset = {
+        (0.5f - transform.anchor.x) * width,
+        (0.5f - transform.anchor.y) * height
+    };
+
+    
+    if (std::abs(transform.rotation) > 0.001f)
+    {
+        const float sinR = sinf(transform.rotation);
+        const float cosR = cosf(transform.rotation);
+        float tempX = anchorOffset.x;
+        anchorOffset.x = anchorOffset.x * cosR - anchorOffset.y * sinR;
+        anchorOffset.y = tempX * sinR + anchorOffset.y * cosR;
+    }
+
+    std::vector<ImVec2> screenCorners;
+    screenCorners.reserve(4);
+
+    
+    for (const auto& corner : corners)
+    {
+        ECS::Vector2f worldPos = transform.position + anchorOffset + corner;
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
     }
 
@@ -1085,42 +1215,57 @@ void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const E
     const SkRect localBounds = GetLocalTextBounds(displayTextComp, padding);
     if (localBounds.isEmpty()) return;
 
-    std::vector<ECS::Vector2f> localCorners = {
-        {localBounds.fLeft, localBounds.fTop},
-        {localBounds.fRight, localBounds.fTop},
-        {localBounds.fRight, localBounds.fBottom},
-        {localBounds.fLeft, localBounds.fBottom}
+    
+    const float width = localBounds.width() * transform.scale.x;
+    const float height = localBounds.height() * transform.scale.y;
+
+    const float halfWidth = width * 0.5f;
+    const float halfHeight = height * 0.5f;
+
+    
+    std::vector<ECS::Vector2f> corners = {
+        {-halfWidth, -halfHeight},
+        {halfWidth, -halfHeight},
+        {halfWidth, halfHeight},
+        {-halfWidth, halfHeight}
     };
 
     
-    const float localW2 = localBounds.width();
-    const float localH2 = localBounds.height();
-    const float pivotLocalX2 = localBounds.fLeft + transform.anchor.x * localW2;
-    const float pivotLocalY2 = localBounds.fTop + transform.anchor.y * localH2;
-
-    std::vector<ImVec2> screenCorners;
-    screenCorners.reserve(4);
-
-    const float sinR = sinf(transform.rotation);
-    const float cosR = cosf(transform.rotation);
-
-    for (auto corner : localCorners)
+    if (std::abs(transform.rotation) > 0.001f)
     {
-        
-        corner.x -= pivotLocalX2;
-        corner.y -= pivotLocalY2;
-
-        corner.x *= transform.scale.x;
-        corner.y *= transform.scale.y;
-
-        if (std::abs(transform.rotation) > 0.001f)
+        const float sinR = sinf(transform.rotation);
+        const float cosR = cosf(transform.rotation);
+        for (auto& corner : corners)
         {
             float tempX = corner.x;
             corner.x = corner.x * cosR - corner.y * sinR;
             corner.y = tempX * sinR + corner.y * cosR;
         }
+    }
 
-        ECS::Vector2f worldPos = transform.position + corner;
+    
+    ECS::Vector2f anchorOffset = {
+        (0.5f - transform.anchor.x) * width,
+        (0.5f - transform.anchor.y) * height
+    };
+
+    
+    if (std::abs(transform.rotation) > 0.001f)
+    {
+        const float sinR = sinf(transform.rotation);
+        const float cosR = cosf(transform.rotation);
+        float tempX = anchorOffset.x;
+        anchorOffset.x = anchorOffset.x * cosR - anchorOffset.y * sinR;
+        anchorOffset.y = tempX * sinR + anchorOffset.y * cosR;
+    }
+
+    std::vector<ImVec2> screenCorners;
+    screenCorners.reserve(4);
+
+    
+    for (const auto& corner : corners)
+    {
+        ECS::Vector2f worldPos = transform.position + anchorOffset + corner;
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
     }
 
@@ -1768,6 +1913,20 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
     const ImVec2 currentMousePos = ImGui::GetIO().MousePos;
 
     std::vector<std::pair<entt::entity, int>> candidates;
+
+    
+    auto buttonView = registry.view<ECS::TransformComponent, ECS::ButtonComponent>();
+    for (auto entity : buttonView)
+    {
+        const auto& transform = buttonView.get<ECS::TransformComponent>(entity);
+        const auto& button = buttonView.get<ECS::ButtonComponent>(entity);
+        if (isPointInButton(worldMousePos, transform, button))
+        {
+            
+            candidates.emplace_back(entity, 2000);
+        }
+    }
+
     auto inputTextView = registry.view<ECS::TransformComponent, ECS::InputTextComponent>();
     for (auto entity : inputTextView)
     {
@@ -1811,7 +1970,9 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
     auto emptyView = registry.view<ECS::TransformComponent>();
     for (auto entity : emptyView)
     {
-        if (registry.any_of<ECS::SpriteComponent, ECS::TextComponent, ECS::InputTextComponent>(entity))
+        
+        if (registry.any_of<ECS::SpriteComponent, ECS::TextComponent, ECS::InputTextComponent,
+                            ECS::ButtonComponent>(entity))
             continue;
         const auto& transform = emptyView.get<ECS::TransformComponent>(entity);
         if (isPointInEmptyObject(worldMousePos, transform))

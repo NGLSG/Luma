@@ -390,12 +390,11 @@ void Editor::Render()
         return;
     }
     {
+        PROFILE_SCOPE("AssetManager::Update");
+        AssetManager::GetInstance().Update(1.f / m_context.currentFps);
+    }
+    {
         PROFILE_SCOPE("UI::Update");
-
-        {
-            PROFILE_SCOPE("UI::AssetManager::Update");
-            AssetManager::GetInstance().Update(1.f / m_context.currentFps);
-        }
 
         for (auto& panel : m_panels)
         {

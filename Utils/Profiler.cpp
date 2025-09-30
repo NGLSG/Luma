@@ -14,10 +14,10 @@ using json = nlohmann::json;
 
 namespace
 {
-    // Merge adjacent sibling nodes that share the same name to avoid duplicate rows like two consecutive "Update".
+    
     static void CompactAdjacentDuplicates(ProfileNode& node)
     {
-        // Recurse first to compact children of each child
+        
         for (auto& child : node.children)
         {
             CompactAdjacentDuplicates(*child);
@@ -32,13 +32,13 @@ namespace
         {
             if (!compacted.empty() && compacted.back()->name == current->name)
             {
-                // Merge current into the last compacted node
+                
                 auto& last = compacted.back();
                 last->timeMilliseconds += current->timeMilliseconds;
                 last->memoryDeltaBytes += current->memoryDeltaBytes;
                 last->callCount += current->callCount;
 
-                // Append children of current to last (preserve order)
+                
                 for (auto& grandChild : current->children)
                 {
                     last->children.push_back(std::move(grandChild));
@@ -237,7 +237,7 @@ void Profiler::sampleAndStore()
             threadNode->children.push_back(std::move(child));
         }
 
-        // Compact duplicate adjacent entries to reduce visual duplication (e.g., two consecutive Update scopes)
+        
         CompactAdjacentDuplicates(*threadNode);
         totalTime += threadNode->timeMilliseconds;
         mergedRoot->children.push_back(std::move(threadNode));

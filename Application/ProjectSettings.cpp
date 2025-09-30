@@ -24,7 +24,7 @@ namespace YAML
             node["TargetHeight"] = rhs.GetTargetHeight();
             node["IsBorderless"] = rhs.IsBorderless();
             node["EnableConsole"] = rhs.IsConsoleEnabled();
-            // Serialize tags
+            
             if (!rhs.GetTags().empty())
             {
                 Node tagsNode;
@@ -52,7 +52,7 @@ namespace YAML
             rhs.SetBorderless(node["IsBorderless"].as<bool>(false));
             rhs.SetConsoleEnabled(node["EnableConsole"].as<bool>(false));
 
-            // Tags
+            
             std::vector<std::string> tags;
             if (node["Tags"] && node["Tags"].IsSequence())
             {

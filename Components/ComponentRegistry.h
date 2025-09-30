@@ -50,7 +50,7 @@ struct ComponentRegistration
     std::function<YAML::Node(const entt::registry&, entt::entity)> serialize; ///< 将组件序列化为YAML节点的函数。
     std::function<void*(entt::registry&, entt::entity)> get_raw_ptr; ///< 获取组件原始指针的函数。
     std::function<void(const entt::registry&, entt::entity, entt::registry&, entt::entity)> clone; ///< 克隆组件的函数。
-    std::unordered_map<std::string, PropertyRegistration> properties; ///< 该组件的所有属性注册信息。
+    std::vector<PropertyRegistration> properties; ///< 该组件的所有属性注册信息。
     size_t size = 0; ///< 组件的内存大小。
     bool isExposedInEditor = true; ///< 指示该组件是否在编辑器中暴露。
     bool isRemovable = true; ///< 指示该组件是否可以被移除。
@@ -234,7 +234,7 @@ public:
             }
         };
         prop.draw_ui = [member_ptr](const std::string& label, entt::registry& reg, entt::entity e,
-                                    const UIDrawData& callbacks)
+                                  const UIDrawData& callbacks)
         {
             auto& component = reg.get<T>(e);
             auto& property_ref = component.*member_ptr;
@@ -255,7 +255,6 @@ public:
         };
         prop.set_from_raw_ptr = [member_ptr](entt::registry& reg, entt::entity e, void* value_ptr)
         {
-            // 这个 lambda 捕获了成员的类型信息，所以在这里是类型安全的
             using MemberType = typename std::remove_reference<decltype(std::declval<T>().*member_ptr)>::type;
             if (value_ptr)
             {
@@ -271,7 +270,7 @@ public:
                 *static_cast<MemberType*>(value_ptr) = (reg.get<T>(e).*member_ptr);
             }
         };
-        m_registration.properties[name] = std::move(prop);
+        m_registration.properties.push_back(std::move(prop));
         return *this;
     }
 
@@ -308,7 +307,7 @@ public:
             }
         };
         prop.draw_ui = [get_fn, set_fn](const std::string& label, entt::registry& reg, entt::entity e,
-                                        const UIDrawData& callbacks)
+                                      const UIDrawData& callbacks)
         {
             auto& component = reg.get<T>(e);
 
@@ -344,7 +343,7 @@ public:
                 *static_cast<MemberType*>(value_ptr) = get_fn(reg.get<T>(e));
             }
         };
-        m_registration.properties[name] = std::move(prop);
+        m_registration.properties.push_back(std::move(prop));
         return *this;
     }
 

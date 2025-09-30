@@ -238,13 +238,16 @@ REGISTRY
     Registry_<ECS::ButtonComponent>("ButtonComponent")
         .property("rect", &ECS::ButtonComponent::rect)
         .property("isVisible", &ECS::ButtonComponent::isVisible)
+        .property("isInteractable", &ECS::ButtonComponent::isInteractable)
+
         .property("backgroundImage", &ECS::ButtonComponent::backgroundImage)
         .property("roundness", &ECS::ButtonComponent::roundness)
-        .property("isInteractable", &ECS::ButtonComponent::isInteractable)
+
         .property("normalColor", &ECS::ButtonComponent::normalColor)
         .property("hoverColor", &ECS::ButtonComponent::hoverColor)
         .property("pressedColor", &ECS::ButtonComponent::pressedColor)
         .property("disabledColor", &ECS::ButtonComponent::disabledColor)
+
         .property("onClickTargets", &ECS::ButtonComponent::onClickTargets)
         .property("onHoverEnterTargets", &ECS::ButtonComponent::onHoverEnterTargets)
         .property("onHoverExitTargets", &ECS::ButtonComponent::onHoverExitTargets);
@@ -252,17 +255,22 @@ REGISTRY
     Registry_<ECS::InputTextComponent>("InputTextComponent")
         .property("rect", &ECS::InputTextComponent::rect)
         .property("isVisible", &ECS::InputTextComponent::isVisible)
+
         .property("text", &ECS::InputTextComponent::text)
         .property("placeholder", &ECS::InputTextComponent::placeholder)
         .property("maxLength", &ECS::InputTextComponent::maxLength)
+
         .property("isReadOnly", &ECS::InputTextComponent::isReadOnly)
         .property("isPasswordField", &ECS::InputTextComponent::isPasswordField)
+
         .property("backgroundImage", &ECS::InputTextComponent::backgroundImage)
         .property("roundness", &ECS::InputTextComponent::roundness)
+
         .property("normalBackgroundColor", &ECS::InputTextComponent::normalBackgroundColor)
         .property("focusedBackgroundColor", &ECS::InputTextComponent::focusedBackgroundColor)
         .property("readOnlyBackgroundColor", &ECS::InputTextComponent::readOnlyBackgroundColor)
         .property("cursorColor", &ECS::InputTextComponent::cursorColor)
+
         .property("onTextChangedTargets", &ECS::InputTextComponent::onTextChangedTargets)
         .property("onSubmitTargets", &ECS::InputTextComponent::onSubmitTargets);
 }
