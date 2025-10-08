@@ -26,7 +26,8 @@ public struct RaycastHit
     public readonly Vector2 Normal;
     public readonly float Fraction;
 }
-internal static class Native
+
+internal static class Native
 {
     private const string DllName = "LumaEngine";
 
@@ -250,18 +251,6 @@ public struct RaycastHit
 
     [DllImport(DllName, CharSet = CharSet.Ansi)]
     internal static extern void TagComponent_SetName(IntPtr scene, uint entityId, string name);
-
-    [DllImport(DllName)]
-    internal static extern IntPtr InputTextComponent_GetText(IntPtr scene, uint entityId);
-
-    [DllImport(DllName, CharSet = CharSet.Ansi)]
-    internal static extern void InputTextComponent_SetText(IntPtr scene, uint entityId, string text);
-
-    [DllImport(DllName)]
-    internal static extern IntPtr InputTextComponent_GetPlaceholder(IntPtr scene, uint entityId);
-
-    [DllImport(DllName, CharSet = CharSet.Ansi)]
-    internal static extern void InputTextComponent_SetPlaceholder(IntPtr scene, uint entityId, string text);
 
     [DllImport(DllName)]
     internal static extern int PolygonCollider_GetVertexCount(IntPtr scene, uint entityId);

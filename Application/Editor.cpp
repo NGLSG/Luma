@@ -189,8 +189,6 @@ bool Editor::checkDotNetEnvironment()
 Editor::~Editor() = default;
 
 
-
-
 void Editor::InitializeDerived()
 {
     initializeEditorContext();
@@ -201,6 +199,10 @@ void Editor::InitializeDerived()
         m_graphicsBackend->GetDevice(),
         m_graphicsBackend->GetSurfaceFormat()
     );
+    if (!m_imguiRenderer)
+    {
+        throw std::runtime_error("无法初始化ImGui渲染器");
+    }
     m_imguiRenderer->SetFont(m_imguiRenderer->LoadFonts("Fonts/SourceBlack-Medium.otf", 1.0f));
     m_sceneRenderer = std::make_unique<SceneRenderer>();
 
@@ -236,7 +238,7 @@ void Editor::InitializeDerived()
     }
     PreferenceSettings::GetInstance().Initialize("./LumaEditor.settings");
 
-    
+
     m_editorContext.lastFpsUpdateTime = std::chrono::steady_clock::now();
     m_editorContext.lastUpsUpdateTime = std::chrono::steady_clock::now();
 }
@@ -370,8 +372,8 @@ void Editor::Update(float fixedDeltaTime)
         }
 
 
-        m_editorContext.activeScene->Update(fixedDeltaTime, *m_editorContext.engineContext,
-                                            m_editorContext.editorState == EditorState::Paused);
+        m_editorContext.activeScene->UpdateSimulation(fixedDeltaTime, *m_editorContext.engineContext,
+                                                      m_editorContext.editorState == EditorState::Paused);
 
         Camera::GetInstance().SetProperties(m_editorContext.activeScene->GetCameraProperties());
 
@@ -383,7 +385,8 @@ void Editor::Update(float fixedDeltaTime)
 void Editor::Render()
 {
     PROFILE_FUNCTION();
-
+    m_editorContext.activeScene->UpdateMainThread(1.f / m_context.currentFps, *m_editorContext.engineContext,
+                                                  m_editorContext.editorState == EditorState::Paused);
     if (!m_graphicsBackend || !m_imguiRenderer || !m_renderSystem)
     {
         LogError("Editor::Render: 核心组件未初始化。");
@@ -743,15 +746,13 @@ void Editor::drawFileConflictPopupContent()
 }
 
 
-
-
 void Editor::updateUps()
 {
     m_editorContext.updateCount++;
     auto currentTime = std::chrono::steady_clock::now();
     double elapsedSeconds = std::chrono::duration<double>(currentTime - m_editorContext.lastUpsUpdateTime).count();
 
-    
+
     if (elapsedSeconds >= 1.0)
     {
         const int updateCount = m_editorContext.updateCount;
@@ -766,15 +767,13 @@ void Editor::updateUps()
 }
 
 
-
-
 void Editor::updateFps()
 {
     m_editorContext.frameCount++;
     auto currentTime = std::chrono::steady_clock::now();
     double elapsedSeconds = std::chrono::duration<double>(currentTime - m_editorContext.lastFpsUpdateTime).count();
 
-    
+
     if (elapsedSeconds >= 1.0)
     {
         const int frameCount = m_editorContext.frameCount;

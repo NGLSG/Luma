@@ -192,10 +192,174 @@ namespace Systems
             
             const ECS::Vector2f inputSize = {inputText.rect.z, inputText.rect.w};
 
-            if (isPointInRectUI(worldMousePos, transform, inputSize))
+        if (isPointInRectUI(worldMousePos, transform, inputSize))
+        {
+            
+            candidates.emplace_back(entity, inputText.zIndex);
+        }
+    }
+
+        
+        auto toggleView = registry.view<ECS::TransformComponent, ECS::ToggleButtonComponent>();
+        for (auto entity : toggleView)
+        {
+            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                continue;
+            const auto& toggle = toggleView.get<ECS::ToggleButtonComponent>(entity);
+            if (!toggle.Enable || !toggle.isVisible) continue;
+
+            const auto& transform = toggleView.get<ECS::TransformComponent>(entity);
+            const ECS::Vector2f size = {toggle.rect.z, toggle.rect.w};
+            if (isPointInRectUI(worldMousePos, transform, size))
             {
-                
-                candidates.emplace_back(entity, inputText.zIndex);
+                candidates.emplace_back(entity, toggle.zIndex);
+            }
+        }
+
+        
+        auto radioView = registry.view<ECS::TransformComponent, ECS::RadioButtonComponent>();
+        for (auto entity : radioView)
+        {
+            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                continue;
+            const auto& radio = radioView.get<ECS::RadioButtonComponent>(entity);
+            if (!radio.Enable || !radio.isVisible) continue;
+
+            const auto& transform = radioView.get<ECS::TransformComponent>(entity);
+            const ECS::Vector2f size = {radio.rect.z, radio.rect.w};
+            if (isPointInRectUI(worldMousePos, transform, size))
+            {
+                candidates.emplace_back(entity, radio.zIndex);
+            }
+        }
+
+        
+        auto checkboxView = registry.view<ECS::TransformComponent, ECS::CheckBoxComponent>();
+        for (auto entity : checkboxView)
+        {
+            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                continue;
+            const auto& checkbox = checkboxView.get<ECS::CheckBoxComponent>(entity);
+            if (!checkbox.Enable || !checkbox.isVisible) continue;
+
+            const auto& transform = checkboxView.get<ECS::TransformComponent>(entity);
+            const ECS::Vector2f size = {checkbox.rect.z, checkbox.rect.w};
+            if (isPointInRectUI(worldMousePos, transform, size))
+            {
+                candidates.emplace_back(entity, checkbox.zIndex);
+            }
+        }
+
+        
+        auto sliderView = registry.view<ECS::TransformComponent, ECS::SliderComponent>();
+        for (auto entity : sliderView)
+        {
+            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                continue;
+            const auto& slider = sliderView.get<ECS::SliderComponent>(entity);
+            if (!slider.Enable || !slider.isVisible) continue;
+
+            const auto& transform = sliderView.get<ECS::TransformComponent>(entity);
+            const ECS::Vector2f size = {slider.rect.z, slider.rect.w};
+            if (isPointInRectUI(worldMousePos, transform, size))
+            {
+                candidates.emplace_back(entity, slider.zIndex);
+            }
+        }
+
+        
+        auto comboView = registry.view<ECS::TransformComponent, ECS::ComboBoxComponent>();
+        for (auto entity : comboView)
+        {
+            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                continue;
+            const auto& combo = comboView.get<ECS::ComboBoxComponent>(entity);
+            if (!combo.Enable || !combo.isVisible) continue;
+
+            const auto& transform = comboView.get<ECS::TransformComponent>(entity);
+            const ECS::Vector2f baseSize = {combo.rect.z, combo.rect.w};
+            bool inside = isPointInRectUI(worldMousePos, transform, baseSize);
+
+            if (!inside && combo.isDropdownOpen && !combo.items.empty())
+            {
+                const float itemHeight = std::max(combo.displayText.fontSize * 1.4f, combo.rect.w);
+                const float additionalHeight = itemHeight * static_cast<float>(combo.items.size());
+                ECS::TransformComponent adjustedTransform = transform;
+                adjustedTransform.position.y += additionalHeight * 0.5f;
+                const ECS::Vector2f dropdownSize = {combo.rect.z, combo.rect.w + additionalHeight};
+                inside = isPointInRectUI(worldMousePos, adjustedTransform, dropdownSize);
+            }
+
+            if (inside)
+            {
+                candidates.emplace_back(entity, combo.zIndex);
+            }
+        }
+
+        
+        auto expanderView = registry.view<ECS::TransformComponent, ECS::ExpanderComponent>();
+        for (auto entity : expanderView)
+        {
+            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                continue;
+            const auto& expander = expanderView.get<ECS::ExpanderComponent>(entity);
+            if (!expander.Enable || !expander.isVisible) continue;
+
+            const auto& transform = expanderView.get<ECS::TransformComponent>(entity);
+            const ECS::Vector2f size = {expander.rect.z, expander.rect.w};
+            if (isPointInRectUI(worldMousePos, transform, size))
+            {
+                candidates.emplace_back(entity, expander.zIndex);
+            }
+        }
+
+        
+        auto tabView = registry.view<ECS::TransformComponent, ECS::TabControlComponent>();
+        for (auto entity : tabView)
+        {
+            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                continue;
+            const auto& tabControl = tabView.get<ECS::TabControlComponent>(entity);
+            if (!tabControl.Enable || !tabControl.isVisible) continue;
+
+            const auto& transform = tabView.get<ECS::TransformComponent>(entity);
+            ECS::Vector2f localPoint = worldMousePos - transform.position;
+            if (transform.rotation != 0.0f)
+            {
+                const float sinR = sinf(-transform.rotation);
+                const float cosR = cosf(-transform.rotation);
+                const float tempX = localPoint.x;
+                localPoint.x = localPoint.x * cosR - localPoint.y * sinR;
+                localPoint.y = tempX * sinR + localPoint.y * cosR;
+            }
+            localPoint.x /= transform.scale.x;
+            localPoint.y /= transform.scale.y;
+
+            const float halfWidth = tabControl.rect.z * 0.5f;
+            const float halfHeight = tabControl.rect.w * 0.5f;
+            const float tabsTop = -halfHeight;
+            const float tabsBottom = tabsTop + tabControl.tabHeight;
+
+            if (localPoint.y >= tabsTop && localPoint.y <= tabsBottom && localPoint.x >= -halfWidth && localPoint.x <= halfWidth)
+            {
+                candidates.emplace_back(entity, tabControl.zIndex);
+            }
+        }
+
+        
+        auto listBoxView = registry.view<ECS::TransformComponent, ECS::ListBoxComponent>();
+        for (auto entity : listBoxView)
+        {
+            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+                continue;
+            const auto& listBox = listBoxView.get<ECS::ListBoxComponent>(entity);
+            if (!listBox.Enable || !listBox.isVisible) continue;
+
+            const auto& transform = listBoxView.get<ECS::TransformComponent>(entity);
+            const ECS::Vector2f size = {listBox.rect.z, listBox.rect.w};
+            if (isPointInRectUI(worldMousePos, transform, size))
+            {
+                candidates.emplace_back(entity, listBox.zIndex);
             }
         }
 
@@ -205,7 +369,9 @@ namespace Systems
         for (auto entity : spriteView)
         {
             
-            if (registry.any_of<ECS::ButtonComponent, ECS::InputTextComponent>(entity))
+            if (registry.any_of<ECS::ButtonComponent, ECS::InputTextComponent, ECS::ToggleButtonComponent,
+                ECS::RadioButtonComponent, ECS::CheckBoxComponent, ECS::SliderComponent, ECS::ComboBoxComponent,
+                ECS::ExpanderComponent, ECS::TabControlComponent, ECS::ListBoxComponent>(entity))
             {
                 continue;
             }

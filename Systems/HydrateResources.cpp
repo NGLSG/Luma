@@ -34,6 +34,15 @@ namespace Systems
             if (registry.all_of<ECS::TextComponent>(entity)) OnTextUpdated(registry, entity);
             if (registry.all_of<ECS::ButtonComponent>(entity)) OnButtonUpdated(registry, entity);
             if (registry.all_of<ECS::InputTextComponent>(entity)) OnInputTextUpdated(registry, entity);
+            if (registry.all_of<ECS::ToggleButtonComponent>(entity)) OnToggleButtonUpdated(registry, entity);
+            if (registry.all_of<ECS::RadioButtonComponent>(entity)) OnRadioButtonUpdated(registry, entity);
+            if (registry.all_of<ECS::CheckBoxComponent>(entity)) OnCheckBoxUpdated(registry, entity);
+            if (registry.all_of<ECS::SliderComponent>(entity)) OnSliderUpdated(registry, entity);
+            if (registry.all_of<ECS::ComboBoxComponent>(entity)) OnComboBoxUpdated(registry, entity);
+            if (registry.all_of<ECS::ExpanderComponent>(entity)) OnExpanderUpdated(registry, entity);
+            if (registry.all_of<ECS::ProgressBarComponent>(entity)) OnProgressBarUpdated(registry, entity);
+            if (registry.all_of<ECS::TabControlComponent>(entity)) OnTabControlUpdated(registry, entity);
+            if (registry.all_of<ECS::ListBoxComponent>(entity)) OnListBoxUpdated(registry, entity);
             if (registry.all_of<ECS::TilemapComponent>(entity)) OnTilemapUpdated(registry, entity);
         };
 
@@ -153,6 +162,354 @@ namespace Systems
         }
     }
 
+
+    void HydrateResources::OnToggleButtonUpdated(entt::registry& registry, entt::entity entity)
+    {
+        if (!m_context || !m_context->graphicsBackend) return;
+
+        auto& toggle = registry.get<ECS::ToggleButtonComponent>(entity);
+        TextureLoader textureLoader(*m_context->graphicsBackend);
+
+        auto loadTexture = [&](const AssetHandle& handle, sk_sp<RuntimeTexture>& target, const char* fieldName)
+        {
+            if (handle.Valid() && (!target || target->GetSourceGuid() != handle.assetGuid))
+            {
+                target = textureLoader.LoadAsset(handle.assetGuid);
+                if (!target)
+                {
+                    LogError("Failed to load ToggleButton {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                }
+            }
+            else if (!handle.Valid())
+            {
+                target.reset();
+            }
+        };
+
+        loadTexture(toggle.backgroundImage, toggle.backgroundImageTexture, "backgroundImage");
+    }
+
+    void HydrateResources::OnRadioButtonUpdated(entt::registry& registry, entt::entity entity)
+    {
+        auto& radio = registry.get<ECS::RadioButtonComponent>(entity);
+
+        {
+            FontLoader fontLoader;
+            auto ensureTypeface = [&](ECS::TextComponent& text, const char* fieldName)
+            {
+                if (text.fontHandle.Valid() && (!text.typeface || text.lastFontHandle != text.fontHandle))
+                {
+                    text.typeface = fontLoader.LoadAsset(text.fontHandle.assetGuid);
+                    if (!text.typeface)
+                    {
+                        LogError("Failed to load RadioButton {} font with GUID: {}", fieldName, text.fontHandle.assetGuid.ToString());
+                    }
+                    text.lastFontHandle = text.fontHandle;
+                }
+                else if (!text.fontHandle.Valid())
+                {
+                    text.typeface.reset();
+                    text.lastFontHandle = {};
+                }
+            };
+
+            ensureTypeface(radio.label, "label");
+        }
+
+        if (!m_context || !m_context->graphicsBackend) return;
+        TextureLoader textureLoader(*m_context->graphicsBackend);
+        auto loadTexture = [&](const AssetHandle& handle, sk_sp<RuntimeTexture>& target, const char* fieldName)
+        {
+            if (handle.Valid() && (!target || target->GetSourceGuid() != handle.assetGuid))
+            {
+                target = textureLoader.LoadAsset(handle.assetGuid);
+                if (!target)
+                {
+                    LogError("Failed to load RadioButton {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                }
+            }
+            else if (!handle.Valid())
+            {
+                target.reset();
+            }
+        };
+
+        loadTexture(radio.backgroundImage, radio.backgroundImageTexture, "backgroundImage");
+        loadTexture(radio.selectionImage, radio.selectionImageTexture, "selectionImage");
+    }
+
+    void HydrateResources::OnCheckBoxUpdated(entt::registry& registry, entt::entity entity)
+    {
+        auto& checkbox = registry.get<ECS::CheckBoxComponent>(entity);
+
+        {
+            FontLoader fontLoader;
+            auto ensureTypeface = [&](ECS::TextComponent& text, const char* fieldName)
+            {
+                if (text.fontHandle.Valid() && (!text.typeface || text.lastFontHandle != text.fontHandle))
+                {
+                    text.typeface = fontLoader.LoadAsset(text.fontHandle.assetGuid);
+                    if (!text.typeface)
+                    {
+                        LogError("Failed to load CheckBox {} font with GUID: {}", fieldName, text.fontHandle.assetGuid.ToString());
+                    }
+                    text.lastFontHandle = text.fontHandle;
+                }
+                else if (!text.fontHandle.Valid())
+                {
+                    text.typeface.reset();
+                    text.lastFontHandle = {};
+                }
+            };
+
+            ensureTypeface(checkbox.label, "label");
+        }
+
+        if (!m_context || !m_context->graphicsBackend) return;
+        TextureLoader textureLoader(*m_context->graphicsBackend);
+        auto loadTexture = [&](const AssetHandle& handle, sk_sp<RuntimeTexture>& target, const char* fieldName)
+        {
+            if (handle.Valid() && (!target || target->GetSourceGuid() != handle.assetGuid))
+            {
+                target = textureLoader.LoadAsset(handle.assetGuid);
+                if (!target)
+                {
+                    LogError("Failed to load CheckBox {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                }
+            }
+            else if (!handle.Valid())
+            {
+                target.reset();
+            }
+        };
+
+        loadTexture(checkbox.backgroundImage, checkbox.backgroundImageTexture, "backgroundImage");
+        loadTexture(checkbox.checkmarkImage, checkbox.checkmarkImageTexture, "checkmarkImage");
+    }
+
+    void HydrateResources::OnSliderUpdated(entt::registry& registry, entt::entity entity)
+    {
+        if (!m_context || !m_context->graphicsBackend) return;
+
+        auto& slider = registry.get<ECS::SliderComponent>(entity);
+        TextureLoader textureLoader(*m_context->graphicsBackend);
+        auto loadTexture = [&](const AssetHandle& handle, sk_sp<RuntimeTexture>& target, const char* fieldName)
+        {
+            if (handle.Valid() && (!target || target->GetSourceGuid() != handle.assetGuid))
+            {
+                target = textureLoader.LoadAsset(handle.assetGuid);
+                if (!target)
+                {
+                    LogError("Failed to load Slider {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                }
+            }
+            else if (!handle.Valid())
+            {
+                target.reset();
+            }
+        };
+
+        loadTexture(slider.trackImage, slider.trackImageTexture, "trackImage");
+        loadTexture(slider.fillImage, slider.fillImageTexture, "fillImage");
+        loadTexture(slider.thumbImage, slider.thumbImageTexture, "thumbImage");
+    }
+
+    void HydrateResources::OnComboBoxUpdated(entt::registry& registry, entt::entity entity)
+    {
+        auto& combo = registry.get<ECS::ComboBoxComponent>(entity);
+
+        {
+            FontLoader fontLoader;
+            auto ensureTypeface = [&](ECS::TextComponent& text, const char* fieldName)
+            {
+                if (text.fontHandle.Valid() && (!text.typeface || text.lastFontHandle != text.fontHandle))
+                {
+                    text.typeface = fontLoader.LoadAsset(text.fontHandle.assetGuid);
+                    if (!text.typeface)
+                    {
+                        LogError("Failed to load ComboBox {} font with GUID: {}", fieldName, text.fontHandle.assetGuid.ToString());
+                    }
+                    text.lastFontHandle = text.fontHandle;
+                }
+                else if (!text.fontHandle.Valid())
+                {
+                    text.typeface.reset();
+                    text.lastFontHandle = {};
+                }
+            };
+
+            ensureTypeface(combo.displayText, "displayText");
+        }
+
+        if (!m_context || !m_context->graphicsBackend) return;
+        TextureLoader textureLoader(*m_context->graphicsBackend);
+        auto loadTexture = [&](const AssetHandle& handle, sk_sp<RuntimeTexture>& target, const char* fieldName)
+        {
+            if (handle.Valid() && (!target || target->GetSourceGuid() != handle.assetGuid))
+            {
+                target = textureLoader.LoadAsset(handle.assetGuid);
+                if (!target)
+                {
+                    LogError("Failed to load ComboBox {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                }
+            }
+            else if (!handle.Valid())
+            {
+                target.reset();
+            }
+        };
+
+        loadTexture(combo.backgroundImage, combo.backgroundImageTexture, "backgroundImage");
+        loadTexture(combo.dropdownIcon, combo.dropdownIconTexture, "dropdownIcon");
+    }
+
+    void HydrateResources::OnExpanderUpdated(entt::registry& registry, entt::entity entity)
+    {
+        auto& expander = registry.get<ECS::ExpanderComponent>(entity);
+
+        {
+            FontLoader fontLoader;
+            auto ensureTypeface = [&](ECS::TextComponent& text, const char* fieldName)
+            {
+                if (text.fontHandle.Valid() && (!text.typeface || text.lastFontHandle != text.fontHandle))
+                {
+                    text.typeface = fontLoader.LoadAsset(text.fontHandle.assetGuid);
+                    if (!text.typeface)
+                    {
+                        LogError("Failed to load Expander {} font with GUID: {}", fieldName, text.fontHandle.assetGuid.ToString());
+                    }
+                    text.lastFontHandle = text.fontHandle;
+                }
+                else if (!text.fontHandle.Valid())
+                {
+                    text.typeface.reset();
+                    text.lastFontHandle = {};
+                }
+            };
+
+            ensureTypeface(expander.header, "header");
+        }
+
+        if (!m_context || !m_context->graphicsBackend) return;
+        TextureLoader textureLoader(*m_context->graphicsBackend);
+        auto loadTexture = [&](const AssetHandle& handle, sk_sp<RuntimeTexture>& target, const char* fieldName)
+        {
+            if (handle.Valid() && (!target || target->GetSourceGuid() != handle.assetGuid))
+            {
+                target = textureLoader.LoadAsset(handle.assetGuid);
+                if (!target)
+                {
+                    LogError("Failed to load Expander {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                }
+            }
+            else if (!handle.Valid())
+            {
+                target.reset();
+            }
+        };
+
+        loadTexture(expander.backgroundImage, expander.backgroundImageTexture, "backgroundImage");
+    }
+
+    void HydrateResources::OnProgressBarUpdated(entt::registry& registry, entt::entity entity)
+    {
+        if (!m_context || !m_context->graphicsBackend) return;
+
+        auto& progress = registry.get<ECS::ProgressBarComponent>(entity);
+        TextureLoader textureLoader(*m_context->graphicsBackend);
+        auto loadTexture = [&](const AssetHandle& handle, sk_sp<RuntimeTexture>& target, const char* fieldName)
+        {
+            if (handle.Valid() && (!target || target->GetSourceGuid() != handle.assetGuid))
+            {
+                target = textureLoader.LoadAsset(handle.assetGuid);
+                if (!target)
+                {
+                    LogError("Failed to load ProgressBar {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                }
+            }
+            else if (!handle.Valid())
+            {
+                target.reset();
+            }
+        };
+
+        loadTexture(progress.backgroundImage, progress.backgroundImageTexture, "backgroundImage");
+        loadTexture(progress.fillImage, progress.fillImageTexture, "fillImage");
+    }
+
+    void HydrateResources::OnTabControlUpdated(entt::registry& registry, entt::entity entity)
+    {
+        if (!m_context || !m_context->graphicsBackend) return;
+
+        auto& tabControl = registry.get<ECS::TabControlComponent>(entity);
+        TextureLoader textureLoader(*m_context->graphicsBackend);
+        auto loadTexture = [&](const AssetHandle& handle, sk_sp<RuntimeTexture>& target, const char* fieldName)
+        {
+            if (handle.Valid() && (!target || target->GetSourceGuid() != handle.assetGuid))
+            {
+                target = textureLoader.LoadAsset(handle.assetGuid);
+                if (!target)
+                {
+                    LogError("Failed to load TabControl {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                }
+            }
+            else if (!handle.Valid())
+            {
+                target.reset();
+            }
+        };
+
+        loadTexture(tabControl.backgroundImage, tabControl.backgroundImageTexture, "backgroundImage");
+        loadTexture(tabControl.tabBackgroundImage, tabControl.tabBackgroundImageTexture, "tabBackgroundImage");
+    }
+
+    void HydrateResources::OnListBoxUpdated(entt::registry& registry, entt::entity entity)
+    {
+        auto& listBox = registry.get<ECS::ListBoxComponent>(entity);
+
+        {
+            FontLoader fontLoader;
+            auto ensureTypeface = [&](ECS::TextComponent& text, const char* fieldName)
+            {
+                if (text.fontHandle.Valid() && (!text.typeface || text.lastFontHandle != text.fontHandle))
+                {
+                    text.typeface = fontLoader.LoadAsset(text.fontHandle.assetGuid);
+                    if (!text.typeface)
+                    {
+                        LogError("Failed to load ListBox {} font with GUID: {}", fieldName, text.fontHandle.assetGuid.ToString());
+                    }
+                    text.lastFontHandle = text.fontHandle;
+                }
+                else if (!text.fontHandle.Valid())
+                {
+                    text.typeface.reset();
+                    text.lastFontHandle = {};
+                }
+            };
+
+            ensureTypeface(listBox.itemTemplate, "itemTemplate");
+        }
+
+        if (!m_context || !m_context->graphicsBackend) return;
+        TextureLoader textureLoader(*m_context->graphicsBackend);
+        auto loadTexture = [&](const AssetHandle& handle, sk_sp<RuntimeTexture>& target, const char* fieldName)
+        {
+            if (handle.Valid() && (!target || target->GetSourceGuid() != handle.assetGuid))
+            {
+                target = textureLoader.LoadAsset(handle.assetGuid);
+                if (!target)
+                {
+                    LogError("Failed to load ListBox {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                }
+            }
+            else if (!handle.Valid())
+            {
+                target.reset();
+            }
+        };
+
+        loadTexture(listBox.backgroundImage, listBox.backgroundImageTexture, "backgroundImage");
+    }
     void HydrateResources::OnScriptUpdated(entt::registry& registry, entt::entity entity)
     {
         auto& scriptsComp = registry.get<ECS::ScriptsComponent>(entity);

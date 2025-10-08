@@ -9,9 +9,9 @@
 
 #include "IRuntimeAsset.h"
 #include "RuntimePrefab.h"
+#include "SystemsManager.h"
 #include "../../Data/SceneData.h"
 #include "../../Systems/ISystem.h"
-
 #include "../../Data/EngineContext.h"
 
 struct ComponentRegistration;
@@ -40,15 +40,16 @@ public:
      * @param guid 场景的全局唯一标识符。
      */
     RuntimeScene(const Guid& guid);
+
     /**
      * @brief 构造一个默认的运行时场景。
      */
     RuntimeScene();
+
     /**
      * @brief 析构函数，清理场景资源。
      */
     ~RuntimeScene() override;
-
 
     /**
      * @brief 激活场景，准备其运行。
@@ -56,13 +57,11 @@ public:
      */
     void Activate(EngineContext& engineCtx);
 
-
     /**
      * @brief 创建当前场景的一个播放模式副本。
      * @return 当前场景的智能指针副本，用于播放模式。
      */
     sk_sp<RuntimeScene> CreatePlayModeCopy();
-
 
     /**
      * @brief 从另一个源场景克隆数据到当前场景。
@@ -70,9 +69,8 @@ public:
      */
     void CloneFromScene(const RuntimeScene& sourceScene);
 
-
     /**
-     * @brief 向场景添加一个系统。
+     * @brief 向场景的模拟线程添加一个系统（默认）。
      * @tparam T 系统的类型，必须继承自 ISystem。
      * @tparam Args 构造系统所需的参数类型。
      * @param args 构造系统所需的参数。
@@ -82,7 +80,7 @@ public:
     T* AddSystem(Args&&... args);
 
     /**
-     * @brief 向场景添加一个核心系统（通常在场景生命周期中不可或缺）。
+     * @brief 向场景添加一个核心模拟线程系统（默认）。
      * @tparam T 核心系统的类型，必须继承自 ISystem。
      * @tparam Args 构造系统所需的参数类型。
      * @param args 构造系统所需的参数。
@@ -92,6 +90,46 @@ public:
     T* AddEssentialSystem(Args&&... args);
 
     /**
+     * @brief 向场景的模拟线程添加一个系统。
+     * @tparam T 系统的类型，必须继承自 ISystem。
+     * @tparam Args 构造系统所需的参数类型。
+     * @param args 构造系统所需的参数。
+     * @return 添加的系统实例的原始指针。
+     */
+    template <typename T, typename... Args>
+    T* AddSystemToSimulationThread(Args&&... args);
+
+    /**
+     * @brief 向场景的主线程添加一个系统。
+     * @tparam T 系统的类型，必须继承自 ISystem。
+     * @tparam Args 构造系统所需的参数类型。
+     * @param args 构造系统所需的参数。
+     * @return 添加的系统实例的原始指针。
+     */
+    template <typename T, typename... Args>
+    T* AddSystemToMainThread(Args&&... args);
+
+    /**
+     * @brief 向场景添加一个核心模拟线程系统。
+     * @tparam T 核心系统的类型，必须继承自 ISystem。
+     * @tparam Args 构造系统所需的参数类型。
+     * @param args 构造系统所需的参数。
+     * @return 添加的核心系统实例的原始指针。
+     */
+    template <typename T, typename... Args>
+    T* AddEssentialSystemToSimulationThread(Args&&... args);
+
+    /**
+     * @brief 向场景添加一个核心主线程系统。
+     * @tparam T 核心系统的类型，必须继承自 ISystem。
+     * @tparam Args 构造系统所需的参数类型。
+     * @param args 构造系统所需的参数。
+     * @return 添加的核心系统实例的原始指针。
+     */
+    template <typename T, typename... Args>
+    T* AddEssentialSystemToMainThread(Args&&... args);
+
+    /**
      * @brief 获取场景中指定类型的系统。
      * @tparam T 要获取的系统类型。
      * @return 指定类型的系统实例的原始指针，如果不存在则返回 nullptr。
@@ -99,13 +137,11 @@ public:
     template <typename T>
     T* GetSystem();
 
-
     /**
      * @brief 从场景数据加载场景内容。
      * @param sceneData 包含场景数据的结构体。
      */
     void LoadFromData(const Data::SceneData& sceneData);
-
 
     /**
      * @brief 实例化一个预制体，创建新的游戏对象。
@@ -114,7 +150,6 @@ public:
      * @return 新创建的游戏对象。
      */
     RuntimeGameObject Instantiate(RuntimePrefab& prefab, RuntimeGameObject* parent = nullptr);
-
 
     /**
      * @brief 创建一个新的游戏对象。
@@ -130,18 +165,17 @@ public:
      */
     std::unordered_map<std::string, const ComponentRegistration*> GetAllComponents(entt::entity entity);
 
-
     /**
      * @brief 获取场景的实体注册表。
      * @return 实体注册表的引用。
      */
     entt::registry& GetRegistry();
+
     /**
      * @brief 获取场景的常量实体注册表。
      * @return 实体注册表的常量引用。
      */
     const entt::registry& GetRegistry() const;
-
 
     /**
      * @brief 根据实体句柄查找游戏对象。
@@ -149,12 +183,12 @@ public:
      * @return 对应的运行时游戏对象。
      */
     RuntimeGameObject FindGameObjectByEntity(entt::entity handle);
+
     /**
      * @brief 获取场景中的所有根游戏对象。
      * @return 根游戏对象的向量引用。
      */
     std::vector<RuntimeGameObject>& GetRootGameObjects();
-
 
     /**
      * @brief 根据全局唯一标识符(GUID)查找游戏对象。
@@ -162,7 +196,6 @@ public:
      * @return 对应的运行时游戏对象。
      */
     RuntimeGameObject FindGameObjectByGuid(const Guid& guid);
-
 
     /**
      * @brief 对指定实体上的脚本组件调用一个事件。
@@ -173,7 +206,6 @@ public:
      */
     template <typename... Args>
     void InvokeEvent(entt::entity entity, const std::string& eventName, Args&&... args);
-
 
     /**
      * @brief 从序列化的YAML字符串参数调用指定实体上的脚本事件。
@@ -199,6 +231,7 @@ public:
      * @brief 清空场景中的所有游戏对象和系统。
      */
     void Clear();
+
     /**
      * @brief 序列化一个实体到预制体节点数据。
      * @param entity 要序列化的实体句柄。
@@ -212,11 +245,13 @@ public:
      * @return 包含场景所有数据的结构体。
      */
     Data::SceneData SerializeToData();
+
     /**
      * @brief 获取场景的名称。
      * @return 场景的名称。
      */
     const std::string& GetName() const { return m_name; }
+
     /**
      * @brief 设置场景的名称。
      * @param name 要设置的场景名称。
@@ -228,6 +263,7 @@ public:
      * @return 场景的源GUID。
      */
     Guid GetGuid() { return m_sourceGuid; }
+
     /**
      * @brief 将一个游戏对象添加到场景的根对象列表。
      * @param go 要添加的游戏对象。
@@ -258,7 +294,6 @@ public:
      */
     void DestroyGameObject(RuntimeGameObject& gameObject);
 
-
     /**
      * @brief 从预制体节点创建游戏对象层级结构。
      * @param node 包含层级结构数据的预制体节点。
@@ -268,12 +303,14 @@ public:
      */
     RuntimeGameObject CreateHierarchyFromNode(const Data::PrefabNode& node, RuntimeGameObject* parent,
                                               bool newGuid = true);
+
     /**
      * @brief 设置根游戏对象的同级索引。
      * @param object 要设置索引的根游戏对象。
      * @param newIndex 新的同级索引。
      */
     void SetRootSiblingIndex(RuntimeGameObject& object, int newIndex);
+
     /**
      * @brief 获取根游戏对象的同级索引。
      * @param object 要查询索引的根游戏对象。
@@ -287,15 +324,21 @@ private:
     friend class Game; ///< 允许 Game 访问私有成员。
     friend class ISystem; ///< 允许 ISystem 访问私有成员。
 
-
     /**
-     * @brief 更新场景中的所有系统和游戏对象。
+     * @brief 更新场景中模拟线程的所有系统。
      * @param deltaTime 帧时间间隔。
      * @param engineCtx 引擎上下文。
      * @param pauseNormalSystem 是否暂停普通系统的更新。
      */
-    void Update(float deltaTime, EngineContext& engineCtx, bool pauseNormalSystem);
+    void UpdateSimulation(float deltaTime, EngineContext& engineCtx, bool pauseNormalSystem);
 
+    /**
+     * @brief 更新场景中主线程的所有系统。
+     * @param deltaTime 帧时间间隔。
+     * @param engineCtx 引擎上下文。
+     * @param pauseNormalSystem 是否暂停普通系统的更新。
+     */
+    void UpdateMainThread(float deltaTime, EngineContext& engineCtx, bool pauseNormalSystem);
 
     /**
      * @brief 当实体被销毁时调用的回调函数。
@@ -303,7 +346,6 @@ private:
      * @param entity 被销毁的实体句柄。
      */
     void OnEntityDestroyed(entt::registry& registry, entt::entity entity);
-
 
     /**
      * @brief 克隆一个实体及其组件到目标注册表。
@@ -317,7 +359,6 @@ private:
                              entt::registry& targetRegistry,
                              std::unordered_map<entt::entity, entt::entity>& entityMapping);
 
-
     /**
      * @brief 根据实体映射重建实体之间的父子关系。
      * @param entityMapping 实体句柄从源到目标的映射。
@@ -328,14 +369,12 @@ private:
     std::unique_ptr<std::vector<uint8_t>> m_snapshotData = nullptr; ///< 场景快照数据，用于播放模式恢复。
     entt::registry m_registry; ///< 场景的实体组件系统(ECS)注册表。
     std::vector<RuntimeGameObject> m_rootGameObjects; ///< 场景中的所有根游戏对象。
-    std::vector<std::unique_ptr<Systems::ISystem>> m_systems; ///< 场景中所有普通系统的列表。
-    std::vector<std::unique_ptr<Systems::ISystem>> m_essSystems; ///< 场景中所有核心系统的列表。
+    SystemsManager m_systemsManager; ///< 系统管理器，负责管理所有系统。
     std::unordered_map<Guid, entt::entity> m_guidToEntityMap; ///< GUID到实体句柄的映射。
     std::string m_name = "Untitled Scene"; ///< 场景的名称。
     Camera::CamProperties m_cameraProperties; ///< 场景的摄像机属性。
     mutable bool m_isDirty = false; ///< 指示场景数据是否已被修改。
 };
-
 
 #include <yaml-cpp/yaml.h>
 
@@ -344,7 +383,7 @@ private:
 #include "../../Scripting/CoreCLRHost.h"
 
 /**
- * @brief 向场景添加一个系统。
+ * @brief 向场景的模拟线程添加一个系统（默认）。
  * @tparam T 系统的类型，必须继承自 ISystem。
  * @tparam Args 构造系统所需的参数类型。
  * @param args 构造系统所需的参数。
@@ -353,15 +392,11 @@ private:
 template <typename T, typename... Args>
 T* RuntimeScene::AddSystem(Args&&... args)
 {
-    static_assert(std::is_base_of_v<Systems::ISystem, T>, "T must inherit from ISystem");
-    auto newSystem = std::make_unique<T>(std::forward<Args>(args)...);
-    T* rawPtr = newSystem.get();
-    m_systems.push_back(std::move(newSystem));
-    return rawPtr;
+    return m_systemsManager.AddSimulationSystem<T>(std::forward<Args>(args)...);
 }
 
 /**
- * @brief 向场景添加一个核心系统（通常在场景生命周期中不可或缺）。
+ * @brief 向场景添加一个核心模拟线程系统（默认）。
  * @tparam T 核心系统的类型，必须继承自 ISystem。
  * @tparam Args 构造系统所需的参数类型。
  * @param args 构造系统所需的参数。
@@ -370,11 +405,59 @@ T* RuntimeScene::AddSystem(Args&&... args)
 template <typename T, typename... Args>
 T* RuntimeScene::AddEssentialSystem(Args&&... args)
 {
-    static_assert(std::is_base_of_v<Systems::ISystem, T>, "T must inherit from ISystem");
-    auto newSystem = std::make_unique<T>(std::forward<Args>(args)...);
-    T* rawPtr = newSystem.get();
-    m_essSystems.push_back(std::move(newSystem));
-    return rawPtr;
+    return m_systemsManager.AddEssentialSimulationSystem<T>(std::forward<Args>(args)...);
+}
+
+/**
+ * @brief 向场景的模拟线程添加一个系统。
+ * @tparam T 系统的类型，必须继承自 ISystem。
+ * @tparam Args 构造系统所需的参数类型。
+ * @param args 构造系统所需的参数。
+ * @return 添加的系统实例的原始指针。
+ */
+template <typename T, typename... Args>
+T* RuntimeScene::AddSystemToSimulationThread(Args&&... args)
+{
+    return m_systemsManager.AddSimulationSystem<T>(std::forward<Args>(args)...);
+}
+
+/**
+ * @brief 向场景的主线程添加一个系统。
+ * @tparam T 系统的类型，必须继承自 ISystem。
+ * @tparam Args 构造系统所需的参数类型。
+ * @param args 构造系统所需的参数。
+ * @return 添加的系统实例的原始指针。
+ */
+template <typename T, typename... Args>
+T* RuntimeScene::AddSystemToMainThread(Args&&... args)
+{
+    return m_systemsManager.AddMainThreadSystem<T>(std::forward<Args>(args)...);
+}
+
+/**
+ * @brief 向场景添加一个核心模拟线程系统。
+ * @tparam T 核心系统的类型，必须继承自 ISystem。
+ * @tparam Args 构造系统所需的参数类型。
+ * @param args 构造系统所需的参数。
+ * @return 添加的核心系统实例的原始指针。
+ */
+template <typename T, typename... Args>
+T* RuntimeScene::AddEssentialSystemToSimulationThread(Args&&... args)
+{
+    return m_systemsManager.AddEssentialSimulationSystem<T>(std::forward<Args>(args)...);
+}
+
+/**
+ * @brief 向场景添加一个核心主线程系统。
+ * @tparam T 核心系统的类型，必须继承自 ISystem。
+ * @tparam Args 构造系统所需的参数类型。
+ * @param args 构造系统所需的参数。
+ * @return 添加的核心系统实例的原始指针。
+ */
+template <typename T, typename... Args>
+T* RuntimeScene::AddEssentialSystemToMainThread(Args&&... args)
+{
+    return m_systemsManager.AddEssentialMainThreadSystem<T>(std::forward<Args>(args)...);
 }
 
 /**
@@ -385,15 +468,7 @@ T* RuntimeScene::AddEssentialSystem(Args&&... args)
 template <typename T>
 T* RuntimeScene::GetSystem()
 {
-    static_assert(std::is_base_of_v<Systems::ISystem, T>, "T must inherit from ISystem");
-    for (const auto& system : m_systems)
-    {
-        if (auto* sys = dynamic_cast<T*>(system.get()))
-        {
-            return sys;
-        }
-    }
-    return nullptr;
+    return m_systemsManager.GetSystem<T>();
 }
 
 /**

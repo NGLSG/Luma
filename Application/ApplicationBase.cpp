@@ -6,7 +6,7 @@
 #include <SDL3/SDL.h>
 #include <chrono>
 #include <stdexcept>
-#include <vector> 
+#include <vector>
 
 #include "ImGuiRenderer.h"
 #include "imgui_node_editor.h"

@@ -51,7 +51,8 @@ namespace
             level = std::max(1, std::min(level, ImGui::MarkdownConfig::NUMHEADINGS));
             if (start)
             {
-                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, ImGui::GetStyle().ItemSpacing.y * 1.35f));
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+                                    ImVec2(ImGui::GetStyle().ItemSpacing.x, ImGui::GetStyle().ItemSpacing.y * 1.35f));
                 ImGui::SetWindowFontScale(kHeadingScales[level - 1]);
             }
             else
@@ -72,7 +73,10 @@ namespace
 
     std::string to_lower_copy(std::string value)
     {
-        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c)
+        {
+            return static_cast<char>(std::tolower(c));
+        });
         return value;
     }
 
@@ -106,9 +110,12 @@ namespace
             section.title = trimmedTitle;
             section.body = trimmedBody;
             std::string lowerTitle = to_lower_copy(section.title);
-            section.isSummary = !section.title.empty() && (lowerTitle.find("summary") != std::string::npos || lowerTitle.find("总结") != std::string::npos || lowerTitle.find("汇总") != std::string::npos);
-            bool isThinking = !section.title.empty() && (lowerTitle.find("thinking") != std::string::npos || lowerTitle.find("思考") != std::string::npos || lowerTitle.find("推理") != std::string::npos);
-            bool isTool = !section.title.empty() && (lowerTitle.find("tool") != std::string::npos || lowerTitle.find("工具") != std::string::npos);
+            section.isSummary = !section.title.empty() && (lowerTitle.find("summary") != std::string::npos || lowerTitle
+                .find("总结") != std::string::npos || lowerTitle.find("汇总") != std::string::npos);
+            bool isThinking = !section.title.empty() && (lowerTitle.find("thinking") != std::string::npos || lowerTitle.
+                find("思考") != std::string::npos || lowerTitle.find("推理") != std::string::npos);
+            bool isTool = !section.title.empty() && (lowerTitle.find("tool") != std::string::npos || lowerTitle.
+                find("工具") != std::string::npos);
             section.collapsible = !section.isSummary && !section.title.empty();
             if (isThinking)
             {
@@ -159,12 +166,14 @@ namespace
         ImGui::PopTextWrapPos();
     }
 }
+
 void AIPanel::initializeMarkdown()
 {
     m_markdownConfig = ImGui::MarkdownConfig();
     m_markdownConfig.linkCallback = markdownLinkCallback;
     m_markdownConfig.formatCallback = markdownFormatCallback;
 }
+
 void AIPanel::Initialize(EditorContext* context)
 {
     m_context = context;
@@ -173,7 +182,7 @@ void AIPanel::Initialize(EditorContext* context)
     initializeBots();
     initializeMarkdown();
 
-    
+
     switch (m_config.permissionLevel)
     {
     case 1: m_permissionLevel = PermissionLevel::Agent;
@@ -277,7 +286,9 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
     ToolInvocationLog* currentLog = nullptr;
     {
         ToolInvocationLog logEntry;
-        logEntry.messageIndex = (m_toolCallMessageIndex == static_cast<size_t>(-1)) ? -1 : static_cast<int>(m_toolCallMessageIndex);
+        logEntry.messageIndex = (m_toolCallMessageIndex == static_cast<size_t>(-1))
+                                    ? -1
+                                    : static_cast<int>(m_toolCallMessageIndex);
         logEntry.timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::high_resolution_clock::now().time_since_epoch()).count();
         logEntry.rawRequest = aiResponse;
@@ -426,7 +437,7 @@ void AIPanel::Draw()
             ImGui::EndChild();
             ImGui::SameLine();
             ImGui::BeginChild("ChatArea", ImVec2(0, 0));
-            
+
             {
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 6));
                 ImGui::Text("权限:");
@@ -455,7 +466,7 @@ void AIPanel::Draw()
     }
     ImGui::End();
 
-    
+
     drawToolApprovalPopup();
 }
 
@@ -574,8 +585,8 @@ void AIPanel::drawChatPanel()
     ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 80.0f);
 
     const char* current_model = (m_selectedModelIndex >= 0 && m_selectedModelIndex < m_availableModels.size())
-                                ? m_availableModels[m_selectedModelIndex].displayName.c_str()
-                                : "选择模型";
+                                    ? m_availableModels[m_selectedModelIndex].displayName.c_str()
+                                    : "选择模型";
 
     if (ImGui::BeginCombo("##选择模型", current_model))
     {
@@ -706,10 +717,13 @@ void AIPanel::drawChatPanel()
                     ImGuiTreeNodeFlags flags = hasResult ? ImGuiTreeNodeFlags_DefaultOpen : 0;
                     if (ImGui::CollapsingHeader(headerLabel.c_str(), flags))
                     {
-                        bool success = hasResult && call.result->contains("success") && call.result->value("success", false);
+                        bool success = hasResult && call.result->contains("success") && call.result->value(
+                            "success", false);
                         ImVec4 statusColor = hasResult
-                            ? (success ? ImVec4(0.4f, 0.9f, 0.4f, 1.0f) : ImVec4(0.95f, 0.5f, 0.4f, 1.0f))
-                            : ImVec4(0.9f, 0.9f, 0.4f, 1.0f);
+                                                 ? (success
+                                                        ? ImVec4(0.4f, 0.9f, 0.4f, 1.0f)
+                                                        : ImVec4(0.95f, 0.5f, 0.4f, 1.0f))
+                                                 : ImVec4(0.9f, 0.9f, 0.4f, 1.0f);
                         const char* statusText = hasResult ? (success ? "成功" : "失败") : "待执行";
                         ImGui::TextColored(statusColor, "状态: %s", statusText);
 
@@ -876,6 +890,7 @@ void AIPanel::resetToDefaults()
     m_config = Configure();
     LogInfo("AI面板配置已重置为默认值。");
 }
+
 void AIPanel::drawSettingsPanel()
 {
     if (ImGui::Button("保存"))
@@ -897,7 +912,7 @@ void AIPanel::drawSettingsPanel()
     ImGui::Separator();
 
     ImGui::BeginChild("SettingsRegion");
-    
+
     if (ImGui::CollapsingHeader("权限设置", ImGuiTreeNodeFlags_DefaultOpen))
     {
         const char* permItems[] = {"Chat", "Agent", "Agent(Full)"};
@@ -1105,7 +1120,6 @@ void AIPanel::drawToolApprovalPopup()
         ImGui::SameLine();
         if (ImGui::Button("取消", ImVec2(120, 0)))
         {
-            
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -1675,26 +1689,27 @@ void AIPanel::drawModelManager(std::string& model, std::vector<std::string>& sup
 {
     ImGui::PushID(id);
 
-    
+
     ImGui::Text("默认模型（输入用于检索）");
     ImGui::InputText("##DefaultModel", &model);
     ImGui::Separator();
 
-    
+
     ImGui::Text("可用模型（筛选后）");
     std::vector<const char*> items;
     items.reserve(supportedModels.size());
-    std::vector<int> mapIndex; 
+    std::vector<int> mapIndex;
     mapIndex.reserve(supportedModels.size());
 
-    std::string ql = model; 
+    std::string ql = model;
     std::transform(ql.begin(), ql.end(), ql.begin(), ::tolower);
     for (int i = 0; i < (int)supportedModels.size(); ++i)
     {
         const std::string& m = supportedModels[i];
         if (!ql.empty())
         {
-            std::string ml = m; std::transform(ml.begin(), ml.end(), ml.begin(), ::tolower);
+            std::string ml = m;
+            std::transform(ml.begin(), ml.end(), ml.begin(), ::tolower);
             if (ml.find(ql) == std::string::npos) continue;
         }
         items.push_back(m.c_str());
@@ -1703,13 +1718,16 @@ void AIPanel::drawModelManager(std::string& model, std::vector<std::string>& sup
     int current = -1;
     if (!model.empty())
     {
-        
         for (int i = 0; i < (int)items.size(); ++i)
         {
-            if (supportedModels[mapIndex[i]] == model) { current = i; break; }
+            if (supportedModels[mapIndex[i]] == model)
+            {
+                current = i;
+                break;
+            }
         }
     }
-    
+
     int height = (int)std::min<size_t>(items.size(), 4);
     if (ImGui::ListBox("##AvailableModels", &current, items.data(), (int)items.size(), height))
     {
@@ -1719,7 +1737,7 @@ void AIPanel::drawModelManager(std::string& model, std::vector<std::string>& sup
         }
     }
 
-    
+
     int globalIndex = (current >= 0 && current < (int)mapIndex.size()) ? mapIndex[current] : -1;
     ImGui::BeginDisabled(globalIndex < 0);
     if (ImGui::Button("删除选中"))
@@ -1727,7 +1745,7 @@ void AIPanel::drawModelManager(std::string& model, std::vector<std::string>& sup
         if (globalIndex >= 0 && globalIndex < (int)supportedModels.size())
         {
             supportedModels.erase(supportedModels.begin() + globalIndex);
-            
+
             current = -1;
         }
     }
@@ -1735,9 +1753,9 @@ void AIPanel::drawModelManager(std::string& model, std::vector<std::string>& sup
 
     ImGui::Separator();
 
-    
+
     ImGui::Text("批量添加（换行或分号分隔）");
-    static std::unordered_map<std::string, std::string> s_batchBuf; 
+    static std::unordered_map<std::string, std::string> s_batchBuf;
     std::string key = std::string("batch_") + id;
     std::string& buf = s_batchBuf[key];
     ImGui::InputTextMultiline("##BatchAdd", &buf, ImVec2(-1, 80));
@@ -1746,8 +1764,8 @@ void AIPanel::drawModelManager(std::string& model, std::vector<std::string>& sup
         auto addOne = [&](const std::string& raw)
         {
             std::string s = raw;
-            
-            auto notSpace = [](unsigned char c){ return !std::isspace(c); };
+
+            auto notSpace = [](unsigned char c) { return !std::isspace(c); };
             s.erase(s.begin(), std::find_if(s.begin(), s.end(), notSpace));
             s.erase(std::find_if(s.rbegin(), s.rend(), notSpace).base(), s.end());
             if (s.empty()) return;
@@ -1755,9 +1773,10 @@ void AIPanel::drawModelManager(std::string& model, std::vector<std::string>& sup
                 supportedModels.push_back(s);
         };
         std::string tmp = buf;
-        
+
         std::vector<std::string> parts;
-        size_t start = 0; size_t pos;
+        size_t start = 0;
+        size_t pos;
         while ((pos = tmp.find(';', start)) != std::string::npos)
         {
             parts.push_back(tmp.substr(start, pos - start));
@@ -2178,8 +2197,9 @@ C# Scripting Example
                 bool caseSensitive = args.value("caseSensitive", false);
                 int maxResults = args.value("maxResults", 0);
                 std::regex_constants::syntax_option_type opts = std::regex_constants::ECMAScript;
-                if (!caseSensitive) opts = (std::regex_constants::syntax_option_type)(opts |
-                    std::regex_constants::icase);
+                if (!caseSensitive)
+                    opts = (std::regex_constants::syntax_option_type)(opts |
+                        std::regex_constants::icase);
                 std::regex re(pattern, opts);
                 std::filesystem::path base = rel.empty() ? root : (root / rel);
                 if (!std::filesystem::exists(base))
@@ -2249,8 +2269,9 @@ C# Scripting Example
                 int maxMatchesPerFile = args.value("maxMatchesPerFile", 5);
                 int maxFiles = args.value("maxFiles", 50);
                 std::regex_constants::syntax_option_type opts = std::regex_constants::ECMAScript;
-                if (!caseSensitive) opts = (std::regex_constants::syntax_option_type)(opts |
-                    std::regex_constants::icase);
+                if (!caseSensitive)
+                    opts = (std::regex_constants::syntax_option_type)(opts |
+                        std::regex_constants::icase);
                 std::optional<std::regex> fileRe;
                 if (!fileRegex.empty()) fileRe = std::regex(fileRegex, opts);
                 std::filesystem::path base = rel.empty() ? root : (root / rel);
@@ -2409,13 +2430,19 @@ C# Scripting Example
                     {
                         std::error_code ec;
                         auto relp = std::filesystem::relative(e.path(), root, ec);
-                        items.push_back({{"name", e.path().filename().generic_string()}, {"path", (ec? e.path() : relp).generic_string()}, {"type", "dir"}});
+                        items.push_back({
+                            {"name", e.path().filename().generic_string()},
+                            {"path", (ec ? e.path() : relp).generic_string()}, {"type", "dir"}
+                        });
                     }
                     else if (e.is_regular_file() && includeFiles)
                     {
                         std::error_code ec;
                         auto relp = std::filesystem::relative(e.path(), root, ec);
-                        items.push_back({{"name", e.path().filename().generic_string()}, {"path", (ec? e.path() : relp).generic_string()}, {"type", "file"}});
+                        items.push_back({
+                            {"name", e.path().filename().generic_string()},
+                            {"path", (ec ? e.path() : relp).generic_string()}, {"type", "file"}
+                        });
                     }
                     if (maxResults > 0 && items.size() >= static_cast<size_t>(maxResults)) break;
                 }
@@ -2453,7 +2480,7 @@ C# Scripting Example
                     playScene->AddSystem<Systems::AudioSystem>();
                     playScene->AddSystem<Systems::InteractionSystem>();
                     playScene->AddSystem<Systems::ButtonSystem>();
-                    playScene->AddSystem<Systems::InputTextSystem>();
+                    playScene->AddSystemToMainThread<Systems::InputTextSystem>();
                     playScene->AddSystem<Systems::ScriptingSystem>();
                     playScene->AddSystem<Systems::AnimationSystem>();
                     SceneManager::GetInstance().SetCurrentScene(playScene);

@@ -851,7 +851,7 @@ void ToolbarPanel::play()
         playScene->AddSystem<Systems::AudioSystem>();
         playScene->AddSystem<Systems::InteractionSystem>();
         playScene->AddSystem<Systems::ButtonSystem>();
-        playScene->AddSystem<Systems::InputTextSystem>();
+        playScene->AddSystemToMainThread<Systems::InputTextSystem>();
         playScene->AddSystem<Systems::ScriptingSystem>();
         playScene->AddSystem<Systems::AnimationSystem>();
         

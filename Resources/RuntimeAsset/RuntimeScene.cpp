@@ -4,8 +4,6 @@
 #include "../../Components/Transform.h"
 #include "../../Components/RelationshipComponent.h"
 #include "../../Components/ComponentRegistry.h"
-
-
 #include "ActivityComponent.h"
 #include "TagComponent.h"
 #include "../Loaders/PrefabLoader.h"
@@ -14,7 +12,6 @@
 RuntimeScene::RuntimeScene(const Guid& guid)
 {
     m_sourceGuid = guid;
-
     m_registry.on_destroy<ECS::IDComponent>().connect<&RuntimeScene::OnEntityDestroyed>(this);
 }
 
@@ -25,31 +22,12 @@ RuntimeScene::RuntimeScene() : RuntimeScene(Guid::NewGuid())
 RuntimeScene::~RuntimeScene()
 {
     m_registry.on_destroy<ECS::IDComponent>().disconnect(this);
-
-
-    for (auto it = m_systems.rbegin(); it != m_systems.rend(); ++it)
-    {
-        (*it)->OnDestroy(this);
-    }
-    m_systems.clear();
-    for (auto it = m_essSystems.rbegin(); it != m_essSystems.rend(); ++it)
-    {
-        (*it)->OnDestroy(this);
-    }
-    m_essSystems.clear();
+    m_systemsManager.DestroySystems(this);
 }
 
 void RuntimeScene::Activate(EngineContext& engineCtx)
 {
-    for (auto& essSystem : m_essSystems)
-    {
-        essSystem->OnCreate(this, engineCtx);
-    }
-
-    for (const auto& system : m_systems)
-    {
-        system->OnCreate(this, engineCtx);
-    }
+    m_systemsManager.InitializeSystems(this, engineCtx);
 }
 
 sk_sp<RuntimeScene> RuntimeScene::CreatePlayModeCopy()
@@ -64,20 +42,16 @@ void RuntimeScene::CloneFromScene(const RuntimeScene& sourceScene)
 {
     Clear();
 
-
     m_name = sourceScene.m_name;
     m_cameraProperties = sourceScene.m_cameraProperties;
 
-
     std::unordered_map<entt::entity, entt::entity> entityMapping;
-
 
     auto allEntities = sourceScene.m_registry.view<ECS::IDComponent>();
     for (auto sourceEntity : allEntities)
     {
         entt::entity newEntity = cloneEntity(sourceScene.m_registry, sourceEntity,
                                              m_registry, entityMapping);
-
 
         if (m_registry.all_of<ECS::IDComponent>(newEntity))
         {
@@ -86,9 +60,7 @@ void RuntimeScene::CloneFromScene(const RuntimeScene& sourceScene)
         }
     }
 
-
     rebuildRelationships(entityMapping);
-
 
     m_rootGameObjects.clear();
     auto rootView = m_registry.view<ECS::IDComponent>(entt::exclude<ECS::ParentComponent>);
@@ -104,9 +76,7 @@ entt::entity RuntimeScene::cloneEntity(const entt::registry& sourceRegistry, ent
 {
     entt::entity newEntity = targetRegistry.create();
 
-
     entityMapping[sourceEntity] = newEntity;
-
 
     auto& compRegistry = ComponentRegistry::GetInstance();
     for (const auto& compName : compRegistry.GetAllRegisteredNames())
@@ -125,15 +95,12 @@ void RuntimeScene::rebuildRelationships(const std::unordered_map<entt::entity, e
     {
         auto& parentComp = m_registry.get<ECS::ParentComponent>(childEntity);
 
-
         auto parentIt = entityMapping.find(parentComp.parent);
         if (parentIt != entityMapping.end())
         {
             entt::entity newParentEntity = parentIt->second;
 
-
             parentComp.parent = newParentEntity;
-
 
             if (!m_registry.all_of<ECS::ChildrenComponent>(newParentEntity))
             {
@@ -141,7 +108,6 @@ void RuntimeScene::rebuildRelationships(const std::unordered_map<entt::entity, e
             }
 
             auto& childrenComp = m_registry.get<ECS::ChildrenComponent>(newParentEntity);
-
 
             if (std::find(childrenComp.children.begin(), childrenComp.children.end(), childEntity)
                 == childrenComp.children.end())
@@ -157,6 +123,7 @@ void RuntimeScene::Clear()
     m_registry.clear();
     m_rootGameObjects.clear();
     m_guidToEntityMap.clear();
+    m_systemsManager.Clear();
 }
 
 Data::PrefabNode RuntimeScene::SerializeEntity(entt::entity entity, entt::registry& registry)
@@ -186,7 +153,6 @@ Data::PrefabNode RuntimeScene::SerializeEntity(entt::entity entity, entt::regist
     return nodeData;
 }
 
-
 Data::SceneData RuntimeScene::SerializeToData()
 {
     Data::SceneData sceneData;
@@ -200,7 +166,6 @@ Data::SceneData RuntimeScene::SerializeToData()
     }
     return sceneData;
 }
-
 
 void RuntimeScene::AddToRoot(RuntimeGameObject go)
 {
@@ -230,36 +195,27 @@ void RuntimeScene::DestroyGameObject(RuntimeGameObject& gameObject)
 {
     entt::entity entity = static_cast<entt::entity>(gameObject);
 
-
     EventBus::GetInstance().Publish(GameObjectDestroyedEvent{m_registry, entity});
-
 
     for (auto& child : gameObject.GetChildren())
     {
         DestroyGameObject(child);
     }
 
-
     RemoveFromRoot(gameObject);
-
 
     m_registry.destroy(entity);
     EventBus::GetInstance().Publish(SceneUpdateEvent{});
 }
 
-void RuntimeScene::Update(float deltaTime, EngineContext& engineCtx, bool pauseNormalSystem)
+void RuntimeScene::UpdateSimulation(float deltaTime, EngineContext& engineCtx, bool pauseNormalSystem)
 {
-    for (auto& essSystem : m_essSystems)
-    {
-        essSystem->OnUpdate(this, deltaTime, engineCtx);
-    }
-    if (!pauseNormalSystem)
-    {
-        for (const auto& system : m_systems)
-        {
-            system->OnUpdate(this, deltaTime, engineCtx);
-        }
-    }
+    m_systemsManager.UpdateSimulationSystems(this, deltaTime, engineCtx, pauseNormalSystem);
+}
+
+void RuntimeScene::UpdateMainThread(float deltaTime, EngineContext& engineCtx, bool pauseNormalSystem)
+{
+    m_systemsManager.UpdateMainThreadSystems(this, deltaTime, engineCtx, pauseNormalSystem);
 }
 
 void RuntimeScene::LoadFromData(const Data::SceneData& sceneData)
@@ -303,28 +259,22 @@ RuntimeGameObject RuntimeScene::FindGameObjectByGuid(const Guid& guid)
     return {entt::null, nullptr};
 }
 
-
 RuntimeGameObject RuntimeScene::CreateGameObject(const std::string& name)
 {
     entt::entity newHandle = m_registry.create();
     RuntimeGameObject newGameObject(newHandle, this);
 
-
     auto& id = newGameObject.AddComponent<ECS::IDComponent>();
     id.name = name;
     id.guid = Guid::NewGuid();
-
 
     newGameObject.AddComponent<ECS::TransformComponent>();
     newGameObject.AddComponent<ECS::ActivityComponent>();
     newGameObject.AddComponent<ECS::TagComponent>();
 
-
     m_guidToEntityMap[id.guid] = newHandle;
 
-
     m_rootGameObjects.push_back(newGameObject);
-
 
     EventBus::GetInstance().Publish(GameObjectCreatedEvent{m_registry, newHandle});
     EventBus::GetInstance().Publish(SceneUpdateEvent{});
@@ -368,19 +318,15 @@ RuntimeGameObject RuntimeScene::CreateHierarchyFromNode(const Data::PrefabNode& 
     entt::entity newHandle = m_registry.create();
     RuntimeGameObject newGameObject(newHandle, this);
 
-
     auto& id = newGameObject.AddComponent<ECS::IDComponent>();
     id.name = node.name;
     id.guid = newGuid ? Guid::NewGuid() : node.localGuid;
 
-
     m_guidToEntityMap[id.guid] = newHandle;
-
 
     auto& compRegistry = ComponentRegistry::GetInstance();
     for (const auto& [compName, compData] : node.components)
     {
-        
         if (compName == "IDComponent" || compName == "ParentComponent" || compName == "ChildrenComponent")
         {
             continue;
@@ -393,15 +339,12 @@ RuntimeGameObject RuntimeScene::CreateHierarchyFromNode(const Data::PrefabNode& 
             {
                 reg->add(m_registry, newHandle);
 
-
                 EventBus::GetInstance().Publish(ComponentAddedEvent{m_registry, newHandle, compName});
             }
-
 
             reg->deserialize(m_registry, newHandle, compData);
         }
     }
-
 
     if (!newGameObject.HasComponent<ECS::TransformComponent>())
     {
@@ -419,7 +362,6 @@ RuntimeGameObject RuntimeScene::CreateHierarchyFromNode(const Data::PrefabNode& 
         EventBus::GetInstance().Publish(ComponentAddedEvent{m_registry, newHandle, "TagComponent"});
     }
 
-
     if (parent)
     {
         newGameObject.SetParent(*parent);
@@ -429,9 +371,7 @@ RuntimeGameObject RuntimeScene::CreateHierarchyFromNode(const Data::PrefabNode& 
         m_rootGameObjects.push_back(newGameObject);
     }
 
-
     EventBus::GetInstance().Publish(GameObjectCreatedEvent{m_registry, newHandle});
-
 
     for (const auto& childNode : node.children)
     {
@@ -447,7 +387,6 @@ int RuntimeScene::GetRootSiblingIndex(const RuntimeGameObject& object) const
     {
         return -1;
     }
-
 
     auto it = std::find(m_rootGameObjects.begin(), m_rootGameObjects.end(), object);
 
@@ -474,7 +413,6 @@ void RuntimeScene::SetRootSiblingIndex(RuntimeGameObject& object, int newIndex)
     m_rootGameObjects.insert(m_rootGameObjects.begin() + newIndex, object);
     EventBus::GetInstance().Publish(SceneUpdateEvent{});
 }
-
 
 RuntimeGameObject RuntimeScene::Instantiate(RuntimePrefab& prefab, RuntimeGameObject* parent)
 {

@@ -63,6 +63,15 @@ namespace Systems
          */
         void OnInputTextUpdated(entt::registry& registry, entt::entity entity);
 
+        void OnToggleButtonUpdated(entt::registry& registry, entt::entity entity);
+        void OnRadioButtonUpdated(entt::registry& registry, entt::entity entity);
+        void OnCheckBoxUpdated(entt::registry& registry, entt::entity entity);
+        void OnSliderUpdated(entt::registry& registry, entt::entity entity);
+        void OnComboBoxUpdated(entt::registry& registry, entt::entity entity);
+        void OnExpanderUpdated(entt::registry& registry, entt::entity entity);
+        void OnProgressBarUpdated(entt::registry& registry, entt::entity entity);
+        void OnTabControlUpdated(entt::registry& registry, entt::entity entity);
+        void OnListBoxUpdated(entt::registry& registry, entt::entity entity);
         /**
          * @brief 当按钮组件更新时调用，加载背景图像。
          * @param registry ECS注册表。

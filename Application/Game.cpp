@@ -68,7 +68,7 @@ void Game::Update(float deltaTime)
 
     if (auto activeScene = SceneManager::GetInstance().GetCurrentScene())
     {
-        activeScene->Update(deltaTime, m_context, false);
+        activeScene->UpdateSimulation(deltaTime, m_context, false);
 
 
         auto& cameraProps = activeScene->GetCameraProperties();
@@ -89,7 +89,10 @@ void Game::Render()
     {
         return;
     }
-
+    if (auto activeScene = SceneManager::GetInstance().GetCurrentScene())
+    {
+        activeScene->UpdateMainThread(1.f / m_context.currentFps, m_context, false);
+    }
 
     if (!m_graphicsBackend->BeginFrame())
     {
