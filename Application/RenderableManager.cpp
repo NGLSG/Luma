@@ -262,7 +262,7 @@ namespace
                     if (!textToDrawData.typeface) return;
 
                     SkFont font(textToDrawData.typeface, textToDrawData.fontSize);
-                    SkFontMetrics metrics;
+                    SkFontMetrics metrics{};
                     font.getMetrics(&metrics);
                     float textY = worldRect.y + worldRect.Height() / 2.0f - (metrics.fAscent + metrics.fDescent) / 2.0f;
 
