@@ -109,15 +109,15 @@ namespace Systems
             }
         }
 
-        // 在处理输入前先保存当前焦点实体，防止在HandleActiveInput中失焦后继续访问
+        
         entt::entity currentFocused = focusedEntity;
 
         if (registry.valid(currentFocused))
         {
             HandleActiveInput(scene, currentFocused, context);
 
-            // 检查是否在HandleActiveInput中失去了焦点（比如按下ESC或ENTER）
-            // 如果失去焦点，不再继续处理光标闪烁
+            
+            
             if (focusedEntity == currentFocused && registry.valid(focusedEntity))
             {
                 auto& inputText = registry.get<ECS::InputTextComponent>(focusedEntity);
@@ -141,7 +141,7 @@ namespace Systems
         inputText.isCursorVisible = true;
         inputText.cursorBlinkTimer = 0.0f;
 
-        // 初始化输入缓冲区
+        
         inputText.inputBuffer = inputText.text.text;
         inputText.cursorPosition = inputText.inputBuffer.length();
 
@@ -162,7 +162,7 @@ namespace Systems
         inputText->isFocused = false;
         inputText->isCursorVisible = false;
 
-        // 提交文本变更
+        
         if (inputText->text.text != inputText->inputBuffer)
         {
             inputText->text.text = inputText->inputBuffer;
@@ -190,16 +190,16 @@ namespace Systems
         bool textChanged = false;
         bool cursorMoved = false;
 
-        // 只读模式下不处理输入
+        
         if (inputText.isReadOnly)
         {
             return;
         }
 
-        // 处理所有输入事件
+        
         for (const auto& event : context.frameEvents.GetView())
         {
-            // 文本输入事件
+            
             if (event.type == SDL_EVENT_TEXT_INPUT)
             {
                 std::string inputTextStr = event.text.text;
@@ -210,7 +210,7 @@ namespace Systems
                     textChanged = true;
                 }
             }
-            // 键盘按键事件
+            
             else if (event.type == SDL_EVENT_KEY_DOWN)
             {
                 switch (event.key.key)
@@ -218,7 +218,7 @@ namespace Systems
                 case SDLK_BACKSPACE:
                     if (inputText.cursorPosition > 0)
                     {
-                        // 获取前一个UTF-8字符的起始位置
+                        
                         size_t prevPos = GetPreviousUtf8CharPosition(inputText.inputBuffer, inputText.cursorPosition);
                         size_t deleteLength = inputText.cursorPosition - prevPos;
 
@@ -231,7 +231,7 @@ namespace Systems
                 case SDLK_DELETE:
                     if (inputText.cursorPosition < inputText.inputBuffer.length())
                     {
-                        // 获取当前UTF-8字符的字节长度
+                        
                         size_t deleteLength = GetUtf8CharByteLength(&inputText.inputBuffer[inputText.cursorPosition]);
                         inputText.inputBuffer.erase(inputText.cursorPosition, deleteLength);
                         textChanged = true;
@@ -241,7 +241,7 @@ namespace Systems
                 case SDLK_LEFT:
                     if (inputText.cursorPosition > 0)
                     {
-                        // 向前移动一个完整的UTF-8字符
+                        
                         inputText.cursorPosition = GetPreviousUtf8CharPosition(
                             inputText.inputBuffer, inputText.cursorPosition);
                         cursorMoved = true;
@@ -251,7 +251,7 @@ namespace Systems
                 case SDLK_RIGHT:
                     if (inputText.cursorPosition < inputText.inputBuffer.length())
                     {
-                        // 向后移动一个完整的UTF-8字符
+                        
                         inputText.cursorPosition = GetNextUtf8CharPosition(
                             inputText.inputBuffer, inputText.cursorPosition);
                         cursorMoved = true;
@@ -276,15 +276,15 @@ namespace Systems
 
                 case SDLK_RETURN:
                 case SDLK_KP_ENTER:
-                    // 提交输入并失去焦点
-                    // 注意：这里会导致focusedEntity变为null，所以函数返回后不应再访问
+                    
+                    
                     InvokeSubmitEvent(scene, inputText.onSubmitTargets, inputText.inputBuffer);
                     OnFocusLost(scene, entity, context);
                     return;
 
                 case SDLK_ESCAPE:
-                    // 取消输入，恢复原文本并失去焦点
-                    // 注意：这里会导致focusedEntity变为null，所以函数返回后不应再访问
+                    
+                    
                     inputText.inputBuffer = inputText.text.text;
                     OnFocusLost(scene, entity, context);
                     return;
@@ -295,7 +295,7 @@ namespace Systems
             }
         }
 
-        // 重置光标闪烁计时器
+        
         if (textChanged || cursorMoved)
         {
             inputText.isCursorVisible = true;

@@ -111,9 +111,11 @@ bool InspectorUI::DrawAssetHandle(const std::string& label, AssetHandle& handle,
     bool valueChanged = false;
     ImGui::PushID(label.c_str());
 
+    
     ImGui::Text("%s", label.c_str());
     ImGui::SameLine();
 
+    
     std::string displayName = "[None]";
     if (handle.Valid())
     {
@@ -121,7 +123,41 @@ bool InspectorUI::DrawAssetHandle(const std::string& label, AssetHandle& handle,
         if (displayName.empty()) displayName = "[Missing Asset]";
     }
 
-    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+    
+    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+    ImVec2 availableSize = ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeightWithSpacing());
+
+    
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    
+    ImVec2 rectMin = cursorPos;
+    ImVec2 rectMax = ImVec2(cursorPos.x + availableSize.x, cursorPos.y + availableSize.y);
+
+    
+    bool isHovered = ImGui::IsMouseHoveringRect(rectMin, rectMax);
+
+    
+    ImU32 bgColor = isHovered
+                        ? IM_COL32(76, 76, 89, 255)
+                        : 
+                        IM_COL32(51, 51, 64, 255); 
+
+    
+    drawList->AddRectFilled(rectMin, rectMax, bgColor, 3.0f); 
+
+    
+    drawList->AddRect(rectMin, rectMax, IM_COL32(80, 80, 90, 255), 3.0f, 0, 1.0f);
+
+    
+    ImGui::InvisibleButton("##AssetHandleButton", availableSize);
+
+    
+    ImVec2 textPos = ImVec2(cursorPos.x + 5.0f, cursorPos.y + (availableSize.y - ImGui::GetTextLineHeight()) * 0.5f);
+    drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), displayName.c_str());
+
+    
+    if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
     {
         s_assetPickerTarget = &handle;
         s_assetPickerFilterType = handle.assetType;
@@ -129,14 +165,13 @@ bool InspectorUI::DrawAssetHandle(const std::string& label, AssetHandle& handle,
         PopupManager::GetInstance().Open("SelectAssetPopup");
     }
 
-    if (ImGui::Button(displayName.c_str(), ImVec2(-1.0f, 0.0f)))
+    
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && handle.Valid() && callbacks.onFocusInAssetBrowser)
     {
-        if (handle.Valid() && callbacks.onFocusInAssetBrowser)
-        {
-            callbacks.onFocusInAssetBrowser.Invoke(handle.assetGuid);
-        }
+        callbacks.onFocusInAssetBrowser.Invoke(handle.assetGuid);
     }
 
+    
     if (ImGui::BeginDragDropTarget())
     {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DRAG_DROP_ASSET_HANDLE"))
