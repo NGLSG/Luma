@@ -270,6 +270,31 @@ static bool isPointInButton(const ECS::Vector2f& worldPoint, const ECS::Transfor
         localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
 }
 
+
+static bool isPointInUIRect(const ECS::Vector2f& worldPoint,
+                            const ECS::TransformComponent& transform,
+                            float width, float height)
+{
+    const float halfWidth = width * 0.5f;
+    const float halfHeight = height * 0.5f;
+    if (halfWidth <= 0 || halfHeight <= 0) return false;
+
+    ECS::Vector2f localPoint = worldPoint - transform.position;
+    if (transform.rotation != 0.0f)
+    {
+        const float sinR = sinf(-transform.rotation);
+        const float cosR = cosf(-transform.rotation);
+        float tempX = localPoint.x;
+        localPoint.x = localPoint.x * cosR - localPoint.y * sinR;
+        localPoint.y = tempX * sinR + localPoint.y * cosR;
+    }
+    if (std::abs(transform.scale.x) > 1e-5f) localPoint.x /= transform.scale.x;
+    if (std::abs(transform.scale.y) > 1e-5f) localPoint.y /= transform.scale.y;
+
+    return (localPoint.x >= -halfWidth && localPoint.x <= halfWidth &&
+            localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
+}
+
 entt::entity SceneViewPanel::findEntityByTransform(const ECS::TransformComponent& targetTransform)
 {
     auto& registry = m_context->activeScene->GetRegistry();
@@ -451,6 +476,7 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     m_colliderHandles.clear();
+    m_uiRectHandles.clear();
     auto& registry = m_context->activeScene->GetRegistry();
 
 
@@ -535,6 +561,69 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
                                           outlineThickness);
             hasVisualRepresentation = true;
         }
+        else if (gameObject.HasComponent<ECS::ListBoxComponent>())
+        {
+            const auto& listBox = gameObject.GetComponent<ECS::ListBoxComponent>();
+            drawUIRectOutline(drawList, transform, listBox.rect, outlineColor, fillColor, outlineThickness);
+            drawUIRectEditHandle(drawList, transform, listBox.rect, m_uiRectHandles);
+            hasVisualRepresentation = true;
+        }
+        else if (gameObject.HasComponent<ECS::ToggleButtonComponent>())
+        {
+            const auto& comp = gameObject.GetComponent<ECS::ToggleButtonComponent>();
+            drawUIRectOutline(drawList, transform, comp.rect, outlineColor, fillColor, outlineThickness);
+            drawUIRectEditHandle(drawList, transform, comp.rect, m_uiRectHandles);
+            hasVisualRepresentation = true;
+        }
+        else if (gameObject.HasComponent<ECS::RadioButtonComponent>())
+        {
+            const auto& comp = gameObject.GetComponent<ECS::RadioButtonComponent>();
+            drawUIRectOutline(drawList, transform, comp.rect, outlineColor, fillColor, outlineThickness);
+            drawUIRectEditHandle(drawList, transform, comp.rect, m_uiRectHandles);
+            hasVisualRepresentation = true;
+        }
+        else if (gameObject.HasComponent<ECS::CheckBoxComponent>())
+        {
+            const auto& comp = gameObject.GetComponent<ECS::CheckBoxComponent>();
+            drawUIRectOutline(drawList, transform, comp.rect, outlineColor, fillColor, outlineThickness);
+            drawUIRectEditHandle(drawList, transform, comp.rect, m_uiRectHandles);
+            hasVisualRepresentation = true;
+        }
+        else if (gameObject.HasComponent<ECS::SliderComponent>())
+        {
+            const auto& comp = gameObject.GetComponent<ECS::SliderComponent>();
+            drawUIRectOutline(drawList, transform, comp.rect, outlineColor, fillColor, outlineThickness);
+            drawUIRectEditHandle(drawList, transform, comp.rect, m_uiRectHandles);
+            hasVisualRepresentation = true;
+        }
+        else if (gameObject.HasComponent<ECS::ComboBoxComponent>())
+        {
+            const auto& comp = gameObject.GetComponent<ECS::ComboBoxComponent>();
+            drawUIRectOutline(drawList, transform, comp.rect, outlineColor, fillColor, outlineThickness);
+            drawUIRectEditHandle(drawList, transform, comp.rect, m_uiRectHandles);
+            hasVisualRepresentation = true;
+        }
+        else if (gameObject.HasComponent<ECS::ExpanderComponent>())
+        {
+            const auto& comp = gameObject.GetComponent<ECS::ExpanderComponent>();
+            drawUIRectOutline(drawList, transform, comp.rect, outlineColor, fillColor, outlineThickness);
+            drawUIRectEditHandle(drawList, transform, comp.rect, m_uiRectHandles);
+            hasVisualRepresentation = true;
+        }
+        else if (gameObject.HasComponent<ECS::ProgressBarComponent>())
+        {
+            const auto& comp = gameObject.GetComponent<ECS::ProgressBarComponent>();
+            drawUIRectOutline(drawList, transform, comp.rect, outlineColor, fillColor, outlineThickness);
+            drawUIRectEditHandle(drawList, transform, comp.rect, m_uiRectHandles);
+            hasVisualRepresentation = true;
+        }
+        else if (gameObject.HasComponent<ECS::TabControlComponent>())
+        {
+            const auto& comp = gameObject.GetComponent<ECS::TabControlComponent>();
+            drawUIRectOutline(drawList, transform, comp.rect, outlineColor, fillColor, outlineThickness);
+            drawUIRectEditHandle(drawList, transform, comp.rect, m_uiRectHandles);
+            hasVisualRepresentation = true;
+        }
 
 
         if (!hasVisualRepresentation)
@@ -549,6 +638,46 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
 
 
         drawColliderEditHandles(drawList, gameObject, transform);
+    }
+}
+
+void SceneViewPanel::drawUIRectOutline(ImDrawList* drawList, const ECS::TransformComponent& transform, const ECS::RectF& rect,
+                                       ImU32 outlineColor, ImU32 fillColor, float thickness)
+{
+    const float halfW = rect.z * 0.5f;
+    const float halfH = rect.w * 0.5f;
+    std::vector<ECS::Vector2f> local = {{-halfW, -halfH}, {halfW, -halfH}, {halfW, halfH}, {-halfW, halfH}};
+    const float sinR = sinf(transform.rotation); const float cosR = cosf(transform.rotation);
+    std::vector<ImVec2> screen; screen.reserve(4);
+    for (auto p : local)
+    {
+        p.x *= transform.scale.x; p.y *= transform.scale.y;
+        if (std::abs(transform.rotation) > 0.001f) { float tx = p.x; p.x = p.x * cosR - p.y * sinR; p.y = tx * sinR + p.y * cosR; }
+        const ECS::Vector2f wp = transform.position + p; screen.push_back(worldToScreenWith(m_editorCameraProperties, wp));
+    }
+    drawList->AddConvexPolyFilled(screen.data(), 4, fillColor);
+    drawList->AddPolyline(screen.data(), 4, outlineColor, ImDrawFlags_Closed, thickness);
+}
+
+void SceneViewPanel::drawUIRectEditHandle(ImDrawList* drawList, const ECS::TransformComponent& transform, const ECS::RectF& rect,
+                                          std::vector<UIRectHandle>& outHandles)
+{
+    ECS::Vector2f brLocal = {rect.z * 0.5f * transform.scale.x, rect.w * 0.5f * transform.scale.y};
+    if (std::abs(transform.rotation) > 0.001f)
+    {
+        const float sinR = sinf(transform.rotation), cosR = cosf(transform.rotation);
+        float tx = brLocal.x; brLocal.x = brLocal.x * cosR - brLocal.y * sinR; brLocal.y = tx * sinR + brLocal.y * cosR;
+    }
+    const ECS::Vector2f brWorld = transform.position + brLocal;
+    const ImVec2 brScreen = worldToScreenWith(m_editorCameraProperties, brWorld);
+    const float s = 12.0f;
+    ImU32 col = IM_COL32(255,255,255,255);
+    drawList->AddTriangleFilled(brScreen, ImVec2(brScreen.x + s, brScreen.y), ImVec2(brScreen.x + s, brScreen.y + s), col);
+    entt::entity e = findEntityByTransform(transform);
+    if (e != entt::null)
+    {
+        Guid g = m_context->activeScene->FindGameObjectByEntity(e).GetGuid();
+        outHandles.push_back({g, brScreen, s});
     }
 }
 
@@ -1868,7 +1997,8 @@ void SceneViewPanel::handleNavigationAndPick(const ImVec2& viewportScreenPos, co
         {
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             {
-                if (!handleColliderHandlePicking(worldMousePos))
+                
+                if (!handleUIRectHandlePicking(worldMousePos) && !handleColliderHandlePicking(worldMousePos))
                 {
                     m_potentialDragEntity = handleObjectPicking(worldMousePos);
                     if (m_potentialDragEntity != entt::null) { m_mouseDownScreenPos = io.MousePos; }
@@ -1876,7 +2006,7 @@ void SceneViewPanel::handleNavigationAndPick(const ImVec2& viewportScreenPos, co
             }
             if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
             {
-                if (m_potentialDragEntity != entt::null && !m_isDragging && !m_isEditingCollider)
+                if (m_potentialDragEntity != entt::null && !m_isDragging && !m_isEditingCollider && !m_isEditingUIRect)
                 {
                     const float dragThresholdSq = 5.0f * 5.0f;
                     if (ImLengthSqr(io.MousePos - m_mouseDownScreenPos) > dragThresholdSq)
@@ -1888,15 +2018,17 @@ void SceneViewPanel::handleNavigationAndPick(const ImVec2& viewportScreenPos, co
                     }
                 }
                 if (m_isEditingCollider) { handleColliderHandleDragging(worldMousePos); }
+                else if (m_isEditingUIRect) { handleUIRectHandleDragging(worldMousePos); }
                 else if (m_isDragging) { handleObjectDragging(worldMousePos); }
             }
             if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
             {
-                if (m_isEditingCollider || m_isDragging)
+                if (m_isEditingCollider || m_isEditingUIRect || m_isDragging)
                 {
                     SceneManager::GetInstance().PushUndoState(m_context->activeScene);
                 }
                 m_isEditingCollider = false;
+                m_isEditingUIRect = false;
                 m_activeColliderHandle.Reset();
                 m_isDragging = false;
                 m_draggedObjects.clear();
@@ -1952,6 +2084,18 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
             {
                 candidates.emplace_back(entity, sprite.zIndex + 1000);
             }
+        }
+    }
+
+    
+    auto listView = registry.view<ECS::TransformComponent, ECS::ListBoxComponent>();
+    for (auto entity : listView)
+    {
+        const auto& transform = listView.get<ECS::TransformComponent>(entity);
+        const auto& listBox = listView.get<ECS::ListBoxComponent>(entity);
+        if (isPointInUIRect(worldMousePos, transform, listBox.rect.Width(), listBox.rect.Height()))
+        {
+            candidates.emplace_back(entity, listBox.zIndex + 1500);
         }
     }
 
@@ -2258,6 +2402,54 @@ void SceneViewPanel::handleColliderHandleDragging(const ECS::Vector2f& worldMous
     {
         boxCollider.offset.y = localOffsetScaled.y / transform.scale.y;
     }
+}
+
+bool SceneViewPanel::handleUIRectHandlePicking(const ECS::Vector2f& worldMousePos)
+{
+    const ImVec2 mousePos = ImGui::GetIO().MousePos;
+    for (auto it = m_uiRectHandles.rbegin(); it != m_uiRectHandles.rend(); ++it)
+    {
+        const float dx = mousePos.x - it->screenPosition.x;
+        const float dy = mousePos.y - it->screenPosition.y;
+        const float distSq = dx * dx + dy * dy;
+        const float rSq = it->size * it->size * 1.5f;
+        if (distSq <= rSq)
+        {
+            m_isEditingUIRect = true;
+            m_activeUIRectEntity = it->entityGuid;
+            return true;
+        }
+    }
+    return false;
+}
+
+void SceneViewPanel::handleUIRectHandleDragging(const ECS::Vector2f& worldMousePos)
+{
+    if (!m_activeUIRectEntity.Valid()) return;
+    RuntimeGameObject go = m_context->activeScene->FindGameObjectByGuid(m_activeUIRectEntity);
+    if (!go.IsValid() || !go.HasComponent<ECS::TransformComponent>()) return;
+    auto& transform = go.GetComponent<ECS::TransformComponent>();
+
+    auto applyResize = [&](auto& uiComp)
+    {
+        ECS::Vector2f delta = worldMousePos - transform.position;
+        float newW = std::max(1.0f, std::abs(delta.x) * 2.0f);
+        float newH = std::max(1.0f, std::abs(delta.y) * 2.0f);
+        uiComp.rect.z = newW;
+        uiComp.rect.w = newH;
+    };
+
+    if (go.HasComponent<ECS::ListBoxComponent>()) applyResize(go.GetComponent<ECS::ListBoxComponent>());
+    else if (go.HasComponent<ECS::ButtonComponent>()) applyResize(go.GetComponent<ECS::ButtonComponent>());
+    else if (go.HasComponent<ECS::InputTextComponent>()) applyResize(go.GetComponent<ECS::InputTextComponent>());
+    else if (go.HasComponent<ECS::ToggleButtonComponent>()) applyResize(go.GetComponent<ECS::ToggleButtonComponent>());
+    else if (go.HasComponent<ECS::RadioButtonComponent>()) applyResize(go.GetComponent<ECS::RadioButtonComponent>());
+    else if (go.HasComponent<ECS::CheckBoxComponent>()) applyResize(go.GetComponent<ECS::CheckBoxComponent>());
+    else if (go.HasComponent<ECS::SliderComponent>()) applyResize(go.GetComponent<ECS::SliderComponent>());
+    else if (go.HasComponent<ECS::ComboBoxComponent>()) applyResize(go.GetComponent<ECS::ComboBoxComponent>());
+    else if (go.HasComponent<ECS::ExpanderComponent>()) applyResize(go.GetComponent<ECS::ExpanderComponent>());
+    else if (go.HasComponent<ECS::ProgressBarComponent>()) applyResize(go.GetComponent<ECS::ProgressBarComponent>());
+    else if (go.HasComponent<ECS::TabControlComponent>()) applyResize(go.GetComponent<ECS::TabControlComponent>());
 }
 
 void SceneViewPanel::selectSingleObject(const Guid& objectGuid)

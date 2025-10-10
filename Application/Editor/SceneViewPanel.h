@@ -113,6 +113,14 @@ private:
         }
     };
 
+    // UI 矩形编辑手柄（基于 IUIComponent::rect 的尺寸编辑）
+    struct UIRectHandle
+    {
+        Guid entityGuid;
+        ImVec2 screenPosition;
+        float size;
+    };
+
     /**
      * @brief 根据变换组件查找对应的实体。
      * @param targetTransform 目标变换组件。
@@ -364,6 +372,14 @@ private:
      */
     void handleColliderHandleDragging(const ECS::Vector2f& worldMousePos);
 
+    // UI 矩形编辑：绘制与交互
+    void drawUIRectOutline(ImDrawList* drawList, const ECS::TransformComponent& transform, const ECS::RectF& rect,
+                           ImU32 outlineColor, ImU32 fillColor, float thickness);
+    void drawUIRectEditHandle(ImDrawList* drawList, const ECS::TransformComponent& transform, const ECS::RectF& rect,
+                              std::vector<UIRectHandle>& outHandles);
+    bool handleUIRectHandlePicking(const ECS::Vector2f& worldMousePos);
+    void handleUIRectHandleDragging(const ECS::Vector2f& worldMousePos);
+
 
     /**
      * @brief 选中单个对象。
@@ -411,8 +427,11 @@ private:
 
     bool m_isDragging; ///< 标记当前是否正在拖拽对象。
     bool m_isEditingCollider; ///< 标记当前是否正在编辑碰撞体。
+    bool m_isEditingUIRect = false; ///< 标记当前是否正在编辑 UI 矩形。
     ActiveColliderHandle m_activeColliderHandle; ///< 当前激活的碰撞体编辑手柄。
     std::vector<DraggedObject> m_draggedObjects; ///< 存储被拖拽对象的列表。
+    std::vector<UIRectHandle> m_uiRectHandles; ///< UI 矩形的编辑手柄集合（底角手柄）。
+    Guid m_activeUIRectEntity; ///< 当前激活的 UI 矩形所在实体。
 
     entt::entity m_potentialDragEntity = entt::null; ///< 潜在的拖拽实体。
     ImVec2 m_mouseDownScreenPos; ///< 鼠标按下时的屏幕位置。

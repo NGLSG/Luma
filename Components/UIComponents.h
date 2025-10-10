@@ -109,6 +109,7 @@ namespace ECS
         bool isCursorVisible = false; ///< 光标当前是否可见。
         sk_sp<RuntimeTexture> backgroundImageTexture;
     };
+
     /**
      * @brief 切换按钮组件，支持双态交互并提供可定制的视觉反馈。
      */
@@ -387,8 +388,9 @@ namespace ECS
         float roundness = 4.0f;
         ListBoxLayout layout = ListBoxLayout::Vertical;
         Vector2f itemSpacing = {4.0f, 4.0f};
-        int maxItemsPerRow = 1;
-        int maxItemsPerColumn = 1;
+        // 0 表示自动适应（Grid 布局时按可见项数/面积估算行列）
+        int maxItemsPerRow = 0;
+        int maxItemsPerColumn = 0;
 
         // --- 外观属性 ---
         TextComponent itemTemplate = TextComponent("列表项", "ListItemTemplate");
@@ -413,9 +415,14 @@ namespace ECS
         // --- 运行时状态字段 (不应被序列化) ---
         int hoveredIndex = -1;
         int scrollOffset = 0;
+        // 运行时：滚动条拖拽状态（不序列化）
+        bool draggingVerticalScrollbar = false;
+        bool draggingHorizontalScrollbar = false;
+        float dragGrabOffset = 0.0f; // 鼠标在滑块内的抓取偏移
         sk_sp<RuntimeTexture> backgroundImageTexture;
     };
 }
+
 namespace YAML
 {
     /**
@@ -546,6 +553,7 @@ namespace YAML
             return true;
         }
     };
+
     /**
      * @brief YAML 转换器，用于序列化和反序列化 ECS::ToggleButtonComponent。
      */
@@ -586,7 +594,8 @@ namespace YAML
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
             rhs.isToggled = node["isToggled"].as<bool>(rhs.isToggled);
             rhs.allowToggleOff = node["allowToggleOff"].as<bool>(rhs.allowToggleOff);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(rhs.backgroundImage);
+            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                rhs.backgroundImage);
             rhs.roundness = node["roundness"].as<float>(rhs.roundness);
             rhs.normalColor = node["normalColor"].as<ECS::Color>(rhs.normalColor);
             rhs.hoverColor = node["hoverColor"].as<ECS::Color>(rhs.hoverColor);
@@ -595,8 +604,10 @@ namespace YAML
             rhs.toggledHoverColor = node["toggledHoverColor"].as<ECS::Color>(rhs.toggledHoverColor);
             rhs.toggledPressedColor = node["toggledPressedColor"].as<ECS::Color>(rhs.toggledPressedColor);
             rhs.disabledColor = node["disabledColor"].as<ECS::Color>(rhs.disabledColor);
-            rhs.onToggleOnTargets = node["onToggleOnTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onToggleOnTargets);
-            rhs.onToggleOffTargets = node["onToggleOffTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onToggleOffTargets);
+            rhs.onToggleOnTargets = node["onToggleOnTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onToggleOnTargets);
+            rhs.onToggleOffTargets = node["onToggleOffTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onToggleOffTargets);
             return true;
         }
     };
@@ -642,7 +653,8 @@ namespace YAML
             rhs.groupId = node["groupId"].as<std::string>(rhs.groupId);
             rhs.isSelected = node["isSelected"].as<bool>(rhs.isSelected);
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(rhs.backgroundImage);
+            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                rhs.backgroundImage);
             if (node["selectionImage"]) rhs.selectionImage = node["selectionImage"].as<AssetHandle>(rhs.selectionImage);
             rhs.roundness = node["roundness"].as<float>(rhs.roundness);
             rhs.normalColor = node["normalColor"].as<ECS::Color>(rhs.normalColor);
@@ -650,8 +662,10 @@ namespace YAML
             rhs.selectedColor = node["selectedColor"].as<ECS::Color>(rhs.selectedColor);
             rhs.disabledColor = node["disabledColor"].as<ECS::Color>(rhs.disabledColor);
             rhs.indicatorColor = node["indicatorColor"].as<ECS::Color>(rhs.indicatorColor);
-            rhs.onSelectedTargets = node["onSelectedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onSelectedTargets);
-            rhs.onDeselectedTargets = node["onDeselectedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onDeselectedTargets);
+            rhs.onSelectedTargets = node["onSelectedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onSelectedTargets);
+            rhs.onDeselectedTargets = node["onDeselectedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onDeselectedTargets);
             return true;
         }
     };
@@ -699,7 +713,8 @@ namespace YAML
             rhs.allowIndeterminate = node["allowIndeterminate"].as<bool>(rhs.allowIndeterminate);
             rhs.isIndeterminate = node["isIndeterminate"].as<bool>(rhs.isIndeterminate);
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(rhs.backgroundImage);
+            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                rhs.backgroundImage);
             if (node["checkmarkImage"]) rhs.checkmarkImage = node["checkmarkImage"].as<AssetHandle>(rhs.checkmarkImage);
             rhs.roundness = node["roundness"].as<float>(rhs.roundness);
             rhs.normalColor = node["normalColor"].as<ECS::Color>(rhs.normalColor);
@@ -708,7 +723,8 @@ namespace YAML
             rhs.indeterminateColor = node["indeterminateColor"].as<ECS::Color>(rhs.indeterminateColor);
             rhs.disabledColor = node["disabledColor"].as<ECS::Color>(rhs.disabledColor);
             rhs.checkmarkColor = node["checkmarkColor"].as<ECS::Color>(rhs.checkmarkColor);
-            rhs.onValueChangedTargets = node["onValueChangedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onValueChangedTargets);
+            rhs.onValueChangedTargets = node["onValueChangedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onValueChangedTargets);
             return true;
         }
     };
@@ -765,9 +781,12 @@ namespace YAML
             rhs.fillColor = node["fillColor"].as<ECS::Color>(rhs.fillColor);
             rhs.thumbColor = node["thumbColor"].as<ECS::Color>(rhs.thumbColor);
             rhs.disabledColor = node["disabledColor"].as<ECS::Color>(rhs.disabledColor);
-            rhs.onValueChangedTargets = node["onValueChangedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onValueChangedTargets);
-            rhs.onDragStartedTargets = node["onDragStartedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onDragStartedTargets);
-            rhs.onDragEndedTargets = node["onDragEndedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onDragEndedTargets);
+            rhs.onValueChangedTargets = node["onValueChangedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onValueChangedTargets);
+            rhs.onDragStartedTargets = node["onDragStartedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onDragStartedTargets);
+            rhs.onDragEndedTargets = node["onDragEndedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onDragEndedTargets);
             return true;
         }
     };
@@ -814,7 +833,8 @@ namespace YAML
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
             rhs.allowCustomInput = node["allowCustomInput"].as<bool>(rhs.allowCustomInput);
             rhs.displayText = node["displayText"].as<ECS::TextComponent>(rhs.displayText);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(rhs.backgroundImage);
+            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                rhs.backgroundImage);
             if (node["dropdownIcon"]) rhs.dropdownIcon = node["dropdownIcon"].as<AssetHandle>(rhs.dropdownIcon);
             rhs.roundness = node["roundness"].as<float>(rhs.roundness);
             rhs.normalColor = node["normalColor"].as<ECS::Color>(rhs.normalColor);
@@ -822,7 +842,8 @@ namespace YAML
             rhs.pressedColor = node["pressedColor"].as<ECS::Color>(rhs.pressedColor);
             rhs.disabledColor = node["disabledColor"].as<ECS::Color>(rhs.disabledColor);
             rhs.dropdownBackgroundColor = node["dropdownBackgroundColor"].as<ECS::Color>(rhs.dropdownBackgroundColor);
-            rhs.onSelectionChangedTargets = node["onSelectionChangedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onSelectionChangedTargets);
+            rhs.onSelectionChangedTargets = node["onSelectionChangedTargets"].as<std::vector<
+                ECS::SerializableEventTarget>>(rhs.onSelectionChangedTargets);
             return true;
         }
     };
@@ -865,13 +886,16 @@ namespace YAML
             rhs.isExpanded = node["isExpanded"].as<bool>(rhs.isExpanded);
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
             rhs.roundness = node["roundness"].as<float>(rhs.roundness);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(rhs.backgroundImage);
+            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                rhs.backgroundImage);
             rhs.headerColor = node["headerColor"].as<ECS::Color>(rhs.headerColor);
             rhs.expandedColor = node["expandedColor"].as<ECS::Color>(rhs.expandedColor);
             rhs.collapsedColor = node["collapsedColor"].as<ECS::Color>(rhs.collapsedColor);
             rhs.disabledColor = node["disabledColor"].as<ECS::Color>(rhs.disabledColor);
-            rhs.onExpandedTargets = node["onExpandedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onExpandedTargets);
-            rhs.onCollapsedTargets = node["onCollapsedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onCollapsedTargets);
+            rhs.onExpandedTargets = node["onExpandedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onExpandedTargets);
+            rhs.onCollapsedTargets = node["onCollapsedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onCollapsedTargets);
             return true;
         }
     };
@@ -918,13 +942,16 @@ namespace YAML
             rhs.showPercentage = node["showPercentage"].as<bool>(rhs.showPercentage);
             rhs.isIndeterminate = node["isIndeterminate"].as<bool>(rhs.isIndeterminate);
             rhs.indeterminateSpeed = node["indeterminateSpeed"].as<float>(rhs.indeterminateSpeed);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(rhs.backgroundImage);
+            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                rhs.backgroundImage);
             if (node["fillImage"]) rhs.fillImage = node["fillImage"].as<AssetHandle>(rhs.fillImage);
             rhs.backgroundColor = node["backgroundColor"].as<ECS::Color>(rhs.backgroundColor);
             rhs.fillColor = node["fillColor"].as<ECS::Color>(rhs.fillColor);
             rhs.borderColor = node["borderColor"].as<ECS::Color>(rhs.borderColor);
-            rhs.onValueChangedTargets = node["onValueChangedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onValueChangedTargets);
-            rhs.onCompletedTargets = node["onCompletedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onCompletedTargets);
+            rhs.onValueChangedTargets = node["onValueChangedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onValueChangedTargets);
+            rhs.onCompletedTargets = node["onCompletedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onCompletedTargets);
             return true;
         }
     };
@@ -1000,8 +1027,10 @@ namespace YAML
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
             rhs.allowReorder = node["allowReorder"].as<bool>(rhs.allowReorder);
             rhs.allowCloseTabs = node["allowCloseTabs"].as<bool>(rhs.allowCloseTabs);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(rhs.backgroundImage);
-            if (node["tabBackgroundImage"]) rhs.tabBackgroundImage = node["tabBackgroundImage"].as<AssetHandle>(rhs.tabBackgroundImage);
+            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                rhs.backgroundImage);
+            if (node["tabBackgroundImage"]) rhs.tabBackgroundImage = node["tabBackgroundImage"].as<AssetHandle>(
+                rhs.tabBackgroundImage);
             rhs.tabHeight = node["tabHeight"].as<float>(rhs.tabHeight);
             rhs.tabSpacing = node["tabSpacing"].as<float>(rhs.tabSpacing);
             rhs.backgroundColor = node["backgroundColor"].as<ECS::Color>(rhs.backgroundColor);
@@ -1009,8 +1038,10 @@ namespace YAML
             rhs.activeTabColor = node["activeTabColor"].as<ECS::Color>(rhs.activeTabColor);
             rhs.hoverTabColor = node["hoverTabColor"].as<ECS::Color>(rhs.hoverTabColor);
             rhs.disabledTabColor = node["disabledTabColor"].as<ECS::Color>(rhs.disabledTabColor);
-            rhs.onTabChangedTargets = node["onTabChangedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onTabChangedTargets);
-            rhs.onTabClosedTargets = node["onTabClosedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onTabClosedTargets);
+            rhs.onTabChangedTargets = node["onTabChangedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onTabChangedTargets);
+            rhs.onTabClosedTargets = node["onTabClosedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onTabClosedTargets);
             return true;
         }
     };
@@ -1081,7 +1112,8 @@ namespace YAML
             rhs.maxItemsPerRow = node["maxItemsPerRow"].as<int>(rhs.maxItemsPerRow);
             rhs.maxItemsPerColumn = node["maxItemsPerColumn"].as<int>(rhs.maxItemsPerColumn);
             rhs.itemTemplate = node["itemTemplate"].as<ECS::TextComponent>(rhs.itemTemplate);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(rhs.backgroundImage);
+            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                rhs.backgroundImage);
             rhs.backgroundColor = node["backgroundColor"].as<ECS::Color>(rhs.backgroundColor);
             rhs.itemColor = node["itemColor"].as<ECS::Color>(rhs.itemColor);
             rhs.hoverColor = node["hoverColor"].as<ECS::Color>(rhs.hoverColor);
@@ -1090,13 +1122,36 @@ namespace YAML
             rhs.enableVerticalScrollbar = node["enableVerticalScrollbar"].as<bool>(rhs.enableVerticalScrollbar);
             rhs.verticalScrollbarAutoHide = node["verticalScrollbarAutoHide"].as<bool>(rhs.verticalScrollbarAutoHide);
             rhs.enableHorizontalScrollbar = node["enableHorizontalScrollbar"].as<bool>(rhs.enableHorizontalScrollbar);
-            rhs.horizontalScrollbarAutoHide = node["horizontalScrollbarAutoHide"].as<bool>(rhs.horizontalScrollbarAutoHide);
+            rhs.horizontalScrollbarAutoHide = node["horizontalScrollbarAutoHide"].as<bool>(
+                rhs.horizontalScrollbarAutoHide);
             rhs.scrollbarThickness = node["scrollbarThickness"].as<float>(rhs.scrollbarThickness);
             rhs.scrollbarTrackColor = node["scrollbarTrackColor"].as<ECS::Color>(rhs.scrollbarTrackColor);
             rhs.scrollbarThumbColor = node["scrollbarThumbColor"].as<ECS::Color>(rhs.scrollbarThumbColor);
-            rhs.onSelectionChangedTargets = node["onSelectionChangedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onSelectionChangedTargets);
-            rhs.onItemActivatedTargets = node["onItemActivatedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onItemActivatedTargets);
+            rhs.onSelectionChangedTargets = node["onSelectionChangedTargets"].as<std::vector<
+                ECS::SerializableEventTarget>>(rhs.onSelectionChangedTargets);
+            rhs.onItemActivatedTargets = node["onItemActivatedTargets"].as<std::vector<ECS::SerializableEventTarget>>(
+                rhs.onItemActivatedTargets);
             return true;
+        }
+    };
+}
+
+namespace CustomDrawing
+{
+    template <>
+    struct WidgetDrawer<ECS::ListBoxLayout>
+    {
+        static bool Draw(const std::string& label, ECS::ListBoxLayout& value, const UIDrawData& callbacks)
+        {
+            const char* items[] = {"Vertical", "Horizontal", "Grid"};
+            int current = static_cast<int>(value);
+            if (ImGui::Combo(label.c_str(), &current, items, IM_ARRAYSIZE(items)))
+            {
+                value = static_cast<ECS::ListBoxLayout>(current);
+                if (callbacks.onValueChanged) callbacks.onValueChanged();
+                return true;
+            }
+            return false;
         }
     };
 }

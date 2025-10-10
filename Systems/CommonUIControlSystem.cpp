@@ -224,7 +224,7 @@ namespace Systems
             }
         }
 
-        
+
         {
             auto view = registry.view<ECS::ToggleButtonComponent>();
             for (auto entity : view)
@@ -264,7 +264,7 @@ namespace Systems
             }
         }
 
-        
+
         {
             auto view = registry.view<ECS::RadioButtonComponent>();
             for (auto entity : view)
@@ -317,7 +317,7 @@ namespace Systems
             }
         }
 
-        
+
         {
             auto view = registry.view<ECS::CheckBoxComponent>();
             for (auto entity : view)
@@ -373,7 +373,7 @@ namespace Systems
             }
         }
 
-        
+
         {
             auto view = registry.view<ECS::TransformComponent, ECS::SliderComponent>();
             const bool leftMouseDown = context.inputState.isLeftMouseDown;
@@ -506,7 +506,7 @@ namespace Systems
             }
         }
 
-        
+
         {
             auto view = registry.view<ECS::TransformComponent, ECS::ComboBoxComponent>();
             for (auto entity : view)
@@ -641,7 +641,7 @@ namespace Systems
             }
         }
 
-        
+
         {
             auto view = registry.view<ECS::ExpanderComponent>();
             for (auto entity : view)
@@ -673,7 +673,7 @@ namespace Systems
             }
         }
 
-        
+
         {
             auto view = registry.view<ECS::ProgressBarComponent>();
             for (auto entity : view)
@@ -729,7 +729,7 @@ namespace Systems
             }
         }
 
-        
+
         {
             auto view = registry.view<ECS::TransformComponent, ECS::TabControlComponent>();
             for (auto entity : view)
@@ -823,7 +823,7 @@ namespace Systems
             }
         }
 
-        
+
         {
             auto view = registry.view<ECS::TransformComponent, ECS::ListBoxComponent>();
             for (auto entity : view)
@@ -897,8 +897,23 @@ namespace Systems
                     rows = clampPositive(listBox.maxItemsPerColumn, 1);
                     if (listBox.visibleItemCount > 0)
                     {
-                        itemsPerPage = std::min(itemCount, std::min(visibleCandidate, columns * rows));
-                        rows = std::max(1, static_cast<int>(std::ceil(static_cast<float>(std::max(1, itemsPerPage)) / static_cast<float>(columns))));
+                        int target = std::min(visibleCandidate, std::max(1, itemCount));
+                        if (listBox.maxItemsPerRow <= 0 && listBox.maxItemsPerColumn <= 0)
+                        {
+                            columns = std::max(1, static_cast<int>(std::ceil(std::sqrt(static_cast<float>(target)))));
+                            rows = std::max(1, static_cast<int>(std::ceil(static_cast<float>(target) / static_cast<float>(columns))));
+                        }
+                        else if (listBox.maxItemsPerRow <= 0)
+                        {
+                            rows = clampPositive(listBox.maxItemsPerColumn, 1);
+                            columns = std::max(1, static_cast<int>(std::ceil(static_cast<float>(target) / static_cast<float>(rows))));
+                        }
+                        else if (listBox.maxItemsPerColumn <= 0)
+                        {
+                            columns = std::max(1, std::min(listBox.maxItemsPerRow, target));
+                            rows = std::max(1, static_cast<int>(std::ceil(static_cast<float>(target) / static_cast<float>(columns))));
+                        }
+                        itemsPerPage = std::min(itemCount, columns * rows);
                     }
                     else
                     {
@@ -917,6 +932,45 @@ namespace Systems
                         itemsPerPage = itemCount;
                     }
                     break;
+                }
+                
+                if (listBox.visibleItemCount <= 0)
+                {
+                    const float spacingX = std::max(0.0f, listBox.itemSpacing.x);
+                    const float spacingY = std::max(0.0f, listBox.itemSpacing.y);
+                    const float approxLineHeight = listBox.itemTemplate.fontSize > 0.0f
+                        ? (listBox.itemTemplate.fontSize * 1.4f)
+                        : 20.0f;
+                    const float containerWidth = listBox.rect.Width();
+                    const float containerHeight = listBox.rect.Height();
+
+                    switch (listBox.layout)
+                    {
+                    case ListBoxLayout::Horizontal:
+                    {
+                        int maxTextLen = 1;
+                        for (const auto& s : listBox.items)
+                            maxTextLen = std::max<int>(maxTextLen, static_cast<int>(s.size()));
+                        const float estCharWidth = std::max(1.0f, listBox.itemTemplate.fontSize * 0.6f);
+                        const float paddingX = 8.0f;
+                        const float estItemWidth = paddingX * 2.0f + estCharWidth * static_cast<float>(maxTextLen);
+
+                        rows = clampPositive(listBox.maxItemsPerColumn, 1);
+                        columns = std::max(1, static_cast<int>(std::floor((containerWidth + spacingX) / (estItemWidth + spacingX))));
+                        itemsPerPage = std::min(itemCount, rows * columns);
+                        break;
+                    }
+                    case ListBoxLayout::Grid:
+                    case ListBoxLayout::Vertical:
+                    default:
+                    {
+                        columns = clampPositive(listBox.maxItemsPerRow, 1);
+                        const float cellH = approxLineHeight;
+                        rows = std::max(1, static_cast<int>(std::floor((containerHeight + spacingY) / (cellH + spacingY))));
+                        itemsPerPage = std::min(itemCount, rows * columns);
+                        break;
+                    }
+                    }
                 }
                 if (itemCount == 0)
                 {
@@ -967,6 +1021,107 @@ namespace Systems
                 const float contentTopWorld = transform.position.y - availableHeight * 0.5f;
                 const int maxScroll = std::max(0, itemCount - itemsPerPage);
                 listBox.scrollOffset = std::clamp(listBox.scrollOffset, 0, maxScroll);
+
+                
+                if (isRuntime && (showVertical || showHorizontal) && maxScroll > 0)
+                {
+                    const bool mouseDown = context.inputState.isLeftMouseDown;
+                    
+                    if (showVertical)
+                    {
+                        const float trackLeft = contentLeftWorld + availableWidth + trackSpacing;
+                        const float trackTop = contentTopWorld;
+                        const float trackWidth = trackThickness;
+                        const float trackHeight = availableHeight;
+
+                        const float ratio = static_cast<float>(itemsPerPage) / static_cast<float>(itemCount);
+                        const float thumbHeight = std::max(trackHeight * std::clamp(ratio, 0.0f, 1.0f), trackThickness);
+                        const float scrollRange = std::max(1, itemCount - itemsPerPage);
+                        float thumbOffset = 0.0f;
+                        if (scrollRange > 0)
+                        {
+                            const float offsetRatio = static_cast<float>(std::clamp((float)listBox.scrollOffset, 0.f, scrollRange)) / static_cast<float>(scrollRange);
+                            thumbOffset = (trackHeight - thumbHeight) * std::clamp(offsetRatio, 0.0f, 1.0f);
+                        }
+                        const float thumbTop = trackTop + thumbOffset;
+
+                        const bool insideTrack = (worldMousePos.x >= trackLeft && worldMousePos.x <= trackLeft + trackWidth &&
+                                                  worldMousePos.y >= trackTop && worldMousePos.y <= trackTop + trackHeight);
+                        const bool insideThumb = (worldMousePos.x >= trackLeft && worldMousePos.x <= trackLeft + trackWidth &&
+                                                  worldMousePos.y >= thumbTop && worldMousePos.y <= thumbTop + thumbHeight);
+
+                        if (registry.all_of<PointerDownEvent>(entity) && insideTrack)
+                        {
+                            listBox.draggingVerticalScrollbar = true;
+                            listBox.dragGrabOffset = insideThumb ? (worldMousePos.y - thumbTop) : (thumbHeight * 0.5f);
+                        }
+                        if (listBox.draggingVerticalScrollbar)
+                        {
+                            if (mouseDown)
+                            {
+                                float newThumbTop = std::clamp(worldMousePos.y - listBox.dragGrabOffset, trackTop, trackTop + trackHeight - thumbHeight);
+                                float newOffsetRatio = (trackHeight - thumbHeight) > 0.0f
+                                    ? (newThumbTop - trackTop) / (trackHeight - thumbHeight)
+                                    : 0.0f;
+                                int newScroll = static_cast<int>(std::round(newOffsetRatio * static_cast<float>(scrollRange)));
+                                listBox.scrollOffset = std::clamp(newScroll, 0, maxScroll);
+                            }
+                            else
+                            {
+                                listBox.draggingVerticalScrollbar = false;
+                                listBox.dragGrabOffset = 0.0f;
+                            }
+                        }
+                    }
+
+                    
+                    if (showHorizontal)
+                    {
+                        const float trackLeft = contentLeftWorld;
+                        const float trackTop = contentTopWorld + availableHeight + trackSpacing;
+                        const float trackWidth = availableWidth;
+                        const float trackHeight = trackThickness;
+
+                        const float ratio = static_cast<float>(itemsPerPage) / static_cast<float>(itemCount);
+                        float thumbWidth = std::max(trackWidth * std::clamp(ratio, 0.0f, 1.0f), trackThickness);
+                        const float scrollRange = std::max(1, itemCount - itemsPerPage);
+                        float thumbOffset = 0.0f;
+                        if (scrollRange > 0)
+                        {
+                            const float offsetRatio = static_cast<float>(std::clamp((float)listBox.scrollOffset, 0.f, scrollRange)) / static_cast<float>(scrollRange);
+                            thumbOffset = (trackWidth - thumbWidth) * std::clamp(offsetRatio, 0.0f, 1.0f);
+                        }
+                        const float thumbLeft = trackLeft + thumbOffset;
+
+                        const bool insideTrack = (worldMousePos.x >= trackLeft && worldMousePos.x <= trackLeft + trackWidth &&
+                                                  worldMousePos.y >= trackTop && worldMousePos.y <= trackTop + trackHeight);
+                        const bool insideThumb = (worldMousePos.x >= thumbLeft && worldMousePos.x <= thumbLeft + thumbWidth &&
+                                                  worldMousePos.y >= trackTop && worldMousePos.y <= trackTop + trackHeight);
+
+                        if (registry.all_of<PointerDownEvent>(entity) && insideTrack)
+                        {
+                            listBox.draggingHorizontalScrollbar = true;
+                            listBox.dragGrabOffset = insideThumb ? (worldMousePos.x - thumbLeft) : (thumbWidth * 0.5f);
+                        }
+                        if (listBox.draggingHorizontalScrollbar)
+                        {
+                            if (mouseDown)
+                            {
+                                float newThumbLeft = std::clamp(worldMousePos.x - listBox.dragGrabOffset, trackLeft, trackLeft + trackWidth - thumbWidth);
+                                float newOffsetRatio = (trackWidth - thumbWidth) > 0.0f
+                                    ? (newThumbLeft - trackLeft) / (trackWidth - thumbWidth)
+                                    : 0.0f;
+                                int newScroll = static_cast<int>(std::round(newOffsetRatio * static_cast<float>(scrollRange)));
+                                listBox.scrollOffset = std::clamp(newScroll, 0, maxScroll);
+                            }
+                            else
+                            {
+                                listBox.draggingHorizontalScrollbar = false;
+                                listBox.dragGrabOffset = 0.0f;
+                            }
+                        }
+                    }
+                }
                 Vector2f localMouse = worldToLocal(transform, worldMousePos);
                 const float leftLocal = -availableWidth * 0.5f;
                 const float rightLocal = availableWidth * 0.5f;
@@ -994,7 +1149,9 @@ namespace Systems
 
                 if (useContainer)
                 {
-                    for (int i = 0; i < static_cast<int>(managedGuids.size()); ++i)
+                    
+                    const int childCount = static_cast<int>(managedGuids.size());
+                    for (int i = 0; i < childCount; ++i)
                     {
                         RuntimeGameObject childGO = scene->FindGameObjectByGuid(managedGuids[i]);
                         if (!childGO.IsValid()) continue;
@@ -1005,7 +1162,19 @@ namespace Systems
                             continue;
                         }
 
-                        int baseIndex = i - startIndex;
+                        auto& childTransform = registry.get<ECS::TransformComponent>(childEntity);
+
+                        if (i < startIndex || i >= endIndex)
+                        {
+                            
+                            
+                            childTransform.position.x = transform.position.x + 1.0e7f;
+                            childTransform.position.y = transform.position.y + 1.0e7f;
+                            continue;
+                        }
+
+                        
+                        const int baseIndex = i - startIndex;
                         int rowIndex = 0;
                         int columnIndex = 0;
                         if (listBox.layout == ListBoxLayout::Horizontal)
@@ -1019,10 +1188,9 @@ namespace Systems
                             rowIndex = floorDiv(baseIndex, columns);
                         }
 
-                        float cellCenterX = contentLeftWorld + static_cast<float>(columnIndex) * (itemWidth + spacingX) + itemWidth * 0.5f;
-                        float cellCenterY = contentTopWorld + static_cast<float>(rowIndex) * (itemHeight + spacingY) + itemHeight * 0.5f;
+                        const float cellCenterX = contentLeftWorld + static_cast<float>(columnIndex) * (itemWidth + spacingX) + itemWidth * 0.5f;
+                        const float cellCenterY = contentTopWorld + static_cast<float>(rowIndex) * (itemHeight + spacingY) + itemHeight * 0.5f;
 
-                        auto& childTransform = registry.get<ECS::TransformComponent>(childEntity);
                         childTransform.position.x = cellCenterX;
                         childTransform.position.y = cellCenterY;
                     }
