@@ -487,7 +487,15 @@ namespace Systems
                 }
             };
 
-            ensureTypeface(listBox.itemTemplate, "itemTemplate");
+            if (!listBox.itemsContainerGuid.Valid())
+            {
+                ensureTypeface(listBox.itemTemplate, "itemTemplate");
+            }
+            else
+            {
+                listBox.itemTemplate.typeface.reset();
+                listBox.itemTemplate.lastFontHandle = {};
+            }
         }
 
         if (!m_context || !m_context->graphicsBackend) return;

@@ -613,7 +613,12 @@ void InspectorPanel::drawScriptsComponentUI(RuntimeGameObject& gameObject)
 
     bool isHeaderOpen = ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
 
-    drawComponentContextMenu("ScriptsComponent", compInfo, entityHandle);
+    bool removedComponent = drawComponentContextMenu("ScriptsComponent", compInfo, entityHandle);
+    if (removedComponent || !gameObject.HasComponent<ECS::ScriptsComponent>())
+    {
+        ImGui::PopID();
+        return;
+    }
 
     if (isHeaderOpen)
     {
@@ -1102,7 +1107,12 @@ void InspectorPanel::drawComponentHeader(const std::string& componentName, const
     ImGui::SameLine();
     bool isHeaderOpen = ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
 
-    drawComponentContextMenu(componentName, compInfo, entityHandle);
+    bool removedComponent = drawComponentContextMenu(componentName, compInfo, entityHandle);
+    if (removedComponent || !compInfo->has(registry, entityHandle))
+    {
+        ImGui::PopID();
+        return;
+    }
 
     if (isHeaderOpen)
     {
@@ -1206,10 +1216,12 @@ void InspectorPanel::drawComponentHeader(const std::string& componentName, const
     ImGui::PopID();
 }
 
-void InspectorPanel::drawComponentContextMenu(const std::string& componentName, const ComponentRegistration* compInfo,
+bool InspectorPanel::drawComponentContextMenu(const std::string& componentName, const ComponentRegistration* compInfo,
                                               entt::entity entityHandle)
 {
-    if (!m_context->activeScene) return;
+    bool removed = false;
+    if (!m_context->activeScene) return removed;
+
     if (ImGui::BeginPopupContextItem())
     {
         auto& registry = m_context->activeScene->GetRegistry();
@@ -1221,6 +1233,7 @@ void InspectorPanel::drawComponentContextMenu(const std::string& componentName, 
                 m_context->uiCallbacks->onValueChanged.Invoke();
                 compInfo->remove(registry, entityHandle);
                 ImGui::CloseCurrentPopup();
+                removed = true;
             }
         }
         else
@@ -1228,44 +1241,49 @@ void InspectorPanel::drawComponentContextMenu(const std::string& componentName, 
             ImGui::TextDisabled("移除组件");
         }
 
-        ImGui::Separator();
-
-        if (ImGui::MenuItem("复制组件"))
+        if (!removed)
         {
-            m_context->componentClipboard_Type = componentName;
-            m_context->componentClipboard_Data = compInfo->serialize(registry, entityHandle);
-        }
+            ImGui::Separator();
 
-        bool canPasteValues = !m_context->componentClipboard_Type.empty() &&
-            m_context->componentClipboard_Type == componentName;
-        if (!canPasteValues) ImGui::BeginDisabled();
-        if (ImGui::MenuItem("粘贴组件数值"))
-        {
-            m_context->uiCallbacks->onValueChanged.Invoke();
-            compInfo->deserialize(registry, entityHandle, m_context->componentClipboard_Data);
-        }
-        if (!canPasteValues) ImGui::EndDisabled();
+            if (ImGui::MenuItem("复制组件"))
+            {
+                m_context->componentClipboard_Type = componentName;
+                m_context->componentClipboard_Data = compInfo->serialize(registry, entityHandle);
+            }
 
-        if (componentName == "ScriptsComponent")
-        {
-            bool canPasteScript = !m_context->componentClipboard_Type.empty() && m_context->componentClipboard_Type ==
-                "ScriptComponent";
-            if (!canPasteScript) ImGui::BeginDisabled();
-            if (ImGui::MenuItem("粘贴脚本为新的"))
+            bool canPasteValues = !m_context->componentClipboard_Type.empty() &&
+                m_context->componentClipboard_Type == componentName;
+            if (!canPasteValues) ImGui::BeginDisabled();
+            if (ImGui::MenuItem("粘贴组件数值"))
             {
                 m_context->uiCallbacks->onValueChanged.Invoke();
-                ECS::ScriptComponent newScript;
-                if (YAML::convert<ECS::ScriptComponent>::decode(m_context->componentClipboard_Data, newScript))
-                {
-                    auto& scriptsComp = registry.get<ECS::ScriptsComponent>(entityHandle);
-                    scriptsComp.scripts.push_back(newScript);
-                }
+                compInfo->deserialize(registry, entityHandle, m_context->componentClipboard_Data);
             }
-            if (!canPasteScript) ImGui::EndDisabled();
+            if (!canPasteValues) ImGui::EndDisabled();
+
+            if (componentName == "ScriptsComponent")
+            {
+                bool canPasteScript = !m_context->componentClipboard_Type.empty() &&
+                    m_context->componentClipboard_Type == "ScriptComponent";
+                if (!canPasteScript) ImGui::BeginDisabled();
+                if (ImGui::MenuItem("粘贴脚本为新的"))
+                {
+                    m_context->uiCallbacks->onValueChanged.Invoke();
+                    ECS::ScriptComponent newScript;
+                    if (YAML::convert<ECS::ScriptComponent>::decode(m_context->componentClipboard_Data, newScript))
+                    {
+                        auto& scriptsComp = registry.get<ECS::ScriptsComponent>(entityHandle);
+                        scriptsComp.scripts.push_back(newScript);
+                    }
+                }
+                if (!canPasteScript) ImGui::EndDisabled();
+            }
         }
 
         ImGui::EndPopup();
     }
+
+    return removed;
 }
 
 void InspectorPanel::drawAddComponentButton()

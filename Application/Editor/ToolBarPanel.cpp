@@ -5,6 +5,7 @@
 #include "AssetPacker.h"
 #include "AudioSystem.h"
 #include "ButtonSystem.h"
+#include "CommonUIControlSystem.h"
 #include "Debug.Test.h"
 #include "Editor.h"
 #include "EngineCrypto.h"
@@ -852,6 +853,7 @@ void ToolbarPanel::play()
         playScene->AddSystem<Systems::InteractionSystem>();
         playScene->AddSystem<Systems::ButtonSystem>();
         playScene->AddSystemToMainThread<Systems::InputTextSystem>();
+        playScene->AddSystem<Systems::CommonUIControlSystem>();
         playScene->AddSystem<Systems::ScriptingSystem>();
         playScene->AddSystem<Systems::AnimationSystem>();
         

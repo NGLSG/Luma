@@ -4,6 +4,7 @@
 #include "ApplicationBase.h"
 #include "AudioSystem.h"
 #include "ButtonSystem.h"
+#include "CommonUIControlSystem.h"
 #include "HydrateResources.h"
 #include "InputTextSystem.h"
 #include "InteractionSystem.h"
@@ -83,6 +84,7 @@ sk_sp<RuntimeScene> SceneManager::LoadScene(const Guid& guid)
         newScene->AddSystem<Systems::AudioSystem>();
         newScene->AddSystem<Systems::ButtonSystem>();
         newScene->AddSystem<Systems::InputTextSystem>();
+        newScene->AddSystem<Systems::CommonUIControlSystem>();
         newScene->AddSystem<Systems::ScriptingSystem>();
         newScene->AddSystem<Systems::AnimationSystem>();
         newScene->Activate(*m_context);
@@ -119,6 +121,7 @@ void SceneManager::Update(EngineContext& engineCtx)
                 loadedScene->AddSystem<Systems::AudioSystem>();
                 loadedScene->AddSystem<Systems::ButtonSystem>();
                 loadedScene->AddSystem<Systems::InputTextSystem>();
+                loadedScene->AddSystem<Systems::CommonUIControlSystem>();
                 loadedScene->AddSystem<Systems::ScriptingSystem>();
                 loadedScene->AddSystem<Systems::AnimationSystem>();
             }

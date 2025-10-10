@@ -80,7 +80,7 @@ private:
     /// @param componentName 组件的名称。
     /// @param compInfo 组件的注册信息。
     /// @param entityHandle 实体句柄。
-    void drawComponentContextMenu(const std::string& componentName, const ComponentRegistration* compInfo,
+    bool drawComponentContextMenu(const std::string& componentName, const ComponentRegistration* compInfo,
                                   entt::entity entityHandle);
     /// 绘制添加组件按钮。
     void drawAddComponentButton();

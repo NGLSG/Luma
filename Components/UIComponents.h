@@ -40,6 +40,16 @@ namespace ECS
     };
 
     /**
+     * @brief 列表布局模式。
+     */
+    enum class ListBoxLayout
+    {
+        Vertical, ///< 垂直排列（默认）
+        Horizontal, ///< 水平排列
+        Grid ///< 网格排列
+    };
+
+    /**
      * @brief 按钮组件，处理用户交互、视觉状态反馈和事件触发。
      * @details 这是一个自绘组件，其外观由内部的drawFunction定义，并通过ButtonSystem更新其状态。
      */
@@ -369,10 +379,16 @@ namespace ECS
     {
         // --- 数据属性 ---
         std::vector<std::string> items;
+        Guid itemsContainerGuid = Guid::Invalid();
         std::vector<int> selectedIndices;
         bool allowMultiSelect = false;
         bool isInteractable = true;
         int visibleItemCount = 6;
+        float roundness = 4.0f;
+        ListBoxLayout layout = ListBoxLayout::Vertical;
+        Vector2f itemSpacing = {4.0f, 4.0f};
+        int maxItemsPerRow = 1;
+        int maxItemsPerColumn = 1;
 
         // --- 外观属性 ---
         TextComponent itemTemplate = TextComponent("列表项", "ListItemTemplate");
@@ -382,6 +398,13 @@ namespace ECS
         Color hoverColor = {0.20f, 0.20f, 0.20f, 1.0f};
         Color selectedColor = {0.30f, 0.60f, 0.95f, 1.0f};
         Color disabledColor = {0.45f, 0.45f, 0.45f, 0.4f};
+        bool enableVerticalScrollbar = true;
+        bool verticalScrollbarAutoHide = true;
+        bool enableHorizontalScrollbar = false;
+        bool horizontalScrollbarAutoHide = true;
+        float scrollbarThickness = 6.0f;
+        Color scrollbarTrackColor = {0.18f, 0.18f, 0.18f, 1.0f};
+        Color scrollbarThumbColor = {0.45f, 0.45f, 0.45f, 0.8f};
 
         // --- 事件目标 ---
         std::vector<SerializableEventTarget> onSelectionChangedTargets;
@@ -393,7 +416,6 @@ namespace ECS
         sk_sp<RuntimeTexture> backgroundImageTexture;
     };
 }
-
 namespace YAML
 {
     /**
@@ -1007,10 +1029,16 @@ namespace YAML
             node["zIndex"] = rhs.zIndex;
             node["Enable"] = rhs.Enable;
             node["items"] = rhs.items;
+            node["itemsContainerGuid"] = rhs.itemsContainerGuid;
             node["selectedIndices"] = rhs.selectedIndices;
             node["allowMultiSelect"] = rhs.allowMultiSelect;
             node["isInteractable"] = rhs.isInteractable;
             node["visibleItemCount"] = rhs.visibleItemCount;
+            node["roundness"] = rhs.roundness;
+            node["layout"] = static_cast<int>(rhs.layout);
+            node["itemSpacing"] = rhs.itemSpacing;
+            node["maxItemsPerRow"] = rhs.maxItemsPerRow;
+            node["maxItemsPerColumn"] = rhs.maxItemsPerColumn;
             node["itemTemplate"] = rhs.itemTemplate;
             node["backgroundImage"] = rhs.backgroundImage;
             node["backgroundColor"] = rhs.backgroundColor;
@@ -1018,6 +1046,13 @@ namespace YAML
             node["hoverColor"] = rhs.hoverColor;
             node["selectedColor"] = rhs.selectedColor;
             node["disabledColor"] = rhs.disabledColor;
+            node["enableVerticalScrollbar"] = rhs.enableVerticalScrollbar;
+            node["verticalScrollbarAutoHide"] = rhs.verticalScrollbarAutoHide;
+            node["enableHorizontalScrollbar"] = rhs.enableHorizontalScrollbar;
+            node["horizontalScrollbarAutoHide"] = rhs.horizontalScrollbarAutoHide;
+            node["scrollbarThickness"] = rhs.scrollbarThickness;
+            node["scrollbarTrackColor"] = rhs.scrollbarTrackColor;
+            node["scrollbarThumbColor"] = rhs.scrollbarThumbColor;
             node["onSelectionChangedTargets"] = rhs.onSelectionChangedTargets;
             node["onItemActivatedTargets"] = rhs.onItemActivatedTargets;
             return node;
@@ -1031,10 +1066,20 @@ namespace YAML
             rhs.zIndex = node["zIndex"].as<int>(rhs.zIndex);
             rhs.Enable = node["Enable"].as<bool>(rhs.Enable);
             rhs.items = node["items"].as<std::vector<std::string>>(rhs.items);
+            rhs.itemsContainerGuid = node["itemsContainerGuid"].as<Guid>(rhs.itemsContainerGuid);
             rhs.selectedIndices = node["selectedIndices"].as<std::vector<int>>(rhs.selectedIndices);
             rhs.allowMultiSelect = node["allowMultiSelect"].as<bool>(rhs.allowMultiSelect);
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
             rhs.visibleItemCount = node["visibleItemCount"].as<int>(rhs.visibleItemCount);
+            rhs.roundness = node["roundness"].as<float>(rhs.roundness);
+            if (node["layout"])
+            {
+                rhs.layout = static_cast<ECS::ListBoxLayout>(
+                    node["layout"].as<int>(static_cast<int>(rhs.layout)));
+            }
+            rhs.itemSpacing = node["itemSpacing"].as<ECS::Vector2f>(rhs.itemSpacing);
+            rhs.maxItemsPerRow = node["maxItemsPerRow"].as<int>(rhs.maxItemsPerRow);
+            rhs.maxItemsPerColumn = node["maxItemsPerColumn"].as<int>(rhs.maxItemsPerColumn);
             rhs.itemTemplate = node["itemTemplate"].as<ECS::TextComponent>(rhs.itemTemplate);
             if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(rhs.backgroundImage);
             rhs.backgroundColor = node["backgroundColor"].as<ECS::Color>(rhs.backgroundColor);
@@ -1042,6 +1087,13 @@ namespace YAML
             rhs.hoverColor = node["hoverColor"].as<ECS::Color>(rhs.hoverColor);
             rhs.selectedColor = node["selectedColor"].as<ECS::Color>(rhs.selectedColor);
             rhs.disabledColor = node["disabledColor"].as<ECS::Color>(rhs.disabledColor);
+            rhs.enableVerticalScrollbar = node["enableVerticalScrollbar"].as<bool>(rhs.enableVerticalScrollbar);
+            rhs.verticalScrollbarAutoHide = node["verticalScrollbarAutoHide"].as<bool>(rhs.verticalScrollbarAutoHide);
+            rhs.enableHorizontalScrollbar = node["enableHorizontalScrollbar"].as<bool>(rhs.enableHorizontalScrollbar);
+            rhs.horizontalScrollbarAutoHide = node["horizontalScrollbarAutoHide"].as<bool>(rhs.horizontalScrollbarAutoHide);
+            rhs.scrollbarThickness = node["scrollbarThickness"].as<float>(rhs.scrollbarThickness);
+            rhs.scrollbarTrackColor = node["scrollbarTrackColor"].as<ECS::Color>(rhs.scrollbarTrackColor);
+            rhs.scrollbarThumbColor = node["scrollbarThumbColor"].as<ECS::Color>(rhs.scrollbarThumbColor);
             rhs.onSelectionChangedTargets = node["onSelectionChangedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onSelectionChangedTargets);
             rhs.onItemActivatedTargets = node["onItemActivatedTargets"].as<std::vector<ECS::SerializableEventTarget>>(rhs.onItemActivatedTargets);
             return true;
@@ -1239,10 +1291,15 @@ REGISTRY
         .property("rect", &ECS::ListBoxComponent::rect)
         .property("isVisible", &ECS::ListBoxComponent::isVisible)
         .property("items", &ECS::ListBoxComponent::items)
+        .property("itemsContainerGuid", &ECS::ListBoxComponent::itemsContainerGuid)
         .property("selectedIndices", &ECS::ListBoxComponent::selectedIndices)
         .property("allowMultiSelect", &ECS::ListBoxComponent::allowMultiSelect)
         .property("isInteractable", &ECS::ListBoxComponent::isInteractable)
         .property("visibleItemCount", &ECS::ListBoxComponent::visibleItemCount)
+        .property("layout", &ECS::ListBoxComponent::layout)
+        .property("itemSpacing", &ECS::ListBoxComponent::itemSpacing)
+        .property("maxItemsPerRow", &ECS::ListBoxComponent::maxItemsPerRow)
+        .property("maxItemsPerColumn", &ECS::ListBoxComponent::maxItemsPerColumn)
         .property("itemTemplate", &ECS::ListBoxComponent::itemTemplate)
         .property("backgroundImage", &ECS::ListBoxComponent::backgroundImage)
         .property("backgroundColor", &ECS::ListBoxComponent::backgroundColor)
@@ -1250,6 +1307,14 @@ REGISTRY
         .property("hoverColor", &ECS::ListBoxComponent::hoverColor)
         .property("selectedColor", &ECS::ListBoxComponent::selectedColor)
         .property("disabledColor", &ECS::ListBoxComponent::disabledColor)
+        .property("roundness", &ECS::ListBoxComponent::roundness)
+        .property("enableVerticalScrollbar", &ECS::ListBoxComponent::enableVerticalScrollbar)
+        .property("verticalScrollbarAutoHide", &ECS::ListBoxComponent::verticalScrollbarAutoHide)
+        .property("enableHorizontalScrollbar", &ECS::ListBoxComponent::enableHorizontalScrollbar)
+        .property("horizontalScrollbarAutoHide", &ECS::ListBoxComponent::horizontalScrollbarAutoHide)
+        .property("scrollbarThickness", &ECS::ListBoxComponent::scrollbarThickness)
+        .property("scrollbarTrackColor", &ECS::ListBoxComponent::scrollbarTrackColor)
+        .property("scrollbarThumbColor", &ECS::ListBoxComponent::scrollbarThumbColor)
         .property("onSelectionChangedTargets", &ECS::ListBoxComponent::onSelectionChangedTargets)
         .property("onItemActivatedTargets", &ECS::ListBoxComponent::onItemActivatedTargets);
 }

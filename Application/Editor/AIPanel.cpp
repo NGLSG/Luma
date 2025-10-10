@@ -20,6 +20,7 @@
 #include "AnimationSystem.h"
 #include "AudioSystem.h"
 #include "ButtonSystem.h"
+#include "CommonUIControlSystem.h"
 #include "InputTextSystem.h"
 #include "../Systems/HydrateResources.h"
 #include "../Systems/TransformSystem.h"
@@ -2481,6 +2482,7 @@ C# Scripting Example
                     playScene->AddSystem<Systems::InteractionSystem>();
                     playScene->AddSystem<Systems::ButtonSystem>();
                     playScene->AddSystemToMainThread<Systems::InputTextSystem>();
+                    playScene->AddSystem<Systems::CommonUIControlSystem>();
                     playScene->AddSystem<Systems::ScriptingSystem>();
                     playScene->AddSystem<Systems::AnimationSystem>();
                     SceneManager::GetInstance().SetCurrentScene(playScene);
