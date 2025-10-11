@@ -411,7 +411,8 @@ void Editor::Render()
     }
 
 
-    RenderableManager::GetInstance().SetExternalAlpha(m_context.interpolationAlpha);
+    // Let RenderableManager compute interpolation alpha from actual simulation timestamps
+    // to avoid jitter introduced by render-thread-only accumulator.
     m_editorContext.renderQueue = RenderableManager::GetInstance().GetInterpolationData();
     auto currentTime = std::chrono::steady_clock::now();
     float deltaTime = std::chrono::duration<float>(currentTime - m_editorContext.lastFrameTime).count();

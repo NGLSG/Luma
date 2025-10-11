@@ -373,22 +373,30 @@ namespace
                     {
                         switch (button.currentState)
                         {
-                        case ECS::ButtonState::Hovered: tintColor = button.hoverColor; break;
-                        case ECS::ButtonState::Pressed: tintColor = button.pressedColor; break;
-                        case ECS::ButtonState::Disabled: tintColor = button.disabledColor; break;
+                        case ECS::ButtonState::Hovered: tintColor = button.hoverColor;
+                            break;
+                        case ECS::ButtonState::Pressed: tintColor = button.pressedColor;
+                            break;
+                        case ECS::ButtonState::Disabled: tintColor = button.disabledColor;
+                            break;
                         case ECS::ButtonState::Normal:
-                        default: tintColor = button.normalColor; break;
+                        default: tintColor = button.normalColor;
+                            break;
                         }
                     }
                     else
                     {
                         switch (button.currentState)
                         {
-                        case ECS::ButtonState::Hovered: tintColor = button.toggledHoverColor; break;
-                        case ECS::ButtonState::Pressed: tintColor = button.toggledPressedColor; break;
-                        case ECS::ButtonState::Disabled: tintColor = button.disabledColor; break;
+                        case ECS::ButtonState::Hovered: tintColor = button.toggledHoverColor;
+                            break;
+                        case ECS::ButtonState::Pressed: tintColor = button.toggledPressedColor;
+                            break;
+                        case ECS::ButtonState::Disabled: tintColor = button.disabledColor;
+                            break;
                         case ECS::ButtonState::Normal:
-                        default: tintColor = button.toggledColor; break;
+                        default: tintColor = button.toggledColor;
+                            break;
                         }
                     }
 
@@ -461,7 +469,8 @@ namespace
                         paint.setColorFilter(SkColorFilters::Blend(baseColor, SkBlendMode::kModulate));
                         canvas->save();
                         canvas->clipRRect(SkRRect::MakeOval(circleRect), true);
-                        canvas->drawImageRect(radio.backgroundImage, circleRect, SkSamplingOptions(SkFilterMode::kLinear));
+                        canvas->drawImageRect(radio.backgroundImage, circleRect,
+                                              SkSamplingOptions(SkFilterMode::kLinear));
                         canvas->restore();
                     }
                     else
@@ -479,7 +488,8 @@ namespace
 
                         if (radio.selectionImage)
                         {
-                            canvas->drawImageRect(radio.selectionImage, indicatorRect, SkSamplingOptions(SkFilterMode::kLinear));
+                            canvas->drawImageRect(radio.selectionImage, indicatorRect,
+                                                  SkSamplingOptions(SkFilterMode::kLinear));
                         }
                         else
                         {
@@ -500,7 +510,9 @@ namespace
 
                         SkPaint textPaint;
                         textPaint.setAntiAlias(true);
-                        textPaint.setColor4f({radio.label.color.r, radio.label.color.g, radio.label.color.b, radio.label.color.a});
+                        textPaint.setColor4f({
+                            radio.label.color.r, radio.label.color.g, radio.label.color.b, radio.label.color.a
+                        });
 
                         SkFontMetrics metrics;
                         font.getMetrics(&metrics);
@@ -556,7 +568,8 @@ namespace
                         paint.setColorFilter(SkColorFilters::Blend(baseColor, SkBlendMode::kModulate));
                         canvas->save();
                         canvas->clipRRect(SkRRect::MakeRectXY(boxRect, checkbox.roundness, checkbox.roundness), true);
-                        canvas->drawImageRect(checkbox.backgroundImage, boxRect, SkSamplingOptions(SkFilterMode::kLinear));
+                        canvas->drawImageRect(checkbox.backgroundImage, boxRect,
+                                              SkSamplingOptions(SkFilterMode::kLinear));
                         canvas->restore();
                     }
                     else
@@ -572,7 +585,8 @@ namespace
                             const float inset = boxSize * 0.15f;
                             SkRect markRect = SkRect::MakeXYWH(boxX + inset, boxY + inset,
                                                                boxSize - inset * 2.0f, boxSize - inset * 2.0f);
-                            canvas->drawImageRect(checkbox.checkmarkImage, markRect, SkSamplingOptions(SkFilterMode::kLinear));
+                            canvas->drawImageRect(checkbox.checkmarkImage, markRect,
+                                                  SkSamplingOptions(SkFilterMode::kLinear));
                         }
                         else
                         {
@@ -671,7 +685,8 @@ namespace
                         if (slider.trackImage)
                         {
                             paint.setColorFilter(SkColorFilters::Blend(trackColor, SkBlendMode::kModulate));
-                            canvas->drawImageRect(slider.trackImage, trackRect, SkSamplingOptions(SkFilterMode::kLinear), &paint);
+                            canvas->drawImageRect(slider.trackImage, trackRect,
+                                                  SkSamplingOptions(SkFilterMode::kLinear), &paint);
                         }
                         else
                         {
@@ -686,7 +701,8 @@ namespace
                             if (slider.fillImage)
                             {
                                 paint.setColorFilter(SkColorFilters::Blend(fillColor, SkBlendMode::kModulate));
-                                canvas->drawImageRect(slider.fillImage, fillRect, SkSamplingOptions(SkFilterMode::kLinear), &paint);
+                                canvas->drawImageRect(slider.fillImage, fillRect,
+                                                      SkSamplingOptions(SkFilterMode::kLinear), &paint);
                             }
                             else
                             {
@@ -705,12 +721,15 @@ namespace
                             SkRect thumbRect = SkRect::MakeXYWH(thumbCenterX - thumbRadius, thumbCenterY - thumbRadius,
                                                                 thumbSize, thumbSize);
                             paint.setColorFilter(SkColorFilters::Blend(thumbColor, SkBlendMode::kModulate));
-                            canvas->drawImageRect(slider.thumbImage, thumbRect, SkSamplingOptions(SkFilterMode::kLinear), &paint);
+                            canvas->drawImageRect(slider.thumbImage, thumbRect,
+                                                  SkSamplingOptions(SkFilterMode::kLinear), &paint);
                         }
                         else
                         {
-                            paint.setColor4f({thumbColor.r, thumbColor.g, thumbColor.b,
-                                slider.isDragging ? std::min(1.0f, thumbColor.a + 0.2f) : thumbColor.a});
+                            paint.setColor4f({
+                                thumbColor.r, thumbColor.g, thumbColor.b,
+                                slider.isDragging ? std::min(1.0f, thumbColor.a + 0.2f) : thumbColor.a
+                            });
                             canvas->drawCircle(thumbCenterX, thumbCenterY, thumbRadius, paint);
                         }
                     }
@@ -723,7 +742,8 @@ namespace
                         if (slider.trackImage)
                         {
                             paint.setColorFilter(SkColorFilters::Blend(trackColor, SkBlendMode::kModulate));
-                            canvas->drawImageRect(slider.trackImage, trackRect, SkSamplingOptions(SkFilterMode::kLinear), &paint);
+                            canvas->drawImageRect(slider.trackImage, trackRect,
+                                                  SkSamplingOptions(SkFilterMode::kLinear), &paint);
                         }
                         else
                         {
@@ -739,7 +759,8 @@ namespace
                             if (slider.fillImage)
                             {
                                 paint.setColorFilter(SkColorFilters::Blend(fillColor, SkBlendMode::kModulate));
-                                canvas->drawImageRect(slider.fillImage, fillRect, SkSamplingOptions(SkFilterMode::kLinear), &paint);
+                                canvas->drawImageRect(slider.fillImage, fillRect,
+                                                      SkSamplingOptions(SkFilterMode::kLinear), &paint);
                             }
                             else
                             {
@@ -758,12 +779,15 @@ namespace
                             SkRect thumbRect = SkRect::MakeXYWH(thumbCenterX - thumbRadius, thumbCenterY - thumbRadius,
                                                                 thumbSize, thumbSize);
                             paint.setColorFilter(SkColorFilters::Blend(thumbColor, SkBlendMode::kModulate));
-                            canvas->drawImageRect(slider.thumbImage, thumbRect, SkSamplingOptions(SkFilterMode::kLinear), &paint);
+                            canvas->drawImageRect(slider.thumbImage, thumbRect,
+                                                  SkSamplingOptions(SkFilterMode::kLinear), &paint);
                         }
                         else
                         {
-                            paint.setColor4f({thumbColor.r, thumbColor.g, thumbColor.b,
-                                slider.isDragging ? std::min(1.0f, thumbColor.a + 0.2f) : thumbColor.a});
+                            paint.setColor4f({
+                                thumbColor.r, thumbColor.g, thumbColor.b,
+                                slider.isDragging ? std::min(1.0f, thumbColor.a + 0.2f) : thumbColor.a
+                            });
                             canvas->drawCircle(thumbCenterX, thumbCenterY, thumbRadius, paint);
                         }
                     }
@@ -797,11 +821,15 @@ namespace
                     ECS::Color baseColor = combo.normalColor;
                     switch (combo.currentState)
                     {
-                    case ECS::ButtonState::Hovered: baseColor = combo.hoverColor; break;
-                    case ECS::ButtonState::Pressed: baseColor = combo.pressedColor; break;
-                    case ECS::ButtonState::Disabled: baseColor = combo.disabledColor; break;
+                    case ECS::ButtonState::Hovered: baseColor = combo.hoverColor;
+                        break;
+                    case ECS::ButtonState::Pressed: baseColor = combo.pressedColor;
+                        break;
+                    case ECS::ButtonState::Disabled: baseColor = combo.disabledColor;
+                        break;
                     case ECS::ButtonState::Normal:
-                    default: baseColor = combo.normalColor; break;
+                    default: baseColor = combo.normalColor;
+                        break;
                     }
 
                     SkPaint paint;
@@ -834,14 +862,16 @@ namespace
 
                     SkFontMetrics metrics;
                     font.getMetrics(&metrics);
-                    const float baseline = worldRect.y + worldRect.Height() * 0.5f - (metrics.fAscent + metrics.fDescent) * 0.5f;
+                    const float baseline = worldRect.y + worldRect.Height() * 0.5f - (metrics.fAscent + metrics.
+                        fDescent) * 0.5f;
                     const float contentPadding = 8.0f;
                     const float iconSize = std::min(worldRect.Height() * 0.5f, 18.0f);
                     const float iconX = worldRect.x + worldRect.Width() - contentPadding - iconSize;
                     const float iconY = worldRect.y + (worldRect.Height() - iconSize) * 0.5f;
 
                     std::string display = combo.displayText.text;
-                    if (display.empty() && combo.selectedIndex >= 0 && combo.selectedIndex < static_cast<int>(combo.items.size()))
+                    if (display.empty() && combo.selectedIndex >= 0 && combo.selectedIndex < static_cast<int>(combo.
+                        items.size()))
                     {
                         display = combo.items[combo.selectedIndex];
                     }
@@ -864,8 +894,10 @@ namespace
                         triangle.lineTo(midX, bottomY);
                         triangle.close();
 
-                        paint.setColor4f({combo.displayText.color.r, combo.displayText.color.g,
-                            combo.displayText.color.b, combo.displayText.color.a});
+                        paint.setColor4f({
+                            combo.displayText.color.r, combo.displayText.color.g,
+                            combo.displayText.color.b, combo.displayText.color.a
+                        });
                         canvas->drawPath(triangle, paint);
                     }
 
@@ -892,26 +924,32 @@ namespace
                         for (size_t i = 0; i < combo.items.size(); ++i)
                         {
                             const float itemTop = dropdownRect.top() + itemHeight * static_cast<float>(i);
-                            SkRect itemRect = SkRect::MakeXYWH(dropdownRect.left(), itemTop, dropdownRect.width(), itemHeight);
+                            SkRect itemRect = SkRect::MakeXYWH(dropdownRect.left(), itemTop, dropdownRect.width(),
+                                                               itemHeight);
 
                             if (static_cast<int>(i) == combo.hoveredIndex)
                             {
                                 SkPaint hoverPaint;
                                 hoverPaint.setAntiAlias(true);
-                                hoverPaint.setColor4f({combo.hoverColor.r, combo.hoverColor.g, combo.hoverColor.b, 0.65f});
+                                hoverPaint.setColor4f({
+                                    combo.hoverColor.r, combo.hoverColor.g, combo.hoverColor.b, 0.65f
+                                });
                                 canvas->drawRect(itemRect, hoverPaint);
                             }
                             else if (static_cast<int>(i) == combo.selectedIndex)
                             {
                                 SkPaint selectedPaint;
                                 selectedPaint.setAntiAlias(true);
-                                selectedPaint.setColor4f({combo.pressedColor.r, combo.pressedColor.g, combo.pressedColor.b, 0.55f});
+                                selectedPaint.setColor4f({
+                                    combo.pressedColor.r, combo.pressedColor.g, combo.pressedColor.b, 0.55f
+                                });
                                 canvas->drawRect(itemRect, selectedPaint);
                             }
 
                             canvas->drawString(combo.items[i].c_str(),
                                                itemRect.left() + contentPadding,
-                                               itemRect.top() + itemHeight * 0.5f - (metrics.fAscent + metrics.fDescent) * 0.5f,
+                                               itemRect.top() + itemHeight * 0.5f - (metrics.fAscent + metrics.fDescent)
+                                               * 0.5f,
                                                font,
                                                textPaint);
                         }
@@ -944,7 +982,8 @@ namespace
                     worldRect.x = trans.position.x - expander.rect.Width() * 0.5f;
                     worldRect.y = trans.position.y - expander.rect.Height() * 0.5f;
 
-                    const float headerHeight = std::min(worldRect.Height(), std::max(28.0f, expander.header.fontSize * 1.8f));
+                    const float headerHeight = std::min(worldRect.Height(),
+                                                        std::max(28.0f, expander.header.fontSize * 1.8f));
                     SkRect headerRect = SkRect::MakeXYWH(worldRect.x, worldRect.y, worldRect.Width(), headerHeight);
 
                     SkPaint paint;
@@ -992,7 +1031,8 @@ namespace
 
                     SkFontMetrics metrics;
                     font.getMetrics(&metrics);
-                    const float baseline = headerRect.top() + headerRect.height() * 0.5f - (metrics.fAscent + metrics.fDescent) * 0.5f;
+                    const float baseline = headerRect.top() + headerRect.height() * 0.5f - (metrics.fAscent + metrics.
+                        fDescent) * 0.5f;
                     const float padding = 10.0f;
                     const float indicatorSize = headerRect.height() * 0.35f;
 
@@ -1063,7 +1103,8 @@ namespace
                     if (progress.backgroundImage)
                     {
                         paint.setColorFilter(SkColorFilters::Blend(progress.backgroundColor, SkBlendMode::kModulate));
-                        canvas->drawImageRect(progress.backgroundImage, barRect, SkSamplingOptions(SkFilterMode::kLinear), &paint);
+                        canvas->drawImageRect(progress.backgroundImage, barRect,
+                                              SkSamplingOptions(SkFilterMode::kLinear), &paint);
                     }
                     else
                     {
@@ -1076,13 +1117,14 @@ namespace
 
                     const float range = progress.maxValue - progress.minValue;
                     float normalized = range > 1e-5f
-                        ? std::clamp((progress.value - progress.minValue) / range, 0.0f, 1.0f)
-                        : 0.0f;
+                                           ? std::clamp((progress.value - progress.minValue) / range, 0.0f, 1.0f)
+                                           : 0.0f;
 
                     if (progress.isIndeterminate)
                     {
                         const float segmentWidth = barRect.width() * 0.35f;
-                        float start = barRect.left() + (barRect.width() + segmentWidth) * progress.indeterminatePhase - segmentWidth;
+                        float start = barRect.left() + (barRect.width() + segmentWidth) * progress.indeterminatePhase -
+                            segmentWidth;
                         float end = start + segmentWidth;
                         start = std::clamp(start, barRect.left(), barRect.right());
                         end = std::clamp(end, barRect.left(), barRect.right());
@@ -1093,7 +1135,8 @@ namespace
                             if (progress.fillImage)
                             {
                                 paint.setColorFilter(SkColorFilters::Blend(progress.fillColor, SkBlendMode::kModulate));
-                                canvas->drawImageRect(progress.fillImage, fillRect, SkSamplingOptions(SkFilterMode::kLinear), &paint);
+                                canvas->drawImageRect(progress.fillImage, fillRect,
+                                                      SkSamplingOptions(SkFilterMode::kLinear), &paint);
                             }
                             else
                             {
@@ -1114,7 +1157,8 @@ namespace
                         if (progress.fillImage)
                         {
                             paint.setColorFilter(SkColorFilters::Blend(progress.fillColor, SkBlendMode::kModulate));
-                            canvas->drawImageRect(progress.fillImage, fillRect, SkSamplingOptions(SkFilterMode::kLinear), &paint);
+                            canvas->drawImageRect(progress.fillImage, fillRect,
+                                                  SkSamplingOptions(SkFilterMode::kLinear), &paint);
                         }
                         else
                         {
@@ -1171,7 +1215,8 @@ namespace
                     if (tabs.backgroundImage)
                     {
                         paint.setColorFilter(SkColorFilters::Blend(tabs.backgroundColor, SkBlendMode::kModulate));
-                        canvas->drawImageRect(tabs.backgroundImage, fullRect, SkSamplingOptions(SkFilterMode::kLinear), &paint);
+                        canvas->drawImageRect(tabs.backgroundImage, fullRect, SkSamplingOptions(SkFilterMode::kLinear),
+                                              &paint);
                     }
                     else
                     {
@@ -1193,7 +1238,8 @@ namespace
                         if (!tabItem.isVisible) continue;
 
                         const float titleFactor = static_cast<float>(tabItem.title.size()) * 0.6f + 2.0f;
-                        const float tabWidth = std::clamp(headerHeight * titleFactor, headerHeight * 1.8f, worldRect.Width());
+                        const float tabWidth = std::clamp(headerHeight * titleFactor, headerHeight * 1.8f,
+                                                          worldRect.Width());
                         SkRect tabRect = SkRect::MakeXYWH(cursor, worldRect.y, tabWidth, headerHeight);
 
                         ECS::Color tabColor = tabs.tabColor;
@@ -1213,7 +1259,8 @@ namespace
                         if (tabs.tabBackgroundImage)
                         {
                             paint.setColorFilter(SkColorFilters::Blend(tabColor, SkBlendMode::kModulate));
-                            canvas->drawImageRect(tabs.tabBackgroundImage, tabRect, SkSamplingOptions(SkFilterMode::kLinear), &paint);
+                            canvas->drawImageRect(tabs.tabBackgroundImage, tabRect,
+                                                  SkSamplingOptions(SkFilterMode::kLinear), &paint);
                         }
                         else
                         {
@@ -1236,7 +1283,8 @@ namespace
 
                         SkFontMetrics metrics;
                         font.getMetrics(&metrics);
-                        const float baseline = tabRect.top() + tabRect.height() * 0.5f - (metrics.fAscent + metrics.fDescent) * 0.5f;
+                        const float baseline = tabRect.top() + tabRect.height() * 0.5f - (metrics.fAscent + metrics.
+                            fDescent) * 0.5f;
                         canvas->drawString(tabItem.title.c_str(), tabRect.left() + 10.0f, baseline, font, textPaint);
 
                         cursor += tabWidth + tabs.tabSpacing;
@@ -1250,418 +1298,457 @@ namespace
             });
         }
 
-void processListBoxData(const Renderable* currIt, const ECS::TransformComponent& transform,
-                        const RawListBoxRenderData& data)
-{
-    RawDrawBatch batch;
-    batch.zIndex = currIt->zIndex;
-
-    batch.drawFunc.AddListener(
-        [
-            trans = transform,
-            listBox = data
-        ](SkCanvas* canvas)
+        void processListBoxData(const Renderable* currIt, const ECS::TransformComponent& transform,
+                                const RawListBoxRenderData& data)
         {
-            if (!canvas) return;
+            RawDrawBatch batch;
+            batch.zIndex = currIt->zIndex;
 
-            ECS::RectF worldRect = listBox.rect;
-            worldRect.x = trans.position.x - listBox.rect.Width() * 0.5f;
-            worldRect.y = trans.position.y - listBox.rect.Height() * 0.5f;
-
-            SkRect boxRect = SkRect::MakeXYWH(worldRect.x, worldRect.y, worldRect.Width(), worldRect.Height());
-
-            SkPaint paint;
-            paint.setAntiAlias(true);
-            if (listBox.backgroundImage)
-            {
-                paint.setColorFilter(SkColorFilters::Blend(listBox.backgroundColor, SkBlendMode::kModulate));
-                canvas->save();
-                canvas->clipRRect(SkRRect::MakeRectXY(boxRect, listBox.roundness, listBox.roundness), true);
-                canvas->drawImageRect(listBox.backgroundImage, boxRect, SkSamplingOptions(SkFilterMode::kLinear), &paint);
-                canvas->restore();
-            }
-            else
-            {
-                paint.setColor4f({
-                    listBox.backgroundColor.r, listBox.backgroundColor.g,
-                    listBox.backgroundColor.b, listBox.backgroundColor.a
-                });
-                canvas->drawRRect(SkRRect::MakeRectXY(boxRect, listBox.roundness, listBox.roundness), paint);
-            }
-
-            const int itemCount = std::max(0, listBox.itemCount);
-            const float spacingX = std::max(0.0f, listBox.itemSpacing.x);
-            const float spacingY = std::max(0.0f, listBox.itemSpacing.y);
-            const float trackSpacing = 4.0f;
-            const float trackThickness = std::max(listBox.scrollbarThickness, 2.0f);
-
-            auto clampPositive = [](int value, int fallback)
-            {
-                return value > 0 ? value : fallback;
-            };
-
-            const int visibleCandidate = listBox.visibleItemCount > 0
-                ? std::min(listBox.visibleItemCount, std::max(1, itemCount))
-                : std::max(1, itemCount);
-
-            int columns = 1;
-            int rows = 1;
-            int itemsPerPage = 0;
-
-            switch (listBox.layout)
-            {
-            case ECS::ListBoxLayout::Horizontal:
-                rows = clampPositive(listBox.maxItemsPerColumn, 1);
-                if (listBox.visibleItemCount > 0)
+            batch.drawFunc.AddListener(
+                [
+                    trans = transform,
+                    listBox = data
+                ](SkCanvas* canvas)
                 {
-                    columns = std::max(1, static_cast<int>(std::ceil(static_cast<float>(visibleCandidate) / static_cast<float>(rows))));
-                    itemsPerPage = std::min(itemCount, columns * rows);
-                }
-                else
-                {
-                    columns = std::max(1, static_cast<int>(std::ceil(static_cast<float>(std::max(1, itemCount)) / static_cast<float>(rows))));
-                    itemsPerPage = itemCount;
-                }
-                break;
-            case ECS::ListBoxLayout::Grid:
-                columns = clampPositive(listBox.maxItemsPerRow, 1);
-                rows = clampPositive(listBox.maxItemsPerColumn, 1);
-                if (listBox.visibleItemCount > 0)
-                {
-                    int target = std::min(visibleCandidate, std::max(1, itemCount));
-                    if (listBox.maxItemsPerRow <= 0 && listBox.maxItemsPerColumn <= 0)
+                    if (!canvas) return;
+
+                    ECS::RectF worldRect = listBox.rect;
+                    worldRect.x = trans.position.x - listBox.rect.Width() * 0.5f;
+                    worldRect.y = trans.position.y - listBox.rect.Height() * 0.5f;
+
+                    SkRect boxRect = SkRect::MakeXYWH(worldRect.x, worldRect.y, worldRect.Width(), worldRect.Height());
+
+                    SkPaint paint;
+                    paint.setAntiAlias(true);
+                    if (listBox.backgroundImage)
                     {
-                        columns = std::max(1, static_cast<int>(std::ceil(std::sqrt(static_cast<float>(target)))));
-                        rows = std::max(1, static_cast<int>(std::ceil(static_cast<float>(target) / static_cast<float>(columns))));
-                    }
-                    else if (listBox.maxItemsPerRow <= 0)
-                    {
-                        rows = clampPositive(listBox.maxItemsPerColumn, 1);
-                        columns = std::max(1, static_cast<int>(std::ceil(static_cast<float>(target) / static_cast<float>(rows))));
-                    }
-                    else if (listBox.maxItemsPerColumn <= 0)
-                    {
-                        columns = std::max(1, std::min(listBox.maxItemsPerRow, target));
-                        rows = std::max(1, static_cast<int>(std::ceil(static_cast<float>(target) / static_cast<float>(columns))));
-                    }
-                    itemsPerPage = std::min(itemCount, columns * rows);
-                }
-                else
-                {
-                    itemsPerPage = std::min(itemCount, columns * rows);
-                }
-                break;
-            case ECS::ListBoxLayout::Vertical:
-            default:
-                columns = clampPositive(listBox.maxItemsPerRow, 1);
-                if (listBox.visibleItemCount > 0)
-                {
-                    rows = std::max(1, static_cast<int>(std::ceil(static_cast<float>(visibleCandidate) / static_cast<float>(columns))));
-                    itemsPerPage = std::min(itemCount, rows * columns);
-                }
-                else
-                {
-                    rows = std::max(1, static_cast<int>(std::ceil(static_cast<float>(std::max(1, itemCount)) / static_cast<float>(columns))));
-                    itemsPerPage = itemCount;
-                }
-                break;
-            }
-
-            
-            if (listBox.visibleItemCount <= 0)
-            {
-                const float approxLineHeight = listBox.itemTemplate.fontSize > 0.0f
-                    ? (listBox.itemTemplate.fontSize * 1.4f)
-                    : 20.0f;
-                const float containerWidth = listBox.rect.Width();
-                const float containerHeight = listBox.rect.Height();
-
-                switch (listBox.layout)
-                {
-                case ECS::ListBoxLayout::Horizontal:
-                {
-                    int maxTextLen = 1;
-                    for (const auto& s : listBox.items)
-                        maxTextLen = std::max<int>(maxTextLen, static_cast<int>(s.size()));
-                    const float estCharWidth = std::max(1.0f, listBox.itemTemplate.fontSize * 0.6f);
-                    const float paddingX = 8.0f;
-                    const float estItemWidth = paddingX * 2.0f + estCharWidth * static_cast<float>(maxTextLen);
-
-                    rows = clampPositive(listBox.maxItemsPerColumn, 1);
-                    columns = std::max(1, static_cast<int>(std::floor((containerWidth + spacingX) / (estItemWidth + spacingX))));
-                    itemsPerPage = std::min(itemCount, rows * columns);
-                    break;
-                }
-                case ECS::ListBoxLayout::Grid:
-                case ECS::ListBoxLayout::Vertical:
-                default:
-                {
-                    columns = clampPositive(listBox.maxItemsPerRow, 1);
-                    const float cellH = approxLineHeight;
-                    
-                    rows = std::max(1, static_cast<int>(std::floor((containerHeight + spacingY) / (cellH + spacingY))));
-                    itemsPerPage = std::min(itemCount, rows * columns);
-                    break;
-                }
-                }
-            }
-
-            if (itemCount == 0)
-            {
-                itemsPerPage = 0;
-            }
-            else
-            {
-                itemsPerPage = std::max(1, itemsPerPage);
-            }
-
-            const bool primaryIsVertical = listBox.layout != ECS::ListBoxLayout::Horizontal;
-            bool verticalScrollable = primaryIsVertical && itemCount > itemsPerPage;
-            bool baseHorizontalScrollable = !primaryIsVertical && itemCount > itemsPerPage;
-            bool showVertical = listBox.enableVerticalScrollbar && (verticalScrollable || !listBox.verticalScrollbarAutoHide);
-
-            float contentLeft = boxRect.left() + 2.0f;
-            float contentRight = boxRect.right() - 2.0f - (showVertical ? (trackThickness + trackSpacing) : 0.0f);
-            float contentTop = boxRect.top() + 2.0f;
-            float contentBottom = boxRect.bottom() - 2.0f;
-
-            const bool drawText = !listBox.useContainer && listBox.itemTemplate.typeface;
-            SkFont font;
-            SkFontMetrics metrics{};
-            SkPaint textPaint;
-            if (drawText)
-            {
-                font = SkFont(listBox.itemTemplate.typeface, listBox.itemTemplate.fontSize);
-                font.setEdging(SkFont::Edging::kAntiAlias);
-                font.getMetrics(&metrics);
-
-                textPaint.setAntiAlias(true);
-                textPaint.setColor4f({
-                    listBox.itemColor.r, listBox.itemColor.g,
-                    listBox.itemColor.b, listBox.itemColor.a
-                });
-            }
-
-            float availableWidth = std::max(0.0f, contentRight - contentLeft);
-            float availableHeight = std::max(0.0f, contentBottom - contentTop);
-
-            float maxContentWidth = drawText ? 0.0f : availableWidth;
-            if (drawText)
-            {
-                for (const auto& text : listBox.items)
-                {
-                    SkRect bounds{};
-                    font.measureText(text.c_str(), text.size(), SkTextEncoding::kUTF8, &bounds);
-                    maxContentWidth = std::max(maxContentWidth, bounds.width() + 16.0f);
-                }
-            }
-
-            bool textHorizontalScrollable = drawText && maxContentWidth > availableWidth;
-            bool showHorizontal = listBox.enableHorizontalScrollbar &&
-                ((baseHorizontalScrollable || textHorizontalScrollable) || !listBox.horizontalScrollbarAutoHide);
-
-            if (showHorizontal)
-            {
-                contentBottom -= (trackThickness + trackSpacing);
-                availableHeight = std::max(0.0f, contentBottom - contentTop);
-            }
-
-            int maxScroll = std::max(0, itemCount - itemsPerPage);
-            int startIndex = std::clamp(listBox.scrollOffset, 0, maxScroll);
-            int endIndex = (itemsPerPage > 0) ? std::min(itemCount, startIndex + itemsPerPage) : 0;
-
-            columns = std::max(1, columns);
-            rows = std::max(1, rows);
-
-            
-            
-            float itemWidth = 0.0f;
-            float itemHeight = 0.0f;
-
-            if (drawText)
-            {
-                
-                const float textHeight = metrics.fDescent - metrics.fAscent;
-                const float paddingY = 8.0f;
-                const float actualItemHeight = textHeight + paddingY * 2.0f;
-
-                
-                float totalSpacingX = spacingX * static_cast<float>(std::max(0, columns - 1));
-                float totalSpacingY = spacingY * static_cast<float>(std::max(0, rows - 1));
-
-                itemWidth = columns > 0 ? (availableWidth - totalSpacingX) / static_cast<float>(columns) : availableWidth;
-
-                
-                if (primaryIsVertical)
-                {
-                    itemHeight = actualItemHeight;
-                }
-                else
-                {
-                    itemHeight = rows > 0 ? (availableHeight - totalSpacingY) / static_cast<float>(rows) : availableHeight;
-                }
-            }
-            else
-            {
-                
-                float totalSpacingX = spacingX * static_cast<float>(std::max(0, columns - 1));
-                float totalSpacingY = spacingY * static_cast<float>(std::max(0, rows - 1));
-
-                itemWidth = columns > 0 ? (availableWidth - totalSpacingX) / static_cast<float>(columns) : availableWidth;
-                itemHeight = rows > 0 ? (availableHeight - totalSpacingY) / static_cast<float>(rows) : availableHeight;
-            }
-
-            itemWidth = std::max(itemWidth, 1.0f);
-            itemHeight = std::max(itemHeight, 1.0f);
-
-            const float paddingX = 8.0f;
-
-            SkRect contentRect = SkRect::MakeXYWH(contentLeft, contentTop, availableWidth, availableHeight);
-            if (contentRect.width() > 0.0f && contentRect.height() > 0.0f && endIndex > startIndex)
-            {
-                canvas->save();
-                canvas->clipRect(contentRect, true);
-
-                for (int i = startIndex; i < endIndex; ++i)
-                {
-                    const int visibleIndex = i - startIndex;
-                    int row = 0;
-                    int column = 0;
-                    if (listBox.layout == ECS::ListBoxLayout::Horizontal)
-                    {
-                        column = rows > 0 ? visibleIndex / rows : 0;
-                        row = rows > 0 ? visibleIndex % rows : 0;
+                        paint.setColorFilter(SkColorFilters::Blend(listBox.backgroundColor, SkBlendMode::kModulate));
+                        canvas->save();
+                        canvas->clipRRect(SkRRect::MakeRectXY(boxRect, listBox.roundness, listBox.roundness), true);
+                        canvas->drawImageRect(listBox.backgroundImage, boxRect,
+                                              SkSamplingOptions(SkFilterMode::kLinear), &paint);
+                        canvas->restore();
                     }
                     else
                     {
-                        row = columns > 0 ? visibleIndex / columns : 0;
-                        column = columns > 0 ? visibleIndex % columns : 0;
-                    }
-
-                    float x = contentLeft + static_cast<float>(column) * (itemWidth + spacingX);
-                    float y = contentTop + static_cast<float>(row) * (itemHeight + spacingY);
-                    SkRect itemRect = SkRect::MakeXYWH(x, y, itemWidth, itemHeight);
-
-                    bool isSelected = std::find(listBox.selectedIndices.begin(), listBox.selectedIndices.end(), i)
-                        != listBox.selectedIndices.end();
-                    bool isHovered = (i == listBox.hoveredIndex);
-
-                    if (isSelected || isHovered)
-                    {
-                        ECS::Color highlightColor = isSelected ? listBox.selectedColor : listBox.hoverColor;
-                        SkPaint highlightPaint;
-                        highlightPaint.setAntiAlias(true);
-                        highlightPaint.setColor4f({
-                            highlightColor.r, highlightColor.g,
-                            highlightColor.b, std::min(1.0f, highlightColor.a + 0.2f)
+                        paint.setColor4f({
+                            listBox.backgroundColor.r, listBox.backgroundColor.g,
+                            listBox.backgroundColor.b, listBox.backgroundColor.a
                         });
-                        canvas->drawRect(itemRect, highlightPaint);
+                        canvas->drawRRect(SkRRect::MakeRectXY(boxRect, listBox.roundness, listBox.roundness), paint);
                     }
 
-                    if (drawText && i < static_cast<int>(listBox.items.size()))
+                    const int itemCount = std::max(0, listBox.itemCount);
+                    const float spacingX = std::max(0.0f, listBox.itemSpacing.x);
+                    const float spacingY = std::max(0.0f, listBox.itemSpacing.y);
+                    const float trackSpacing = 4.0f;
+                    const float trackThickness = std::max(listBox.scrollbarThickness, 2.0f);
+
+                    auto clampPositive = [](int value, int fallback)
                     {
-                        float baseline = itemRect.top() + itemRect.height() * 0.5f - (metrics.fAscent + metrics.fDescent) * 0.5f;
-                        canvas->drawString(listBox.items[i].c_str(),
-                                           itemRect.left() + paddingX,
-                                           baseline,
-                                           font,
-                                           textPaint);
-                    }
-                }
+                        return value > 0 ? value : fallback;
+                    };
 
-                canvas->restore();
-            }
+                    const int visibleCandidate = listBox.visibleItemCount > 0
+                                                     ? std::min(listBox.visibleItemCount, std::max(1, itemCount))
+                                                     : std::max(1, itemCount);
 
-            if (showVertical && availableHeight > 0.0f)
-            {
-                SkRect trackRect = SkRect::MakeXYWH(contentRight + trackSpacing,
-                                                     contentTop,
-                                                     trackThickness,
-                                                     availableHeight);
-                SkPaint trackPaint;
-                trackPaint.setAntiAlias(true);
-                trackPaint.setColor4f({
-                    listBox.scrollbarTrackColor.r, listBox.scrollbarTrackColor.g,
-                    listBox.scrollbarTrackColor.b, listBox.scrollbarTrackColor.a
-                });
-                canvas->drawRRect(SkRRect::MakeRectXY(trackRect, trackThickness * 0.5f, trackThickness * 0.5f), trackPaint);
+                    int columns = 1;
+                    int rows = 1;
+                    int itemsPerPage = 0;
 
-                float thumbHeight = trackRect.height();
-                if (itemCount > 0 && itemsPerPage > 0)
-                {
-                    float ratio = static_cast<float>(itemsPerPage) / static_cast<float>(itemCount);
-                    thumbHeight = std::max(trackRect.height() * std::clamp(ratio, 0.0f, 1.0f), trackThickness);
-                }
-
-                float scrollRange = std::max(1, itemCount - itemsPerPage);
-                float thumbOffset = 0.0f;
-                if (scrollRange > 0 && itemsPerPage > 0)
-                {
-                    float ratio = static_cast<float>(std::clamp(static_cast<float>(listBox.scrollOffset), 0.0f, static_cast<float>(scrollRange))) / static_cast<float>(scrollRange);
-                    thumbOffset = (trackRect.height() - thumbHeight) * std::clamp(ratio, 0.0f, 1.0f);
-                }
-
-                SkRect thumbRect = SkRect::MakeXYWH(trackRect.left(), trackRect.top() + thumbOffset,
-                                                    trackRect.width(), thumbHeight);
-                SkPaint thumbPaint;
-                thumbPaint.setAntiAlias(true);
-                thumbPaint.setColor4f({
-                    listBox.scrollbarThumbColor.r, listBox.scrollbarThumbColor.g,
-                    listBox.scrollbarThumbColor.b, listBox.scrollbarThumbColor.a
-                });
-                canvas->drawRRect(SkRRect::MakeRectXY(thumbRect, trackThickness * 0.5f, trackThickness * 0.5f), thumbPaint);
-            }
-
-            if (showHorizontal && availableWidth > 0.0f)
-            {
-                SkRect trackRect = SkRect::MakeXYWH(contentLeft,
-                                                     contentBottom + trackSpacing,
-                                                     availableWidth,
-                                                     trackThickness);
-                SkPaint trackPaint;
-                trackPaint.setAntiAlias(true);
-                trackPaint.setColor4f({
-                    listBox.scrollbarTrackColor.r, listBox.scrollbarTrackColor.g,
-                    listBox.scrollbarTrackColor.b, listBox.scrollbarTrackColor.a
-                });
-                canvas->drawRRect(SkRRect::MakeRectXY(trackRect, trackThickness * 0.5f, trackThickness * 0.5f), trackPaint);
-
-                float thumbWidth = trackRect.width();
-                float thumbOffset = 0.0f;
-                if (baseHorizontalScrollable && itemCount > 0 && itemsPerPage > 0)
-                {
-                    float ratio = static_cast<float>(itemsPerPage) / static_cast<float>(itemCount);
-                    thumbWidth = std::max(trackRect.width() * std::clamp(ratio, 0.0f, 1.0f), trackThickness);
-                    float scrollRange = std::max(1, itemCount - itemsPerPage);
-                    if (scrollRange > 0)
+                    switch (listBox.layout)
                     {
-                        float offsetRatio = static_cast<float>(std::clamp(static_cast<float>(listBox.scrollOffset), 0.0f, static_cast<float>(scrollRange))) / static_cast<float>(scrollRange);
-                        thumbOffset = (trackRect.width() - thumbWidth) * std::clamp(offsetRatio, 0.0f, 1.0f);
+                    case ECS::ListBoxLayout::Horizontal:
+                        rows = clampPositive(listBox.maxItemsPerColumn, 1);
+                        if (listBox.visibleItemCount > 0)
+                        {
+                            columns = std::max(
+                                1, static_cast<int>(std::ceil(
+                                    static_cast<float>(visibleCandidate) / static_cast<float>(rows))));
+                            itemsPerPage = std::min(itemCount, columns * rows);
+                        }
+                        else
+                        {
+                            columns = std::max(1, static_cast<int>(std::ceil(
+                                                   static_cast<float>(std::max(1, itemCount)) / static_cast<float>(
+                                                       rows))));
+                            itemsPerPage = itemCount;
+                        }
+                        break;
+                    case ECS::ListBoxLayout::Grid:
+                        columns = clampPositive(listBox.maxItemsPerRow, 1);
+                        rows = clampPositive(listBox.maxItemsPerColumn, 1);
+                        if (listBox.visibleItemCount > 0)
+                        {
+                            int target = std::min(visibleCandidate, std::max(1, itemCount));
+                            if (listBox.maxItemsPerRow <= 0 && listBox.maxItemsPerColumn <= 0)
+                            {
+                                columns = std::max(
+                                    1, static_cast<int>(std::ceil(std::sqrt(static_cast<float>(target)))));
+                                rows = std::max(
+                                    1, static_cast<int>(std::ceil(
+                                        static_cast<float>(target) / static_cast<float>(columns))));
+                            }
+                            else if (listBox.maxItemsPerRow <= 0)
+                            {
+                                rows = clampPositive(listBox.maxItemsPerColumn, 1);
+                                columns = std::max(
+                                    1, static_cast<int>(
+                                        std::ceil(static_cast<float>(target) / static_cast<float>(rows))));
+                            }
+                            else if (listBox.maxItemsPerColumn <= 0)
+                            {
+                                columns = std::max(1, std::min(listBox.maxItemsPerRow, target));
+                                rows = std::max(
+                                    1, static_cast<int>(std::ceil(
+                                        static_cast<float>(target) / static_cast<float>(columns))));
+                            }
+                            itemsPerPage = std::min(itemCount, columns * rows);
+                        }
+                        else
+                        {
+                            itemsPerPage = std::min(itemCount, columns * rows);
+                        }
+                        break;
+                    case ECS::ListBoxLayout::Vertical:
+                    default:
+                        columns = clampPositive(listBox.maxItemsPerRow, 1);
+                        if (listBox.visibleItemCount > 0)
+                        {
+                            rows = std::max(
+                                1, static_cast<int>(std::ceil(
+                                    static_cast<float>(visibleCandidate) / static_cast<float>(columns))));
+                            itemsPerPage = std::min(itemCount, rows * columns);
+                        }
+                        else
+                        {
+                            rows = std::max(1, static_cast<int>(std::ceil(
+                                                static_cast<float>(std::max(1, itemCount)) / static_cast<float>(
+                                                    columns))));
+                            itemsPerPage = itemCount;
+                        }
+                        break;
+                    }
+
+
+                    if (listBox.visibleItemCount <= 0)
+                    {
+                        const float approxLineHeight = listBox.itemTemplate.fontSize > 0.0f
+                                                           ? (listBox.itemTemplate.fontSize * 1.4f)
+                                                           : 20.0f;
+                        const float containerWidth = listBox.rect.Width();
+                        const float containerHeight = listBox.rect.Height();
+
+                        switch (listBox.layout)
+                        {
+                        case ECS::ListBoxLayout::Horizontal:
+                            {
+                                int maxTextLen = 1;
+                                for (const auto& s : listBox.items)
+                                    maxTextLen = std::max<int>(maxTextLen, static_cast<int>(s.size()));
+                                const float estCharWidth = std::max(1.0f, listBox.itemTemplate.fontSize * 0.6f);
+                                const float paddingX = 8.0f;
+                                const float estItemWidth = paddingX * 2.0f + estCharWidth * static_cast<float>(
+                                    maxTextLen);
+
+                                rows = clampPositive(listBox.maxItemsPerColumn, 1);
+                                columns = std::max(
+                                    1, static_cast<int>(std::floor(
+                                        (containerWidth + spacingX) / (estItemWidth + spacingX))));
+                                itemsPerPage = std::min(itemCount, rows * columns);
+                                break;
+                            }
+                        case ECS::ListBoxLayout::Grid:
+                        case ECS::ListBoxLayout::Vertical:
+                        default:
+                            {
+                                columns = clampPositive(listBox.maxItemsPerRow, 1);
+                                const float cellH = approxLineHeight;
+
+                                rows = std::max(
+                                    1, static_cast<int>(std::floor((containerHeight + spacingY) / (cellH + spacingY))));
+                                itemsPerPage = std::min(itemCount, rows * columns);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (itemCount == 0)
+                    {
+                        itemsPerPage = 0;
+                    }
+                    else
+                    {
+                        itemsPerPage = std::max(1, itemsPerPage);
+                    }
+
+                    const bool primaryIsVertical = listBox.layout != ECS::ListBoxLayout::Horizontal;
+                    bool verticalScrollable = primaryIsVertical && itemCount > itemsPerPage;
+                    bool baseHorizontalScrollable = !primaryIsVertical && itemCount > itemsPerPage;
+                    bool showVertical = listBox.enableVerticalScrollbar && (verticalScrollable || !listBox.
+                        verticalScrollbarAutoHide);
+
+                    float contentLeft = boxRect.left() + 2.0f;
+                    float contentRight = boxRect.right() - 2.0f - (
+                        showVertical ? (trackThickness + trackSpacing) : 0.0f);
+                    float contentTop = boxRect.top() + 2.0f;
+                    float contentBottom = boxRect.bottom() - 2.0f;
+
+                    const bool drawText = !listBox.useContainer && listBox.itemTemplate.typeface;
+                    SkFont font;
+                    SkFontMetrics metrics{};
+                    SkPaint textPaint;
+                    if (drawText)
+                    {
+                        font = SkFont(listBox.itemTemplate.typeface, listBox.itemTemplate.fontSize);
+                        font.setEdging(SkFont::Edging::kAntiAlias);
+                        font.getMetrics(&metrics);
+
+                        textPaint.setAntiAlias(true);
+                        textPaint.setColor4f({
+                            listBox.itemColor.r, listBox.itemColor.g,
+                            listBox.itemColor.b, listBox.itemColor.a
+                        });
+                    }
+
+                    float availableWidth = std::max(0.0f, contentRight - contentLeft);
+                    float availableHeight = std::max(0.0f, contentBottom - contentTop);
+
+                    float maxContentWidth = drawText ? 0.0f : availableWidth;
+                    if (drawText)
+                    {
+                        for (const auto& text : listBox.items)
+                        {
+                            SkRect bounds{};
+                            font.measureText(text.c_str(), text.size(), SkTextEncoding::kUTF8, &bounds);
+                            maxContentWidth = std::max(maxContentWidth, bounds.width() + 16.0f);
+                        }
+                    }
+
+                    bool textHorizontalScrollable = drawText && maxContentWidth > availableWidth;
+                    bool showHorizontal = listBox.enableHorizontalScrollbar &&
+                    ((baseHorizontalScrollable || textHorizontalScrollable) || !listBox.
+                        horizontalScrollbarAutoHide);
+
+                    if (showHorizontal)
+                    {
+                        contentBottom -= (trackThickness + trackSpacing);
+                        availableHeight = std::max(0.0f, contentBottom - contentTop);
+                    }
+
+                    int maxScroll = std::max(0, itemCount - itemsPerPage);
+                    int startIndex = std::clamp(listBox.scrollOffset, 0, maxScroll);
+                    int endIndex = (itemsPerPage > 0) ? std::min(itemCount, startIndex + itemsPerPage) : 0;
+
+                    columns = std::max(1, columns);
+                    rows = std::max(1, rows);
+
+
+                    float itemWidth = 0.0f;
+                    float itemHeight = 0.0f;
+
+                    if (drawText)
+                    {
+                        const float textHeight = metrics.fDescent - metrics.fAscent;
+                        const float paddingY = 8.0f;
+                        const float actualItemHeight = textHeight + paddingY * 2.0f;
+
+
+                        float totalSpacingX = spacingX * static_cast<float>(std::max(0, columns - 1));
+                        float totalSpacingY = spacingY * static_cast<float>(std::max(0, rows - 1));
+
+                        itemWidth = columns > 0
+                                        ? (availableWidth - totalSpacingX) / static_cast<float>(columns)
+                                        : availableWidth;
+
+
+                        if (primaryIsVertical)
+                        {
+                            itemHeight = actualItemHeight;
+                        }
+                        else
+                        {
+                            itemHeight = rows > 0
+                                             ? (availableHeight - totalSpacingY) / static_cast<float>(rows)
+                                             : availableHeight;
+                        }
+                    }
+                    else
+                    {
+                        float totalSpacingX = spacingX * static_cast<float>(std::max(0, columns - 1));
+                        float totalSpacingY = spacingY * static_cast<float>(std::max(0, rows - 1));
+
+                        itemWidth = columns > 0
+                                        ? (availableWidth - totalSpacingX) / static_cast<float>(columns)
+                                        : availableWidth;
+                        itemHeight = rows > 0
+                                         ? (availableHeight - totalSpacingY) / static_cast<float>(rows)
+                                         : availableHeight;
+                    }
+
+                    itemWidth = std::max(itemWidth, 1.0f);
+                    itemHeight = std::max(itemHeight, 1.0f);
+
+                    const float paddingX = 8.0f;
+
+                    SkRect contentRect = SkRect::MakeXYWH(contentLeft, contentTop, availableWidth, availableHeight);
+                    if (contentRect.width() > 0.0f && contentRect.height() > 0.0f && endIndex > startIndex)
+                    {
+                        canvas->save();
+                        canvas->clipRect(contentRect, true);
+
+                        for (int i = startIndex; i < endIndex; ++i)
+                        {
+                            const int visibleIndex = i - startIndex;
+                            int row = 0;
+                            int column = 0;
+                            if (listBox.layout == ECS::ListBoxLayout::Horizontal)
+                            {
+                                column = rows > 0 ? visibleIndex / rows : 0;
+                                row = rows > 0 ? visibleIndex % rows : 0;
+                            }
+                            else
+                            {
+                                row = columns > 0 ? visibleIndex / columns : 0;
+                                column = columns > 0 ? visibleIndex % columns : 0;
+                            }
+
+                            float x = contentLeft + static_cast<float>(column) * (itemWidth + spacingX);
+                            float y = contentTop + static_cast<float>(row) * (itemHeight + spacingY);
+                            SkRect itemRect = SkRect::MakeXYWH(x, y, itemWidth, itemHeight);
+
+                            bool isSelected = std::find(listBox.selectedIndices.begin(), listBox.selectedIndices.end(),
+                                                        i)
+                                != listBox.selectedIndices.end();
+                            bool isHovered = (i == listBox.hoveredIndex);
+
+                            if (isSelected || isHovered)
+                            {
+                                ECS::Color highlightColor = isSelected ? listBox.selectedColor : listBox.hoverColor;
+                                SkPaint highlightPaint;
+                                highlightPaint.setAntiAlias(true);
+                                highlightPaint.setColor4f({
+                                    highlightColor.r, highlightColor.g,
+                                    highlightColor.b, std::min(1.0f, highlightColor.a + 0.2f)
+                                });
+                                canvas->drawRect(itemRect, highlightPaint);
+                            }
+
+                            if (drawText && i < static_cast<int>(listBox.items.size()))
+                            {
+                                float baseline = itemRect.top() + itemRect.height() * 0.5f - (metrics.fAscent + metrics.
+                                    fDescent) * 0.5f;
+                                canvas->drawString(listBox.items[i].c_str(),
+                                                   itemRect.left() + paddingX,
+                                                   baseline,
+                                                   font,
+                                                   textPaint);
+                            }
+                        }
+
+                        canvas->restore();
+                    }
+
+                    if (showVertical && availableHeight > 0.0f)
+                    {
+                        SkRect trackRect = SkRect::MakeXYWH(contentRight + trackSpacing,
+                                                            contentTop,
+                                                            trackThickness,
+                                                            availableHeight);
+                        SkPaint trackPaint;
+                        trackPaint.setAntiAlias(true);
+                        trackPaint.setColor4f({
+                            listBox.scrollbarTrackColor.r, listBox.scrollbarTrackColor.g,
+                            listBox.scrollbarTrackColor.b, listBox.scrollbarTrackColor.a
+                        });
+                        canvas->drawRRect(SkRRect::MakeRectXY(trackRect, trackThickness * 0.5f, trackThickness * 0.5f),
+                                          trackPaint);
+
+                        float thumbHeight = trackRect.height();
+                        if (itemCount > 0 && itemsPerPage > 0)
+                        {
+                            float ratio = static_cast<float>(itemsPerPage) / static_cast<float>(itemCount);
+                            thumbHeight = std::max(trackRect.height() * std::clamp(ratio, 0.0f, 1.0f), trackThickness);
+                        }
+
+                        float scrollRange = std::max(1, itemCount - itemsPerPage);
+                        float thumbOffset = 0.0f;
+                        if (scrollRange > 0 && itemsPerPage > 0)
+                        {
+                            float ratio = static_cast<float>(std::clamp(static_cast<float>(listBox.scrollOffset), 0.0f,
+                                                                        static_cast<float>(scrollRange))) / static_cast<
+                                float>(scrollRange);
+                            thumbOffset = (trackRect.height() - thumbHeight) * std::clamp(ratio, 0.0f, 1.0f);
+                        }
+
+                        SkRect thumbRect = SkRect::MakeXYWH(trackRect.left(), trackRect.top() + thumbOffset,
+                                                            trackRect.width(), thumbHeight);
+                        SkPaint thumbPaint;
+                        thumbPaint.setAntiAlias(true);
+                        thumbPaint.setColor4f({
+                            listBox.scrollbarThumbColor.r, listBox.scrollbarThumbColor.g,
+                            listBox.scrollbarThumbColor.b, listBox.scrollbarThumbColor.a
+                        });
+                        canvas->drawRRect(SkRRect::MakeRectXY(thumbRect, trackThickness * 0.5f, trackThickness * 0.5f),
+                                          thumbPaint);
+                    }
+
+                    if (showHorizontal && availableWidth > 0.0f)
+                    {
+                        SkRect trackRect = SkRect::MakeXYWH(contentLeft,
+                                                            contentBottom + trackSpacing,
+                                                            availableWidth,
+                                                            trackThickness);
+                        SkPaint trackPaint;
+                        trackPaint.setAntiAlias(true);
+                        trackPaint.setColor4f({
+                            listBox.scrollbarTrackColor.r, listBox.scrollbarTrackColor.g,
+                            listBox.scrollbarTrackColor.b, listBox.scrollbarTrackColor.a
+                        });
+                        canvas->drawRRect(SkRRect::MakeRectXY(trackRect, trackThickness * 0.5f, trackThickness * 0.5f),
+                                          trackPaint);
+
+                        float thumbWidth = trackRect.width();
+                        float thumbOffset = 0.0f;
+                        if (baseHorizontalScrollable && itemCount > 0 && itemsPerPage > 0)
+                        {
+                            float ratio = static_cast<float>(itemsPerPage) / static_cast<float>(itemCount);
+                            thumbWidth = std::max(trackRect.width() * std::clamp(ratio, 0.0f, 1.0f), trackThickness);
+                            float scrollRange = std::max(1, itemCount - itemsPerPage);
+                            if (scrollRange > 0)
+                            {
+                                float offsetRatio = static_cast<float>(std::clamp(
+                                    static_cast<float>(listBox.scrollOffset), 0.0f,
+                                    static_cast<float>(scrollRange))) / static_cast<float>(scrollRange);
+                                thumbOffset = (trackRect.width() - thumbWidth) * std::clamp(offsetRatio, 0.0f, 1.0f);
+                            }
+                        }
+                        else if (textHorizontalScrollable && maxContentWidth > availableWidth && maxContentWidth > 0.0f)
+                        {
+                            float ratio = availableWidth / maxContentWidth;
+                            thumbWidth = std::max(trackRect.width() * std::clamp(ratio, 0.0f, 1.0f), trackThickness);
+                        }
+
+                        SkRect thumbRect = SkRect::MakeXYWH(trackRect.left() + thumbOffset, trackRect.top(), thumbWidth,
+                                                            trackRect.height());
+                        SkPaint thumbPaint;
+                        thumbPaint.setAntiAlias(true);
+                        thumbPaint.setColor4f({
+                            listBox.scrollbarThumbColor.r, listBox.scrollbarThumbColor.g,
+                            listBox.scrollbarThumbColor.b, listBox.scrollbarThumbColor.a
+                        });
+                        canvas->drawRRect(SkRRect::MakeRectXY(thumbRect, trackThickness * 0.5f, trackThickness * 0.5f),
+                                          thumbPaint);
                     }
                 }
-                else if (textHorizontalScrollable && maxContentWidth > availableWidth && maxContentWidth > 0.0f)
-                {
-                    float ratio = availableWidth / maxContentWidth;
-                    thumbWidth = std::max(trackRect.width() * std::clamp(ratio, 0.0f, 1.0f), trackThickness);
-                }
+            );
 
-                SkRect thumbRect = SkRect::MakeXYWH(trackRect.left() + thumbOffset, trackRect.top(), thumbWidth, trackRect.height());
-                SkPaint thumbPaint;
-                thumbPaint.setAntiAlias(true);
-                thumbPaint.setColor4f({
-                    listBox.scrollbarThumbColor.r, listBox.scrollbarThumbColor.g,
-                    listBox.scrollbarThumbColor.b, listBox.scrollbarThumbColor.a
-                });
-                canvas->drawRRect(SkRRect::MakeRectXY(thumbRect, trackThickness * 0.5f, trackThickness * 0.5f), thumbPaint);
-            }
+            result->rawDrawPackets.emplace_back(RenderPacket{
+                .zIndex = batch.zIndex,
+                .batchData = std::move(batch)
+            });
         }
-    );
-
-    result->rawDrawPackets.emplace_back(RenderPacket{
-        .zIndex = batch.zIndex,
-        .batchData = std::move(batch)
-    });
-}
 
         void processSpriteData(const Renderable* currIt, const ECS::TransformComponent& transform,
                                const SpriteRenderData& spriteData)
@@ -1782,11 +1869,7 @@ void RenderableManager::SubmitFrame(std::vector<Renderable>&& frameData)
     DynamicArray<Renderable> dynamicFrameData;
     dynamicFrameData.ClearAndModify([&frameData](auto& proxy)
     {
-        proxy.Reserve(frameData.size());
-        for (auto&& renderable : frameData)
-        {
-            proxy.EmplaceBack(std::move(renderable));
-        }
+        proxy = std::move(frameData);
     });
 
     SubmitFrame(std::move(dynamicFrameData));

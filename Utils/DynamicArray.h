@@ -437,6 +437,36 @@ public:
          * @return 容量
          */
         [[nodiscard]] size_t Capacity() const noexcept { return m_buffer->m_capacity; }
+        /**
+         * @brief 判断数组是否为空。
+         * @return 是否为空
+         */
+        [[nodiscard]] bool IsEmpty() const noexcept { return m_buffer->m_size == 0; }
+
+        /**
+         * @brief 重载等于运算符,由vector直接复制给data。
+         * @param vec 源vector
+         * @return 当前Proxy引用
+         */
+        Proxy& operator=(const std::vector<T>& vec)
+        {
+            Clear();
+
+            if (!vec.empty())
+            {
+                // 确保有足够的容量
+                if (vec.size() > m_buffer->m_capacity)
+                {
+                    m_buffer->Reserve(vec.size());
+                }
+
+                // 复制数据
+                std::copy(vec.begin(), vec.end(), m_buffer->m_data);
+                m_buffer->m_size = vec.size();
+            }
+
+            return *this;
+        }
     };
 
 public:
