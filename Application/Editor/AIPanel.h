@@ -246,6 +246,7 @@ private:
 
     std::vector<ToolInvocationLog> m_toolInvocationLogs; ///< 记录工具调用的日志。
     int m_pendingToolLogIndex = -1; ///< 待审批工具调用关联的日志索引。
+    std::optional<nlohmann::json> m_pendingToolResults; ///< 待嵌入到最终消息的工具结果（纯文本持久化）。
 
     std::map<std::string, std::unique_ptr<ChatBot>> m_bots; ///< 存储所有聊天机器人的映射。
     std::vector<AvailableModel> m_availableModels; ///< 可用的AI模型列表。
@@ -302,6 +303,9 @@ private:
     void drawToolApprovalPopup(); ///< 绘制并处理工具调用审批弹窗
     void executePendingToolCalls(); ///< 执行已审批的工具调用
     void denyPendingToolCalls(const std::string& reason); ///< 拒绝工具调用并反馈给AI
+
+    // 构建“工具结果”Markdown段落，便于持久化与会话重载后的纯文本展示
+    std::string buildToolResultsMarkdown(const nlohmann::json& toolResults) const;
 
     // ===== 生成参数（可选，不设置则不上传） =====
     bool m_enableTemperature = false; ///< 是否启用 temperature 参数

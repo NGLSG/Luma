@@ -385,8 +385,11 @@ void Editor::Update(float fixedDeltaTime)
 void Editor::Render()
 {
     PROFILE_FUNCTION();
-    m_editorContext.activeScene->UpdateMainThread(1.f / m_context.currentFps, *m_editorContext.engineContext,
-                                                  m_editorContext.editorState == EditorState::Paused);
+    if (m_editorContext.activeScene)
+    {
+        m_editorContext.activeScene->UpdateMainThread(1.f / m_context.currentFps, *m_editorContext.engineContext,
+                                                      m_editorContext.editorState == EditorState::Paused);
+    }
     if (!m_graphicsBackend || !m_imguiRenderer || !m_renderSystem)
     {
         LogError("Editor::Render: 核心组件未初始化。");

@@ -154,16 +154,19 @@ void SceneManager::Update(EngineContext& engineCtx)
 
 void SceneManager::SetCurrentScene(sk_sp<RuntimeScene> scene)
 {
+    std::unique_lock<std::shared_mutex> lock(m_currentSceneMutex);
     m_currentScene = std::move(scene);
 }
 
 sk_sp<RuntimeScene> SceneManager::GetCurrentScene() const
 {
+    std::shared_lock<std::shared_mutex> lock(m_currentSceneMutex);
     return m_currentScene;
 }
 
 Guid SceneManager::GetCurrentSceneGuid() const
 {
+    std::shared_lock<std::shared_mutex> lock(m_currentSceneMutex);
     return m_currentScene ? m_currentScene->GetGuid() : Guid::Invalid();
 }
 
@@ -205,7 +208,12 @@ bool SceneManager::SaveScene(sk_sp<RuntimeScene> scene)
 
 bool SceneManager::SaveCurrentScene()
 {
-    return SaveScene(m_currentScene);
+    sk_sp<RuntimeScene> scene;
+    {
+        std::shared_lock<std::shared_mutex> lock(m_currentSceneMutex);
+        scene = m_currentScene;
+    }
+    return SaveScene(scene);
 }
 
 
@@ -263,6 +271,7 @@ bool SceneManager::CanRedo() const
 
 void SceneManager::Shutdown()
 {
+    std::unique_lock<std::shared_mutex> lock(m_currentSceneMutex);
     m_currentScene.reset();
     m_undoStack.clear();
     m_redoStack.clear();

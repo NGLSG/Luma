@@ -2,6 +2,7 @@
 #define CAMERA_H
 
 #include "../Utils/LazySingleton.h"
+#include <shared_mutex>
 #include <include/core/SkPoint.h>
 #include <include/core/SkRect.h>
 #include <include/core/SkColor.h>
@@ -33,6 +34,7 @@ public:
         float zoom = 1.0f;           ///< 摄像机的缩放级别。
         SkColor4f clearColor = SkColor4f{0.15f, 0.16f, 0.18f, 1.0f}; ///< 渲染前用于清除背景的颜色。
     } m_properties; ///< 当前摄像机的属性实例。
+    mutable std::shared_mutex m_mutex; ///< 保护摄像机属性的读写锁。
 
     /**
      * @brief 将摄像机的变换应用到给定的SkCanvas。
@@ -79,7 +81,7 @@ public:
      *
      * @return 当前摄像机的CamProperties结构体。
      */
-    CamProperties GetProperties() const { return m_properties; }
+    CamProperties GetProperties() const;
 };
 
 #endif

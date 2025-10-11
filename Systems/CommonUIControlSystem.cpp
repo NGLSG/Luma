@@ -11,6 +11,7 @@
 #include "yaml-cpp/yaml.h"
 #include "../Scripting/CoreCLRHost.h"
 #include "Renderer/Camera.h"
+#include "Application/Window.h"
 #include <SDL3/SDL_events.h>
 #include <algorithm>
 #include <cmath>
@@ -199,8 +200,8 @@ namespace Systems
 
         const bool isRuntime = context.appMode != ApplicationMode::Editor;
         const Vector2f globalMousePos = {
-            static_cast<float>(context.inputState.mousePosition.x),
-            static_cast<float>(context.inputState.mousePosition.y)
+            static_cast<float>((context.window ? context.window->GetInputState().mousePosition.x : context.inputState.mousePosition.x)),
+            static_cast<float>((context.window ? context.window->GetInputState().mousePosition.y : context.inputState.mousePosition.y))
         };
 
         auto cameraProps = scene->GetCameraProperties();
@@ -378,7 +379,7 @@ namespace Systems
 
         {
             auto view = registry.view<ECS::TransformComponent, ECS::SliderComponent>();
-            const bool leftMouseDown = context.inputState.isLeftMouseDown;
+            const bool leftMouseDown = context.window ? context.window->GetInputState().isLeftMouseDown : context.inputState.isLeftMouseDown;
 
             for (auto entity : view)
             {
@@ -1027,7 +1028,7 @@ namespace Systems
                 
                 if (isRuntime && (showVertical || showHorizontal) && maxScroll > 0)
                 {
-                    const bool mouseDown = context.inputState.isLeftMouseDown;
+                    const bool mouseDown = context.window ? context.window->GetInputState().isLeftMouseDown : context.inputState.isLeftMouseDown;
                     
                     if (showVertical)
                     {

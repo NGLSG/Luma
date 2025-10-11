@@ -67,7 +67,11 @@ void ApplicationBase::Run()
 
         Keyboard::GetInstance().Update();
         LumaCursor::GetInstance().Update();
-        m_context.inputState = m_window->GetInputState();
+        const InputState latestInput = m_window->GetInputState();
+        
+        m_context.commandsForSim.Push([this, latestInput]() {
+            m_context.inputState = latestInput; 
+        });
         static double accumulator = 0.0;
         const float fixedDeltaTime = 1.0f / static_cast<float>(m_config.SimulationFPS);
         accumulator += frameTime;

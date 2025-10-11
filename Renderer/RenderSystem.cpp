@@ -291,7 +291,7 @@ void RenderSystem::Flush()
     }
     canvas->save();
 
-    canvas->clear(Camera::GetInstance().m_properties.clearColor);
+    canvas->clear(Camera::GetInstance().GetProperties().clearColor);
     Camera::GetInstance().ApplyTo(canvas);
 
     pImpl->DrawAllSpriteBatches(canvas);

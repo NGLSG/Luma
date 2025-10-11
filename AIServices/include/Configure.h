@@ -222,6 +222,12 @@ struct Configure
     UserInfo admin = {"admin", "null", "123456", 999}; ///< 管理员用户信息。
     // 0=Chat, 1=Agent, 2=AgentFull
     int permissionLevel = 0; ///< AI 面板权限等级（0=Chat,1=Agent,2=AgentFull）。
+    // ===== Agent 行为与展示配置 =====
+    int maxReasoningRounds = 6; ///< 允许的最大思考/迭代轮数（用于提示词引导收敛）。
+    std::string headingThinking = "思考"; ///< 文本响应中的思考段落标题。
+    std::string headingToolResults = "工具结果"; ///< 文本响应中的工具结果段落标题。
+    std::string headingSummary = "总结"; ///< 文本响应中的总结段落标题。
+    bool embedToolResultsInFinalMessage = true; ///< 是否将工具结果以纯文本嵌入最终助手消息，便于会话重载后查看。
     OpenAIBotCreateInfo openAi; ///< OpenAI 机器人配置。
     ClaudeBotCreateInfo claude; ///< Claude 机器人配置。
     GeminiBotCreateInfo gemini; ///< Gemini 机器人配置。
@@ -994,6 +1000,11 @@ namespace YAML
             node["enableAuth"] = config.enableAuth;
             node["admin"] = config.admin;
             node["permissionLevel"] = config.permissionLevel;
+            node["maxReasoningRounds"] = config.maxReasoningRounds;
+            node["headingThinking"] = config.headingThinking;
+            node["headingToolResults"] = config.headingToolResults;
+            node["headingSummary"] = config.headingSummary;
+            node["embedToolResultsInFinalMessage"] = config.embedToolResultsInFinalMessage;
             node["openAi"] = config.openAi;
             node["claude"] = config.claude;
             node["gemini"] = config.gemini;
@@ -1036,6 +1047,21 @@ namespace YAML
             }
             if (node["permissionLevel"]) {
                 config.permissionLevel = node["permissionLevel"].as<int>();
+            }
+            if (node["maxReasoningRounds"]) {
+                config.maxReasoningRounds = node["maxReasoningRounds"].as<int>();
+            }
+            if (node["headingThinking"]) {
+                config.headingThinking = node["headingThinking"].as<std::string>();
+            }
+            if (node["headingToolResults"]) {
+                config.headingToolResults = node["headingToolResults"].as<std::string>();
+            }
+            if (node["headingSummary"]) {
+                config.headingSummary = node["headingSummary"].as<std::string>();
+            }
+            if (node["embedToolResultsInFinalMessage"]) {
+                config.embedToolResultsInFinalMessage = node["embedToolResultsInFinalMessage"].as<bool>();
             }
             if (node["claudeAPI"])
             {

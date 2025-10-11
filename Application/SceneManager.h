@@ -8,6 +8,7 @@
 #include <future>
 #include <queue>
 #include <mutex>
+#include <shared_mutex>
 
 #include "../Utils/LazySingleton.h"
 #include "../Utils/Guid.h"
@@ -132,6 +133,7 @@ private:
     };
 
     sk_sp<RuntimeScene> m_currentScene; ///< 当前活动的运行时场景。
+    mutable std::shared_mutex m_currentSceneMutex; ///< 保护当前场景指针的读写锁。
 
     std::thread m_loadingThread; ///< 用于异步加载场景的线程。
     std::queue<SceneLoadRequest> m_completedLoads; ///< 已完成的场景加载请求队列。

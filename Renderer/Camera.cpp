@@ -3,30 +3,33 @@
 
 SkPoint Camera::ScreenToWorld(const SkPoint& screenPoint) const
 {
-    const float localX = screenPoint.x() - m_properties.viewport.x();
-    const float localY = screenPoint.y() - m_properties.viewport.y();
+    std::shared_lock<std::shared_mutex> lock(m_mutex);
+    const auto props = m_properties;
+    const float localX = screenPoint.x() - props.viewport.x();
+    const float localY = screenPoint.y() - props.viewport.y();
 
 
-    float worldX = (localX - m_properties.viewport.width() * 0.5f) / m_properties.zoom + m_properties.position.x();
-    float worldY = (localY - m_properties.viewport.height() * 0.5f) / m_properties.zoom + m_properties.position.y();
+    float worldX = (localX - props.viewport.width() * 0.5f) / props.zoom + props.position.x();
+    float worldY = (localY - props.viewport.height() * 0.5f) / props.zoom + props.position.y();
     return {worldX, worldY};
 }
 
 SkPoint Camera::WorldToScreen(const SkPoint& worldPoint) const
 {
-    float localX = (worldPoint.x() - m_properties.position.x()) * m_properties.zoom + m_properties.viewport.width() *
-        0.5f;
-    float localY = (worldPoint.y() - m_properties.position.y()) * m_properties.zoom + m_properties.viewport.height() *
-        0.5f;
+    std::shared_lock<std::shared_mutex> lock(m_mutex);
+    const auto props = m_properties;
+    float localX = (worldPoint.x() - props.position.x()) * props.zoom + props.viewport.width() * 0.5f;
+    float localY = (worldPoint.y() - props.position.y()) * props.zoom + props.viewport.height() * 0.5f;
 
 
-    float screenX = localX + m_properties.viewport.x();
-    float screenY = localY + m_properties.viewport.y();
+    float screenX = localX + props.viewport.x();
+    float screenY = localY + props.viewport.y();
     return {screenX, screenY};
 }
 
 void Camera::SetProperties(const CamProperties& cam_properties)
 {
+    std::unique_lock<std::shared_mutex> lock(m_mutex);
     m_properties = cam_properties;
 
 
@@ -38,16 +41,18 @@ void Camera::SetProperties(const CamProperties& cam_properties)
 
 SkM44 Camera::BuildViewMatrix()
 {
+    std::shared_lock<std::shared_mutex> lock(m_mutex);
+    const auto props = m_properties;
     SkM44 viewMatrix;
 
 
-    viewMatrix.preTranslate(m_properties.viewport.width() * 0.5f, m_properties.viewport.height() * 0.5f);
+    viewMatrix.preTranslate(props.viewport.width() * 0.5f, props.viewport.height() * 0.5f);
 
 
-    viewMatrix.preScale(m_properties.zoom, m_properties.zoom);
+    viewMatrix.preScale(props.zoom, props.zoom);
 
 
-    viewMatrix.preTranslate(-m_properties.position.x(), -m_properties.position.y());
+    viewMatrix.preTranslate(-props.position.x(), -props.position.y());
 
     return viewMatrix;
 }
@@ -55,13 +60,15 @@ SkM44 Camera::BuildViewMatrix()
 void Camera::ApplyTo(SkCanvas* canvas) const
 {
     if (!canvas) return;
+    std::shared_lock<std::shared_mutex> lock(m_mutex);
+    const auto props = m_properties;
+    canvas->translate(props.viewport.width() * 0.5f, props.viewport.height() * 0.5f);
+    canvas->scale(props.zoom, props.zoom);
+    canvas->translate(-props.position.x(), -props.position.y());
+}
 
-
-    canvas->translate(m_properties.viewport.width() * 0.5f, m_properties.viewport.height() * 0.5f);
-
-
-    canvas->scale(m_properties.zoom, m_properties.zoom);
-
-
-    canvas->translate(-m_properties.position.x(), -m_properties.position.y());
+Camera::CamProperties Camera::GetProperties() const
+{
+    std::shared_lock<std::shared_mutex> lock(m_mutex);
+    return m_properties;
 }

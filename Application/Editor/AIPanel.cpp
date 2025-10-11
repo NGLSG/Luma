@@ -261,9 +261,20 @@ void AIPanel::Update(float deltaTime)
             {
                 if (m_toolCallMessageIndex != -1)
                 {
-                    m_messages[m_toolCallMessageIndex].content = filterUnintendTags(finalRawResponse);
+                    std::string finalText = filterUnintendTags(finalRawResponse);
+                    if (m_pendingToolResults.has_value() && m_config.embedToolResultsInFinalMessage)
+                    {
+                        
+                        std::string toolSection = buildToolResultsMarkdown(*m_pendingToolResults);
+                        if (!toolSection.empty())
+                        {
+                            finalText = toolSection + "\n\n" + finalText;
+                        }
+                    }
+                    m_messages[m_toolCallMessageIndex].content = finalText;
                     m_messages.erase(m_messages.begin() + m_toolCallMessageIndex + 1, m_messages.end());
                     m_toolCallMessageIndex = -1;
+                    m_pendingToolResults.reset();
                 }
                 else
                 {
@@ -302,8 +313,11 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
         auto& bot = m_bots.at(m_currentBotKey);
         m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        
+        m_pendingToolResults = toolResults;
         std::string followUp = toolResults.dump(2);
-        followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## Summary，总结最终结果；不要展示工具调用细节或原始参数。请收敛，最多再思考/迭代 2 轮。";
+        
+        followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## " + m_config.headingSummary + "，总结最终结果；不要展示工具调用细节或原始参数。请先发散后收敛，最多再思考/迭代 " + std::to_string(std::max(0, m_config.maxReasoningRounds)) + " 轮。";
         bot->SubmitAsync(followUp, m_lastRequestTimestamp, Role::User, m_currentConversation);
         
         m_messages.push_back({"assistant", "", 0});
@@ -376,8 +390,9 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
         auto& bot = m_bots.at(m_currentBotKey);
         m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        m_pendingToolResults = toolResults;
         std::string followUp = toolResults.dump(2);
-        followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## Summary，总结最终结果；不要展示工具调用细节或原始参数。请收敛，最多再思考/迭代 2 轮。";
+        followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## " + m_config.headingSummary + "，总结最终结果；不要展示工具调用细节或原始参数。请先发散后收敛，最多再思考/迭代 " + std::to_string(std::max(0, m_config.maxReasoningRounds)) + " 轮。";
         bot->SubmitAsync(followUp, m_lastRequestTimestamp, Role::User, m_currentConversation);
         
         m_messages.push_back({"assistant", "", 0});
@@ -447,8 +462,9 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
     auto& bot = m_bots.at(m_currentBotKey);
     m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    m_pendingToolResults = toolResults;
     std::string followUp = toolResults.dump(2);
-    followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## Summary，总结最终结果；不要展示工具调用细节或原始参数。请收敛，最多再思考/迭代 2 轮。";
+    followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## " + m_config.headingSummary + "，总结最终结果；不要展示工具调用细节或原始参数。请先发散后收敛，最多再思考/迭代 " + std::to_string(std::max(0, m_config.maxReasoningRounds)) + " 轮。";
     bot->SubmitAsync(followUp, m_lastRequestTimestamp, Role::User, m_currentConversation);
     
     m_messages.push_back({"assistant", "", 0});
@@ -476,6 +492,38 @@ void AIPanel::synchronizeAndSaveHistory()
 
 
     bot->Save(m_currentConversation);
+}
+
+
+std::string AIPanel::buildToolResultsMarkdown(const nlohmann::json& toolResults) const
+{
+    try
+    {
+        if (!toolResults.contains("tool_results") || !toolResults["tool_results"].is_array())
+            return {};
+
+        std::ostringstream oss;
+        oss << "## " << m_config.headingToolResults << "\n";
+        for (const auto& item : toolResults["tool_results"]) {
+            std::string fname = item.value("function_name", "unknown");
+            const auto& res = item.contains("result") ? item["result"] : nlohmann::json::object();
+            bool success = res.contains("success") ? res.value("success", false) : false;
+            std::string status = success ? "成功" : "失败";
+            std::string extra;
+            if (!success && res.contains("error") && res["error"].is_string())
+            {
+                extra = std::string("（错误: ") + res["error"].get<std::string>() + ")";
+            }
+            oss << "- " << fname << "：" << status;
+            if (!extra.empty()) oss << " " << extra;
+            oss << "\n";
+        }
+        return oss.str();
+    }
+    catch (...)
+    {
+        return {};
+    }
 }
 
 
@@ -1288,8 +1336,9 @@ void AIPanel::executePendingToolCalls()
     auto& bot = m_bots.at(m_currentBotKey);
     m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    m_pendingToolResults = toolResults;
     std::string followUp = toolResults.dump(2);
-    followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## Summary，总结最终结果；不要展示工具调用细节或原始参数。请收敛，最多再思考/迭代 2 轮。";
+    followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## " + m_config.headingSummary + "，总结最终结果；不要展示工具调用细节或原始参数。请先发散后收敛，最多再思考/迭代 " + std::to_string(std::max(0, m_config.maxReasoningRounds)) + " 轮。";
     bot->SubmitAsync(followUp, m_lastRequestTimestamp, Role::User, m_currentConversation);
     
     m_messages.push_back({"assistant", "", 0});
@@ -1345,8 +1394,9 @@ void AIPanel::denyPendingToolCalls(const std::string& reason)
     auto& bot = m_bots.at(m_currentBotKey);
     m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    m_pendingToolResults = toolResults;
     std::string followUp = toolResults.dump(2);
-    followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## Summary，总结最终结果；不要展示工具调用细节或原始参数。请收敛，最多再思考/迭代 2 轮。";
+    followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## " + m_config.headingSummary + "，总结最终结果；不要展示工具调用细节或原始参数。请先发散后收敛，最多再思考/迭代 " + std::to_string(std::max(0, m_config.maxReasoningRounds)) + " 轮。";
     bot->SubmitAsync(followUp, m_lastRequestTimestamp, Role::User, m_currentConversation);
     
     m_messages.push_back({"assistant", "", 0});
@@ -1996,7 +2046,7 @@ Core Rules & Behavior
 8. Project Grounding: When the user's request relates to this Luma Engine project or its assets, proactively inspect the relevant source files with the provided tools before responding. Base your explanation strictly on what you verify; never fabricate APIs or behavior.
 9. Planning & Convergence: Before any tool call you MUST think briefly (internally) and plan the next step. After each tool response, re-evaluate the plan concisely and decide whether additional calls are necessary.
    - Keep your thinking short and focused; avoid verbose chains of thought.
-   - Converge quickly: at most 2 additional plan-and-call cycles per user request.
+    - Converge: explore briefly then converge; at most 2 additional plan-and-call cycles per user request.
    - If still ambiguous or blocked, ask one concise clarification in plain text, then stop.
 
 Response Format (MANDATORY & STRICT)
@@ -2075,6 +2125,15 @@ Tool Manifest
 C# Scripting Example
 {{C_SHARP_EXAMPLE}}
 )";
+    // 根据配置动态调整：思考/工具结果/总结标题，以及最大思考轮数与“先发散后收敛”指令
+    StringReplace(promptTemplate, "## Thinking", std::string("## ") + m_config.headingThinking);
+    StringReplace(promptTemplate, "## Tool Results", std::string("## ") + m_config.headingToolResults);
+    StringReplace(promptTemplate, "## Summary", std::string("## ") + m_config.headingSummary);
+    // 放宽迭代规则：从固定2轮改为由配置驱动，并显式强调“先发散后收敛”
+    StringReplace(promptTemplate,
+        "at most 2 additional plan-and-call cycles per user request.",
+        std::string("up to ") + std::to_string(std::max(0, m_config.maxReasoningRounds)) +
+        " plan-and-call cycles as needed; first DIVERGE then CONVERGE.");
 
     //注册“ModifyComponent”,用于修改游戏对象组件属性
     {
