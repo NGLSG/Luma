@@ -270,12 +270,14 @@ NativeWindowHandle PlatformWindow::GetNativeWindowHandle() const
 
 #elif defined(SDL_PLATFORM_MACOS)
 
-    handle.metalLayer = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_COCOA_METAL_LAYER_POINTER, NULL);
+    handle.metalLayer = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
 
 #elif defined(SDL_PLATFORM_LINUX) && !defined(SDL_PLATFORM_ANDROID)
 
     handle.x11Display = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
     handle.x11Window = SDL_GetNumberProperty(props, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
+#elif defined(SDL_PLATFORM_ANDROID)
+    handle.aNativeWindow = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, NULL);
 
 #endif
 

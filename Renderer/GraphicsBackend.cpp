@@ -1,4 +1,3 @@
-
 #include "GraphicsBackend.h"
 
 #include "include/core/SkData.h"
@@ -334,6 +333,10 @@ wgpu::Surface GraphicsBackend::CreateSurface(const GraphicsBackendOptions& optio
     surfaceChainedDesc.display = options.windowHandle.x11Display;
     surfaceChainedDesc.window = options.windowHandle.x11Window;
     surfaceDesc.nextInChain = &surfaceChainedDesc;
+#elif defined(__ANDROID__)
+    wgpu::SurfaceDescriptorFromAndroidNativeWindow surfaceChainedDesc;
+    surfaceChainedDesc.window = options.windowHandle.aNativeWindow;
+    surfaceDesc.nextInChain = &surfaceChainedDesc;
 #else
 #error "Unsupported platform for surface creation"
     LogError("不支持的平台: 无法创建表面");
@@ -502,7 +505,6 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& options)
             }
             configureSurface(options.width, options.height);
         }
-
     }
     catch (const std::exception& e)
     {
@@ -689,10 +691,10 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
         }
 
         auto surface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(),
-                                              backendTex,
-                                              kBGRA_8888_SkColorType,
-                                              nullptr,
-                                              nullptr);
+                                                      backendTex,
+                                                      kBGRA_8888_SkColorType,
+                                                      nullptr,
+                                                      nullptr);
         if (!surface)
         {
             LogError("GetSurface: 包装活动渲染目标失败");
@@ -712,7 +714,7 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
             }
 
             auto skSurface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(), backendTex,
-                                                  kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
+                                                            kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
             if (!skSurface)
             {
                 LogError("GetSurface: 包装 MSAA 纹理失败");
@@ -737,7 +739,7 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
             }
 
             auto skSurface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(), backendTex,
-                                                  kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
+                                                            kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
             if (!skSurface)
             {
                 LogError("GetSurface: 包装表面纹理失败");

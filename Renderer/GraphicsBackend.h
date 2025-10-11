@@ -13,10 +13,10 @@
  */
 enum class BackendType
 {
-    D3D12,  ///< Direct3D 12 后端。
-    D3D11,  ///< Direct3D 11 后端。
+    D3D12, ///< Direct3D 12 后端。
+    D3D11, ///< Direct3D 11 后端。
     Vulkan, ///< Vulkan 后端。
-    Metal,  ///< Metal 后端。
+    Metal, ///< Metal 后端。
     OpenGL, ///< OpenGL 后端。
     OpenGLES, ///< OpenGL ES 后端。
 };
@@ -26,10 +26,10 @@ enum class BackendType
  */
 enum class QualityLevel
 {
-    Low,    ///< 低质量。
+    Low, ///< 低质量。
     Medium, ///< 中等质量。
-    High,   ///< 高质量。
-    Ultra   ///< 超高质量。
+    High, ///< 高质量。
+    Ultra ///< 超高质量。
 };
 
 /**
@@ -40,13 +40,15 @@ enum class QualityLevel
 struct NativeWindowHandle
 {
 #if defined(_WIN32)
-    void* hWnd = nullptr;   ///< Windows 窗口句柄。
-    void* hInst = nullptr;  ///< Windows 实例句柄。
+    void* hWnd = nullptr; ///< Windows 窗口句柄。
+    void* hInst = nullptr; ///< Windows 实例句柄。
 #elif defined(__APPLE__)
     void* metalLayer = nullptr; ///< Metal 层对象。
 #elif defined(__linux__) && !defined(__ANDROID__)
     void* x11Display = nullptr; ///< X11 显示器句柄。
     unsigned long x11Window = 0; ///< X11 窗口ID。
+#elif defined(__ANDROID__)
+    void* aNativeWindow = nullptr; ///< Android 原生窗口指针。
 #else
 
     void* placeholder = nullptr; ///< 占位符，用于未知平台。
@@ -64,6 +66,8 @@ struct NativeWindowHandle
         return metalLayer != nullptr;
 #elif defined(__linux__) && !defined(__ANDROID__)
         return x11Display != nullptr && x11Window != 0;
+#elif defined(__ANDROID__)
+        return androidWindow != nullptr;
 #else
         return placeholder != nullptr;
 #endif

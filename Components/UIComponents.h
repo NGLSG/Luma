@@ -1345,7 +1345,7 @@ REGISTRY
         .property("onValueChangedTargets", &ECS::ProgressBarComponent::onValueChangedTargets)
         .property("onCompletedTargets", &ECS::ProgressBarComponent::onCompletedTargets);
 
-    Registry_<ECS::TabControlComponent>("TabControlComponent")
+    /*Registry_<ECS::TabControlComponent>("TabControlComponent")
         .property("rect", &ECS::TabControlComponent::rect)
         .property("isVisible", &ECS::TabControlComponent::isVisible)
         .property("tabs", &ECS::TabControlComponent::tabs)
@@ -1363,7 +1363,7 @@ REGISTRY
         .property("hoverTabColor", &ECS::TabControlComponent::hoverTabColor)
         .property("disabledTabColor", &ECS::TabControlComponent::disabledTabColor)
         .property("onTabChangedTargets", &ECS::TabControlComponent::onTabChangedTargets)
-        .property("onTabClosedTargets", &ECS::TabControlComponent::onTabClosedTargets);
+        .property("onTabClosedTargets", &ECS::TabControlComponent::onTabClosedTargets);*/
 
     Registry_<ECS::ListBoxComponent>("ListBoxComponent")
         .property("rect", &ECS::ListBoxComponent::rect)
