@@ -416,6 +416,7 @@ void Editor::Render()
 
     
     
+    RenderableManager::GetInstance().SetExternalAlpha(m_context.interpolationAlpha);
     m_editorContext.renderQueue = RenderableManager::GetInstance().GetInterpolationData();
     auto currentTime = std::chrono::steady_clock::now();
     float deltaTime = std::chrono::duration<float>(currentTime - m_editorContext.lastFrameTime).count();

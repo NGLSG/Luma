@@ -719,15 +719,6 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             return static_cast<uint32_t>(a.entityId) < static_cast<uint32_t>(b.entityId);
         });
     }
-    for (auto& renderable : renderables)
-    {
-        std::fstream file("DebugTracing.txt", std::ios::app | std::ios::out);
-        file << "Renderable Entity: " << static_cast<uint32_t>(renderable.entityId) << " Recorded transform is:"
-            << " Position(" << renderable.transform.position.x << ", " << renderable.transform.position.y << ")"
-            << " Rotation(" << renderable.transform.rotation << ")"
-            << " Scale(" << renderable.transform.scale.x << ", " << renderable.transform.scale.y << ")"
-            << std::endl;
-        file.close();
-    }
+    
     RenderableManager::GetInstance().SubmitFrame(std::move(renderables));
 }

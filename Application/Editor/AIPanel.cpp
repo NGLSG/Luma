@@ -3440,7 +3440,7 @@ void AIPanel::drawRightOptionsPanel()
     }
 
     ImGui::Dummy(ImVec2(0, 6));
-    ImGui::Text("全局参数（持久化）");
+    ImGui::Text("全局参数");
     ImGui::Separator();
     // 使用已有的变量编辑器复用 UI 逻辑
     drawVariablesEditor(m_config.globalParams, "global_params_editor");

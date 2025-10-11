@@ -13,6 +13,9 @@
 #include "include/core/SkPath.h"
 #include "include/core/SkRRect.h"
 
+#include <cstdint>
+#include <cstring>
+
 inline float Lerp(float a, float b, float t)
 {
     return a + (b - a) * t;
@@ -20,6 +23,113 @@ inline float Lerp(float a, float b, float t)
 
 namespace
 {
+    static inline uint32_t float_bits(float v)
+    {
+        uint32_t b;
+        static_assert(sizeof(float) == sizeof(uint32_t));
+        std::memcpy(&b, &v, sizeof(uint32_t));
+        return b;
+    }
+
+    static inline uint64_t hash_combine_u64(uint64_t seed, uint64_t v)
+    {
+        
+        const uint64_t kMul = 0x9ddfea08eb382d69ULL;
+        uint64_t a = (v ^ seed) * kMul;
+        a ^= (a >> 47);
+        uint64_t b = (seed ^ a) * kMul;
+        b ^= (b >> 47);
+        b *= kMul;
+        return b;
+    }
+
+    static int packet_type_index(const RenderPacket& p)
+    {
+        return static_cast<int>(p.batchData.index());
+    }
+
+    static uint64_t stable_packet_key(const RenderPacket& p)
+    {
+        uint64_t seed = 0xcbf29ce484222325ULL; 
+        std::visit([&](auto const& batch)
+        {
+            using T = std::decay_t<decltype(batch)>;
+            if constexpr (std::is_same_v<T, SpriteBatch>)
+            {
+                seed = hash_combine_u64(seed, reinterpret_cast<uint64_t>(batch.image.get()));
+                seed = hash_combine_u64(seed, reinterpret_cast<uint64_t>(batch.material));
+                seed = hash_combine_u64(seed, float_bits(batch.sourceRect.fLeft));
+                seed = hash_combine_u64(seed, float_bits(batch.sourceRect.fTop));
+                seed = hash_combine_u64(seed, float_bits(batch.sourceRect.fRight));
+                seed = hash_combine_u64(seed, float_bits(batch.sourceRect.fBottom));
+                seed = hash_combine_u64(seed, float_bits(batch.ppuScaleFactor));
+                
+                seed = hash_combine_u64(seed, float_bits(batch.color.fR));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fG));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fB));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fA));
+                seed = hash_combine_u64(seed, static_cast<uint64_t>(batch.filterQuality));
+                seed = hash_combine_u64(seed, static_cast<uint64_t>(batch.wrapMode));
+            }
+            else if constexpr (std::is_same_v<T, TextBatch>)
+            {
+                seed = hash_combine_u64(seed, reinterpret_cast<uint64_t>(batch.typeface.get()));
+                seed = hash_combine_u64(seed, float_bits(batch.fontSize));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fR));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fG));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fB));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fA));
+                seed = hash_combine_u64(seed, static_cast<uint64_t>(batch.alignment));
+            }
+            else if constexpr (std::is_same_v<T, InstanceBatch>)
+            {
+                seed = hash_combine_u64(seed, reinterpret_cast<uint64_t>(batch.atlasImage.get()));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fR));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fG));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fB));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fA));
+                seed = hash_combine_u64(seed, static_cast<uint64_t>(batch.filterQuality));
+                seed = hash_combine_u64(seed, static_cast<uint64_t>(batch.wrapMode));
+            }
+            else if constexpr (std::is_same_v<T, RectBatch>)
+            {
+                seed = hash_combine_u64(seed, float_bits(batch.size.fWidth));
+                seed = hash_combine_u64(seed, float_bits(batch.size.fHeight));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fR));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fG));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fB));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fA));
+            }
+            else if constexpr (std::is_same_v<T, CircleBatch>)
+            {
+                seed = hash_combine_u64(seed, float_bits(batch.radius));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fR));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fG));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fB));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fA));
+            }
+            else if constexpr (std::is_same_v<T, LineBatch>)
+            {
+                seed = hash_combine_u64(seed, float_bits(batch.width));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fR));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fG));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fB));
+                seed = hash_combine_u64(seed, float_bits(batch.color.fA));
+            }
+            else if constexpr (std::is_same_v<T, ShaderBatch>)
+            {
+                seed = hash_combine_u64(seed, reinterpret_cast<uint64_t>(batch.material));
+                seed = hash_combine_u64(seed, float_bits(batch.size.fWidth));
+                seed = hash_combine_u64(seed, float_bits(batch.size.fHeight));
+            }
+            else if constexpr (std::is_same_v<T, RawDrawBatch>)
+            {
+                
+                seed = hash_combine_u64(seed, 0xDEADBEEFULL);
+            }
+        }, p.batchData);
+        return seed;
+    }
     struct ThreadLocalBatchResult
     {
         std::unordered_map<FastSpriteBatchKey, size_t> spriteGroupIndices;
@@ -1842,6 +1952,10 @@ void RenderableManager::SubmitFrame(DynamicArray<Renderable>&& frameData)
             {
                 proxy.PushBack(currView[i]);
             }
+            proxy.Sort([](const Renderable& a, const Renderable& b)
+            {
+                return static_cast<uint32_t>(a.entityId) < static_cast<uint32_t>(b.entityId);
+            });
         });
     }
 
@@ -1854,6 +1968,10 @@ void RenderableManager::SubmitFrame(DynamicArray<Renderable>&& frameData)
             {
                 proxy.PushBack(newView[i]);
             }
+            proxy.Sort([](const Renderable& a, const Renderable& b)
+            {
+                return static_cast<uint32_t>(a.entityId) < static_cast<uint32_t>(b.entityId);
+            });
         });
     }
 
@@ -2155,7 +2273,13 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
     std::ranges::sort(outPackets, [](const RenderPacket& a, const RenderPacket& b)
     {
-        return a.zIndex < b.zIndex;
+        if (a.zIndex != b.zIndex) return a.zIndex < b.zIndex;
+        int ta = packet_type_index(a);
+        int tb = packet_type_index(b);
+        if (ta != tb) return ta < tb;
+        uint64_t ka = stable_packet_key(a);
+        uint64_t kb = stable_packet_key(b);
+        return ka < kb;
     });
 
     activeBufferIndex.store(buildIndex, std::memory_order_release);
