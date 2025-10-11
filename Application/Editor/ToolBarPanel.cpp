@@ -853,7 +853,7 @@ void ToolbarPanel::play()
         playScene->AddSystem<Systems::InteractionSystem>();
         playScene->AddSystem<Systems::ButtonSystem>();
         playScene->AddSystemToMainThread<Systems::InputTextSystem>();
-        playScene->AddSystem<Systems::CommonUIControlSystem>();
+        playScene->AddSystemToMainThread<Systems::CommonUIControlSystem>();
         playScene->AddSystem<Systems::ScriptingSystem>();
         playScene->AddSystem<Systems::AnimationSystem>();
         

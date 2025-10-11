@@ -83,8 +83,8 @@ sk_sp<RuntimeScene> SceneManager::LoadScene(const Guid& guid)
         newScene->AddSystem<Systems::InteractionSystem>();
         newScene->AddSystem<Systems::AudioSystem>();
         newScene->AddSystem<Systems::ButtonSystem>();
-        newScene->AddSystem<Systems::InputTextSystem>();
-        newScene->AddSystem<Systems::CommonUIControlSystem>();
+        newScene->AddSystemToMainThread<Systems::InputTextSystem>();
+        newScene->AddSystemToMainThread<Systems::CommonUIControlSystem>();
         newScene->AddSystem<Systems::ScriptingSystem>();
         newScene->AddSystem<Systems::AnimationSystem>();
         newScene->Activate(*m_context);

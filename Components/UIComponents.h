@@ -14,7 +14,7 @@
 #include "TextComponent.h"
 #include "include/core/SkCanvas.h"
 #include "RuntimeAsset/RuntimeTexture.h"
-
+#include "imgui_stdlib.h"
 namespace ECS
 {
     /**
@@ -594,8 +594,9 @@ namespace YAML
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
             rhs.isToggled = node["isToggled"].as<bool>(rhs.isToggled);
             rhs.allowToggleOff = node["allowToggleOff"].as<bool>(rhs.allowToggleOff);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
-                rhs.backgroundImage);
+            if (node["backgroundImage"])
+                rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                    rhs.backgroundImage);
             rhs.roundness = node["roundness"].as<float>(rhs.roundness);
             rhs.normalColor = node["normalColor"].as<ECS::Color>(rhs.normalColor);
             rhs.hoverColor = node["hoverColor"].as<ECS::Color>(rhs.hoverColor);
@@ -653,8 +654,9 @@ namespace YAML
             rhs.groupId = node["groupId"].as<std::string>(rhs.groupId);
             rhs.isSelected = node["isSelected"].as<bool>(rhs.isSelected);
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
-                rhs.backgroundImage);
+            if (node["backgroundImage"])
+                rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                    rhs.backgroundImage);
             if (node["selectionImage"]) rhs.selectionImage = node["selectionImage"].as<AssetHandle>(rhs.selectionImage);
             rhs.roundness = node["roundness"].as<float>(rhs.roundness);
             rhs.normalColor = node["normalColor"].as<ECS::Color>(rhs.normalColor);
@@ -713,8 +715,9 @@ namespace YAML
             rhs.allowIndeterminate = node["allowIndeterminate"].as<bool>(rhs.allowIndeterminate);
             rhs.isIndeterminate = node["isIndeterminate"].as<bool>(rhs.isIndeterminate);
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
-                rhs.backgroundImage);
+            if (node["backgroundImage"])
+                rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                    rhs.backgroundImage);
             if (node["checkmarkImage"]) rhs.checkmarkImage = node["checkmarkImage"].as<AssetHandle>(rhs.checkmarkImage);
             rhs.roundness = node["roundness"].as<float>(rhs.roundness);
             rhs.normalColor = node["normalColor"].as<ECS::Color>(rhs.normalColor);
@@ -833,8 +836,9 @@ namespace YAML
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
             rhs.allowCustomInput = node["allowCustomInput"].as<bool>(rhs.allowCustomInput);
             rhs.displayText = node["displayText"].as<ECS::TextComponent>(rhs.displayText);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
-                rhs.backgroundImage);
+            if (node["backgroundImage"])
+                rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                    rhs.backgroundImage);
             if (node["dropdownIcon"]) rhs.dropdownIcon = node["dropdownIcon"].as<AssetHandle>(rhs.dropdownIcon);
             rhs.roundness = node["roundness"].as<float>(rhs.roundness);
             rhs.normalColor = node["normalColor"].as<ECS::Color>(rhs.normalColor);
@@ -886,8 +890,9 @@ namespace YAML
             rhs.isExpanded = node["isExpanded"].as<bool>(rhs.isExpanded);
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
             rhs.roundness = node["roundness"].as<float>(rhs.roundness);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
-                rhs.backgroundImage);
+            if (node["backgroundImage"])
+                rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                    rhs.backgroundImage);
             rhs.headerColor = node["headerColor"].as<ECS::Color>(rhs.headerColor);
             rhs.expandedColor = node["expandedColor"].as<ECS::Color>(rhs.expandedColor);
             rhs.collapsedColor = node["collapsedColor"].as<ECS::Color>(rhs.collapsedColor);
@@ -942,8 +947,9 @@ namespace YAML
             rhs.showPercentage = node["showPercentage"].as<bool>(rhs.showPercentage);
             rhs.isIndeterminate = node["isIndeterminate"].as<bool>(rhs.isIndeterminate);
             rhs.indeterminateSpeed = node["indeterminateSpeed"].as<float>(rhs.indeterminateSpeed);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
-                rhs.backgroundImage);
+            if (node["backgroundImage"])
+                rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                    rhs.backgroundImage);
             if (node["fillImage"]) rhs.fillImage = node["fillImage"].as<AssetHandle>(rhs.fillImage);
             rhs.backgroundColor = node["backgroundColor"].as<ECS::Color>(rhs.backgroundColor);
             rhs.fillColor = node["fillColor"].as<ECS::Color>(rhs.fillColor);
@@ -1027,10 +1033,12 @@ namespace YAML
             rhs.isInteractable = node["isInteractable"].as<bool>(rhs.isInteractable);
             rhs.allowReorder = node["allowReorder"].as<bool>(rhs.allowReorder);
             rhs.allowCloseTabs = node["allowCloseTabs"].as<bool>(rhs.allowCloseTabs);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
-                rhs.backgroundImage);
-            if (node["tabBackgroundImage"]) rhs.tabBackgroundImage = node["tabBackgroundImage"].as<AssetHandle>(
-                rhs.tabBackgroundImage);
+            if (node["backgroundImage"])
+                rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                    rhs.backgroundImage);
+            if (node["tabBackgroundImage"])
+                rhs.tabBackgroundImage = node["tabBackgroundImage"].as<AssetHandle>(
+                    rhs.tabBackgroundImage);
             rhs.tabHeight = node["tabHeight"].as<float>(rhs.tabHeight);
             rhs.tabSpacing = node["tabSpacing"].as<float>(rhs.tabSpacing);
             rhs.backgroundColor = node["backgroundColor"].as<ECS::Color>(rhs.backgroundColor);
@@ -1112,8 +1120,9 @@ namespace YAML
             rhs.maxItemsPerRow = node["maxItemsPerRow"].as<int>(rhs.maxItemsPerRow);
             rhs.maxItemsPerColumn = node["maxItemsPerColumn"].as<int>(rhs.maxItemsPerColumn);
             rhs.itemTemplate = node["itemTemplate"].as<ECS::TextComponent>(rhs.itemTemplate);
-            if (node["backgroundImage"]) rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
-                rhs.backgroundImage);
+            if (node["backgroundImage"])
+                rhs.backgroundImage = node["backgroundImage"].as<AssetHandle>(
+                    rhs.backgroundImage);
             rhs.backgroundColor = node["backgroundColor"].as<ECS::Color>(rhs.backgroundColor);
             rhs.itemColor = node["itemColor"].as<ECS::Color>(rhs.itemColor);
             rhs.hoverColor = node["hoverColor"].as<ECS::Color>(rhs.hoverColor);
@@ -1152,6 +1161,20 @@ namespace CustomDrawing
                 return true;
             }
             return false;
+        }
+    };
+
+    template <>
+    struct WidgetDrawer<ECS::TabItem>
+    {
+        static bool Draw(const std::string& label, ECS::TabItem& value, const UIDrawData& callbacks)
+        {
+            bool changed = false;
+            ImGui::InputText((label + " Title").c_str(), &value.title);
+            ImGui::Checkbox((label + " Is Visible").c_str(), &value.isVisible);
+            ImGui::Checkbox((label + " Is Enabled").c_str(), &value.isEnabled);
+            if (callbacks.onValueChanged && ImGui::IsItemDeactivatedAfterEdit()) callbacks.onValueChanged();
+            return changed;
         }
     };
 }
