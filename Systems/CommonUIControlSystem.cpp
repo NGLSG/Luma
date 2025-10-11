@@ -16,6 +16,7 @@
 #include <cmath>
 #include <functional>
 #include <vector>
+#include <cmath>
 
 namespace
 {
@@ -51,8 +52,9 @@ namespace
         Vector2f local = worldPoint - transform.position;
         if (std::abs(transform.rotation) > EPSILON)
         {
-            const float sinR = std::sinf(-transform.rotation);
-            const float cosR = std::cosf(-transform.rotation);
+
+            const float sinR = std::sin(-transform.rotation);
+            const float cosR = std::cos(-transform.rotation);
             const float tempX = local.x;
             local.x = local.x * cosR - local.y * sinR;
             local.y = tempX * sinR + local.y * cosR;

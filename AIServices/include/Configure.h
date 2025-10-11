@@ -236,6 +236,8 @@ struct Configure
     ClaudeAPICreateInfo claudeAPI; ///< Claude API 配置。
     std::unordered_map<std::string, GPTLikeCreateInfo> customGPTs; ///< 自定义 GPT 配置映射。
     std::vector<CustomRule> customRules; ///< 自定义规则列表。
+    // 全局可选请求参数（键值对），在所有请求中附加；右侧面板可编辑，持久化到 aiconfig.yaml
+    std::vector<CustomVariable> globalParams; ///< 全局额外参数列表。
 };
 
 namespace YAML
@@ -1006,6 +1008,13 @@ namespace YAML
             node["claudeAPI"] = config.claudeAPI;
             node["customGPTs"] = config.customGPTs;
             node["customRules"] = config.customRules;
+            // encode global params
+            if (!config.globalParams.empty())
+            {
+                Node vars;
+                for (const auto& v : config.globalParams) vars.push_back(v);
+                node["globalParams"] = vars;
+            }
             return node;
         }
 
@@ -1070,8 +1079,15 @@ namespace YAML
                 config.grok = node["grok"].as<GPTLikeCreateInfo>();
             if (node["customGPTs"])
                 config.customGPTs = node["customGPTs"].as<std::unordered_map<std::string, GPTLikeCreateInfo>>();
-            if (node["customRules"])
+            if (node["customRules"]) 
                 config.customRules = node["customRules"].as<std::vector<CustomRule>>();
+            if (node["globalParams"]) 
+            {
+                config.globalParams.clear();
+                for (const auto& v : node["globalParams"]) {
+                    config.globalParams.push_back(v.as<CustomVariable>());
+                }
+            }
             return true;
         }
     };

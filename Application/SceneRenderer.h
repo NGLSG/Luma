@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <type_traits>
 #include <unordered_map>
+#include <cstring>
 
 #include "RenderComponent.h"
 #include "include/core/SkImage.h"
@@ -33,6 +34,13 @@ struct FastSpriteBatchKey
     uintptr_t materialPtr; ///< 材质指针的整数表示。
     uint32_t colorValue; ///< 颜色值的打包表示。
     uint16_t settings; ///< 过滤质量和环绕模式的打包设置。
+    // 额外用于区分批次的关键属性，避免不同视觉效果被错误合批
+    uint32_t srcL; ///< 源矩形 Left 的浮点位模式
+    uint32_t srcT; ///< 源矩形 Top 的浮点位模式
+    uint32_t srcR; ///< 源矩形 Right 的浮点位模式
+    uint32_t srcB; ///< 源矩形 Bottom 的浮点位模式
+    uint32_t ppuBits; ///< ppuScaleFactor 的浮点位模式
+    int32_t zIndex;   ///< 层级索引（确保不同层不会被错误合批）
 
     size_t precomputedHash; ///< 预计算的哈希值。
 
@@ -52,11 +60,18 @@ struct FastSpriteBatchKey
      */
     FastSpriteBatchKey(SkImage* image, const Material* material,
                        const ECS::Color& color, ECS::FilterQuality filterQuality,
-                       ECS::WrapMode wrapMode)
+                       ECS::WrapMode wrapMode, const SkRect& srcRect,
+                       float ppuScaleFactor, int z)
         : imagePtr(reinterpret_cast<uintptr_t>(image))
           , materialPtr(reinterpret_cast<uintptr_t>(material))
           , colorValue(packColor(color))
           , settings(packSettings(filterQuality, wrapMode))
+          , srcL(floatBits(srcRect.fLeft))
+          , srcT(floatBits(srcRect.fTop))
+          , srcR(floatBits(srcRect.fRight))
+          , srcB(floatBits(srcRect.fBottom))
+          , ppuBits(floatBits(ppuScaleFactor))
+          , zIndex(static_cast<int32_t>(z))
     {
         precomputedHash = computeHash();
     }
@@ -72,7 +87,11 @@ struct FastSpriteBatchKey
         return imagePtr == other.imagePtr &&
             materialPtr == other.materialPtr &&
             colorValue == other.colorValue &&
-            settings == other.settings;
+            settings == other.settings &&
+            srcL == other.srcL && srcT == other.srcT &&
+            srcR == other.srcR && srcB == other.srcB &&
+            ppuBits == other.ppuBits &&
+            zIndex == other.zIndex;
     }
 
 private:
@@ -102,6 +121,15 @@ private:
         return (static_cast<uint16_t>(filterQuality) << 8) | static_cast<uint16_t>(wrapMode);
     }
 
+    // 将 float 的比特位按 uint32_t 返回，用于作为键的一部分（避免精度抖动带来的不稳定哈希）
+    static uint32_t floatBits(float v)
+    {
+        uint32_t bits;
+        static_assert(sizeof(float) == sizeof(uint32_t));
+        std::memcpy(&bits, &v, sizeof(uint32_t));
+        return bits;
+    }
+
     /**
      * @brief 计算当前键的哈希值。
      *
@@ -113,6 +141,12 @@ private:
         hash ^= materialPtr + 0x9e3779b9 + (hash << 6) + (hash >> 2);
         hash ^= colorValue + 0x9e3779b9 + (hash << 6) + (hash >> 2);
         hash ^= settings + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= srcL + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= srcT + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= srcR + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= srcB + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= ppuBits + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= static_cast<size_t>(zIndex) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
         return hash;
     }
 };
@@ -128,6 +162,7 @@ struct FastTextBatchKey
     uint32_t fontSizeInt; ///< 字体大小的整数表示。
     uint32_t colorValue; ///< 颜色值的打包表示。
     uint8_t alignment; ///< 对齐方式的打包表示。
+    int32_t zIndex;    ///< 层级索引，避免不同层文本合批
     size_t precomputedHash; ///< 预计算的哈希值。
 
     /**
@@ -144,11 +179,12 @@ struct FastTextBatchKey
      * @param color 颜色值。
      */
     FastTextBatchKey(SkTypeface* typeface, float fontSize,
-                     TextAlignment alignment, const ECS::Color& color)
+                     TextAlignment alignment, const ECS::Color& color, int z)
         : typefacePtr(reinterpret_cast<uintptr_t>(typeface))
           , fontSizeInt(*reinterpret_cast<const uint32_t*>(&fontSize))
           , colorValue(packColor(color))
           , alignment(static_cast<uint8_t>(alignment))
+          , zIndex(static_cast<int32_t>(z))
     {
         precomputedHash = computeHash();
     }
@@ -164,7 +200,8 @@ struct FastTextBatchKey
         return typefacePtr == other.typefacePtr &&
             fontSizeInt == other.fontSizeInt &&
             colorValue == other.colorValue &&
-            alignment == other.alignment;
+            alignment == other.alignment &&
+            zIndex == other.zIndex;
     }
 
 private:
@@ -193,6 +230,7 @@ private:
         hash ^= fontSizeInt + 0x9e3779b9 + (hash << 6) + (hash >> 2);
         hash ^= colorValue + 0x9e3779b9 + (hash << 6) + (hash >> 2);
         hash ^= alignment + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= static_cast<size_t>(zIndex) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
         return hash;
     }
 };

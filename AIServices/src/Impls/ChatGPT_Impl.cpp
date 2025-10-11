@@ -1,4 +1,7 @@
 #include "Impls/ChatGPT_Impl.h"
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
 
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp)
 {
@@ -440,17 +443,50 @@ std::string ChatGPT::Submit(std::string prompt, size_t timeStamp, std::string ro
         }
         history.emplace_back(ask);
         Conversation[convid_] = history;
-        std::string data = "{\n"
-            "  \"model\": \"" + chat_data_.model + "\",\n"
-            "  \"stream\": true,\n"
-            "  \"temperature\":" + std::to_string(temp) + ",\n"
-            "  \"top_k\":" + std::to_string(top_k) + ",\n"
-            "  \"top_p\":" + std::to_string(top_p) + ",\n"
-            "  \"presence_penalty\":" + std::to_string(pres_pen) + ",\n"
-            "  \"frequency_penalty\":" + std::to_string(freq_pen) + ",\n"
-            "  \"messages\": " +
-            Conversation[convid_].dump()
-            + "\n}\n";
+        
+        json payload;
+        payload["model"] = chat_data_.model;
+        payload["stream"] = true;
+        payload["messages"] = Conversation[convid_];
+        if (temp >= 0.0f) payload["temperature"] = temp;
+        if (top_k > 0u) payload["top_k"] = top_k;
+        if (top_p >= 0.0f) payload["top_p"] = top_p;
+        
+        
+        auto addByPath = [](json& j, const std::string& path, const json& val)
+        {
+            if (path.empty()) return;
+            size_t pos = 0; json* cur = &j;
+            while (true)
+            {
+                size_t dot = path.find('.', pos);
+                std::string key = path.substr(pos, dot == std::string::npos ? std::string::npos : dot - pos);
+                if (dot == std::string::npos)
+                {
+                    (*cur)[key] = val;
+                    break;
+                }
+                cur = &((*cur)[key]);
+                pos = dot + 1;
+            }
+        };
+        auto toJsonValue = [](const CustomVariable& v) -> json
+        {
+            if (v.isStr) return json(v.value);
+            std::string low = v.value; std::transform(low.begin(), low.end(), low.begin(), ::tolower);
+            if (low == "true") return json(true);
+            if (low == "false") return json(false);
+            char* endptr = nullptr; long long ival = strtoll(v.value.c_str(), &endptr, 10);
+            if (endptr && *endptr == '\0') return json(ival);
+            char* fend = nullptr; double dval = strtod(v.value.c_str(), &fend);
+            if (fend && *fend == '\0') return json(dval);
+            return json(v.value);
+        };
+        for (const auto& v : ChatBot::GlobalParams)
+        {
+            if (!v.name.empty()) addByPath(payload, v.name, toJsonValue(v));
+        }
+        std::string data = payload.dump();
         Response[timeStamp] = std::make_tuple("", false);
         std::string res = sendRequest(data, timeStamp);
 

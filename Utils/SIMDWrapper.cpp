@@ -59,7 +59,7 @@ namespace
 #if defined(_MSC_VER)
             __cpuid(regs.data(), level);
 #elif defined(__GNUC__) || defined(__clang__)
-            __cpuid(level, regs[0], regs[1], regs[2], regs[3]);
+            cpuid(regs, level);
 #endif
         }
 
@@ -68,7 +68,7 @@ namespace
 #if defined(_MSC_VER)
             __cpuidex(regs.data(), level, count);
 #elif defined(__GNUC__) || defined(__clang__)
-            __cpuid_count(level, count, regs[0], regs[1], regs[2], regs[3]);
+            cpuidex(regs, level, count);
 #endif
         }
 
@@ -121,7 +121,8 @@ public:
         size_t i = 0;
         for (; i + 4 <= count; i += 4)
         {
-             _mm_storeu_ps(result + i, _mm_add_ps(_mm_mul_ps(_mm_loadu_ps(a + i), _mm_loadu_ps(b + i)), _mm_loadu_ps(c + i)));
+            _mm_storeu_ps(result + i, _mm_add_ps(_mm_mul_ps(_mm_loadu_ps(a + i), _mm_loadu_ps(b + i)),
+                                                 _mm_loadu_ps(c + i)));
         }
         for (; i < count; ++i) result[i] = a[i] * b[i] + c[i];
     }
@@ -161,7 +162,8 @@ public:
         for (; i < count; ++i) result[i] = 1.0f / input[i];
     }
 
-    void VectorRotatePoints(const float* points_x, const float* points_y, const float* sin_vals, const float* cos_vals, float* result_x, float* result_y, size_t count) override
+    void VectorRotatePoints(const float* points_x, const float* points_y, const float* sin_vals, const float* cos_vals,
+                            float* result_x, float* result_y, size_t count) override
     {
         size_t i = 0;
         for (; i + 4 <= count; i += 4)
@@ -271,7 +273,8 @@ public:
         size_t i = 0;
         for (; i + 8 <= count; i += 8)
         {
-             _mm256_storeu_ps(result + i, _mm256_add_ps(_mm256_mul_ps(_mm256_loadu_ps(a + i), _mm256_loadu_ps(b + i)), _mm256_loadu_ps(c + i)));
+            _mm256_storeu_ps(result + i, _mm256_add_ps(_mm256_mul_ps(_mm256_loadu_ps(a + i), _mm256_loadu_ps(b + i)),
+                                                       _mm256_loadu_ps(c + i)));
         }
         SSE42 sse_fallback;
         sse_fallback.VectorMultiplyAdd(a + i, b, c, result + i, count - i);
@@ -316,7 +319,8 @@ public:
         sse_fallback.VectorReciprocal(input + i, result + i, count - i);
     }
 
-    void VectorRotatePoints(const float* points_x, const float* points_y, const float* sin_vals, const float* cos_vals, float* result_x, float* result_y, size_t count) override
+    void VectorRotatePoints(const float* points_x, const float* points_y, const float* sin_vals, const float* cos_vals,
+                            float* result_x, float* result_y, size_t count) override
     {
         size_t i = 0;
         for (; i + 8 <= count; i += 8)
@@ -331,7 +335,8 @@ public:
             _mm256_storeu_ps(result_y + i, ry);
         }
         SSE42 sse_fallback;
-        sse_fallback.VectorRotatePoints(points_x + i, points_y + i, sin_vals + i, cos_vals + i, result_x + i, result_y + i, count - i);
+        sse_fallback.VectorRotatePoints(points_x + i, points_y + i, sin_vals + i, cos_vals + i, result_x + i,
+                                        result_y + i, count - i);
     }
 
     float VectorMax(const float* input, size_t count) override
@@ -346,7 +351,7 @@ public:
         float temp[8];
         _mm256_storeu_ps(temp, maxVec);
         float result = temp[0];
-        for(int j=1; j<8; ++j) result = std::max(result, temp[j]);
+        for (int j = 1; j < 8; ++j) result = std::max(result, temp[j]);
 
         SSE42 sse_fallback;
         result = std::max(result, sse_fallback.VectorMax(input + i, count - i));
@@ -365,7 +370,7 @@ public:
         float temp[8];
         _mm256_storeu_ps(temp, minVec);
         float result = temp[0];
-        for(int j=1; j<8; ++j) result = std::min(result, temp[j]);
+        for (int j = 1; j < 8; ++j) result = std::min(result, temp[j]);
 
         SSE42 sse_fallback;
         result = std::min(result, sse_fallback.VectorMin(input + i, count - i));
@@ -397,7 +402,8 @@ public:
         size_t i = 0;
         for (; i + 8 <= count; i += 8)
         {
-            _mm256_storeu_ps(result + i, _mm256_fmadd_ps(_mm256_loadu_ps(a + i), _mm256_loadu_ps(b + i), _mm256_loadu_ps(c + i)));
+            _mm256_storeu_ps(result + i, _mm256_fmadd_ps(_mm256_loadu_ps(a + i), _mm256_loadu_ps(b + i),
+                                                         _mm256_loadu_ps(c + i)));
         }
         SSE42 sse_fallback;
         sse_fallback.VectorMultiplyAdd(a + i, b, c, result + i, count - i);
@@ -467,7 +473,8 @@ public:
         size_t i = 0;
         for (; i + 16 <= count; i += 16)
         {
-            _mm512_storeu_ps(result + i, _mm512_fmadd_ps(_mm512_loadu_ps(a + i), _mm512_loadu_ps(b + i), _mm512_loadu_ps(c + i)));
+            _mm512_storeu_ps(result + i, _mm512_fmadd_ps(_mm512_loadu_ps(a + i), _mm512_loadu_ps(b + i),
+                                                         _mm512_loadu_ps(c + i)));
         }
         AVX2 avx2_fallback;
         avx2_fallback.VectorMultiplyAdd(a + i, b, c, result + i, count - i);
@@ -509,7 +516,8 @@ public:
         avx2_fallback.VectorReciprocal(input + i, result + i, count - i);
     }
 
-    void VectorRotatePoints(const float* points_x, const float* points_y, const float* sin_vals, const float* cos_vals, float* result_x, float* result_y, size_t count) override
+    void VectorRotatePoints(const float* points_x, const float* points_y, const float* sin_vals, const float* cos_vals,
+                            float* result_x, float* result_y, size_t count) override
     {
         size_t i = 0;
         for (; i + 16 <= count; i += 16)
@@ -524,7 +532,8 @@ public:
             _mm512_storeu_ps(result_y + i, ry);
         }
         AVX2 avx2_fallback;
-        avx2_fallback.VectorRotatePoints(points_x + i, points_y + i, sin_vals + i, cos_vals + i, result_x + i, result_y + i, count - i);
+        avx2_fallback.VectorRotatePoints(points_x + i, points_y + i, sin_vals + i, cos_vals + i, result_x + i,
+                                         result_y + i, count - i);
     }
 
     float VectorMax(const float* input, size_t count) override
@@ -653,7 +662,8 @@ public:
         for (; i < count; ++i) result[i] = 1.0f / input[i];
     }
 
-    void VectorRotatePoints(const float* points_x, const float* points_y, const float* sin_vals, const float* cos_vals, float* result_x, float* result_y, size_t count) override
+    void VectorRotatePoints(const float* points_x, const float* points_y, const float* sin_vals, const float* cos_vals,
+                            float* result_x, float* result_y, size_t count) override
     {
         size_t i = 0;
         for (; i + 4 <= count; i += 4)
@@ -765,7 +775,8 @@ void SIMD::VectorMultiplyAdd(const float* a, const float* b, const float* c, flo
     if (impl) impl->VectorMultiplyAdd(a, b, c, result, count);
 }
 
-void SIMD::VectorRotatePoints(const float* points_x, const float* points_y, const float* sin_vals, const float* cos_vals, float* result_x, float* result_y, size_t count)
+void SIMD::VectorRotatePoints(const float* points_x, const float* points_y, const float* sin_vals,
+                              const float* cos_vals, float* result_x, float* result_y, size_t count)
 {
     if (impl) impl->VectorRotatePoints(points_x, points_y, sin_vals, cos_vals, result_x, result_y, count);
 }

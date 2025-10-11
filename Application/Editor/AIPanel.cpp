@@ -1,5 +1,6 @@
 #include "AIPanel.h"
 #include <imgui.h>
+#include <imgui_internal.h>
 #include "imgui_stdlib.h"
 #include "Impls/Bots.h"
 #include "../Utils/Path.h"
@@ -224,7 +225,36 @@ void AIPanel::Update(float deltaTime)
                 {
                     m_toolCallMessageIndex = m_messages.size() - 1;
                 }
-                m_messages.back().content = finalRawResponse;
+                
+                std::string friendly;
+                try
+                {
+                    auto j = nlohmann::json::parse(finalRawResponse);
+                    if (j.contains("tool_calls") && j["tool_calls"].is_array())
+                    {
+                        friendly = "AI 正在调用工具以完成你的请求:\n";
+                        for (const auto& c : j["tool_calls"]) {
+                            std::string fname = c.value("function_name", "unknown");
+                            std::string why;
+                            if (c.contains("reason") && c["reason"].is_string()) {
+                                why = c["reason"].get<std::string>();
+                            } else {
+                                const AITool* tool = AIToolRegistry::GetInstance().GetTool(fname);
+                                if (tool) why = tool->description;
+                            }
+                            if (!why.empty())
+                                friendly += "- " + fname + "：" + why + "\n";
+                            else
+                                friendly += "- " + fname + "\n";
+                        }
+                        friendly += "请稍候……";
+                    }
+                }
+                catch (...)
+                {
+                    friendly = "AI 正在调用工具以完成你的请求，请稍候……";
+                }
+                m_messages.back().content = friendly;
                 processToolCalls(finalRawResponse);
             }
             else
@@ -272,7 +302,14 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
         auto& bot = m_bots.at(m_currentBotKey);
         m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-        bot->SubmitAsync(toolResults.dump(2), m_lastRequestTimestamp, Role::User, m_currentConversation);
+        std::string followUp = toolResults.dump(2);
+        followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## Summary，总结最终结果；不要展示工具调用细节或原始参数。请收敛，最多再思考/迭代 2 轮。";
+        bot->SubmitAsync(followUp, m_lastRequestTimestamp, Role::User, m_currentConversation);
+        
+        m_messages.push_back({"assistant", "", 0});
+        m_streamBuffer.clear();
+        m_scrollToBottom = true;
+        m_toolCallMessageIndex = -1;
         return;
     }
 
@@ -299,6 +336,15 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
             ToolCallEntry callEntry;
             callEntry.functionName = call.value("function_name", "unknown");
             callEntry.arguments = call.contains("arguments") ? call["arguments"] : nlohmann::json::object();
+            if (call.contains("reason") && call["reason"].is_string())
+            {
+                callEntry.reason = call["reason"].get<std::string>();
+            }
+            else
+            {
+                const AITool* tool = AIToolRegistry::GetInstance().GetTool(callEntry.functionName);
+                if (tool) callEntry.reason = tool->description;
+            }
             logEntry.calls.push_back(std::move(callEntry));
         }
 
@@ -330,7 +376,14 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
         auto& bot = m_bots.at(m_currentBotKey);
         m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-        bot->SubmitAsync(toolResults.dump(2), m_lastRequestTimestamp, Role::User, m_currentConversation);
+        std::string followUp = toolResults.dump(2);
+        followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## Summary，总结最终结果；不要展示工具调用细节或原始参数。请收敛，最多再思考/迭代 2 轮。";
+        bot->SubmitAsync(followUp, m_lastRequestTimestamp, Role::User, m_currentConversation);
+        
+        m_messages.push_back({"assistant", "", 0});
+        m_streamBuffer.clear();
+        m_scrollToBottom = true;
+        m_toolCallMessageIndex = -1;
         return;
     }
 
@@ -394,7 +447,14 @@ void AIPanel::processToolCalls(const std::string& aiResponse)
     auto& bot = m_bots.at(m_currentBotKey);
     m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    bot->SubmitAsync(toolResults.dump(2), m_lastRequestTimestamp, Role::User, m_currentConversation);
+    std::string followUp = toolResults.dump(2);
+    followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## Summary，总结最终结果；不要展示工具调用细节或原始参数。请收敛，最多再思考/迭代 2 轮。";
+    bot->SubmitAsync(followUp, m_lastRequestTimestamp, Role::User, m_currentConversation);
+    
+    m_messages.push_back({"assistant", "", 0});
+    m_streamBuffer.clear();
+    m_scrollToBottom = true;
+    m_toolCallMessageIndex = -1;
 }
 
 void AIPanel::synchronizeAndSaveHistory()
@@ -456,8 +516,16 @@ void AIPanel::Draw()
                 }
                 ImGui::PopStyleVar();
                 ImGui::Separator();
+
+                
+                ImGui::BeginChild("ChatMain", ImVec2(-260, 0), false);
+                drawChatPanel();
+                ImGui::EndChild();
+                ImGui::SameLine();
+                ImGui::BeginChild("ParamsSidebar", ImVec2(250, 0), true);
+                drawRightOptionsPanel();
+                ImGui::EndChild();
             }
-            drawChatPanel();
             ImGui::EndChild();
         }
         else
@@ -683,10 +751,10 @@ void AIPanel::drawChatPanel()
                     }
                     else
                     {
-                        float originalScale = ImGui::GetFontSize() / ImGui::GetIO().FontGlobalScale;
-                        ImGui::SetWindowFontScale(1.1f);
+                        float prevScale = ImGui::GetCurrentWindowRead()->FontWindowScale;
+                        ImGui::SetWindowFontScale(prevScale * 1.1f);
                         ImGui::TextUnformatted(section.title.c_str());
-                        ImGui::SetWindowFontScale(originalScale);
+                        ImGui::SetWindowFontScale(prevScale);
                         if (hasBody) renderMarkdownBlock(section.body, bubble_max_width, m_markdownConfig);
                     }
                     ImGui::Spacing();
@@ -715,7 +783,7 @@ void AIPanel::drawChatPanel()
                         headerLabel += " (待执行)";
                     }
                     ImGui::PushID((msgIndex << 16) + static_cast<int>((logIdx << 8) + callIdx));
-                    ImGuiTreeNodeFlags flags = hasResult ? ImGuiTreeNodeFlags_DefaultOpen : 0;
+                    ImGuiTreeNodeFlags flags = 0; 
                     if (ImGui::CollapsingHeader(headerLabel.c_str(), flags))
                     {
                         bool success = hasResult && call.result->contains("success") && call.result->value(
@@ -728,26 +796,29 @@ void AIPanel::drawChatPanel()
                         const char* statusText = hasResult ? (success ? "成功" : "失败") : "待执行";
                         ImGui::TextColored(statusColor, "状态: %s", statusText);
 
-                        if (!call.arguments.empty())
+                        
+                        if (!call.reason.empty())
                         {
-                            std::string argsText = call.arguments.dump(2);
-                            ImGui::TextDisabled("参数:");
+                            ImGui::TextDisabled("理由:");
                             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + bubble_max_width);
-                            ImGui::TextUnformatted(argsText.c_str());
+                            ImGui::TextUnformatted(call.reason.c_str());
                             ImGui::PopTextWrapPos();
                         }
 
                         if (hasResult)
                         {
                             std::string resultText = call.result->dump(2);
-                            ImGui::TextDisabled("结果:");
-                            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + bubble_max_width);
-                            ImGui::TextUnformatted(resultText.c_str());
-                            ImGui::PopTextWrapPos();
+                            if (ImGui::TreeNodeEx("运行结果", ImGuiTreeNodeFlags_DefaultOpen))
+                            {
+                                ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + bubble_max_width);
+                                ImGui::TextUnformatted(resultText.c_str());
+                                ImGui::PopTextWrapPos();
+                                ImGui::TreePop();
+                            }
                         }
                         else
                         {
-                            ImGui::TextDisabled("结果: 等待执行...");
+                            ImGui::TextDisabled("运行结果: 等待执行...");
                         }
                     }
                     ImGui::PopID();
@@ -767,6 +838,12 @@ void AIPanel::drawChatPanel()
     }
     ImGui::EndChild();
     ImGui::Separator();
+
+    
+    if (m_targetedGuid.Valid())
+    {
+        ImGui::TextDisabled("目标对象: %s", m_targetedObjectName.c_str());
+    }
 
     ImGui::PushItemWidth(-80);
     if (ImGui::InputTextMultiline("##Input", m_inputBuffer, sizeof(m_inputBuffer),
@@ -814,12 +891,28 @@ void AIPanel::drawChatPanel()
 
     ImGui::BeginGroup();
     {
-        ImGui::BeginDisabled(m_isWaitingForResponse || m_currentBotKey.empty());
-        if (ImGui::Button("发送", ImVec2(70, ImGui::GetTextLineHeightWithSpacing() * 1.6f)))
+        
+        if (m_isWaitingForResponse)
         {
-            submitMessage();
+            ImGui::BeginDisabled(m_currentBotKey.empty());
+            if (ImGui::Button("停止", ImVec2(70, ImGui::GetTextLineHeightWithSpacing() * 1.6f)))
+            {
+                if (!m_currentBotKey.empty() && m_bots.count(m_currentBotKey))
+                {
+                    m_bots.at(m_currentBotKey)->ForceStop();
+                }
+            }
+            ImGui::EndDisabled();
         }
-        ImGui::EndDisabled();
+        else
+        {
+            ImGui::BeginDisabled(m_currentBotKey.empty());
+            if (ImGui::Button("发送", ImVec2(70, ImGui::GetTextLineHeightWithSpacing() * 1.6f)))
+            {
+                submitMessage();
+            }
+            ImGui::EndDisabled();
+        }
 
         ImGui::BeginDisabled(!m_targetedGuid.Valid());
         if (ImGui::Button("清除", ImVec2(70, ImGui::GetTextLineHeightWithSpacing() * 1.6f)))
@@ -1090,11 +1183,17 @@ void AIPanel::drawToolApprovalPopup()
             {
                 const auto& c = calls[i];
                 std::string fname = c.value("function_name", "");
-                std::string args = c["arguments"].dump(2);
+                const AITool* tool = AIToolRegistry::GetInstance().GetTool(fname);
+                std::string why;
+                if (c.contains("reason") && c["reason"].is_string()) why = c["reason"].get<std::string>();
+                else if (tool) why = tool->description;
                 ImGui::Text("%zu) %s", i + 1, fname.c_str());
-                ImGui::PushTextWrapPos();
-                ImGui::TextDisabled("%s", args.c_str());
-                ImGui::PopTextWrapPos();
+                if (!why.empty())
+                {
+                    ImGui::PushTextWrapPos();
+                    ImGui::TextDisabled("理由: %s", why.c_str());
+                    ImGui::PopTextWrapPos();
+                }
                 ImGui::Separator();
             }
         }
@@ -1150,6 +1249,7 @@ void AIPanel::executePendingToolCalls()
             if (currentLog && i < currentLog->calls.size())
             {
                 currentLog->calls[i].arguments = arguments;
+                if (currentLog->calls[i].reason.empty() && tool) currentLog->calls[i].reason = tool->description;
             }
             if (tool)
             {
@@ -1188,7 +1288,14 @@ void AIPanel::executePendingToolCalls()
     auto& bot = m_bots.at(m_currentBotKey);
     m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    bot->SubmitAsync(toolResults.dump(2), m_lastRequestTimestamp, Role::User, m_currentConversation);
+    std::string followUp = toolResults.dump(2);
+    followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## Summary，总结最终结果；不要展示工具调用细节或原始参数。请收敛，最多再思考/迭代 2 轮。";
+    bot->SubmitAsync(followUp, m_lastRequestTimestamp, Role::User, m_currentConversation);
+    
+    m_messages.push_back({"assistant", "", 0});
+    m_streamBuffer.clear();
+    m_scrollToBottom = true;
+    m_toolCallMessageIndex = -1;
     m_pendingToolLogIndex = -1;
     m_hasPendingToolCalls = false;
     m_pendingToolCalls.clear();
@@ -1238,7 +1345,14 @@ void AIPanel::denyPendingToolCalls(const std::string& reason)
     auto& bot = m_bots.at(m_currentBotKey);
     m_lastRequestTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    bot->SubmitAsync(toolResults.dump(2), m_lastRequestTimestamp, Role::User, m_currentConversation);
+    std::string followUp = toolResults.dump(2);
+    followUp += "\n\n基于以上工具结果：若仍需进一步调用工具以达成用户目标，请仅输出合法的 tool_calls JSON（每个调用包含 function_name、arguments，并建议包含 reason 说明为何调用）；否则请用中文输出简洁的 ## Summary，总结最终结果；不要展示工具调用细节或原始参数。请收敛，最多再思考/迭代 2 轮。";
+    bot->SubmitAsync(followUp, m_lastRequestTimestamp, Role::User, m_currentConversation);
+    
+    m_messages.push_back({"assistant", "", 0});
+    m_streamBuffer.clear();
+    m_scrollToBottom = true;
+    m_toolCallMessageIndex = -1;
     m_pendingToolLogIndex = -1;
     m_hasPendingToolCalls = false;
     m_pendingToolCalls.clear();
@@ -1880,7 +1994,10 @@ Core Rules & Behavior
 6. Language Discipline: You MUST respond in the same language as the user's last message. You MUST NOT switch languages unless explicitly commanded to.
 7. Workflow Adherence: For any engine modification, you MUST strictly follow the multi-turn "Read-Modify-Write" pattern as demonstrated in the workflow example. There are no exceptions.
 8. Project Grounding: When the user's request relates to this Luma Engine project or its assets, proactively inspect the relevant source files with the provided tools before responding. Base your explanation strictly on what you verify; never fabricate APIs or behavior.
-9. Toolchain Termination: After each tool response, decide autonomously whether additional tool calls are necessary. Stop the workflow as soon as the objective is fulfilled and deliver the final report promptly.
+9. Planning & Convergence: Before any tool call you MUST think briefly (internally) and plan the next step. After each tool response, re-evaluate the plan concisely and decide whether additional calls are necessary.
+   - Keep your thinking short and focused; avoid verbose chains of thought.
+   - Converge quickly: at most 2 additional plan-and-call cycles per user request.
+   - If still ambiguous or blocked, ask one concise clarification in plain text, then stop.
 
 Response Format (MANDATORY & STRICT)
 
@@ -1891,7 +2008,8 @@ Your response must conform to one of two types:
     - NO additional text, notes, apologies, or explanations before or after the JSON block.
     - The root JSON object MUST contain a single key: "tool_calls".
     - The value of "tool_calls" MUST be an array of one or more tool call objects.
-    - Each object in the array MUST contain exactly two keys: "function_name" (string) and "arguments" (object).
+    - Each object in the array MUST contain at least two keys: "function_name" (string) and "arguments" (object).
+    - Each object MAY include an optional key "reason" (string), 1–2 short sentences explaining why this call is needed now.
 
 For plain-text responses, structure the content using Markdown sections in the following order:
 - ## Thinking (keep concise; omit only when no reasoning is required)
@@ -2832,7 +2950,12 @@ void AIPanel::submitMessage()
     m_streamBuffer.clear();
 
     auto& bot = m_bots.at(m_currentBotKey);
-    bot->SubmitAsync(finalPrompt, m_lastRequestTimestamp, Role::User, m_currentConversation);
+    // 使用用户选择的参数（未启用则不上传）
+    float temperature = m_enableTemperature ? m_paramTemperature : -1.0f;
+    float topP = m_enableTopP ? m_paramTopP : -1.0f;
+    uint32_t topK = m_enableTopK ? static_cast<uint32_t>(m_paramTopK) : 0u;
+    bot->SubmitAsync(finalPrompt, m_lastRequestTimestamp, Role::User, m_currentConversation,
+                     temperature, topP, topK);
 
     memset(m_inputBuffer, 0, sizeof(m_inputBuffer));
     m_scrollToBottom = true;
@@ -2871,29 +2994,27 @@ void AIPanel::initializeBots()
 
     const auto& cfg = m_config;
 
+    // 同步全局参数到 ChatBot 静态字段，供各实现拼装请求时使用
+    ChatBot::GlobalParams = m_config.globalParams;
+
     if (isProviderConfigValid(cfg.openAi))
     {
-        std::string botKey = "OpenAI";
-        m_bots[botKey] = std::make_unique<ChatGPT>(cfg.openAi, m_systemPrompt);
-
+        std::vector<std::string> models;
         if (!cfg.openAi.supportedModels.empty())
-        {
-            for (const auto& model : cfg.openAi.supportedModels)
-            {
-                m_availableModels.push_back({
-                    "OpenAI/" + model,
-                    "OpenAI",
-                    model,
-                    botKey
-                });
-            }
-        }
+            models = cfg.openAi.supportedModels;
         else if (!cfg.openAi.model.empty())
+            models = {cfg.openAi.model};
+
+        for (const auto& model : models)
         {
+            OpenAIBotCreateInfo perModel = cfg.openAi;
+            perModel.model = model;
+            const std::string botKey = std::string("OpenAI/") + model;
+            m_bots[botKey] = std::make_unique<ChatGPT>(perModel, m_systemPrompt);
             m_availableModels.push_back({
-                "OpenAI/" + cfg.openAi.model,
+                std::string("OpenAI/") + model,
                 "OpenAI",
-                cfg.openAi.model,
+                model,
                 botKey
             });
         }
@@ -2901,86 +3022,70 @@ void AIPanel::initializeBots()
 
     if (isProviderConfigValid(cfg.claudeAPI))
     {
-        std::string botKey = "ClaudeAPI";
-        m_bots[botKey] = std::make_unique<Claude>(cfg.claudeAPI, m_systemPrompt);
-
+        std::vector<std::string> models;
         if (!cfg.claudeAPI.supportedModels.empty())
-        {
-            for (const auto& model : cfg.claudeAPI.supportedModels)
-            {
-                m_availableModels.push_back({
-                    "Claude/" + model,
-                    "Claude",
-                    model,
-                    botKey
-                });
-            }
-        }
+            models = cfg.claudeAPI.supportedModels;
         else if (!cfg.claudeAPI.model.empty())
+            models = {cfg.claudeAPI.model};
+
+        for (const auto& model : models)
         {
+            ClaudeAPICreateInfo perModel = cfg.claudeAPI;
+            perModel.model = model;
+            const std::string botKey = std::string("Claude/") + model;
+            m_bots[botKey] = std::make_unique<Claude>(perModel, m_systemPrompt);
             m_availableModels.push_back({
-                "Claude/" + cfg.claudeAPI.model,
+                std::string("Claude/") + model,
                 "Claude",
-                cfg.claudeAPI.model,
+                model,
                 botKey
             });
         }
     }
     if (isProviderConfigValid(cfg.gemini))
     {
-        std::string botKey = "Gemini";
-        m_bots[botKey] = std::make_unique<Gemini>(cfg.gemini, m_systemPrompt);
-
+        std::vector<std::string> models;
         if (!cfg.gemini.supportedModels.empty())
-        {
-            for (const auto& model : cfg.gemini.supportedModels)
-            {
-                m_availableModels.push_back({
-                    "Gemini/" + model,
-                    "Gemini",
-                    model,
-                    botKey
-                });
-            }
-        }
+            models = cfg.gemini.supportedModels;
         else if (!cfg.gemini.model.empty())
+            models = {cfg.gemini.model};
+
+        for (const auto& model : models)
         {
+            GeminiBotCreateInfo perModel = cfg.gemini;
+            perModel.model = model;
+            const std::string botKey = std::string("Gemini/") + model;
+            m_bots[botKey] = std::make_unique<Gemini>(perModel, m_systemPrompt);
             m_availableModels.push_back({
-                "Gemini/" + cfg.gemini.model,
+                std::string("Gemini/") + model,
                 "Gemini",
-                cfg.gemini.model,
+                model,
                 botKey
             });
         }
     }
     auto addNetworkProvider = [&](const std::string& providerName, const GPTLikeCreateInfo& config, auto botCreator)
     {
-        if (isProviderConfigValid(config))
-        {
-            std::string botKey = providerName;
-            m_bots[botKey] = botCreator(config);
+        if (!isProviderConfigValid(config)) return;
 
-            if (!config.supportedModels.empty())
-            {
-                for (const auto& model : config.supportedModels)
-                {
-                    m_availableModels.push_back({
-                        providerName + "/" + model,
-                        providerName,
-                        model,
-                        botKey
-                    });
-                }
-            }
-            else if (!config.model.empty())
-            {
-                m_availableModels.push_back({
-                    providerName + "/" + config.model,
-                    providerName,
-                    config.model,
-                    botKey
-                });
-            }
+        std::vector<std::string> models;
+        if (!config.supportedModels.empty())
+            models = config.supportedModels;
+        else if (!config.model.empty())
+            models = {config.model};
+
+        for (const auto& model : models)
+        {
+            GPTLikeCreateInfo perModel = config;
+            perModel.model = model;
+            const std::string botKey = providerName + "/" + model;
+            m_bots[botKey] = botCreator(perModel);
+            m_availableModels.push_back({
+                providerName + "/" + model,
+                providerName,
+                model,
+                botKey
+            });
         }
     };
 
@@ -3019,83 +3124,63 @@ void AIPanel::initializeBots()
 
     for (const auto& [name, customGptConfig] : cfg.customGPTs)
     {
-        if (isProviderConfigValid(customGptConfig))
+        if (!isProviderConfigValid(customGptConfig)) continue;
+
+        if (customGptConfig.useLocalModel)
         {
-            std::string botKey = "Custom_" + name;
-
-            if (customGptConfig.useLocalModel)
-            {
-                m_bots[botKey] = std::make_unique<LLama>(customGptConfig.llamaData, m_systemPrompt);
-            }
-            else
-            {
-                m_bots[botKey] = std::make_unique<GPTLike>(customGptConfig, m_systemPrompt);
-            }
-
+            std::vector<std::string> models;
             if (!customGptConfig.supportedModels.empty())
+                models = customGptConfig.supportedModels;
+            else if (!customGptConfig.llamaData.model.empty())
+                models = {customGptConfig.llamaData.model};
+
+            for (const auto& model : models)
             {
-                for (const auto& model : customGptConfig.supportedModels)
-                {
-                    std::string displayName = customGptConfig.useLocalModel
-                                                  ? name + "/本地/" + model
-                                                  : name + "/" + model;
-                    m_availableModels.push_back({
-                        displayName,
-                        name,
-                        model,
-                        botKey
-                    });
-                }
+                LLamaCreateInfo perModel = customGptConfig.llamaData;
+                perModel.model = model;
+                const std::string botKey = std::string("Custom_") + name + "/本地/" + model;
+                m_bots[botKey] = std::make_unique<LLama>(perModel, m_systemPrompt);
+                const std::string displayName = name + "/本地/" + model;
+                m_availableModels.push_back({displayName, name, model, botKey});
             }
-            else
+        }
+        else
+        {
+            std::vector<std::string> models;
+            if (!customGptConfig.supportedModels.empty())
+                models = customGptConfig.supportedModels;
+            else if (!customGptConfig.model.empty())
+                models = {customGptConfig.model};
+
+            for (const auto& model : models)
             {
-                std::string modelName = customGptConfig.useLocalModel
-                                            ? customGptConfig.llamaData.model
-                                            : customGptConfig.model;
-                if (!modelName.empty())
-                {
-                    std::string displayName = customGptConfig.useLocalModel
-                                                  ? name + "/本地/" + modelName
-                                                  : name + "/" + modelName;
-                    m_availableModels.push_back({
-                        displayName,
-                        name,
-                        modelName,
-                        botKey
-                    });
-                }
+                GPTLikeCreateInfo perModel = customGptConfig;
+                perModel.model = model;
+                const std::string botKey = std::string("Custom_") + name + "/" + model;
+                m_bots[botKey] = std::make_unique<GPTLike>(perModel, m_systemPrompt);
+                const std::string displayName = name + "/" + model;
+                m_availableModels.push_back({displayName, name, model, botKey});
             }
         }
     }
 
     for (const auto& rule : cfg.customRules)
     {
-        if (rule.enable && !rule.name.empty())
-        {
-            std::string botKey = "CustomRule_" + rule.name;
-            m_bots[botKey] = std::make_unique<CustomRule_Impl>(rule, m_systemPrompt);
+        if (!(rule.enable && !rule.name.empty())) continue;
 
-            if (!rule.supportedModels.empty())
-            {
-                for (const auto& model : rule.supportedModels)
-                {
-                    m_availableModels.push_back({
-                        rule.name + "/" + model,
-                        rule.name,
-                        model,
-                        botKey
-                    });
-                }
-            }
-            else if (!rule.model.empty())
-            {
-                m_availableModels.push_back({
-                    rule.name + "/" + rule.model,
-                    rule.name,
-                    rule.model,
-                    botKey
-                });
-            }
+        std::vector<std::string> models;
+        if (!rule.supportedModels.empty())
+            models = rule.supportedModels;
+        else if (!rule.model.empty())
+            models = {rule.model};
+
+        for (const auto& model : models)
+        {
+            CustomRule ruleCopy = rule;
+            ruleCopy.model = model;
+            const std::string botKey = std::string("CustomRule_") + rule.name + "/" + model;
+            m_bots[botKey] = std::make_unique<CustomRule_Impl>(ruleCopy, m_systemPrompt);
+            m_availableModels.push_back({rule.name + "/" + model, rule.name, model, botKey});
         }
     }
 
@@ -3242,4 +3327,68 @@ std::string AIPanel::filterUnintendTags(const std::string& rawText)
         tempBuffer.erase(0, endTagPos + tagLen);
     }
     return filteredContent;
+}
+
+
+
+void AIPanel::drawRightOptionsPanel()
+{
+    // 目标对象
+    ImGui::Text("目标对象");
+    ImGui::Separator();
+    if (m_targetedGuid.Valid())
+    {
+        ImGui::TextWrapped("%s", m_targetedObjectName.c_str());
+    }
+    else
+    {
+        ImGui::TextDisabled("未选择对象");
+    }
+
+    ImGui::Dummy(ImVec2(0, 6));
+    ImGui::Text("生成参数");
+    ImGui::Separator();
+
+    // temperature
+    ImGui::Checkbox("temperature", &m_enableTemperature);
+    ImGui::BeginDisabled(!m_enableTemperature);
+    ImGui::SetNextItemWidth(-1);
+    ImGui::SliderFloat("##temperature_slider", &m_paramTemperature, 0.0f, 2.0f, "%.2f");
+    ImGui::EndDisabled();
+
+    // top_p
+    ImGui::Checkbox("top_p", &m_enableTopP);
+    ImGui::BeginDisabled(!m_enableTopP);
+    ImGui::SetNextItemWidth(-1);
+    ImGui::SliderFloat("##top_p_slider", &m_paramTopP, 0.0f, 1.0f, "%.2f");
+    ImGui::EndDisabled();
+
+    // top_k
+    ImGui::Checkbox("top_k", &m_enableTopK);
+    ImGui::BeginDisabled(!m_enableTopK);
+    ImGui::SetNextItemWidth(-1);
+    ImGui::SliderInt("##top_k_slider", &m_paramTopK, 1, 200, "%d");
+    ImGui::EndDisabled();
+
+    if (ImGui::SmallButton("重置为默认"))
+    {
+        m_enableTemperature = false;
+        m_enableTopP = false;
+        m_enableTopK = false;
+        m_paramTemperature = 0.7f;
+        m_paramTopP = 0.9f;
+        m_paramTopK = 40;
+    }
+
+    ImGui::Dummy(ImVec2(0, 6));
+    ImGui::Text("全局参数（持久化）");
+    ImGui::Separator();
+    // 使用已有的变量编辑器复用 UI 逻辑
+    drawVariablesEditor(m_config.globalParams, "global_params_editor");
+    if (ImGui::SmallButton("保存全局参数"))
+    {
+        
+        saveConfiguration();
+        ChatBot::GlobalParams = m_config.globalParams;
+    }
 }

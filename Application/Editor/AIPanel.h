@@ -86,6 +86,7 @@ private:
         std::string functionName; ///< 工具名称。
         nlohmann::json arguments; ///< 调用时的参数。
         std::optional<nlohmann::json> result; ///< 工具执行结果。
+        std::string reason; ///< 调用理由（优先使用AI提供的reason；否则使用工具描述）。
     };
 
     struct ToolInvocationLog
@@ -108,6 +109,10 @@ private:
      * @brief 绘制会话侧边栏。
      */
     void drawConversationSidebar();
+    /**
+     * @brief 绘制右侧参数与控制面板。
+     */
+    void drawRightOptionsPanel();
     /**
      * @brief 初始化所有聊天机器人。
      */
@@ -297,6 +302,14 @@ private:
     void drawToolApprovalPopup(); ///< 绘制并处理工具调用审批弹窗
     void executePendingToolCalls(); ///< 执行已审批的工具调用
     void denyPendingToolCalls(const std::string& reason); ///< 拒绝工具调用并反馈给AI
+
+    // ===== 生成参数（可选，不设置则不上传） =====
+    bool m_enableTemperature = false; ///< 是否启用 temperature 参数
+    bool m_enableTopP = false; ///< 是否启用 top_p 参数
+    bool m_enableTopK = false; ///< 是否启用 top_k 参数
+    float m_paramTemperature = 0.7f; ///< temperature 数值（启用时生效）
+    float m_paramTopP = 0.9f; ///< top_p 数值（启用时生效）
+    int m_paramTopK = 40; ///< top_k 数值（启用时生效）
 };
 
 #endif

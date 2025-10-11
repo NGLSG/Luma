@@ -105,9 +105,10 @@ public:
         size_t timeStamp,
         std::string role = Role::User,
         std::string convid = "default",
-        float temp = 0.7f,
-        float top_p = 0.9f,
-        uint32_t top_k = 40u,
+        // Note: negative or zero values mean "unset" and will be omitted in requests
+        float temp = -1.0f,
+        float top_p = -1.0f,
+        uint32_t top_k = 0u,
         float pres_pen = 0.0f,
         float freq_pen = 0.0f)
     {
@@ -236,6 +237,10 @@ protected:
     unordered_map<size_t, std::tuple<std::string, bool>> Response; ///< 存储响应的映射，键为UID，值为响应字符串和完成状态。
 
     std::mutex forceStopMutex; ///< 用于保护forceStop变量的互斥锁。
+
+public:
+    // 全局附加参数（键值对），由 AIPanel 设置；各实现提交请求时可读取
+    inline static std::vector<CustomVariable> GlobalParams{};
 };
 
 /**

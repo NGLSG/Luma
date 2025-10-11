@@ -1755,7 +1755,8 @@ namespace
         {
             FastSpriteBatchKey key(spriteData.image, spriteData.material, spriteData.color,
                                    static_cast<ECS::FilterQuality>(spriteData.filterQuality),
-                                   static_cast<ECS::WrapMode>(spriteData.wrapMode));
+                                   static_cast<ECS::WrapMode>(spriteData.wrapMode),
+                                   spriteData.sourceRect, spriteData.ppuScaleFactor, currIt->zIndex);
 
             auto keyIt = result->spriteGroupIndices.find(key);
             size_t groupIndex;
@@ -1791,7 +1792,8 @@ namespace
                              const TextRenderData& textData)
         {
             FastTextBatchKey key(const_cast<SkTypeface*>(textData.typeface), textData.fontSize,
-                                 static_cast<TextAlignment>(textData.alignment), textData.color);
+                                 static_cast<TextAlignment>(textData.alignment), textData.color,
+                                 currIt->zIndex);
 
             auto keyIt = result->textGroupIndices.find(key);
             size_t groupIndex;
@@ -2035,13 +2037,14 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     spriteBatchGroups.reserve(totalSpriteGroups);
     textBatchGroups.reserve(totalTextGroups);
 
-    for (const auto& result : threadResults)
-    {
-        for (const auto& threadGroup : result.spriteBatchGroups)
+        for (const auto& result : threadResults)
         {
-            FastSpriteBatchKey key(threadGroup.image, threadGroup.material, threadGroup.color,
-                                   static_cast<ECS::FilterQuality>(threadGroup.filterQuality),
-                                   static_cast<ECS::WrapMode>(threadGroup.wrapMode));
+            for (const auto& threadGroup : result.spriteBatchGroups)
+            {
+                FastSpriteBatchKey key(threadGroup.image, threadGroup.material, threadGroup.color,
+                                       static_cast<ECS::FilterQuality>(threadGroup.filterQuality),
+                                       static_cast<ECS::WrapMode>(threadGroup.wrapMode),
+                                       threadGroup.sourceRect, threadGroup.ppuScaleFactor, threadGroup.zIndex);
 
             auto it = spriteGroupIndices.find(key);
             if (it == spriteGroupIndices.end())
@@ -2060,12 +2063,13 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         }
     }
 
-    for (const auto& result : threadResults)
-    {
-        for (const auto& threadGroup : result.textBatchGroups)
+        for (const auto& result : threadResults)
         {
-            FastTextBatchKey key(threadGroup.typeface, threadGroup.fontSize,
-                                 threadGroup.alignment, threadGroup.color);
+            for (const auto& threadGroup : result.textBatchGroups)
+            {
+                FastTextBatchKey key(threadGroup.typeface, threadGroup.fontSize,
+                                     threadGroup.alignment, threadGroup.color,
+                                     threadGroup.zIndex);
 
             auto it = textGroupIndices.find(key);
             if (it == textGroupIndices.end())
