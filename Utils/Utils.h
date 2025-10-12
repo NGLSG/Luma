@@ -1,7 +1,6 @@
 #ifndef UTILS_H
 #define UTILS_H
 #include <string>
-#include <openssl/sha.h>
 
 /**
  * @brief Utils 工具类，提供文件、字符串哈希及系统相关操作的静态方法。
@@ -32,7 +31,7 @@ public:
      * @brief 在文件资源管理器中打开指定路径。
      * @param path 需要打开的文件或文件夹路径
      */
-    static void OpenFileExplorerAt(std::filesystem::path::iterator::reference path);
+    static void OpenFileExplorerAt(const std::filesystem::path& path);
 
     /**
      * @brief 在默认浏览器中打开指定 URL。

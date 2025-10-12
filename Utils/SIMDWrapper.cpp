@@ -3,13 +3,14 @@
 #include <cfloat>
 #include <cmath>
 
+
+#if defined(LUMA_X64)
 #ifdef _WIN32
 #include <intrin.h>
 #else
 #include <x86intrin.h>
 #endif
 
-#if defined(LUMA_X64)
 namespace
 {
     class CPUInfo

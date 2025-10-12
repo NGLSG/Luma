@@ -20,17 +20,10 @@ ApplicationBase::ApplicationBase(ApplicationConfig config)
     : m_config(config), m_title(config.title), m_isRunning(true)
       , m_window(nullptr), m_graphicsBackend(nullptr), m_renderSystem(nullptr)
 {
-    if (!SDL_Init(SDL_INIT_VIDEO))
-    {
-        throw std::runtime_error(std::string("Failed to initialize SDL: ") + SDL_GetError());
-    }
     JobSystem::GetInstance().Initialize();
 }
 
-ApplicationBase::~ApplicationBase()
-{
-    SDL_Quit();
-}
+ApplicationBase::~ApplicationBase() = default;
 
 void ApplicationBase::Run()
 {
@@ -160,6 +153,10 @@ void ApplicationBase::InitializeCoreSystems()
 void ApplicationBase::ShutdownCoreSystems()
 {
     m_renderSystem.reset();
+    if (m_graphicsBackend)
+    {
+        m_graphicsBackend->shutdown();
+    }
     m_graphicsBackend.reset();
     m_window.reset();
 }

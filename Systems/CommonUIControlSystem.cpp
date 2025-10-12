@@ -9,7 +9,9 @@
 #include "Resources/RuntimeAsset/RuntimeScene.h"
 #include "Resources/RuntimeAsset/RuntimeGameObject.h"
 #include "yaml-cpp/yaml.h"
-#include "../Scripting/CoreCLRHost.h"
+#if !defined(LUMA_DISABLE_SCRIPTING)
+#include "../Scripting/ManagedHost.h"
+#endif
 #include "Renderer/Camera.h"
 #include "Application/Window.h"
 #include <SDL3/SDL_events.h>

@@ -9,7 +9,7 @@
 #include <string>
 #include <list>
 #include <filesystem>
-#include "../Scripting/CoreCLRHost.h"
+#include "../Scripting/ManagedHost.h"
 #include "Event/Events.h"
 
 // 前向声明
@@ -129,10 +129,9 @@ namespace Systems
         void destroyAllInstances();
 
         /**
-         * @brief 获取CoreCLR宿主实例。
-         * @return CoreCLR宿主指针。
+         * @brief 获取托管运行时宿主实例（桌面 CoreCLR 或 Android Mono）。
          */
-        CoreCLRHost* getHost() const { return CoreCLRHost::GetInstance(); }
+        ManagedHost* getHost() const { return ManagedHost::GetInstance(); }
 
         // 使用std::list确保指针稳定性
         std::list<ManagedGCHandle> m_managedHandles; ///< 所有托管GC句柄的存储列表。

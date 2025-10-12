@@ -380,7 +380,9 @@ private:
 
 #include "RuntimeGameObject.h"
 #include "../../Components/ScriptComponent.h"
-#include "../../Scripting/CoreCLRHost.h"
+#if !defined(LUMA_DISABLE_SCRIPTING)
+#include "../../Scripting/ManagedHost.h"
+#endif
 
 /**
  * @brief 向场景的模拟线程添加一个系统（默认）。

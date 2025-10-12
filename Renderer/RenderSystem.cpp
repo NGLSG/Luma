@@ -14,8 +14,6 @@
 #include <include/effects/SkRuntimeEffect.h>
 #include <include/core/SkRSXform.h>
 
-#include <immintrin.h>
-
 #include "Camera.h"
 #include "include/core/SkFont.h"
 #include "include/core/SkFontMetrics.h"

@@ -56,3 +56,4 @@ External/*
 !External/CMakeLists.txt
 !External/cmake/
 *.gz
+Android

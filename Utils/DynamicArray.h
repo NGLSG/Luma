@@ -339,10 +339,20 @@ public:
         {
             if (m_buffer->m_size > 1)
             {
+#if defined(__ANDROID__)
+                std::sort(m_buffer->m_data, m_buffer->m_data + m_buffer->m_size, comp);
+#else
                 if (m_buffer->m_size > 1000)
+                {
+                    // 关键算法说明：当数据量较大时，并行排序能够显著利用多核 CPU 优势，
+                    // par_unseq 策略允许编译器最大程度地进行乱序和向量化优化。
                     std::sort(std::execution::par_unseq, m_buffer->m_data, m_buffer->m_data + m_buffer->m_size, comp);
+                }
                 else
+                {
                     std::sort(m_buffer->m_data, m_buffer->m_data + m_buffer->m_size, comp);
+                }
+#endif
             }
         }
 
@@ -700,7 +710,11 @@ public:
         View view = GetView();
         if (view.Size() > 1000)
         {
+#if defined(__ANDROID__)
+            std::for_each(view.begin(), view.end(), func);
+#else
             std::for_each(std::execution::par, view.begin(), view.end(), func);
+#endif
         }
         else
         {

@@ -1,8 +1,6 @@
 #ifndef LUMAENGINE_SIMDWRAPPER_H
 #define LUMAENGINE_SIMDWRAPPER_H
 
-#include <immintrin.h>
-
 /**
  * @class SIMDIpml
  * @brief SIMD指令集实现类接口

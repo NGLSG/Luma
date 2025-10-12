@@ -9,7 +9,9 @@
 #include "InputTextSystem.h"
 #include "InteractionSystem.h"
 #include "PhysicsSystem.h"
+#if !defined(LUMA_DISABLE_SCRIPTING)
 #include "ScriptingSystem.h"
+#endif
 #include "TransformSystem.h"
 #include "../Resources/AssetManager.h"
 #include "../Resources/Managers/RuntimeSceneManager.h"
@@ -85,7 +87,9 @@ sk_sp<RuntimeScene> SceneManager::LoadScene(const Guid& guid)
         newScene->AddSystem<Systems::ButtonSystem>();
         newScene->AddSystemToMainThread<Systems::InputTextSystem>();
         newScene->AddSystemToMainThread<Systems::CommonUIControlSystem>();
+#if !defined(LUMA_DISABLE_SCRIPTING)
         newScene->AddSystem<Systems::ScriptingSystem>();
+#endif
         newScene->AddSystem<Systems::AnimationSystem>();
         newScene->Activate(*m_context);
     }
@@ -122,7 +126,9 @@ void SceneManager::Update(EngineContext& engineCtx)
                 loadedScene->AddSystem<Systems::ButtonSystem>();
                 loadedScene->AddSystem<Systems::InputTextSystem>();
                 loadedScene->AddSystem<Systems::CommonUIControlSystem>();
+#if !defined(LUMA_DISABLE_SCRIPTING)
                 loadedScene->AddSystem<Systems::ScriptingSystem>();
+#endif
                 loadedScene->AddSystem<Systems::AnimationSystem>();
             }
 

@@ -67,7 +67,7 @@ struct NativeWindowHandle
 #elif defined(__linux__) && !defined(__ANDROID__)
         return x11Display != nullptr && x11Window != 0;
 #elif defined(__ANDROID__)
-        return androidWindow != nullptr;
+        return aNativeWindow != nullptr;
 #else
         return placeholder != nullptr;
 #endif
@@ -145,6 +145,7 @@ private:
 public:
     GraphicsBackend(const GraphicsBackend&) = delete; ///< 禁用拷贝构造函数。
     GraphicsBackend& operator=(const GraphicsBackend&) = delete; ///< 禁用赋值操作符。
+    ~GraphicsBackend();
 
     /**
      * @brief 解析多重采样抗锯齿纹理。

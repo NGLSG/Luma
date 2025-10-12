@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <cstddef>
 
-#include "Scripting/CoreCLRHost.h"
+#if !defined(LUMA_DISABLE_SCRIPTING)
+#include "Scripting/ManagedHost.h"
+#endif
 #include "Components/AssetHandle.h"
 /**
  * @brief Luma场景的句柄类型。
@@ -222,6 +224,18 @@ LUMA_API void Event_Invoke_Bool(LumaSceneHandle scene, LumaEntityHandle entity, 
  */
 LUMA_API void Event_InvokeWithArgs(LumaSceneHandle scene, LumaEntityHandle entity, const char* eventName,
                                    const char* argsAsYaml);
+
+// --- Minimal engine runtime controls (optional for Android bridge) ---
+// Initializes the rendering backend with a native window.
+// On Android, pass ANativeWindow* via aNativeWindow (void* to avoid hard dep).
+// Returns true on success.
+LUMA_API bool Engine_InitWithANativeWindow(void* aNativeWindow, int width, int height);
+
+// Shuts down the minimal engine runtime.
+LUMA_API void Engine_Shutdown();
+
+// Ticks one frame worth of rendering. Supply delta time in seconds.
+LUMA_API void Engine_Frame(float dt);
 
 /**
  * @brief 获取当前场景的句柄。

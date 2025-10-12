@@ -82,7 +82,7 @@ void RuntimeMaterialManager::DrawDebugUI()
             if (asset && asset->effect)
             {
                 ImGui::Text("%s | Uniforms: %zu",
-                            guid,
+                            guid.c_str(),
                             asset->uniforms.size());
             }
         }

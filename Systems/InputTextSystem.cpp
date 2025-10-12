@@ -9,7 +9,9 @@
 
 #include "RenderSystem.h"
 #include "yaml-cpp/yaml.h"
-#include "../Scripting/CoreCLRHost.h"
+#if !defined(LUMA_DISABLE_SCRIPTING)
+#include "../Scripting/ManagedHost.h"
+#endif
 
 namespace Systems
 {

@@ -469,7 +469,7 @@ void InspectorPanel::drawBatchGameObjectName(std::vector<RuntimeGameObject>& sel
     static char batchNameBuffer[256] = {0};
 
     std::string label = isSelectionLocked() ? "批量重命名 [固定]:" : "批量重命名:";
-    ImGui::Text(label.c_str());
+    ImGui::Text("%s",label.c_str());
 
     if (ImGui::InputText("新名称", batchNameBuffer, sizeof(batchNameBuffer), ImGuiInputTextFlags_EnterReturnsTrue))
     {

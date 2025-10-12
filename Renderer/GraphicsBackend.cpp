@@ -22,6 +22,13 @@
 
 GraphicsBackend::GraphicsBackend() = default;
 
+GraphicsBackend::~GraphicsBackend()
+{
+    
+    
+    shutdown();
+}
+
 wgpu::Device GraphicsBackend::CreateDevice(const GraphicsBackendOptions& options,
                                            const std::unique_ptr<dawn::native::Instance>& instance)
 {

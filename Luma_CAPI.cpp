@@ -21,6 +21,12 @@
 #include "Input/Cursor.h"
 #include "Input/Keyboards.h"
 #include "RuntimeAsset/RuntimeAnimationController.h"
+#include "Renderer/GraphicsBackend.h"
+#include "Renderer/RenderSystem.h"
+#include "Renderer/Camera.h"
+#ifdef __ANDROID__
+#include <android/native_window.h>
+#endif
 
 
 static inline RuntimeScene* AsScene(LumaSceneHandle handle)
@@ -256,6 +262,72 @@ LUMA_API bool SceneManager_LoadScene(const char* sceneGuidStr)
         return true;
     }
     return false;
+}
+
+
+
+
+
+namespace
+{
+    std::unique_ptr<GraphicsBackend> g_backend;
+    std::unique_ptr<RenderSystem> g_renderSystem;
+    int g_fbWidth = 0;
+    int g_fbHeight = 0;
+}
+
+LUMA_API bool Engine_InitWithANativeWindow(void* aNativeWindow, int width, int height)
+{
+    try
+    {
+        GraphicsBackendOptions opts;
+        opts.width = static_cast<uint16_t>(width > 0 ? width : 1);
+        opts.height = static_cast<uint16_t>(height > 0 ? height : 1);
+        opts.enableVSync = true;
+#if defined(_WIN32)
+        opts.backendTypePriority = {BackendType::D3D12, BackendType::D3D11, BackendType::Vulkan, BackendType::OpenGL};
+#elif defined(__APPLE__)
+        opts.backendTypePriority = {BackendType::Metal, BackendType::OpenGL};
+#elif defined(__linux__) && !defined(__ANDROID__)
+        opts.backendTypePriority = {BackendType::Vulkan, BackendType::OpenGL};
+#elif defined(__ANDROID__)
+        opts.backendTypePriority = {BackendType::OpenGLES, BackendType::Vulkan};
+#else
+#error "Unsupported platform"
+#endif
+
+#if defined(__ANDROID__)
+        opts.windowHandle.aNativeWindow = reinterpret_cast<ANativeWindow*>(aNativeWindow);
+#else
+        (void)aNativeWindow;
+#endif
+        g_backend = GraphicsBackend::Create(opts);
+        if (!g_backend) return false;
+        g_renderSystem = RenderSystem::Create(*g_backend);
+        if (!g_renderSystem) { g_backend.reset(); return false; }
+        g_fbWidth = width; g_fbHeight = height;
+        Camera::GetInstance().GetProperties().viewport = {0, 0, static_cast<float>(width), static_cast<float>(height)};
+        return true;
+    }
+    catch (...)
+    {
+        g_renderSystem.reset();
+        g_backend.reset();
+        return false;
+    }
+}
+
+LUMA_API void Engine_Shutdown()
+{
+    g_renderSystem.reset();
+    g_backend.reset();
+}
+
+LUMA_API void Engine_Frame(float )
+{
+    if (!g_renderSystem) return;
+    
+    g_renderSystem->Flush();
 }
 
 LUMA_API void SceneManager_LoadSceneAsync(const char* sceneGuidStr)

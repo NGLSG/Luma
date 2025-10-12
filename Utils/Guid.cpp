@@ -124,7 +124,9 @@ std::string Guid::ToString() const
 
 const char* Guid::c_str() const
 {
-    return ToString().c_str();
+    thread_local std::string buffer;
+    buffer = ToString();
+    return buffer.c_str();
 }
 
 bool Guid::Valid() const

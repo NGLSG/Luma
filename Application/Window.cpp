@@ -73,6 +73,7 @@ PlatformWindow::~PlatformWindow()
     if (sdlWindow)
     {
         SDL_DestroyWindow(sdlWindow);
+        sdlWindow = nullptr;
     }
     SDL_Quit();
 }
@@ -353,7 +354,6 @@ void PlatformWindow::Destroy()
 {
     if (sdlWindow)
     {
-        SDL_Quit();
         SDL_DestroyWindow(sdlWindow);
         sdlWindow = nullptr;
     }

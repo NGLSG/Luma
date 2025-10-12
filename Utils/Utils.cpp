@@ -1,4 +1,6 @@
 #include "Utils.h"
+
+#include <openssl/sha.h>
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
@@ -7,14 +9,16 @@
 #endif
 void Utils::trimLeft(std::string& s)
 {
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch)
+    {
         return !std::isspace(ch);
     }));
 }
 
 void Utils::trimRight(std::string& s)
 {
-    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch)
+    {
         return !std::isspace(ch);
     }).base(), s.end());
 }
@@ -30,11 +34,10 @@ std::string Utils::ExecuteCommandAndGetOutput(const std::string& command)
     std::array<char, 256> buffer;
     std::string result;
 
-    
+
     std::unique_ptr<FILE, decltype(&PCLOSE)> pipe(POPEN(command.c_str(), "r"), PCLOSE);
     if (!pipe)
     {
-        
         return "";
     }
 
@@ -43,14 +46,13 @@ std::string Utils::ExecuteCommandAndGetOutput(const std::string& command)
         result += buffer.data();
     }
 
-    
-    
+
     trim(result);
 
     return result;
 }
 
-void Utils::OpenFileExplorerAt(std::filesystem::path::iterator::reference path)
+void Utils::OpenFileExplorerAt(const std::filesystem::path& path)
 {
 #ifdef _WIN32
 

@@ -4,6 +4,8 @@
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #endif
+#include <openssl/crypto.h>
+#include <openssl/opensslv.h>
 #ifndef _MSC_VER
 #include "Resources/RuntimeAsset/RuntimeScene.h"
 #endif
@@ -26,6 +28,13 @@
 
 int main(int argc, char* argv[])
 {
+    
+    
+    
+#if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+    OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, nullptr);
+#endif
+
     std::setlocale(LC_ALL, ".UTF8");
 
 #if defined(LUMA_EDITOR) && (defined(_WIN32) || defined(_WIN64))

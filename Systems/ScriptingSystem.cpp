@@ -24,11 +24,11 @@ namespace Systems
                                    string()
                                    : Directory::GetAbsolutePath("./GameData/GameScripts.dll");
 
-        CoreCLRHost::CreateNewInstance();
-        CoreCLRHost* host = getHost();
+        ManagedHost::CreateNewInstance();
+        ManagedHost* host = getHost();
         if (!host)
         {
-            LogError("ScriptingSystem: 无法获取 CoreCLRHost 实例");
+            LogError("ScriptingSystem: 无法获取 ManagedHost 实例");
             return;
         }
 
@@ -132,7 +132,7 @@ namespace Systems
 
     void ScriptingSystem::OnUpdate(RuntimeScene* scene, float deltaTime, EngineContext& context)
     {
-        CoreCLRHost* host = getHost();
+        ManagedHost* host = getHost();
         if (!host || !host->GetUpdateInstanceFn()) return;
 
         auto updateFn = host->GetUpdateInstanceFn();
@@ -166,7 +166,7 @@ namespace Systems
             EventBus::GetInstance().Unsubscribe(m_physicsContactEventHandle);
         }
         destroyAllInstances();
-        CoreCLRHost::DestroyInstance();
+        ManagedHost::DestroyInstance();
         m_currentScene = nullptr;
         m_loadedAssemblyPath.clear();
         LogInfo("ScriptingSystem: 脚本系统已关闭。");
@@ -174,7 +174,7 @@ namespace Systems
 
     void ScriptingSystem::setupEventLinks(const ECS::ScriptComponent& scriptComp, uint32_t entityId)
     {
-        CoreCLRHost* host = getHost();
+        ManagedHost* host = getHost();
         if (!host || !host->GetSetPropertyFn() || !scriptComp.managedGCHandle) return;
 
         auto setPropertyFn = host->GetSetPropertyFn();
@@ -233,7 +233,7 @@ namespace Systems
             break;
         case InteractScriptEvent::CommandType::UpdateInstance:
             {
-                CoreCLRHost* host = getHost();
+                ManagedHost* host = getHost();
                 auto* scriptComp = findScriptByTypeName(event.entityId, event.typeName);
                 if (host && host->GetUpdateInstanceFn() && scriptComp && scriptComp->managedGCHandle)
                 {
@@ -309,7 +309,7 @@ namespace Systems
     void ScriptingSystem::createInstanceCommand(uint32_t entityId, const std::string& typeName,
                                                 const std::string& assemblyName)
     {
-        CoreCLRHost* host = getHost();
+        ManagedHost* host = getHost();
         if (!host || !host->GetCreateInstanceFn())
         {
             LogError("ScriptingSystem: CreateInstanceFn 不可用，无法创建实例。");
@@ -343,7 +343,7 @@ namespace Systems
 
     void ScriptingSystem::activityChangeCommand(uint32_t entityId, const std::string& typeName, bool isActive)
     {
-        CoreCLRHost* host = getHost();
+        ManagedHost* host = getHost();
         auto* scriptComp = findScriptByTypeName(entityId, typeName);
         if (!host || !scriptComp || !scriptComp->managedGCHandle) return;
 
@@ -365,7 +365,7 @@ namespace Systems
 
     void ScriptingSystem::onCreateCommand(uint32_t entityId, const std::string& typeName)
     {
-        CoreCLRHost* host = getHost();
+        ManagedHost* host = getHost();
         auto* scriptComp = findScriptByTypeName(entityId, typeName);
         if (!host || !host->GetOnCreateFn() || !scriptComp || !scriptComp->managedGCHandle) return;
 
@@ -378,7 +378,7 @@ namespace Systems
         if (!scriptComp || !scriptComp->managedGCHandle) return;
 
         ManagedGCHandle handle = *scriptComp->managedGCHandle;
-        CoreCLRHost* host = getHost();
+        ManagedHost* host = getHost();
 
         if (host && host->GetDestroyInstanceFn())
         {
@@ -397,7 +397,7 @@ namespace Systems
                                              const std::string& propertyName,
                                              const std::string& value)
     {
-        CoreCLRHost* host = getHost();
+        ManagedHost* host = getHost();
         auto* scriptComp = findScriptByTypeName(entityId, typeName);
         if (!host || !host->GetSetPropertyFn() || !scriptComp || !scriptComp->managedGCHandle)
         {
@@ -411,7 +411,7 @@ namespace Systems
                                               const std::string& methodName,
                                               const std::string& args)
     {
-        CoreCLRHost* host = getHost();
+        ManagedHost* host = getHost();
         auto* scriptComp = findScriptByTypeName(entityId, typeName);
         if (!host || !host->GetInvokeMethodFn() || !scriptComp || !scriptComp->managedGCHandle)
         {
@@ -425,7 +425,7 @@ namespace Systems
 
     void ScriptingSystem::destroyAllInstances()
     {
-        CoreCLRHost* host = getHost();
+        ManagedHost* host = getHost();
         if (host && host->GetDestroyInstanceFn())
         {
             auto destroyFn = host->GetDestroyInstanceFn();
