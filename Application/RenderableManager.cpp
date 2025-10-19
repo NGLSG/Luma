@@ -1997,17 +1997,20 @@ void RenderableManager::SubmitFrame(std::vector<Renderable>&& frameData)
 
 const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 {
-    while (isUpdatingFrames.load(std::memory_order_acquire))
+    while (isUpdatingFrames.exchange(true, std::memory_order_acquire))
     {
     }
 
     if (!needsRebuild())
     {
+        isUpdatingFrames.store(false, std::memory_order_release);
         return packetBuffers[activeBufferIndex.load(std::memory_order_relaxed)];
     }
 
     auto prevFrameView = prevFrame.GetView();
     auto currFrameView = currFrame.GetView();
+
+    isUpdatingFrames.store(false, std::memory_order_release);
 
     bool hasPrevFrame = !prevFrameView.IsEmpty();
     bool hasCurrFrame = !currFrameView.IsEmpty();

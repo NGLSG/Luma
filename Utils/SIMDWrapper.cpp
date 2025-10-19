@@ -231,7 +231,7 @@ public:
     const char* GetSupportedInstructions() const override { return "SSE4.2"; }
 };
 
-#if defined(LUMA_AVX)
+#if defined(LUMA_AVX) || defined(LUMA_AVX2)
 class AVX : public SIMDIpml
 {
 public:
@@ -730,26 +730,31 @@ public:
 SIMD::SIMD()
 {
 #if defined(LUMA_X64)
+#ifdef  LUMA_AVX512
     if (g_cpu_info.IsAVX512FSupported())
     {
         impl = std::make_unique<AVX512>();
         return;
     }
+#elif  defined(LUMA_AVX2)
     if (g_cpu_info.IsAVX2Supported())
     {
         impl = std::make_unique<AVX2>();
         return;
     }
+#elif defined (LUMA_AVX)|| defined (LUMA_AVX2)
     if (g_cpu_info.IsAVXSupported())
     {
         impl = std::make_unique<AVX>();
         return;
     }
+#elif defined(LUMA_AVX) || defined(LUMA_AVX2) || defined(LUMA_AVX512) || defined(LUMA_SSE42)
     if (g_cpu_info.IsSSE42Supported())
     {
         impl = std::make_unique<SSE42>();
         return;
     }
+#endif
 #elif defined(LUMA_ARM64) && defined(LUMA_NEON)
     impl = std::make_unique<NEON>();
     return;

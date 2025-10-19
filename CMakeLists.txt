@@ -55,11 +55,17 @@ elseif (LUMA_ARCH_NAME STREQUAL "x86")
 endif ()
 
 # =============================================================================
+# SIMD 指令集选项
+# =============================================================================
+option(ENABLE_AVX512 "启用 AVX512 指令集支持 (需要硬件支持)" OFF)
+
+# =============================================================================
 # 检查指令集扩展
 # =============================================================================
 include(CheckCXXCompilerFlag)
 
 set(LUMA_SUPPORTED_EXTENSIONS "")
+set(LUMA_SIMD_COMPILE_OPTIONS "")
 
 # Android 平台的 NEON 支持
 if (ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
@@ -71,43 +77,122 @@ endif ()
 # x86/x64 平台的 SIMD 扩展检测
 if (NOT ANDROID AND LUMA_ARCH_NAME MATCHES "(x64|x86)")
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        # 检测 SSE 系列指令集
+        check_cxx_compiler_flag("-msse" HAS_SSE)
+        check_cxx_compiler_flag("-msse2" HAS_SSE2)
+        check_cxx_compiler_flag("-msse3" HAS_SSE3)
+        check_cxx_compiler_flag("-mssse3" HAS_SSSE3)
+        check_cxx_compiler_flag("-msse4.1" HAS_SSE41)
+        check_cxx_compiler_flag("-msse4.2" HAS_SSE42)
+
+        # 检测 AVX 系列指令集
         check_cxx_compiler_flag("-mavx" HAS_AVX)
-        if (HAS_AVX)
-            add_compile_definitions(LUMA_AVX)
-            list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX")
-            message(STATUS "启用 AVX 支持")
-        endif ()
-
         check_cxx_compiler_flag("-mavx2" HAS_AVX2)
-        if (HAS_AVX2)
-            add_compile_definitions(LUMA_AVX2)
-            list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX2")
-            message(STATUS "启用 AVX2 支持")
-        endif ()
-
         check_cxx_compiler_flag("-mavx512f" HAS_AVX512)
-        if (HAS_AVX512)
+
+        # 按优先级选择最佳指令集 (AVX512 需要显式启用)
+        if (ENABLE_AVX512 AND HAS_AVX512)
             add_compile_definitions(LUMA_AVX512)
             list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX512")
-            message(STATUS "启用 AVX512 支持")
+            list(APPEND LUMA_SIMD_COMPILE_OPTIONS -mavx512f -mavx512cd -mavx512vl -mavx512dq -mavx512bw)
+            message(STATUS "启用 AVX512 支持 (显式启用)")
+        elseif (HAS_AVX2)
+            add_compile_definitions(LUMA_AVX2)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX2")
+            list(APPEND LUMA_SIMD_COMPILE_OPTIONS -mavx2 -mfma)
+            message(STATUS "启用 AVX2 支持 (自动选择)")
+        elseif (HAS_AVX)
+            add_compile_definitions(LUMA_AVX)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX")
+            list(APPEND LUMA_SIMD_COMPILE_OPTIONS -mavx)
+            message(STATUS "启用 AVX 支持 (自动选择)")
+        elseif (HAS_SSE42)
+            add_compile_definitions(LUMA_SSE42)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "SSE4.2")
+            list(APPEND LUMA_SIMD_COMPILE_OPTIONS -msse4.2)
+            message(STATUS "启用 SSE4.2 支持 (自动选择)")
+        elseif (HAS_SSE41)
+            add_compile_definitions(LUMA_SSE41)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "SSE4.1")
+            list(APPEND LUMA_SIMD_COMPILE_OPTIONS -msse4.1)
+            message(STATUS "启用 SSE4.1 支持 (自动选择)")
+        elseif (HAS_SSSE3)
+            add_compile_definitions(LUMA_SSSE3)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "SSSE3")
+            list(APPEND LUMA_SIMD_COMPILE_OPTIONS -mssse3)
+            message(STATUS "启用 SSSE3 支持 (自动选择)")
+        elseif (HAS_SSE3)
+            add_compile_definitions(LUMA_SSE3)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "SSE3")
+            list(APPEND LUMA_SIMD_COMPILE_OPTIONS -msse3)
+            message(STATUS "启用 SSE3 支持 (自动选择)")
+        elseif (HAS_SSE2)
+            add_compile_definitions(LUMA_SSE2)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "SSE2")
+            list(APPEND LUMA_SIMD_COMPILE_OPTIONS -msse2)
+            message(STATUS "启用 SSE2 支持 (自动选择)")
+        elseif (HAS_SSE)
+            add_compile_definitions(LUMA_SSE)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "SSE")
+            list(APPEND LUMA_SIMD_COMPILE_OPTIONS -msse)
+            message(STATUS "启用 SSE 支持 (自动选择)")
         endif ()
+
     elseif (MSVC)
-        # MSVC 的指令集检测
-        foreach (FLAG AVX AVX2 AVX512)
-            set(TEST_FILE ${CMAKE_BINARY_DIR}/test_${FLAG}.cpp)
-            file(WRITE ${TEST_FILE}
-                    "#include <immintrin.h>\n"
-                    "int main() { __m256 test = _mm256_setzero_ps(); return 0; }\n"
-            )
-            try_compile(HAS_${FLAG} ${CMAKE_BINARY_DIR} ${TEST_FILE}
-                    CMAKE_FLAGS "/arch:${FLAG}"
-            )
-            if (HAS_${FLAG})
-                add_compile_definitions(LUMA_${FLAG})
-                list(APPEND LUMA_SUPPORTED_EXTENSIONS ${FLAG})
-                message(STATUS "启用 ${FLAG} 支持")
-            endif ()
-        endforeach ()
+        # MSVC 的指令集检测和选择
+        # MSVC 在 x64 下默认支持 SSE2
+        if (LUMA_ARCH_NAME STREQUAL "x64")
+            add_compile_definitions(LUMA_SSE2)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "SSE2")
+        endif ()
+
+        # 检测 AVX 支持
+        set(TEST_AVX_FILE ${CMAKE_BINARY_DIR}/test_avx.cpp)
+        file(WRITE ${TEST_AVX_FILE}
+                "#include <immintrin.h>\n"
+                "int main() { __m256 test = _mm256_setzero_ps(); return 0; }\n"
+        )
+        try_compile(HAS_AVX ${CMAKE_BINARY_DIR} ${TEST_AVX_FILE}
+                CMAKE_FLAGS "/arch:AVX"
+        )
+
+        # 检测 AVX2 支持
+        set(TEST_AVX2_FILE ${CMAKE_BINARY_DIR}/test_avx2.cpp)
+        file(WRITE ${TEST_AVX2_FILE}
+                "#include <immintrin.h>\n"
+                "int main() { __m256i test = _mm256_abs_epi32(_mm256_setzero_si256()); return 0; }\n"
+        )
+        try_compile(HAS_AVX2 ${CMAKE_BINARY_DIR} ${TEST_AVX2_FILE}
+                CMAKE_FLAGS "/arch:AVX2"
+        )
+
+        # 检测 AVX512 支持
+        set(TEST_AVX512_FILE ${CMAKE_BINARY_DIR}/test_avx512.cpp)
+        file(WRITE ${TEST_AVX512_FILE}
+                "#include <immintrin.h>\n"
+                "int main() { __m512 test = _mm512_setzero_ps(); return 0; }\n"
+        )
+        try_compile(HAS_AVX512 ${CMAKE_BINARY_DIR} ${TEST_AVX512_FILE}
+                CMAKE_FLAGS "/arch:AVX512"
+        )
+
+        # 按优先级选择最佳指令集
+        if (ENABLE_AVX512 AND HAS_AVX512)
+            add_compile_definitions(LUMA_AVX512)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX512")
+            list(APPEND LUMA_SIMD_COMPILE_OPTIONS /arch:AVX512)
+            message(STATUS "启用 AVX512 支持 (显式启用)")
+        elseif (HAS_AVX2)
+            add_compile_definitions(LUMA_AVX2)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX2")
+            list(APPEND LUMA_SIMD_COMPILE_OPTIONS /arch:AVX2)
+            message(STATUS "启用 AVX2 支持 (自动选择)")
+        elseif (HAS_AVX)
+            add_compile_definitions(LUMA_AVX)
+            list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX")
+            list(APPEND LUMA_SIMD_COMPILE_OPTIONS /arch:AVX)
+            message(STATUS "启用 AVX 支持 (自动选择)")
+        endif ()
     endif ()
 endif ()
 
@@ -188,16 +273,8 @@ target_compile_definitions(LumaEngine PUBLIC
 target_link_libraries(LumaEngine PUBLIC Luma3rd)
 
 # 应用 SIMD 编译选项
-if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    if (HAS_AVX)
-        target_compile_options(LumaEngine PRIVATE -mavx)
-    endif ()
-    if (HAS_AVX2)
-        target_compile_options(LumaEngine PRIVATE -mavx2 -mfma)
-    endif ()
-    if (HAS_AVX512)
-        target_compile_options(LumaEngine PRIVATE -mavx512f -mavx512cd -mavx512vl -mavx512dq -mavx512bw)
-    endif ()
+if (LUMA_SIMD_COMPILE_OPTIONS)
+    target_compile_options(LumaEngine PRIVATE ${LUMA_SIMD_COMPILE_OPTIONS})
 endif ()
 
 # Linux/Android 平台的链接选项
@@ -503,4 +580,9 @@ endif ()
 
 message(STATUS "========================================")
 message(STATUS "Luma Engine 配置完成")
+if (ENABLE_AVX512)
+    message(STATUS "AVX512 指令集: 已显式启用")
+else ()
+    message(STATUS "AVX512 指令集: 未启用 (使用 -DENABLE_AVX512=ON 启用)")
+endif ()
 message(STATUS "========================================")

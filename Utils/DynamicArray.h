@@ -82,7 +82,7 @@ public:
         {
             if (m_buffer)
             {
-                m_buffer->m_refCount.fetch_add(1, std::memory_order_relaxed);
+                m_buffer->m_refCount.fetch_add(1, std::memory_order_acquire);
             }
         }
 
@@ -94,7 +94,7 @@ public:
         {
             if (m_buffer)
             {
-                m_buffer->m_refCount.fetch_add(1, std::memory_order_relaxed);
+                m_buffer->m_refCount.fetch_add(1, std::memory_order_acquire);
             }
         }
 
@@ -120,7 +120,7 @@ public:
                 m_buffer = other.m_buffer;
                 if (m_buffer)
                 {
-                    m_buffer->m_refCount.fetch_add(1, std::memory_order_relaxed);
+                    m_buffer->m_refCount.fetch_add(1, std::memory_order_acquire);
                 }
             }
             return *this;
@@ -673,7 +673,7 @@ public:
 
         std::swap(m_writeBuffer, m_readyBuffer);
 
-        Buffer* oldReadBuffer = m_readBuffer.load(std::memory_order_relaxed);
+        Buffer* oldReadBuffer = m_readBuffer.load(std::memory_order_acquire);
 
         m_writeBuffer->m_size = 0;
 
