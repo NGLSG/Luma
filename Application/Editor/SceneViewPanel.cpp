@@ -37,6 +37,33 @@
 #define PIXELS_PER_METER 32.0f;
 #endif
 
+namespace
+{
+    
+    inline ECS::Vector2f ComputeAnchoredCenter(const ECS::TransformComponent& transform, float width, float height)
+    {
+        
+        float offsetX = (0.5f - transform.anchor.x) * width;
+        float offsetY = (0.5f - transform.anchor.y) * height;
+
+        
+        offsetX *= transform.scale.x;
+        offsetY *= transform.scale.y;
+
+        
+        if (std::abs(transform.rotation) > 0.0001f)
+        {
+            const float sinR = sinf(transform.rotation);
+            const float cosR = cosf(transform.rotation);
+            const float tempX = offsetX;
+            offsetX = offsetX * cosR - offsetY * sinR;
+            offsetY = tempX * sinR + offsetY * cosR;
+        }
+
+        return ECS::Vector2f(transform.position.x + offsetX, transform.position.y + offsetY);
+    }
+}
+
 static bool IsPointInSprite(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
                             const ECS::SpriteComponent& sprite)
 {
@@ -50,41 +77,31 @@ static bool IsPointInSprite(const ECS::Vector2f& worldPoint, const ECS::Transfor
 
     if (halfWidth <= 0 || halfHeight <= 0) return false;
 
+    
+    const float width = halfWidth * 2.0f;
+    const float height = halfHeight * 2.0f;
 
     
-    float width = halfWidth * 2.0f;
-    float height = halfHeight * 2.0f;
-    ECS::Vector2f anchorOffset = {
-        (0.5f - transform.anchor.x) * width * transform.scale.x,
-        (0.5f - transform.anchor.y) * height * transform.scale.y
-    };
+    const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
 
+    
+    ECS::Vector2f localPoint = worldPoint - anchoredCenter;
+
+    
     if (std::abs(transform.rotation) > 0.001f)
-    {
-        const float sinRot = sinf(transform.rotation);
-        const float cosRot = cosf(transform.rotation);
-        float tempX = anchorOffset.x;
-        anchorOffset.x = anchorOffset.x * cosRot - anchorOffset.y * sinRot;
-        anchorOffset.y = tempX * sinRot + anchorOffset.y * cosRot;
-    }
-
-    ECS::Vector2f localPoint = worldPoint - (transform.position + anchorOffset);
-
-
-    if (transform.rotation != 0.0f)
     {
         const float sinR = sinf(-transform.rotation);
         const float cosR = cosf(-transform.rotation);
-        float tempX = localPoint.x;
+        const float tempX = localPoint.x;
         localPoint.x = localPoint.x * cosR - localPoint.y * sinR;
         localPoint.y = tempX * sinR + localPoint.y * cosR;
     }
 
-
+    
     localPoint.x /= transform.scale.x;
     localPoint.y /= transform.scale.y;
 
-
+    
     return (localPoint.x >= -halfWidth && localPoint.x <= halfWidth &&
         localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
 }
@@ -231,29 +248,17 @@ static bool isPointInButton(const ECS::Vector2f& worldPoint, const ECS::Transfor
     if (width <= 0 || height <= 0) return false;
 
     
-    ECS::Vector2f anchorOffset = {
-        (0.5f - transform.anchor.x) * width * transform.scale.x,
-        (0.5f - transform.anchor.y) * height * transform.scale.y
-    };
+    const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
 
+    
+    ECS::Vector2f localPoint = worldPoint - anchoredCenter;
+
+    
     if (std::abs(transform.rotation) > 0.001f)
-    {
-        const float sinRot = sinf(transform.rotation);
-        const float cosRot = cosf(transform.rotation);
-        float tempX = anchorOffset.x;
-        anchorOffset.x = anchorOffset.x * cosRot - anchorOffset.y * sinRot;
-        anchorOffset.y = tempX * sinRot + anchorOffset.y * cosRot;
-    }
-
-    
-    ECS::Vector2f localPoint = worldPoint - (transform.position + anchorOffset);
-
-    
-    if (transform.rotation != 0.0f)
     {
         const float sinR = sinf(-transform.rotation);
         const float cosR = cosf(-transform.rotation);
-        float tempX = localPoint.x;
+        const float tempX = localPoint.x;
         localPoint.x = localPoint.x * cosR - localPoint.y * sinR;
         localPoint.y = tempX * sinR + localPoint.y * cosR;
     }
@@ -874,64 +879,48 @@ void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS:
                                                                                  ? sprite.sourceRect.Height()
                                                                                  : sprite.image->getImage()->height());
 
+    
+    const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
 
-    width *= transform.scale.x;
-    height *= transform.scale.y;
+    
+    const float scaledWidth = width * transform.scale.x;
+    const float scaledHeight = height * transform.scale.y;
+    const float halfWidth = scaledWidth * 0.5f;
+    const float halfHeight = scaledHeight * 0.5f;
 
-    const float halfWidth = width * 0.5f;
-    const float halfHeight = height * 0.5f;
-
-
-    std::vector<ECS::Vector2f> worldCorners = {
+    
+    std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight},
         {halfWidth, -halfHeight},
         {halfWidth, halfHeight},
         {-halfWidth, halfHeight}
     };
 
-
-    if (std::abs(transform.rotation) > 0.001f)
-    {
-        const float sinR = sinf(transform.rotation);
-        const float cosR = cosf(transform.rotation);
-
-        for (auto& corner : worldCorners)
-        {
-            float tempX = corner.x;
-            corner.x = corner.x * cosR - corner.y * sinR;
-            corner.y = tempX * sinR + corner.y * cosR;
-        }
-    }
-
-
-    
-    ECS::Vector2f anchorOffset = {
-        (0.5f - transform.anchor.x) * width,
-        (0.5f - transform.anchor.y) * height
-    };
-
-    if (std::abs(transform.rotation) > 0.001f)
-    {
-        const float sinR2 = sinf(transform.rotation);
-        const float cosR2 = cosf(transform.rotation);
-        float tempX = anchorOffset.x;
-        anchorOffset.x = anchorOffset.x * cosR2 - anchorOffset.y * sinR2;
-        anchorOffset.y = tempX * sinR2 + anchorOffset.y * cosR2;
-    }
-
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
 
-    for (const auto& corner : worldCorners)
+    
+    const float sinR = sinf(transform.rotation);
+    const float cosR = cosf(transform.rotation);
+
+    for (const auto& corner : localCorners)
     {
-        ECS::Vector2f worldPos = transform.position + anchorOffset + corner;
+        ECS::Vector2f rotatedCorner = corner;
+        if (std::abs(transform.rotation) > 0.001f)
+        {
+            const float tempX = corner.x;
+            rotatedCorner.x = corner.x * cosR - corner.y * sinR;
+            rotatedCorner.y = tempX * sinR + corner.y * cosR;
+        }
+
+        
+        ECS::Vector2f worldPos = anchoredCenter + rotatedCorner;
         ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, worldPos);
         screenCorners.push_back(screenPos);
     }
 
-
+    
     drawList->AddConvexPolyFilled(screenCorners.data(), 4, fillColor);
-
 
     for (int i = 0; i < 4; ++i)
     {
@@ -945,54 +934,43 @@ void SceneViewPanel::drawButtonSelectionOutline(ImDrawList* drawList, const ECS:
                                                 const ECS::ButtonComponent& buttonComp, ImU32 outlineColor,
                                                 ImU32 fillColor, float thickness)
 {
-    const float width = buttonComp.rect.Width() * transform.scale.x;
-    const float height = buttonComp.rect.Height() * transform.scale.y;
-
-    const float halfWidth = width * 0.5f;
-    const float halfHeight = height * 0.5f;
+    const float width = buttonComp.rect.Width();
+    const float height = buttonComp.rect.Height();
 
     
-    std::vector<ECS::Vector2f> corners = {
+    const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
+
+    
+    const float scaledWidth = width * transform.scale.x;
+    const float scaledHeight = height * transform.scale.y;
+    const float halfWidth = scaledWidth * 0.5f;
+    const float halfHeight = scaledHeight * 0.5f;
+
+    
+    std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight}, {halfWidth, -halfHeight},
         {halfWidth, halfHeight}, {-halfWidth, halfHeight}
     };
-
-    
-    if (std::abs(transform.rotation) > 0.001f)
-    {
-        const float sinR = sinf(transform.rotation);
-        const float cosR = cosf(transform.rotation);
-        for (auto& corner : corners)
-        {
-            float tempX = corner.x;
-            corner.x = corner.x * cosR - corner.y * sinR;
-            corner.y = tempX * sinR + corner.y * cosR;
-        }
-    }
-
-    
-    ECS::Vector2f anchorOffset = {
-        (0.5f - transform.anchor.x) * width,
-        (0.5f - transform.anchor.y) * height
-    };
-
-    
-    if (std::abs(transform.rotation) > 0.001f)
-    {
-        const float sinR = sinf(transform.rotation);
-        const float cosR = cosf(transform.rotation);
-        float tempX = anchorOffset.x;
-        anchorOffset.x = anchorOffset.x * cosR - anchorOffset.y * sinR;
-        anchorOffset.y = tempX * sinR + anchorOffset.y * cosR;
-    }
 
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
 
     
-    for (const auto& corner : corners)
+    const float sinR = sinf(transform.rotation);
+    const float cosR = cosf(transform.rotation);
+
+    for (const auto& corner : localCorners)
     {
-        ECS::Vector2f worldPos = transform.position + anchorOffset + corner;
+        ECS::Vector2f rotatedCorner = corner;
+        if (std::abs(transform.rotation) > 0.001f)
+        {
+            const float tempX = corner.x;
+            rotatedCorner.x = corner.x * cosR - corner.y * sinR;
+            rotatedCorner.y = tempX * sinR + corner.y * cosR;
+        }
+
+        
+        ECS::Vector2f worldPos = anchoredCenter + rotatedCorner;
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
     }
 
@@ -1271,57 +1249,45 @@ void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::T
     const SkRect localBounds = GetLocalTextBounds(textComp);
     if (localBounds.isEmpty()) return;
 
-    
-    const float width = localBounds.width() * transform.scale.x;
-    const float height = localBounds.height() * transform.scale.y;
-
-    const float halfWidth = width * 0.5f;
-    const float halfHeight = height * 0.5f;
+    const float width = localBounds.width();
+    const float height = localBounds.height();
 
     
-    std::vector<ECS::Vector2f> corners = {
+    const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
+
+    
+    const float scaledWidth = width * transform.scale.x;
+    const float scaledHeight = height * transform.scale.y;
+    const float halfWidth = scaledWidth * 0.5f;
+    const float halfHeight = scaledHeight * 0.5f;
+
+    
+    std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight},
         {halfWidth, -halfHeight},
         {halfWidth, halfHeight},
         {-halfWidth, halfHeight}
     };
 
-    
-    if (std::abs(transform.rotation) > 0.001f)
-    {
-        const float sinR = sinf(transform.rotation);
-        const float cosR = cosf(transform.rotation);
-        for (auto& corner : corners)
-        {
-            float tempX = corner.x;
-            corner.x = corner.x * cosR - corner.y * sinR;
-            corner.y = tempX * sinR + corner.y * cosR;
-        }
-    }
-
-    
-    ECS::Vector2f anchorOffset = {
-        (0.5f - transform.anchor.x) * width,
-        (0.5f - transform.anchor.y) * height
-    };
-
-    
-    if (std::abs(transform.rotation) > 0.001f)
-    {
-        const float sinR = sinf(transform.rotation);
-        const float cosR = cosf(transform.rotation);
-        float tempX = anchorOffset.x;
-        anchorOffset.x = anchorOffset.x * cosR - anchorOffset.y * sinR;
-        anchorOffset.y = tempX * sinR + anchorOffset.y * cosR;
-    }
-
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
 
     
-    for (const auto& corner : corners)
+    const float sinR = sinf(transform.rotation);
+    const float cosR = cosf(transform.rotation);
+
+    for (const auto& corner : localCorners)
     {
-        ECS::Vector2f worldPos = transform.position + anchorOffset + corner;
+        ECS::Vector2f rotatedCorner = corner;
+        if (std::abs(transform.rotation) > 0.001f)
+        {
+            const float tempX = corner.x;
+            rotatedCorner.x = corner.x * cosR - corner.y * sinR;
+            rotatedCorner.y = tempX * sinR + corner.y * cosR;
+        }
+
+        
+        ECS::Vector2f worldPos = anchoredCenter + rotatedCorner;
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
     }
 
@@ -1344,57 +1310,45 @@ void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const E
     const SkRect localBounds = GetLocalTextBounds(displayTextComp, padding);
     if (localBounds.isEmpty()) return;
 
-    
-    const float width = localBounds.width() * transform.scale.x;
-    const float height = localBounds.height() * transform.scale.y;
-
-    const float halfWidth = width * 0.5f;
-    const float halfHeight = height * 0.5f;
+    const float width = localBounds.width();
+    const float height = localBounds.height();
 
     
-    std::vector<ECS::Vector2f> corners = {
+    const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
+
+    
+    const float scaledWidth = width * transform.scale.x;
+    const float scaledHeight = height * transform.scale.y;
+    const float halfWidth = scaledWidth * 0.5f;
+    const float halfHeight = scaledHeight * 0.5f;
+
+    
+    std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight},
         {halfWidth, -halfHeight},
         {halfWidth, halfHeight},
         {-halfWidth, halfHeight}
     };
 
-    
-    if (std::abs(transform.rotation) > 0.001f)
-    {
-        const float sinR = sinf(transform.rotation);
-        const float cosR = cosf(transform.rotation);
-        for (auto& corner : corners)
-        {
-            float tempX = corner.x;
-            corner.x = corner.x * cosR - corner.y * sinR;
-            corner.y = tempX * sinR + corner.y * cosR;
-        }
-    }
-
-    
-    ECS::Vector2f anchorOffset = {
-        (0.5f - transform.anchor.x) * width,
-        (0.5f - transform.anchor.y) * height
-    };
-
-    
-    if (std::abs(transform.rotation) > 0.001f)
-    {
-        const float sinR = sinf(transform.rotation);
-        const float cosR = cosf(transform.rotation);
-        float tempX = anchorOffset.x;
-        anchorOffset.x = anchorOffset.x * cosR - anchorOffset.y * sinR;
-        anchorOffset.y = tempX * sinR + anchorOffset.y * cosR;
-    }
-
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
 
     
-    for (const auto& corner : corners)
+    const float sinR = sinf(transform.rotation);
+    const float cosR = cosf(transform.rotation);
+
+    for (const auto& corner : localCorners)
     {
-        ECS::Vector2f worldPos = transform.position + anchorOffset + corner;
+        ECS::Vector2f rotatedCorner = corner;
+        if (std::abs(transform.rotation) > 0.001f)
+        {
+            const float tempX = corner.x;
+            rotatedCorner.x = corner.x * cosR - corner.y * sinR;
+            rotatedCorner.y = tempX * sinR + corner.y * cosR;
+        }
+
+        
+        ECS::Vector2f worldPos = anchoredCenter + rotatedCorner;
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
     }
 

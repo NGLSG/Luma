@@ -24,6 +24,8 @@ namespace
         float offsetX = (0.5f - transform.anchor.x) * width;
         float offsetY = (0.5f - transform.anchor.y) * height;
 
+        offsetX *= transform.scale.x;
+        offsetY *= transform.scale.y;
 
         if (std::abs(transform.rotation) > 0.0001f)
         {
@@ -719,6 +721,6 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             return static_cast<uint32_t>(a.entityId) < static_cast<uint32_t>(b.entityId);
         });
     }
-    
+
     RenderableManager::GetInstance().SubmitFrame(std::move(renderables));
 }
