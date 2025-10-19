@@ -21,7 +21,7 @@ namespace ECS
         /// 锚点，决定了变换作用的基准点。
         /// 使用归一化坐标，(0,0) 代表左上角，(0.5,0.5) 代表中心，(1,1) 代表右下角。
         /// </summary>
-        Vector2f anchor = {0.0f, 0.0f};
+        Vector2f anchor = {0.5f, 0.5f};
 
         Vector2f localPosition = {0.0f, 0.0f}; ///< 相对于父级的局部位置。
         float localRotation = 0.0f; ///< 相对于父级的局部旋转角度。

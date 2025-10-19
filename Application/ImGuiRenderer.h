@@ -23,7 +23,7 @@ public:
      * @param device WebGPU设备，用于创建渲染资源。
      * @param renderTargetFormat 渲染目标的纹理格式。
      */
-    ImGuiRenderer(SDL_Window* window, wgpu::Device device, wgpu::TextureFormat renderTargetFormat);
+    ImGuiRenderer(SDL_Window* window, const wgpu::Device& device, wgpu::TextureFormat renderTargetFormat);
     /**
      * @brief 销毁ImGui渲染器实例。
      */

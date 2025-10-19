@@ -2,6 +2,8 @@
 #define INSPECTORPANEL_H
 
 #include "IEditorPanel.h"
+#include "../Components/Transform.h"
+#include "../Event/LumaEvent.h"
 
 
 class RuntimeGameObject;
@@ -52,6 +54,10 @@ public:
     const char* GetPanelName() const override { return "属性"; }
 
 private:
+    // Cache/invalidation helpers
+    void rebuildCache(const std::vector<Guid>& guids, SelectionType type);
+    size_t computeSelectionFingerprint(SelectionType type, const std::vector<Guid>& guids) const;
+
     /// 绘制未选中任何对象时的提示信息。
     void drawNoSelection();
     /// 绘制游戏对象的属性检查器。
@@ -181,6 +187,34 @@ private:
     bool m_isLocked = false; ///< 指示选择是否被锁定。
     std::vector<Guid> m_lockedGuids; ///< 存储被锁定的游戏对象GUID列表。
     SelectionType m_lockedSelectionType = SelectionType::NA; ///< 存储被锁定时的选择类型。
+
+    // Event listeners and incremental caching to improve performance with many selections
+    ListenerHandle m_evtGoCreated{};
+    ListenerHandle m_evtGoDestroyed{};
+    ListenerHandle m_evtCompAdded{};
+    ListenerHandle m_evtCompRemoved{};
+    ListenerHandle m_evtCompUpdated{};
+    bool m_dirty = true;
+    size_t m_selectionFingerprint = 0;
+
+    // Cached selection expansion
+    std::vector<RuntimeGameObject> m_cachedSelectedObjects;
+
+    // Cached common components for multi-selection
+    std::vector<std::string> m_cachedCommonComponents;
+
+    struct BatchTransformSummary
+    {
+        bool valid = false;
+        bool allHaveParent = false;
+        bool positionSame = false;
+        bool rotationSame = false;
+        bool scaleSame = false;
+        ECS::Vector2f refPosition{0.f, 0.f};
+        float refRotation = 0.f;
+        ECS::Vector2f refScale{1.f, 1.f};
+    };
+    BatchTransformSummary m_cachedBatchTransform;
 };
 
 #endif

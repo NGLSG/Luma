@@ -192,7 +192,6 @@ namespace YAML
         {
             Node node;
             node["guid"] = handle.assetGuid;
-            node["assetGuid"] = handle.assetGuid;
             node["type"] = handle.assetType;
             return node;
         }

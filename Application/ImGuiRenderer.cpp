@@ -12,7 +12,7 @@
 #include "../Utils/Path.h"
 
 
-ImGuiRenderer::ImGuiRenderer(SDL_Window* window, wgpu::Device device, wgpu::TextureFormat renderTargetFormat)
+ImGuiRenderer::ImGuiRenderer(SDL_Window* window, const wgpu::Device& device, wgpu::TextureFormat renderTargetFormat)
     : m_device(device)
 {
     IMGUI_CHECKVERSION();
@@ -56,7 +56,7 @@ void ImGuiRenderer::NewFrame()
     {
         for (auto it = m_textureCache.begin(); it != m_textureCache.end();)
         {
-            if (std::find(m_activeTexturesInFrame.begin(), m_activeTexturesInFrame.end(), it->first) ==
+            if (std::ranges::find(m_activeTexturesInFrame, it->first) ==
                 m_activeTexturesInFrame.end())
             {
                 it = m_textureCache.erase(it);
@@ -68,7 +68,10 @@ void ImGuiRenderer::NewFrame()
         }
     }
     m_activeTexturesInFrame.clear();
-
+    if (!m_device)
+    {
+        throw std::runtime_error("ImGuiRenderer::NewFrame: WGPU Device is not valid.");
+    }
     ImGui_ImplWGPU_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();

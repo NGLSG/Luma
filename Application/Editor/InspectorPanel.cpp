@@ -17,6 +17,8 @@
 #include "TagComponent.h"
 #include "../TagManager.h"
 #include "TagComponent.h"
+#include "Event/EventBus.h"
+#include "Event/Events.h"
 
 void InspectorPanel::Initialize(EditorContext* context)
 {
@@ -24,6 +26,110 @@ void InspectorPanel::Initialize(EditorContext* context)
     m_isLocked = false;
     m_lockedGuids.clear();
     m_lockedSelectionType = SelectionType::NA;
+
+
+    m_evtGoCreated = EventBus::GetInstance().Subscribe<GameObjectCreatedEvent>([this](const GameObjectCreatedEvent& e)
+    {
+        try
+        {
+            if (!m_context || !m_context->activeScene) return;
+            if (m_context->editorState != EditorState::Editing)
+            {
+                m_dirty = true;
+                return;
+            }
+            auto& id = e.registry.get<ECS::IDComponent>(e.entity);
+            if (m_context->selectionType == SelectionType::NA || m_context->selectionList.empty())
+            {
+                m_context->selectionType = SelectionType::GameObject;
+                m_context->selectionList.clear();
+                m_context->selectionList.push_back(id.guid);
+                m_context->objectToFocusInHierarchy = id.guid;
+            }
+            m_dirty = true;
+        }
+        catch (...)
+        {
+        }
+    });
+
+    m_evtGoDestroyed = EventBus::GetInstance().Subscribe<GameObjectDestroyedEvent>(
+        [this](const GameObjectDestroyedEvent& e)
+        {
+            try
+            {
+                if (!m_context) return;
+                auto& id = e.registry.get<ECS::IDComponent>(e.entity);
+                auto& sel = m_context->selectionList;
+                auto it = std::find(sel.begin(), sel.end(), id.guid);
+                if (it != sel.end())
+                {
+                    sel.erase(it);
+                    if (sel.empty())
+                    {
+                        m_context->selectionType = SelectionType::NA;
+                    }
+                }
+                m_dirty = true;
+            }
+            catch (...)
+            {
+            }
+        });
+
+    m_evtCompAdded = EventBus::GetInstance().Subscribe<ComponentAddedEvent>([this](const ComponentAddedEvent& e)
+    {
+        try
+        {
+            if (!m_context) return;
+            auto& id = e.registry.get<ECS::IDComponent>(e.entity);
+            if (std::find(m_context->selectionList.begin(), m_context->selectionList.end(), id.guid) != m_context->
+                selectionList.end())
+            {
+                m_dirty = true;
+            }
+        }
+        catch (...)
+        {
+        }
+    });
+
+    m_evtCompRemoved = EventBus::GetInstance().Subscribe<ComponentRemovedEvent>([this](const ComponentRemovedEvent& e)
+    {
+        try
+        {
+            if (!m_context) return;
+            auto& id = e.registry.get<ECS::IDComponent>(e.entity);
+            if (std::find(m_context->selectionList.begin(), m_context->selectionList.end(), id.guid) != m_context->
+                selectionList.end())
+            {
+                m_dirty = true;
+            }
+        }
+        catch (...)
+        {
+        }
+    });
+
+    m_evtCompUpdated = EventBus::GetInstance().Subscribe<ComponentUpdatedEvent>([this](const ComponentUpdatedEvent& e)
+    {
+        try
+        {
+            if (!m_context) return;
+            if (m_context->selectionList.size() > 1)
+            {
+                auto& id = e.registry.get<ECS::IDComponent>(e.entity);
+                if (std::find(m_context->selectionList.begin(), m_context->selectionList.end(), id.guid) != m_context->
+                    selectionList.end())
+                {
+                    m_dirty = true;
+                }
+            }
+        }
+        catch (...)
+        {
+        }
+    });
 }
 
 void InspectorPanel::Update(float deltaTime)
@@ -52,6 +158,19 @@ void InspectorPanel::Draw()
         currentSelectionGuids = m_context->selectionList;
     }
 
+
+    size_t fp = computeSelectionFingerprint(currentSelectionType, currentSelectionGuids);
+    if (fp != m_selectionFingerprint)
+    {
+        m_selectionFingerprint = fp;
+        m_dirty = true;
+    }
+    if (m_dirty)
+    {
+        rebuildCache(currentSelectionGuids, currentSelectionType);
+        m_dirty = false;
+    }
+
     switch (currentSelectionType)
     {
     case SelectionType::NA:
@@ -71,6 +190,11 @@ void InspectorPanel::Draw()
 void InspectorPanel::Shutdown()
 {
     unlockSelection();
+    EventBus::GetInstance().Unsubscribe(m_evtGoCreated);
+    EventBus::GetInstance().Unsubscribe(m_evtGoDestroyed);
+    EventBus::GetInstance().Unsubscribe(m_evtCompAdded);
+    EventBus::GetInstance().Unsubscribe(m_evtCompRemoved);
+    EventBus::GetInstance().Unsubscribe(m_evtCompUpdated);
 }
 
 void InspectorPanel::drawLockButton()
@@ -291,7 +415,7 @@ void InspectorPanel::drawSceneCameraInspector()
             if (ImGui::IsItemActivated()) { m_context->uiCallbacks->onValueChanged.Invoke(); }
             changed |= CustomDrawing::WidgetDrawer<SkColor4f>::Draw("清除颜色", camProps.clearColor,
                                                                     *m_context->uiCallbacks);
-
+            camProps.zoom = std::max(0.f, camProps.zoom);
             if (changed)
             {
                 m_context->activeScene->SetCameraProperties(camProps);
@@ -397,11 +521,12 @@ void InspectorPanel::drawGameObjectName(RuntimeGameObject& gameObject)
                     }
                     tags = TagManager::GetAllTags();
                     currentIndex = -1;
-                    for (int i = 0; i < (int)tags.size(); ++i) if (tags[i] == tagComp.tag)
-                    {
-                        currentIndex = i;
-                        break;
-                    }
+                    for (int i = 0; i < (int)tags.size(); ++i)
+                        if (tags[i] == tagComp.tag)
+                        {
+                            currentIndex = i;
+                            break;
+                        }
                 }
             }
             if (!canDelete) ImGui::EndDisabled();
@@ -469,7 +594,7 @@ void InspectorPanel::drawBatchGameObjectName(std::vector<RuntimeGameObject>& sel
     static char batchNameBuffer[256] = {0};
 
     std::string label = isSelectionLocked() ? "批量重命名 [固定]:" : "批量重命名:";
-    ImGui::Text("%s",label.c_str());
+    ImGui::Text("%s", label.c_str());
 
     if (ImGui::InputText("新名称", batchNameBuffer, sizeof(batchNameBuffer), ImGuiInputTextFlags_EnterReturnsTrue))
     {
@@ -675,31 +800,8 @@ void InspectorPanel::drawCommonComponents(const std::vector<RuntimeGameObject>& 
     auto& registry = m_context->activeScene->GetRegistry();
     const auto& componentRegistry = ComponentRegistry::GetInstance();
 
-    std::vector<std::string> commonComponents;
 
-    for (const auto& componentName : componentRegistry.GetAllRegisteredNames())
-    {
-        const ComponentRegistration* compInfo = componentRegistry.Get(componentName);
-        if (!compInfo || !compInfo->isExposedInEditor) continue;
-
-        if (componentName == "ScriptComponent") continue;
-
-        bool allHaveComponent = true;
-        for (const auto& obj : selectedObjects)
-        {
-            auto entityHandle = static_cast<entt::entity>(obj);
-            if (!compInfo->has(registry, entityHandle))
-            {
-                allHaveComponent = false;
-                break;
-            }
-        }
-
-        if (allHaveComponent)
-        {
-            commonComponents.push_back(componentName);
-        }
-    }
+    const auto& commonComponents = m_cachedCommonComponents;
 
     for (const auto& componentName : commonComponents)
     {
@@ -725,15 +827,7 @@ void InspectorPanel::drawBatchTransformComponent(const std::vector<RuntimeGameOb
     if (!m_context->activeScene) return;
     auto& registry = m_context->activeScene->GetRegistry();
 
-    bool allHaveParent = true;
-    for (const auto& obj : selectedObjects)
-    {
-        if (!obj.HasComponent<ECS::ParentComponent>())
-        {
-            allHaveParent = false;
-            break;
-        }
-    }
+    bool allHaveParent = m_cachedBatchTransform.allHaveParent;
 
     std::string headerName = allHaveParent ? "Transform (Local)" : "Transform (混合)";
     if (isSelectionLocked())
@@ -774,65 +868,150 @@ void InspectorPanel::displayBatchTransformValues(const std::vector<RuntimeGameOb
                                                  bool allHaveParent)
 {
     if (!m_context->activeScene) return;
-    auto& registry = m_context->activeScene->GetRegistry();
-
     if (selectedObjects.empty()) return;
 
-    auto firstEntity = static_cast<entt::entity>(selectedObjects[0]);
-    auto& firstTransform = registry.get<ECS::TransformComponent>(firstEntity);
-
-    bool positionSame = true;
-    bool rotationSame = true;
-    bool scaleSame = true;
-
-    ECS::Vector2f refPosition = allHaveParent ? firstTransform.localPosition : firstTransform.position;
-    float refRotation = allHaveParent ? firstTransform.localRotation : firstTransform.rotation;
-    ECS::Vector2f refScale = allHaveParent ? firstTransform.localScale : firstTransform.scale;
-
-    for (size_t i = 1; i < selectedObjects.size(); ++i)
-    {
-        auto entity = static_cast<entt::entity>(selectedObjects[i]);
-        auto& transform = registry.get<ECS::TransformComponent>(entity);
-
-        ECS::Vector2f currentPos = allHaveParent ? transform.localPosition : transform.position;
-        float currentRot = allHaveParent ? transform.localRotation : transform.rotation;
-        ECS::Vector2f currentScale = allHaveParent ? transform.localScale : transform.scale;
-
-        if (std::abs(currentPos.x - refPosition.x) > 0.001f || std::abs(currentPos.y - refPosition.y) > 0.001f)
-            positionSame = false;
-        if (std::abs(currentRot - refRotation) > 0.001f)
-            rotationSame = false;
-        if (std::abs(currentScale.x - refScale.x) > 0.001f || std::abs(currentScale.y - refScale.y) > 0.001f)
-            scaleSame = false;
-    }
-
+    const auto& s = m_cachedBatchTransform;
     ImGui::Text("当前值:");
 
-    if (positionSame)
+    if (s.positionSame)
     {
-        ImGui::Text("位置: (%.3f, %.3f)", refPosition.x, refPosition.y);
+        ImGui::Text("位置: (%.3f, %.3f)", s.refPosition.x, s.refPosition.y);
     }
     else
     {
         ImGui::Text("位置: (不同值...)");
     }
 
-    if (rotationSame)
+    if (s.rotationSame)
     {
-        ImGui::Text("旋转: %.3f", refRotation);
+        ImGui::Text("旋转: %.3f", s.refRotation);
     }
     else
     {
         ImGui::Text("旋转: (不同值...)");
     }
 
-    if (scaleSame)
+    if (s.scaleSame)
     {
-        ImGui::Text("缩放: (%.3f, %.3f)", refScale.x, refScale.y);
+        ImGui::Text("缩放: (%.3f, %.3f)", s.refScale.x, s.refScale.y);
     }
     else
     {
         ImGui::Text("缩放: (不同值...)");
+    }
+}
+
+size_t InspectorPanel::computeSelectionFingerprint(SelectionType type, const std::vector<Guid>& guids) const
+{
+    auto fnv64 = [](uint64_t h, uint64_t v)
+    {
+        const uint64_t FNV_PRIME = 1099511628211ull;
+        h ^= v;
+        h *= FNV_PRIME;
+        return h;
+    };
+    uint64_t h = 1469598103934665603ull;
+    h = fnv64(h, static_cast<uint64_t>(type));
+    h = fnv64(h, static_cast<uint64_t>(guids.size()));
+    for (const auto& g : guids)
+    {
+        std::string s = g.ToString();
+
+        uint64_t part = 0;
+        size_t i = 0;
+        for (unsigned char c : s)
+        {
+            part = (part << 8) | static_cast<uint64_t>(c);
+            if ((++i % 8) == 0)
+            {
+                h = fnv64(h, part);
+                part = 0;
+            }
+        }
+        if (i % 8) h = fnv64(h, part);
+    }
+    return static_cast<size_t>(h);
+}
+
+void InspectorPanel::rebuildCache(const std::vector<Guid>& guids, SelectionType type)
+{
+    m_cachedSelectedObjects.clear();
+    m_cachedCommonComponents.clear();
+    m_cachedBatchTransform = {};
+
+    if (!m_context || !m_context->activeScene) return;
+    if (type != SelectionType::GameObject) return;
+
+
+    m_cachedSelectedObjects.reserve(guids.size());
+    for (const auto& guid : guids)
+    {
+        RuntimeGameObject obj = m_context->activeScene->FindGameObjectByGuid(guid);
+        if (obj.IsValid()) m_cachedSelectedObjects.push_back(obj);
+    }
+
+    if (m_cachedSelectedObjects.empty()) return;
+
+    if (m_cachedSelectedObjects.size() > 1)
+    {
+        auto& registry = m_context->activeScene->GetRegistry();
+        const auto& componentRegistry = ComponentRegistry::GetInstance();
+        for (const auto& componentName : componentRegistry.GetAllRegisteredNames())
+        {
+            const ComponentRegistration* compInfo = componentRegistry.Get(componentName);
+            if (!compInfo || !compInfo->isExposedInEditor) continue;
+            if (componentName == "ScriptComponent") continue;
+
+            bool allHaveComponent = true;
+            for (const auto& obj : m_cachedSelectedObjects)
+            {
+                auto entityHandle = static_cast<entt::entity>(obj);
+                if (!compInfo->has(registry, entityHandle))
+                {
+                    allHaveComponent = false;
+                    break;
+                }
+            }
+            if (allHaveComponent) m_cachedCommonComponents.push_back(componentName);
+        }
+
+
+        BatchTransformSummary s{};
+        s.valid = true;
+        s.allHaveParent = true;
+        for (const auto& obj : m_cachedSelectedObjects)
+        {
+            if (!obj.HasComponent<ECS::ParentComponent>())
+            {
+                s.allHaveParent = false;
+                break;
+            }
+        }
+
+        auto& registry2 = m_context->activeScene->GetRegistry();
+        auto firstEntity = static_cast<entt::entity>(m_cachedSelectedObjects[0]);
+        auto& firstTransform = registry2.get<ECS::TransformComponent>(firstEntity);
+        s.positionSame = true;
+        s.rotationSame = true;
+        s.scaleSame = true;
+        s.refPosition = s.allHaveParent ? firstTransform.localPosition : firstTransform.position;
+        s.refRotation = s.allHaveParent ? firstTransform.localRotation : firstTransform.rotation;
+        s.refScale = s.allHaveParent ? firstTransform.localScale : firstTransform.scale;
+
+        for (size_t i = 1; i < m_cachedSelectedObjects.size(); ++i)
+        {
+            auto entity = static_cast<entt::entity>(m_cachedSelectedObjects[i]);
+            auto& t = registry2.get<ECS::TransformComponent>(entity);
+            ECS::Vector2f pos = s.allHaveParent ? t.localPosition : t.position;
+            float rot = s.allHaveParent ? t.localRotation : t.rotation;
+            ECS::Vector2f sc = s.allHaveParent ? t.localScale : t.scale;
+            if (std::abs(pos.x - s.refPosition.x) > 0.001f || std::abs(pos.y - s.refPosition.y) > 0.001f)
+                s.positionSame
+                    = false;
+            if (std::abs(rot - s.refRotation) > 0.001f) s.rotationSame = false;
+            if (std::abs(sc.x - s.refScale.x) > 0.001f || std::abs(sc.y - s.refScale.y) > 0.001f) s.scaleSame = false;
+        }
+        m_cachedBatchTransform = s;
     }
 }
 
@@ -948,12 +1127,10 @@ void InspectorPanel::drawBatchComponentHeader(const std::string& componentName, 
         }
         else
         {
-            
             for (const auto& propInfo : compInfo->properties)
             {
                 if (propInfo.draw_ui && propInfo.isExposedInEditor)
                 {
-                    
                     drawBatchProperty(propInfo.name, propInfo, compInfo, selectedObjects);
                 }
             }
@@ -1134,11 +1311,12 @@ void InspectorPanel::drawComponentHeader(const std::string& componentName, const
             {
                 TagManager::EnsureDefaults();
                 tags = TagManager::GetAllTags();
-                for (int i = 0; i < (int)tags.size(); ++i) if (tags[i] == tagComp.tag)
-                {
-                    currentIndex = i;
-                    break;
-                }
+                for (int i = 0; i < (int)tags.size(); ++i)
+                    if (tags[i] == tagComp.tag)
+                    {
+                        currentIndex = i;
+                        break;
+                    }
             }
 
             ImGui::Text("标签");
@@ -1200,13 +1378,12 @@ void InspectorPanel::drawComponentHeader(const std::string& componentName, const
         }
         else
         {
-            
             for (const auto& propInfo : compInfo->properties)
             {
                 if (propInfo.draw_ui && propInfo.isExposedInEditor)
                 {
                     m_context->uiCallbacks->SelectedGuids = getCurrentSelectionGuids();
-                    
+
                     propInfo.draw_ui(propInfo.name, registry, entityHandle, *m_context->uiCallbacks);
                 }
             }
