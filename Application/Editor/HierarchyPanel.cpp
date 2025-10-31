@@ -943,7 +943,7 @@ void HierarchyPanel::buildHierarchyCache()
     auto endTime = std::chrono::steady_clock::now();
     lastBuildTime = std::chrono::duration<float, std::milli>(endTime - startTime).count();
 
-    LogInfo("层级缓存重建完成，节点数: {}, 耗时: {:.2f}ms", totalNodeCount, lastBuildTime);
+    
 }
 
 void HierarchyPanel::buildNodeRecursive(RuntimeGameObject& gameObject, int depth, bool parentVisible)

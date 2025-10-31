@@ -664,7 +664,7 @@ void ToolbarPanel::drawSettingsWindow()
     ImGui::Separator();
     ImGui::Spacing();
 
-    if (ImGui::Button("保存设置", ImVec2(120, 0)))
+    if (ImGui::Button("保存设置", ImVec2(120, 30)))
     {
         settings.Save();
         LogInfo("项目设置已保存至: {}", settings.GetProjectFilePath().string());
@@ -679,7 +679,7 @@ void ToolbarPanel::drawSettingsWindow()
     }
     ImGui::SameLine();
 
-    if (ImGui::Button("关闭", ImVec2(120, 0)))
+    if (ImGui::Button("关闭", ImVec2(120, 30)))
     {
         settings.Load();
         m_isSettingsWindowVisible = false;
@@ -856,14 +856,16 @@ void ToolbarPanel::play()
         playScene->AddSystemToMainThread<Systems::CommonUIControlSystem>();
         playScene->AddSystem<Systems::ScriptingSystem>();
         playScene->AddSystem<Systems::AnimationSystem>();
-        
+
         SceneManager::GetInstance().SetCurrentScene(playScene);
 
         playScene->Activate(*ctx->engineContext);
+        std::cout << "原始场景地址: " << ctx->editingScene.get() << std::endl;
         ctx->activeScene = playScene;
 
 
         LogInfo("已通过命令队列安全进入播放模式。");
+        std::cout << "场景地址: " << playScene.get() << std::endl;
     };
 
 
@@ -1275,4 +1277,3 @@ bool ToolbarPanel::runScriptCompilationLogicForPackaging(std::string& statusMess
         return false;
     }
 }
-

@@ -33,7 +33,7 @@ namespace
 
     static inline uint64_t hash_combine_u64(uint64_t seed, uint64_t v)
     {
-        
+
         const uint64_t kMul = 0x9ddfea08eb382d69ULL;
         uint64_t a = (v ^ seed) * kMul;
         a ^= (a >> 47);
@@ -50,7 +50,7 @@ namespace
 
     static uint64_t stable_packet_key(const RenderPacket& p)
     {
-        uint64_t seed = 0xcbf29ce484222325ULL; 
+        uint64_t seed = 0xcbf29ce484222325ULL;
         std::visit([&](auto const& batch)
         {
             using T = std::decay_t<decltype(batch)>;
@@ -63,7 +63,7 @@ namespace
                 seed = hash_combine_u64(seed, float_bits(batch.sourceRect.fRight));
                 seed = hash_combine_u64(seed, float_bits(batch.sourceRect.fBottom));
                 seed = hash_combine_u64(seed, float_bits(batch.ppuScaleFactor));
-                
+
                 seed = hash_combine_u64(seed, float_bits(batch.color.fR));
                 seed = hash_combine_u64(seed, float_bits(batch.color.fG));
                 seed = hash_combine_u64(seed, float_bits(batch.color.fB));
@@ -124,7 +124,7 @@ namespace
             }
             else if constexpr (std::is_same_v<T, RawDrawBatch>)
             {
-                
+
                 seed = hash_combine_u64(seed, 0xDEADBEEFULL);
             }
         }, p.batchData);

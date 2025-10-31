@@ -80,7 +80,8 @@ namespace Systems
             }
         }
 
-        for (const auto& event : context.frameEvents.GetView())
+        
+        for (const auto& event : context.eventsForSim)
         {
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
             {
@@ -111,15 +112,15 @@ namespace Systems
             }
         }
 
-        
+
         entt::entity currentFocused = focusedEntity;
 
         if (registry.valid(currentFocused))
         {
             HandleActiveInput(scene, currentFocused, context);
 
-            
-            
+
+
             if (focusedEntity == currentFocused && registry.valid(focusedEntity))
             {
                 auto& inputText = registry.get<ECS::InputTextComponent>(focusedEntity);
@@ -143,7 +144,7 @@ namespace Systems
         inputText.isCursorVisible = true;
         inputText.cursorBlinkTimer = 0.0f;
 
-        
+
         inputText.inputBuffer = inputText.text.text;
         inputText.cursorPosition = inputText.inputBuffer.length();
 
@@ -164,7 +165,7 @@ namespace Systems
         inputText->isFocused = false;
         inputText->isCursorVisible = false;
 
-        
+
         if (inputText->text.text != inputText->inputBuffer)
         {
             inputText->text.text = inputText->inputBuffer;
@@ -192,16 +193,16 @@ namespace Systems
         bool textChanged = false;
         bool cursorMoved = false;
 
-        
+
         if (inputText.isReadOnly)
         {
             return;
         }
 
         
-        for (const auto& event : context.frameEvents.GetView())
+        for (const auto& event : context.eventsForSim)
         {
-            
+
             if (event.type == SDL_EVENT_TEXT_INPUT)
             {
                 std::string inputTextStr = event.text.text;
@@ -212,7 +213,7 @@ namespace Systems
                     textChanged = true;
                 }
             }
-            
+
             else if (event.type == SDL_EVENT_KEY_DOWN)
             {
                 switch (event.key.key)
@@ -220,7 +221,7 @@ namespace Systems
                 case SDLK_BACKSPACE:
                     if (inputText.cursorPosition > 0)
                     {
-                        
+
                         size_t prevPos = GetPreviousUtf8CharPosition(inputText.inputBuffer, inputText.cursorPosition);
                         size_t deleteLength = inputText.cursorPosition - prevPos;
 
@@ -233,7 +234,7 @@ namespace Systems
                 case SDLK_DELETE:
                     if (inputText.cursorPosition < inputText.inputBuffer.length())
                     {
-                        
+
                         size_t deleteLength = GetUtf8CharByteLength(&inputText.inputBuffer[inputText.cursorPosition]);
                         inputText.inputBuffer.erase(inputText.cursorPosition, deleteLength);
                         textChanged = true;
@@ -243,7 +244,7 @@ namespace Systems
                 case SDLK_LEFT:
                     if (inputText.cursorPosition > 0)
                     {
-                        
+
                         inputText.cursorPosition = GetPreviousUtf8CharPosition(
                             inputText.inputBuffer, inputText.cursorPosition);
                         cursorMoved = true;
@@ -253,7 +254,7 @@ namespace Systems
                 case SDLK_RIGHT:
                     if (inputText.cursorPosition < inputText.inputBuffer.length())
                     {
-                        
+
                         inputText.cursorPosition = GetNextUtf8CharPosition(
                             inputText.inputBuffer, inputText.cursorPosition);
                         cursorMoved = true;
@@ -278,15 +279,15 @@ namespace Systems
 
                 case SDLK_RETURN:
                 case SDLK_KP_ENTER:
-                    
-                    
+
+
                     InvokeSubmitEvent(scene, inputText.onSubmitTargets, inputText.inputBuffer);
                     OnFocusLost(scene, entity, context);
                     return;
 
                 case SDLK_ESCAPE:
-                    
-                    
+
+
                     inputText.inputBuffer = inputText.text.text;
                     OnFocusLost(scene, entity, context);
                     return;
@@ -297,7 +298,7 @@ namespace Systems
             }
         }
 
-        
+
         if (textChanged || cursorMoved)
         {
             inputText.isCursorVisible = true;

@@ -175,6 +175,7 @@ private:
     entt::entity m_entityHandle; ///< 关联的entt实体句柄。
     std::vector<std::string> m_componentNames; ///< 游戏对象上组件的名称列表。
     RuntimeScene* m_scene; ///< 实体所属的运行时场景指针。
+    bool CurrentSceneIsEqualToMScene() const;
 };
 
 

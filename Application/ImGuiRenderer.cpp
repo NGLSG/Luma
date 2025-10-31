@@ -36,9 +36,9 @@ ImGuiRenderer::ImGuiRenderer(SDL_Window* window, const wgpu::Device& device, wgp
 
     ApplyEditorStyle();
 
-    // 初始化 ImGui WGPU 后端
+    
     ImGui_ImplWGPU_InitInfo initInfo = {};
-    initInfo.Device = m_device.Get();  // 使用 wgpu::Device 的原生句柄
+    initInfo.Device = m_device.Get();  
     initInfo.NumFramesInFlight = 1;
     initInfo.RenderTargetFormat = static_cast<WGPUTextureFormat>(renderTargetFormat);
     initInfo.DepthStencilFormat = WGPUTextureFormat_Undefined;
@@ -58,11 +58,11 @@ ImGuiRenderer::~ImGuiRenderer()
 {
     if (m_isInitialized)
     {
-        // 清理纹理缓存
+        
         m_textureCache.clear();
         m_activeTexturesInFrame.clear();
 
-        // 按正确顺序关闭 ImGui 后端
+        
         ImGui_ImplWGPU_Shutdown();
         ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
@@ -79,13 +79,13 @@ void ImGuiRenderer::NewFrame()
         throw std::runtime_error("ImGuiRenderer::NewFrame: 渲染器未初始化");
     }
 
-    // 验证设备有效性
+    
     if (!m_device)
     {
         throw std::runtime_error("ImGuiRenderer::NewFrame: WebGPU 设备无效");
     }
 
-    // 清理未使用的纹理缓存
+    
     if (!m_activeTexturesInFrame.empty())
     {
         for (auto it = m_textureCache.begin(); it != m_textureCache.end();)
@@ -102,7 +102,7 @@ void ImGuiRenderer::NewFrame()
     }
     m_activeTexturesInFrame.clear();
 
-    // 开始新的 ImGui 帧
+    
     ImGui_ImplWGPU_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
@@ -123,7 +123,7 @@ void ImGuiRenderer::Render(wgpu::RenderPassEncoder renderPass)
         ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass.Get());
     }
 
-    // 处理多视口
+    
     if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
         ImGui::UpdatePlatformWindows();
@@ -179,17 +179,17 @@ ImTextureID ImGuiRenderer::GetOrCreateTextureIdFor(wgpu::Texture texture)
 
     WGPUTexture textureHandle = texture.Get();
 
-    // 标记为本帧活跃
+    
     m_activeTexturesInFrame.push_back(textureHandle);
 
-    // 检查缓存
+    
     auto it = m_textureCache.find(textureHandle);
     if (it != m_textureCache.end())
     {
         return reinterpret_cast<ImTextureID>(it->second.Get());
     }
 
-    // 创建纹理视图
+    
     wgpu::TextureViewDescriptor viewDesc = {};
     viewDesc.format = texture.GetFormat();
     viewDesc.dimension = wgpu::TextureViewDimension::e2D;
@@ -206,7 +206,7 @@ ImTextureID ImGuiRenderer::GetOrCreateTextureIdFor(wgpu::Texture texture)
         return reinterpret_cast<ImTextureID>(nullptr);
     }
 
-    // 缓存视图
+    
     m_textureCache[textureHandle] = view;
     return reinterpret_cast<ImTextureID>(view.Get());
 }
@@ -303,7 +303,7 @@ std::string ImGuiRenderer::LoadFonts(const std::string& fontPath, float dpiScale
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
 
-    // 主字体配置
+    
     ImFontConfig mainConfig;
     mainConfig.FontDataOwnedByAtlas = false;
     mainConfig.SizePixels = 16.0f * dpiScale;
@@ -318,7 +318,7 @@ std::string ImGuiRenderer::LoadFonts(const std::string& fontPath, float dpiScale
         return "";
     }
 
-    // Emoji 字体配置
+    
     ImFontConfig emojiConfig;
     emojiConfig.FontDataOwnedByAtlas = false;
     emojiConfig.SizePixels = 16.0f * dpiScale;
@@ -348,7 +348,7 @@ std::string ImGuiRenderer::LoadFonts(const std::string& fontPath, float dpiScale
         }
     }
 
-    // 符号字体配置
+    
     ImFontConfig symbolConfig;
     symbolConfig.FontDataOwnedByAtlas = false;
     symbolConfig.SizePixels = 16.0f * dpiScale;
@@ -362,7 +362,7 @@ std::string ImGuiRenderer::LoadFonts(const std::string& fontPath, float dpiScale
     };
     io.Fonts->AddFontFromFileTTF(fontPath.c_str(), symbolConfig.SizePixels, &symbolConfig, basicSymbolRanges);
 
-    // 构建字体图集
+    
     io.Fonts->Build();
 
     auto name = Path::GetFileNameWithoutExtension(fontPath);

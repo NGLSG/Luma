@@ -21,6 +21,7 @@
 #include <vector>
 #include <cmath>
 
+
 namespace
 {
     using ECS::ButtonState;
@@ -220,7 +221,9 @@ namespace Systems
         const Vector2f worldMousePos = screenToWorldCentered(globalMousePos, cameraProps, viewportRect);
         int scrollWheelX = 0;
         int scrollWheelY = 0;
-        for (const auto& event : context.frameEvents.GetView())
+
+        
+        for (const auto& event : context.eventsForSim)
         {
             if (event.type == SDL_EVENT_MOUSE_WHEEL)
             {
@@ -938,7 +941,7 @@ namespace Systems
                     }
                     break;
                 }
-                
+
                 if (listBox.visibleItemCount <= 0)
                 {
                     const float spacingX = std::max(0.0f, listBox.itemSpacing.x);
@@ -1027,11 +1030,11 @@ namespace Systems
                 const int maxScroll = std::max(0, itemCount - itemsPerPage);
                 listBox.scrollOffset = std::clamp(listBox.scrollOffset, 0, maxScroll);
 
-                
+
                 if (isRuntime && (showVertical || showHorizontal) && maxScroll > 0)
                 {
                     const bool mouseDown = context.window ? context.window->GetInputState().isLeftMouseDown : context.inputState.isLeftMouseDown;
-                    
+
                     if (showVertical)
                     {
                         const float trackLeft = contentLeftWorld + availableWidth + trackSpacing;
@@ -1079,7 +1082,7 @@ namespace Systems
                         }
                     }
 
-                    
+
                     if (showHorizontal)
                     {
                         const float trackLeft = contentLeftWorld;
@@ -1154,7 +1157,7 @@ namespace Systems
 
                 if (useContainer)
                 {
-                    
+
                     const int childCount = static_cast<int>(managedGuids.size());
                     for (int i = 0; i < childCount; ++i)
                     {
@@ -1171,14 +1174,14 @@ namespace Systems
 
                         if (i < startIndex || i >= endIndex)
                         {
-                            
-                            
+
+
                             childTransform.position.x = transform.position.x + 1.0e7f;
                             childTransform.position.y = transform.position.y + 1.0e7f;
                             continue;
                         }
 
-                        
+
                         const int baseIndex = i - startIndex;
                         int rowIndex = 0;
                         int columnIndex = 0;
@@ -1352,4 +1355,3 @@ namespace Systems
 
     }
 }
-

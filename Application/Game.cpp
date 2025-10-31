@@ -31,6 +31,7 @@ void Game::InitializeDerived()
     if (!ProjectSettings::GetInstance().GetAppIconPath().string().empty())
         m_window->SetIcon("icon" + Path::GetFileExtension(ProjectSettings::GetInstance().GetAppIconPath().string()));
     m_window->FullScreen(ProjectSettings::GetInstance().IsFullscreen());
+    m_window->BroaderLess(ProjectSettings::GetInstance().IsBorderless());
 
     AssetManager::GetInstance().Initialize(ApplicationMode::Runtime, "Resources/package.manifest");
 

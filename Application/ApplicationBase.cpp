@@ -1,4 +1,3 @@
-
 #include "ApplicationBase.h"
 #include "Window.h"
 #include "../Renderer/GraphicsBackend.h"
@@ -35,10 +34,7 @@ void ApplicationBase::Run()
         Keyboard::GetInstance().ProcessEvent(event);
         LumaCursor::GetInstance().ProcessEvent(event);
 
-        m_context.frameEvents.Modify([&](auto& events)
-        {
-            events.PushBack(event);
-        });
+        m_context.eventsWriting.push_back(event);
     });
 
     m_context.window = m_window.get();
@@ -50,7 +46,9 @@ void ApplicationBase::Run()
         auto currentTime = std::chrono::high_resolution_clock::now();
         double frameTime = std::chrono::duration<double>(currentTime - lastFrameTime).count();
         lastFrameTime = currentTime;
-        m_context.frameEvents.Clear();
+
+        m_context.eventsWriting.clear();
+
         m_window->PollEvents();
         if (m_window->ShouldClose())
         {
@@ -61,10 +59,15 @@ void ApplicationBase::Run()
         Keyboard::GetInstance().Update();
         LumaCursor::GetInstance().Update();
         const InputState latestInput = m_window->GetInputState();
-        
-        m_context.commandsForSim.Push([this, latestInput]() {
-            m_context.inputState = latestInput; 
+
+        std::vector<SDL_Event> eventsThisFrame = m_context.eventsWriting;
+
+        m_context.commandsForSim.Push([this, latestInput, eventsThisFrame]()
+        {
+            m_context.inputState = latestInput;
+            m_context.eventsForSim = eventsThisFrame;
         });
+
         static double accumulator = 0.0;
         const float fixedDeltaTime = 1.0f / static_cast<float>(m_config.SimulationFPS);
         accumulator += frameTime;
@@ -91,7 +94,6 @@ void ApplicationBase::simulationLoop()
 {
     const std::chrono::duration<double> fixedDeltaTime(1.0 / m_config.SimulationFPS);
     auto nextFrameTime = std::chrono::high_resolution_clock::now();
-
 
     while (m_isRunning)
     {

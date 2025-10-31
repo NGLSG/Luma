@@ -47,8 +47,8 @@ bool IDEIntegration::Open(IDE ide, const std::filesystem::path& solutionPath, co
         return false;
     }
 
-    LogInfo("Opening IDE: {} with args: {}", std::string(idePath.begin(), idePath.end()),
-            std::string(args.begin(), args.end()));
+    LogInfo("Opening IDE: {} with args: {}", idePath, idePath,
+            args);
     ShellExecuteW(NULL, L"open", idePath.c_str(), args.c_str(), NULL, SW_SHOWNORMAL);
     return true;
 #else

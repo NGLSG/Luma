@@ -1,8 +1,12 @@
 #ifndef ENGINECONTEXT_H
 #define ENGINECONTEXT_H
+
 #include "CommandQueue.h"
 #include "DynamicArray.h"
 #include "SDL3/SDL_events.h"
+#include <vector> // 确保包含 <vector>
+#include <mutex>  // 确保包含 <mutex>
+
 class SceneRenderer;
 class RuntimeTextureManager;
 class RuntimeMaterialManager;
@@ -48,9 +52,15 @@ struct EngineContext
     ECS::RectF sceneViewRect; ///< 场景视图的矩形区域。
     bool isSceneViewFocused = false; ///< 场景视图是否获得焦点。
     ApplicationMode appMode = ApplicationMode::Editor; ///< 应用程序当前运行模式。
-    DynamicArray<SDL_Event> frameEvents; ///< 上一帧捕获的事件列表。
     float interpolationAlpha = 1.0f; /// < 用于插值计算的alpha值。
     CommandQueue commandsForSim; ///< 延迟命令队列，用于线程安全的命令执行。
     CommandQueue commandsForRender;
+
+    // 线程安全的事件处理：
+    // eventsWriting 由主线程（渲染线程）在 PollEvents 期间填充。
+    // eventsForSim 由模拟线程在执行 'commandsForSim' 队列时更新，并在 Update 期间读取。
+    std::vector<SDL_Event> eventsForSim; ///< 供模拟线程安全读取的事件列表。
+    std::vector<SDL_Event> eventsWriting; ///< 供主线程（轮询）写入的事件列表。
 };
-#endif
+
+#endif // ENGINECONTEXT_H

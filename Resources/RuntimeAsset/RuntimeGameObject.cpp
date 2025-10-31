@@ -10,6 +10,7 @@
 #include <glm/glm.hpp>
 
 #include "ActivityComponent.h"
+#include "SceneManager.h"
 #include "glm/detail/type_quat.hpp"
 #include "glm/gtx/matrix_decompose.hpp"
 #include "Components/ComponentRegistry.h"
@@ -138,6 +139,12 @@ int RuntimeGameObject::GetSiblingIndex()
 std::unordered_map<std::string, const ComponentRegistration*> RuntimeGameObject::GetAllComponents()
 {
     return m_scene->GetAllComponents(GetEntityHandle());
+}
+
+bool RuntimeGameObject::CurrentSceneIsEqualToMScene() const
+{
+    auto currentScene = SceneManager::GetInstance().GetCurrentScene();
+    return currentScene.get() == m_scene;
 }
 
 

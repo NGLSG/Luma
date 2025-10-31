@@ -12,10 +12,11 @@
 #include <vector>
 
 /**
- * @brief 一个高性能、无锁、三缓冲的动态数组。
+ * @brief 一个高性能、无锁（读取端）、三缓冲的动态数组。
  * @tparam T 元素类型，必须是可移动和可复制的。
  * @details
- * 此实现专为高并发读取和单线程批量写入场景设计。提供了多种写入模式以应对不同性能需求。
+ * 此实现专为高并发读取和单线程批量写入场景设计。
+ * 使用 std::vector 管理内部缓冲区，确保元素生命周期的正确性。
  */
 template <typename T>
     requires std::movable<T> && std::copyable<T>
@@ -23,19 +24,20 @@ class DynamicArray
 {
 private:
     /**
-     * @brief 内部数据缓冲区，包含数据、元数据和引用计数。
+     * @brief 内部数据缓冲区，包含数据和引用计数。
+     * @details
+     * 已重构为使用 std::vector<T> 管理数据，
+     * 自动处理内存分配、元素构造和析构。
      */
     struct Buffer
     {
-        T* m_data = nullptr; ///< 数据指针
-        size_t m_size = 0; ///< 当前元素数量
-        size_t m_capacity = 0; ///< 当前分配容量
+        std::vector<T> m_data; ///< 存储元素的数据向量
         std::atomic<int> m_refCount{0}; ///< 引用计数，用于只读视图管理
 
         /**
-         * @brief 析构函数，释放数据内存
+         * @brief 默认析构函数。std::vector 会自动释放资源。
          */
-        ~Buffer() { delete[] m_data; }
+        ~Buffer() = default;
 
         /**
          * @brief 预分配内存空间
@@ -43,19 +45,7 @@ private:
          */
         void Reserve(size_t newCapacity)
         {
-            if (newCapacity <= m_capacity) return;
-
-            T* newData = new T[newCapacity];
-            if (m_data != nullptr)
-            {
-                if constexpr (std::is_nothrow_move_constructible_v<T>)
-                    std::move(m_data, m_data + m_size, newData);
-                else
-                    std::copy(m_data, m_data + m_size, newData);
-                delete[] m_data;
-            }
-            m_data = newData;
-            m_capacity = newCapacity;
+            m_data.reserve(newCapacity);
         }
     };
 
@@ -72,7 +62,7 @@ public:
         Buffer* m_buffer; ///< 指向底层缓冲区
 
     public:
-        using const_iterator = const T*;
+        using const_iterator = typename std::vector<T>::const_iterator;
 
         /**
          * @brief 构造函数，增加引用计数
@@ -149,27 +139,30 @@ public:
 
         /**
          * @brief 获取只读迭代器起始
-         * @return 指向首元素的指针
+         * @return 指向首元素的常量迭代器
          */
-        [[nodiscard]] const_iterator begin() const noexcept { return m_buffer ? m_buffer->m_data : nullptr; }
+        [[nodiscard]] const_iterator begin() const noexcept
+        {
+            return m_buffer ? m_buffer->m_data.begin() : nullptr;
+        }
 
         /**
          * @brief 获取只读迭代器末尾
-         * @return 指向末尾的指针
+         * @return 指向末尾的常量迭代器
          */
         [[nodiscard]] const_iterator end() const noexcept
         {
-            return m_buffer ? m_buffer->m_data + m_buffer->m_size : nullptr;
+            return m_buffer ? m_buffer->m_data.end() : nullptr;
         }
 
         /**
          * @brief 获取只读迭代器起始
-         * @return 指向首元素的指针
+         * @return 指向首元素的常量迭代器
          */
         [[nodiscard]] const_iterator cbegin() const noexcept { return begin(); }
         /**
          * @brief 获取只读迭代器末尾
-         * @return 指向末尾的指针
+         * @return 指向末尾的常量迭代器
          */
         [[nodiscard]] const_iterator cend() const noexcept { return end(); }
 
@@ -179,11 +172,23 @@ public:
          * @return 元素常引用
          */
         [[nodiscard]] const T& operator[](size_t index) const { return m_buffer->m_data[index]; }
+
+        /**
+         * @brief 安全访问元素（带边界检查）
+         * @param index 索引
+         * @return 元素常引用
+         */
+        [[nodiscard]] const T& at(size_t index) const
+        {
+            if (!m_buffer) throw std::out_of_range("Buffer is null");
+            return m_buffer->m_data.at(index);
+        }
+
         /**
          * @brief 获取元素数量
          * @return 元素数量
          */
-        [[nodiscard]] size_t Size() const noexcept { return m_buffer ? m_buffer->m_size : 0; }
+        [[nodiscard]] size_t Size() const noexcept { return m_buffer ? m_buffer->m_data.size() : 0; }
         /**
          * @brief 判断是否为空
          * @return 是否为空
@@ -193,40 +198,30 @@ public:
          * @brief 获取底层数据指针
          * @return 数据指针
          */
-        [[nodiscard]] const T* Data() const noexcept { return m_buffer ? m_buffer->m_data : nullptr; }
+        [[nodiscard]] const T* Data() const noexcept { return m_buffer ? m_buffer->m_data.data() : nullptr; }
+
         /**
          * @brief 获取首元素
          * @return 首元素常引用
          */
-        [[nodiscard]] const T& Front() const { return m_buffer->m_data[0]; }
+        [[nodiscard]] const T& Front() const
+        {
+            if (IsEmpty()) throw std::out_of_range("View is empty");
+            return m_buffer->m_data.front();
+        }
+
         /**
          * @brief 获取末元素
          * @return 末元素常引用
          */
-        [[nodiscard]] const T& Back() const { return m_buffer->m_data[m_buffer->m_size - 1]; }
-
-        /**
-         * @brief 下标访问元素（可写）
-         * @param index 索引
-         * @return 元素引用
-         */
-        [[nodiscard]] T& operator[](size_t index)
+        [[nodiscard]] const T& Back() const
         {
-            if (!m_buffer) throw std::runtime_error("Buffer is null");
-            return m_buffer->m_data[index];
+            if (IsEmpty()) throw std::out_of_range("View is empty");
+            return m_buffer->m_data.back();
         }
 
-        /**
-         * @brief 安全访问元素
-         * @param index 索引
-         * @return 元素引用
-         */
-        [[nodiscard]] T& at(size_t index)
-        {
-            if (!m_buffer) throw std::runtime_error("Buffer is null");
-            if (index >= m_buffer->m_size) throw std::out_of_range("Index out of range");
-            return m_buffer->m_data[index];
-        }
+        // [重大修正] 移除了非 const 的 operator[] 和 at()。
+        // View 必须是只读的，以保证多线程读取安全。
 
     private:
         /**
@@ -244,6 +239,7 @@ public:
     /**
      * @brief 在 Modify 回调中提供给写入者的写入代理。
      * @details 封装所有修改操作，确保它们作用于后台的 Write Buffer。
+     * 所有操作均委托给内部的 std::vector。
      */
     class Proxy
     {
@@ -265,14 +261,7 @@ public:
          */
         void PushBack(const T& value)
         {
-            if (m_buffer->m_size >= m_buffer->m_capacity)
-            {
-                size_t newCapacity = (m_buffer->m_capacity == 0)
-                                         ? 8
-                                         : static_cast<size_t>(m_buffer->m_capacity * 1.618);
-                m_buffer->Reserve(newCapacity);
-            }
-            m_buffer->m_data[m_buffer->m_size++] = value;
+            m_buffer->m_data.push_back(value);
         }
 
         /**
@@ -281,14 +270,7 @@ public:
          */
         void PushBack(T&& value)
         {
-            if (m_buffer->m_size >= m_buffer->m_capacity)
-            {
-                size_t newCapacity = (m_buffer->m_capacity == 0)
-                                         ? 8
-                                         : static_cast<size_t>(m_buffer->m_capacity * 1.618);
-                m_buffer->Reserve(newCapacity);
-            }
-            m_buffer->m_data[m_buffer->m_size++] = std::move(value);
+            m_buffer->m_data.push_back(std::move(value));
         }
 
         /**
@@ -300,17 +282,7 @@ public:
         template <typename... Args>
         T& EmplaceBack(Args&&... args)
         {
-            if (m_buffer->m_size >= m_buffer->m_capacity)
-            {
-                size_t newCapacity = (m_buffer->m_capacity == 0)
-                                         ? 8
-                                         : static_cast<size_t>(m_buffer->m_capacity * 1.618);
-                m_buffer->Reserve(newCapacity);
-            }
-            T* location = &m_buffer->m_data[m_buffer->m_size];
-            new(location) T(std::forward<Args>(args)...);
-            m_buffer->m_size++;
-            return *location;
+            return m_buffer->m_data.emplace_back(std::forward<Args>(args)...);
         }
 
         /**
@@ -318,16 +290,16 @@ public:
          */
         void PopBack()
         {
-            if (m_buffer->m_size > 0)
+            if (!IsEmpty())
             {
-                m_buffer->m_size--;
+                m_buffer->m_data.pop_back();
             }
         }
 
         /**
          * @brief 清空数组所有元素，但不释放已分配的内存。
          */
-        void Clear() { m_buffer->m_size = 0; }
+        void Clear() { m_buffer->m_data.clear(); }
 
         /**
          * @brief 对数组元素进行排序。
@@ -337,20 +309,20 @@ public:
         template <typename Compare = std::less<T>>
         void Sort(Compare comp = {})
         {
-            if (m_buffer->m_size > 1)
+            if (Size() > 1)
             {
 #if defined(__ANDROID__)
-                std::sort(m_buffer->m_data, m_buffer->m_data + m_buffer->m_size, comp);
+                std::sort(m_buffer->m_data.begin(), m_buffer->m_data.end(), comp);
 #else
-                if (m_buffer->m_size > 1000)
+                if (Size() > 1000)
                 {
                     // 关键算法说明：当数据量较大时，并行排序能够显著利用多核 CPU 优势，
                     // par_unseq 策略允许编译器最大程度地进行乱序和向量化优化。
-                    std::sort(std::execution::par_unseq, m_buffer->m_data, m_buffer->m_data + m_buffer->m_size, comp);
+                    std::sort(std::execution::par_unseq, m_buffer->m_data.begin(), m_buffer->m_data.end(), comp);
                 }
                 else
                 {
-                    std::sort(m_buffer->m_data, m_buffer->m_data + m_buffer->m_size, comp);
+                    std::sort(m_buffer->m_data.begin(), m_buffer->m_data.end(), comp);
                 }
 #endif
             }
@@ -369,18 +341,8 @@ public:
          */
         void Insert(size_t index, const T& value)
         {
-            if (index > m_buffer->m_size) { throw std::out_of_range("Insert index out of bounds"); }
-            if (m_buffer->m_size >= m_buffer->m_capacity)
-            {
-                size_t newCapacity = (m_buffer->m_capacity == 0)
-                                         ? 8
-                                         : static_cast<size_t>(m_buffer->m_capacity * 1.618);
-                m_buffer->Reserve(newCapacity);
-            }
-            T* data = m_buffer->m_data;
-            std::move_backward(data + index, data + m_buffer->m_size, data + m_buffer->m_size + 1);
-            data[index] = value;
-            m_buffer->m_size++;
+            if (index > Size()) { throw std::out_of_range("Insert index out of bounds"); }
+            m_buffer->m_data.insert(m_buffer->m_data.begin() + index, value);
         }
 
         /**
@@ -390,18 +352,8 @@ public:
          */
         void Insert(size_t index, T&& value)
         {
-            if (index > m_buffer->m_size) { throw std::out_of_range("Insert index out of bounds"); }
-            if (m_buffer->m_size >= m_buffer->m_capacity)
-            {
-                size_t newCapacity = (m_buffer->m_capacity == 0)
-                                         ? 8
-                                         : static_cast<size_t>(m_buffer->m_capacity * 1.618);
-                m_buffer->Reserve(newCapacity);
-            }
-            T* data = m_buffer->m_data;
-            std::move_backward(data + index, data + m_buffer->m_size, data + m_buffer->m_size + 1);
-            data[index] = std::move(value);
-            m_buffer->m_size++;
+            if (index > Size()) { throw std::out_of_range("Insert index out of bounds"); }
+            m_buffer->m_data.insert(m_buffer->m_data.begin() + index, std::move(value));
         }
 
         /**
@@ -410,10 +362,8 @@ public:
          */
         void Erase(size_t index)
         {
-            if (index >= m_buffer->m_size) { throw std::out_of_range("Erase index out of bounds"); }
-            T* data = m_buffer->m_data;
-            std::move(data + index + 1, data + m_buffer->m_size, data + index);
-            m_buffer->m_size--;
+            if (index >= Size()) { throw std::out_of_range("Erase index out of bounds"); }
+            m_buffer->m_data.erase(m_buffer->m_data.begin() + index);
         }
 
         /**
@@ -423,12 +373,9 @@ public:
          */
         void Erase(size_t first, size_t last)
         {
-            if (first >= last || first >= m_buffer->m_size) return;
-            last = std::min(last, m_buffer->m_size);
-
-            T* data = m_buffer->m_data;
-            std::move(data + last, data + m_buffer->m_size, data + first);
-            m_buffer->m_size -= (last - first);
+            if (first >= last || first >= Size()) return;
+            last = std::min(last, Size());
+            m_buffer->m_data.erase(m_buffer->m_data.begin() + first, m_buffer->m_data.begin() + last);
         }
 
         /**
@@ -441,17 +388,17 @@ public:
          * @brief 获取当前元素数量。
          * @return 元素数量
          */
-        [[nodiscard]] size_t Size() const noexcept { return m_buffer->m_size; }
+        [[nodiscard]] size_t Size() const noexcept { return m_buffer->m_data.size(); }
         /**
          * @brief 获取当前已分配的容量。
          * @return 容量
          */
-        [[nodiscard]] size_t Capacity() const noexcept { return m_buffer->m_capacity; }
+        [[nodiscard]] size_t Capacity() const noexcept { return m_buffer->m_data.capacity(); }
         /**
          * @brief 判断数组是否为空。
          * @return 是否为空
          */
-        [[nodiscard]] bool IsEmpty() const noexcept { return m_buffer->m_size == 0; }
+        [[nodiscard]] bool IsEmpty() const noexcept { return m_buffer->m_data.empty(); }
 
         /**
          * @brief 重载等于运算符,由vector直接复制给data。
@@ -460,22 +407,18 @@ public:
          */
         Proxy& operator=(const std::vector<T>& vec)
         {
-            Clear();
-
-            if (!vec.empty())
-            {
-                // 确保有足够的容量
-                if (vec.size() > m_buffer->m_capacity)
-                {
-                    m_buffer->Reserve(vec.size());
-                }
-
-                // 复制数据
-                std::copy(vec.begin(), vec.end(), m_buffer->m_data);
-                m_buffer->m_size = vec.size();
-            }
-
+            m_buffer->m_data = vec;
             return *this;
+        }
+
+        /**
+         * @brief 与另一个 std::vector 交换内容。
+         * @details 这是一个 O(1) 操作，用于高效接管数据。
+         * @param other 要交换的向量
+         */
+        void Swap(std::vector<T>& other)
+        {
+            m_buffer->m_data.swap(other);
         }
     };
 
@@ -504,10 +447,6 @@ public:
         delete m_buffers[2];
     }
 
-    // =========================================================================
-    // <<< 新增：移动和复制语义实现 >>>
-    // =========================================================================
-
     /**
      * @brief 复制构造函数 (深拷贝)
      * @details 创建一个拥有独立数据副本的新 DynamicArray。
@@ -515,27 +454,21 @@ public:
      */
     DynamicArray(const DynamicArray& other)
     {
-        // 初始化自己的缓冲区
         m_buffers[0] = new Buffer();
         m_buffers[1] = new Buffer();
         m_buffers[2] = new Buffer();
 
-        // 从 'other' 获取一个安全的只读视图
         View other_view = other.GetView();
 
-        // 深度复制数据到我们自己的第一个缓冲区
-        if (other_view.Size() > 0)
+        if (!other_view.IsEmpty())
         {
-            m_buffers[0]->Reserve(other_view.Size());
-            std::copy(other_view.begin(), other_view.end(), m_buffers[0]->m_data);
-            m_buffers[0]->m_size = other_view.Size();
+            // 使用 std::vector 的拷贝构造函数进行深度复制
+            m_buffers[0]->m_data = std::vector<T>(other_view.begin(), other_view.end());
         }
 
-        // 设置内部状态为干净的初始状态
         m_readBuffer.store(m_buffers[0], std::memory_order_relaxed);
         m_writeBuffer = m_buffers[1];
         m_readyBuffer = m_buffers[2];
-        // 锁状态 m_writerLock 和 m_isWritingInPlace 不需要复制
     }
 
     /**
@@ -597,16 +530,13 @@ public:
     }
 
     /**
-     * @brief 获取一个只读的数据视图。此操作极快且通常无锁。
+     * @brief 获取一个只读的数据视图。此操作极快且无锁。
      * @return 一个 View 对象，封装了当前数据快照。
-     * @note 如果有写入者正在执行 ModifyInPlace()，此函数会自旋等待。
      */
     [[nodiscard]] View GetView() const
     {
-        while (m_isWritingInPlace.load(std::memory_order_acquire))
-        {
-            /* spin */
-        }
+        // [Obsolete] 移除了 m_isWritingInPlace 标志的检查，
+        // 因为该功能未实现，且会给每次读取带来不必要的原子操作开销。
         return View(m_readBuffer.load(std::memory_order_acquire));
     }
 
@@ -625,24 +555,28 @@ public:
             /* spin */
         }
 
+        // 等待上一个 Ready Buffer 释放所有引用
         while (m_readyBuffer->m_refCount.load(std::memory_order_acquire) > 0)
         {
             /* spin */
         }
 
+        // 将 Ready Buffer 切换为 Write Buffer
         std::swap(m_writeBuffer, m_readyBuffer);
 
         Buffer* currentReadBuffer = m_readBuffer.load(std::memory_order_acquire);
-        m_writeBuffer->Reserve(currentReadBuffer->m_size);
-        std::copy(currentReadBuffer->m_data, currentReadBuffer->m_data + currentReadBuffer->m_size,
-                  m_writeBuffer->m_data);
-        m_writeBuffer->m_size = currentReadBuffer->m_size;
+
+        // 关键算法：写时复制
+        // 将当前 Read Buffer 的内容复制到新的 Write Buffer
+        m_writeBuffer->m_data = currentReadBuffer->m_data;
 
         Proxy writerProxy(m_writeBuffer);
         modifier(writerProxy);
 
+        // 发布：将 Write Buffer 切换为 Read Buffer
         m_readBuffer.store(m_writeBuffer, std::memory_order_release);
 
+        // 将旧的 Read Buffer 切换为 Ready Buffer，等待其引用归零
         m_readyBuffer = currentReadBuffer;
 
         m_writerLock.clear(std::memory_order_release);
@@ -654,9 +588,7 @@ public:
      * @param modifier 一个 Lambda 函数，接收一个写入代理对象 (Proxy)。
      * @details
      * 这是一个高度优化的写入路径，适用于需要丢弃所有旧数据并从零开始
-     * 构建新数据的场景（例如，重新加载配置、刷新缓存）。
-     * 它通过直接使用一个干净的后台缓冲区来完全避免了从 Read Buffer 拷贝旧数据的开销。
-     * 读取者在此期间不会被阻塞。
+     * 构建新数据的场景。它避免了从 Read Buffer 拷贝旧数据的开销。
      */
     template <typename F>
     void ClearAndModify(F&& modifier)
@@ -675,7 +607,8 @@ public:
 
         Buffer* oldReadBuffer = m_readBuffer.load(std::memory_order_acquire);
 
-        m_writeBuffer->m_size = 0;
+        // 优化点：不复制旧数据，直接清空 Write Buffer
+        m_writeBuffer->m_data.clear();
 
         Proxy writerProxy(m_writeBuffer);
         modifier(writerProxy);
@@ -694,10 +627,7 @@ public:
     void ForEach(const std::function<void(const T&)>& func) const
     {
         View view = GetView();
-        for (size_t i = 0; i < view.Size(); ++i)
-        {
-            func(view[i]);
-        }
+        std::for_each(view.begin(), view.end(), func);
     }
 
     /**
@@ -740,28 +670,35 @@ public:
 
     /**
      * @brief 清空所有数据。
-     **
      */
     void Clear()
     {
         ClearAndModify([](auto& proxy)
         {
+            // Proxy 已经是空的，什么都不用做
         });
     }
 
+    /**
+     * @brief 通过移动语义高效接管一个 std::vector 的数据。
+     * @param vec 要从中移动数据的 std::vector（此操作后 vec 的内容将与
+     * DynamicArray 的某个旧缓冲区交换）。
+     * @return 当前 DynamicArray 实例的引用。
+     */
     DynamicArray& operator=(std::vector<T>&& vec)
     {
         ClearAndModify([&vec](auto& proxy)
         {
-            proxy.Reserve(vec.size());
-            for (auto&& item : vec)
-            {
-                proxy.PushBack(std::move(item));
-            }
+            // 使用 O(1) swap 操作接管数据
+            proxy.Swap(vec);
         });
         return *this;
     }
 
+    /**
+     * @brief 将当前快照转换为 std::vector。
+     * @return 包含当前数据副本的 std::vector。
+     */
     std::vector<T> ToStdVector() const
     {
         View view = GetView();
@@ -770,8 +707,8 @@ public:
 
 private:
     /**
-    * @brief 交换两个 DynamicArray 实例的内容。
-    */
+     * @brief 交换两个 DynamicArray 实例的内容。
+     */
     friend void swap(DynamicArray& first, DynamicArray& second) noexcept
     {
         using std::swap;
@@ -792,7 +729,10 @@ private:
     Buffer* m_writeBuffer; ///< 当前写缓冲区
     Buffer* m_readyBuffer; ///< 准备缓冲区
     std::atomic_flag m_writerLock = ATOMIC_FLAG_INIT; ///< 写入锁
-    std::atomic<bool> m_isWritingInPlace{false}; ///< 就地写入标志
+
+    // [Obsolete] 移除了 m_isWritingInPlace，因为它用于一个未实现的功能，
+    // 并且会给 GetView() 增加不必要的开销。
+    // std::atomic<bool> m_isWritingInPlace{false};
 };
 
 #endif // DYNAMICARRAY_H
