@@ -34,6 +34,7 @@ void ApplicationBase::Run()
         Keyboard::GetInstance().ProcessEvent(event);
         LumaCursor::GetInstance().ProcessEvent(event);
 
+        
         m_context.eventsWriting.push_back(event);
     });
 
@@ -47,6 +48,7 @@ void ApplicationBase::Run()
         double frameTime = std::chrono::duration<double>(currentTime - lastFrameTime).count();
         lastFrameTime = currentTime;
 
+        
         m_context.eventsWriting.clear();
 
         m_window->PollEvents();
@@ -60,12 +62,20 @@ void ApplicationBase::Run()
         LumaCursor::GetInstance().Update();
         const InputState latestInput = m_window->GetInputState();
 
+        
         std::vector<SDL_Event> eventsThisFrame = m_context.eventsWriting;
 
+        
         m_context.commandsForSim.Push([this, latestInput, eventsThisFrame]()
         {
             m_context.inputState = latestInput;
-            m_context.eventsForSim = eventsThisFrame;
+
+            
+            m_context.eventsForSim.insert(
+                m_context.eventsForSim.end(),
+                eventsThisFrame.begin(),
+                eventsThisFrame.end()
+            );
         });
 
         static double accumulator = 0.0;
@@ -97,9 +107,14 @@ void ApplicationBase::simulationLoop()
 
     while (m_isRunning)
     {
+        
         m_context.commandsForSim.Execute();
 
+        
         Update(static_cast<float>(fixedDeltaTime.count()));
+
+        
+        m_context.eventsForSim.clear();
 
         nextFrameTime += std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(fixedDeltaTime);
         std::this_thread::sleep_until(nextFrameTime);

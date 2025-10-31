@@ -81,7 +81,7 @@ namespace Systems
         }
 
         
-        for (const auto& event : context.eventsForSim)
+        for (const auto& event : context.eventsWriting)
         {
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
             {
@@ -200,7 +200,7 @@ namespace Systems
         }
 
         
-        for (const auto& event : context.eventsForSim)
+        for (const auto& event : context.eventsWriting)
         {
 
             if (event.type == SDL_EVENT_TEXT_INPUT)

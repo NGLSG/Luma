@@ -29,13 +29,12 @@ SceneManager::~SceneManager()
 
 void SceneManager::LoadSceneAsync(const Guid& guid, SceneLoadCallback callback)
 {
-    
     std::future<sk_sp<RuntimeScene>> future = std::async(std::launch::async, [this, guid]()
     {
         return loadSceneFromDisk(guid);
     });
 
-    
+
     std::lock_guard<std::mutex> lock(m_queueMutex);
     m_completedLoads.push({guid, std::move(callback), std::move(future)});
 }
@@ -47,7 +46,6 @@ void SceneManager::Initialize(EngineContext* context)
 
 sk_sp<RuntimeScene> SceneManager::LoadScene(const Guid& guid)
 {
-    
     sk_sp<RuntimeScene> newScene = loadSceneFromDisk(guid);
 
     if (!newScene)
@@ -56,13 +54,13 @@ sk_sp<RuntimeScene> SceneManager::LoadScene(const Guid& guid)
         return nullptr;
     }
 
-    
+
     if (ApplicationBase::CURRENT_MODE == ApplicationMode::Runtime)
     {
         setupRuntimeSystems(newScene, m_context);
     }
 
-    
+
     activateScene(newScene, guid, m_context);
 
     return newScene;
@@ -79,26 +77,25 @@ void SceneManager::Update(EngineContext& engineCtx)
 
     auto& request = m_completedLoads.front();
 
-    
+
     if (request.future.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
     {
         sk_sp<RuntimeScene> loadedScene = request.future.get();
 
         if (loadedScene)
         {
-            
             if (ApplicationBase::CURRENT_MODE == ApplicationMode::Runtime)
             {
                 setupRuntimeSystems(loadedScene, &engineCtx);
             }
 
-            
+
             if (request.callback)
             {
                 request.callback(loadedScene);
             }
 
-            
+
             activateScene(loadedScene, request.guid, &engineCtx);
         }
         else
@@ -137,13 +134,12 @@ bool SceneManager::SaveScene(sk_sp<RuntimeScene> scene)
     m_markedAsDirty = false;
     if (!scene) return false;
 
-    
+
     const AssetMetadata* meta = AssetManager::GetInstance().GetMetadata(scene->GetGuid());
     std::filesystem::path sceneName;
 
     if (!meta)
     {
-        
         sceneName = "NewScene.scene";
         int counter = 1;
         while (std::filesystem::exists(AssetManager::GetInstance().GetAssetsRootPath() / sceneName))
@@ -156,10 +152,10 @@ bool SceneManager::SaveScene(sk_sp<RuntimeScene> scene)
         sceneName = meta->assetPath;
     }
 
-    
+
     Data::SceneData sceneData = scene->SerializeToData();
 
-    
+
     YAML::Node sceneNode = YAML::convert<Data::SceneData>::encode(sceneData);
     std::string targetPath = (AssetManager::GetInstance().GetAssetsRootPath() / sceneName).generic_string();
     std::ofstream fout(targetPath);
@@ -185,13 +181,13 @@ void SceneManager::PushUndoState(sk_sp<RuntimeScene> scene)
     MarkCurrentSceneDirty();
     if (!scene) return;
 
-    
+
     m_redoStack.clear();
 
-    
+
     m_undoStack.push_back(scene->SerializeToData());
 
-    
+
     if (m_undoStack.size() > MAX_UNDO_STEPS)
     {
         m_undoStack.pop_front();
@@ -202,11 +198,11 @@ void SceneManager::Undo()
 {
     if (m_undoStack.size() <= 1) return;
 
-    
+
     m_redoStack.push_back(m_undoStack.back());
     m_undoStack.pop_back();
 
-    
+
     const Data::SceneData& prevState = m_undoStack.back();
     m_currentScene->LoadFromData(prevState);
 }
@@ -215,11 +211,11 @@ void SceneManager::Redo()
 {
     if (m_redoStack.empty()) return;
 
-    
+
     Data::SceneData nextState = m_redoStack.back();
     m_redoStack.pop_back();
 
-    
+
     m_currentScene->LoadFromData(nextState);
     m_undoStack.push_back(std::move(nextState));
 }
@@ -243,10 +239,8 @@ void SceneManager::Shutdown()
 }
 
 
-
 sk_sp<RuntimeScene> SceneManager::loadSceneFromDisk(const Guid& guid)
 {
-    
     SceneLoader loader;
     sk_sp<RuntimeScene> newScene = loader.LoadAsset(guid);
 
@@ -267,39 +261,34 @@ void SceneManager::setupRuntimeSystems(sk_sp<RuntimeScene> scene, EngineContext*
         return;
     }
 
-    
+
     auto setupSystems = [scene]()
     {
-        
-        
-
-        
         scene->AddEssentialSystem<Systems::HydrateResources>();
         scene->AddEssentialSystem<Systems::TransformSystem>();
 
-        
+
         scene->AddSystem<Systems::PhysicsSystem>();
         scene->AddSystem<Systems::InteractionSystem>();
         scene->AddSystem<Systems::AudioSystem>();
 
-        
+
         scene->AddSystem<Systems::ButtonSystem>();
         scene->AddSystemToMainThread<Systems::InputTextSystem>();
-        scene->AddSystemToMainThread<Systems::CommonUIControlSystem>();
+        scene->AddSystem<Systems::CommonUIControlSystem>();
 
-        
+
 #if !defined(LUMA_DISABLE_SCRIPTING)
         scene->AddSystem<Systems::ScriptingSystem>();
 #endif
 
-        
+
         scene->AddSystem<Systems::AnimationSystem>();
 
         LogInfo("运行时系统已配置完成，场景: {}", scene->GetName());
     };
 
-    
-    
+
     if (context)
     {
         context->commandsForSim.Push(setupSystems);
@@ -318,30 +307,28 @@ void SceneManager::activateScene(sk_sp<RuntimeScene> scene, const Guid& guid, En
         return;
     }
 
-    
+
     auto activateFunc = [this, scene, guid, context]()
     {
-        
         auto& runtimeSceneManager = RuntimeSceneManager::GetInstance();
         runtimeSceneManager.TryAddOrUpdateAsset(guid, scene);
 
-        
+
         SetCurrentScene(scene);
 
-        
+
         if (context)
         {
             scene->Activate(*context);
         }
 
-        
+
         m_markedAsDirty = false;
 
         LogInfo("场景已激活: {} (GUID: {})", scene->GetName(), guid.ToString());
     };
 
-    
-    
+
     if (context)
     {
         context->commandsForSim.Push(activateFunc);
