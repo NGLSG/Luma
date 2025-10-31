@@ -3,18 +3,23 @@
 #include "imgui_impl_wgpu.h"
 #include <stdexcept>
 
+#include "GraphicsBackend.h"
 #include "../Utils/Path.h"
-
-#include "dawn/native/DawnNative.h"
-#include "include/gpu/graphite/Recorder.h"
-#include <algorithm>
-
-#include "../Utils/Path.h"
-
+#include "../Utils/Logger.h"
 
 ImGuiRenderer::ImGuiRenderer(SDL_Window* window, const wgpu::Device& device, wgpu::TextureFormat renderTargetFormat)
-    : m_device(device)
+    : m_device(device), m_isInitialized(false)
 {
+    if (!window)
+    {
+        throw std::runtime_error("ImGuiRenderer: SDL 窗口指针为空");
+    }
+
+    if (!m_device)
+    {
+        throw std::runtime_error("ImGuiRenderer: WebGPU 设备无效");
+    }
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -25,13 +30,15 @@ ImGuiRenderer::ImGuiRenderer(SDL_Window* window, const wgpu::Device& device, wgp
 
     if (!ImGui_ImplSDL3_InitForOther(window))
     {
-        throw std::runtime_error("Failed to initialize ImGui SDL3 backend.");
+        ImGui::DestroyContext();
+        throw std::runtime_error("ImGuiRenderer: 初始化 ImGui SDL3 后端失败");
     }
 
     ApplyEditorStyle();
 
+    // 初始化 ImGui WGPU 后端
     ImGui_ImplWGPU_InitInfo initInfo = {};
-    initInfo.Device = device.Get();
+    initInfo.Device = m_device.Get();  // 使用 wgpu::Device 的原生句柄
     initInfo.NumFramesInFlight = 1;
     initInfo.RenderTargetFormat = static_cast<WGPUTextureFormat>(renderTargetFormat);
     initInfo.DepthStencilFormat = WGPUTextureFormat_Undefined;
@@ -39,25 +46,51 @@ ImGuiRenderer::ImGuiRenderer(SDL_Window* window, const wgpu::Device& device, wgp
     if (!ImGui_ImplWGPU_Init(&initInfo))
     {
         ImGui_ImplSDL3_Shutdown();
-        throw std::runtime_error("Failed to initialize ImGui WGPU backend.");
+        ImGui::DestroyContext();
+        throw std::runtime_error("ImGuiRenderer: 初始化 ImGui WGPU 后端失败");
     }
+
+    m_isInitialized = true;
+    LogInfo("ImGuiRenderer 初始化成功");
 }
 
 ImGuiRenderer::~ImGuiRenderer()
 {
-    ImGui_ImplWGPU_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
+    if (m_isInitialized)
+    {
+        // 清理纹理缓存
+        m_textureCache.clear();
+        m_activeTexturesInFrame.clear();
+
+        // 按正确顺序关闭 ImGui 后端
+        ImGui_ImplWGPU_Shutdown();
+        ImGui_ImplSDL3_Shutdown();
+        ImGui::DestroyContext();
+
+        m_isInitialized = false;
+        LogInfo("ImGuiRenderer 已销毁");
+    }
 }
 
 void ImGuiRenderer::NewFrame()
 {
+    if (!m_isInitialized)
+    {
+        throw std::runtime_error("ImGuiRenderer::NewFrame: 渲染器未初始化");
+    }
+
+    // 验证设备有效性
+    if (!m_device)
+    {
+        throw std::runtime_error("ImGuiRenderer::NewFrame: WebGPU 设备无效");
+    }
+
+    // 清理未使用的纹理缓存
     if (!m_activeTexturesInFrame.empty())
     {
         for (auto it = m_textureCache.begin(); it != m_textureCache.end();)
         {
-            if (std::ranges::find(m_activeTexturesInFrame, it->first) ==
-                m_activeTexturesInFrame.end())
+            if (std::ranges::find(m_activeTexturesInFrame, it->first) == m_activeTexturesInFrame.end())
             {
                 it = m_textureCache.erase(it);
             }
@@ -68,10 +101,8 @@ void ImGuiRenderer::NewFrame()
         }
     }
     m_activeTexturesInFrame.clear();
-    if (!m_device)
-    {
-        throw std::runtime_error("ImGuiRenderer::NewFrame: WGPU Device is not valid.");
-    }
+
+    // 开始新的 ImGui 帧
     ImGui_ImplWGPU_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
@@ -79,9 +110,20 @@ void ImGuiRenderer::NewFrame()
 
 void ImGuiRenderer::Render(wgpu::RenderPassEncoder renderPass)
 {
-    ImGui::Render();
-    ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass.Get());
+    if (!m_isInitialized)
+    {
+        LogWarn("ImGuiRenderer::Render: 渲染器未初始化，跳过渲染");
+        return;
+    }
 
+    ImGui::Render();
+    
+    if (renderPass)
+    {
+        ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass.Get());
+    }
+
+    // 处理多视口
     if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
         ImGui::UpdatePlatformWindows();
@@ -91,49 +133,63 @@ void ImGuiRenderer::Render(wgpu::RenderPassEncoder renderPass)
 
 void ImGuiRenderer::EndFrame(const GraphicsBackend& backend)
 {
-    if (wgpu::TextureView frameView = backend.GetCurrentFrameView())
+    if (!m_isInitialized)
     {
-        wgpu::CommandEncoder encoder = backend.GetDevice().CreateCommandEncoder();
-        wgpu::RenderPassColorAttachment colorAttachment{};
-        colorAttachment.view = frameView;
-        colorAttachment.loadOp = wgpu::LoadOp::Clear;
-        colorAttachment.storeOp = wgpu::StoreOp::Store;
-        colorAttachment.clearValue = {0.15f, 0.16f, 0.18f, 1.0f};
-
-        wgpu::RenderPassDescriptor passDesc{};
-        passDesc.colorAttachmentCount = 1;
-        passDesc.colorAttachments = &colorAttachment;
-
-        wgpu::RenderPassEncoder renderPass = encoder.BeginRenderPass(&passDesc);
-        Render(renderPass);
-        renderPass.End();
-
-        wgpu::CommandBuffer commands = encoder.Finish();
-        backend.GetDevice().GetQueue().Submit(1, &commands);
+        return;
     }
+
+    wgpu::TextureView frameView = backend.GetCurrentFrameView();
+    if (!frameView)
+    {
+        LogWarn("ImGuiRenderer::EndFrame: 无法获取当前帧视图");
+        return;
+    }
+
+    wgpu::CommandEncoder encoder = backend.GetDevice().CreateCommandEncoder();
+    if (!encoder)
+    {
+        LogError("ImGuiRenderer::EndFrame: 创建命令编码器失败");
+        return;
+    }
+
+    wgpu::RenderPassColorAttachment colorAttachment{};
+    colorAttachment.view = frameView;
+    colorAttachment.loadOp = wgpu::LoadOp::Clear;
+    colorAttachment.storeOp = wgpu::StoreOp::Store;
+    colorAttachment.clearValue = {0.15f, 0.16f, 0.18f, 1.0f};
+
+    wgpu::RenderPassDescriptor passDesc{};
+    passDesc.colorAttachmentCount = 1;
+    passDesc.colorAttachments = &colorAttachment;
+
+    wgpu::RenderPassEncoder renderPass = encoder.BeginRenderPass(&passDesc);
+    Render(renderPass);
+    renderPass.End();
+
+    wgpu::CommandBuffer commands = encoder.Finish();
+    backend.GetDevice().GetQueue().Submit(1, &commands);
 }
 
 ImTextureID ImGuiRenderer::GetOrCreateTextureIdFor(wgpu::Texture texture)
 {
     if (!texture)
     {
-        return -1;
+        return reinterpret_cast<ImTextureID>(nullptr);
     }
-
 
     WGPUTexture textureHandle = texture.Get();
 
-
+    // 标记为本帧活跃
     m_activeTexturesInFrame.push_back(textureHandle);
 
-
+    // 检查缓存
     auto it = m_textureCache.find(textureHandle);
     if (it != m_textureCache.end())
     {
-        return (ImTextureID)it->second.Get();
+        return reinterpret_cast<ImTextureID>(it->second.Get());
     }
 
-
+    // 创建纹理视图
     wgpu::TextureViewDescriptor viewDesc = {};
     viewDesc.format = texture.GetFormat();
     viewDesc.dimension = wgpu::TextureViewDimension::e2D;
@@ -146,20 +202,19 @@ ImTextureID ImGuiRenderer::GetOrCreateTextureIdFor(wgpu::Texture texture)
     wgpu::TextureView view = texture.CreateView(&viewDesc);
     if (!view)
     {
-        return -1;
+        LogError("ImGuiRenderer::GetOrCreateTextureIdFor: 创建纹理视图失败");
+        return reinterpret_cast<ImTextureID>(nullptr);
     }
 
-
+    // 缓存视图
     m_textureCache[textureHandle] = view;
-    return (ImTextureID)view.Get();
+    return reinterpret_cast<ImTextureID>(view.Get());
 }
-
 
 void ImGuiRenderer::ProcessEvent(const SDL_Event& event)
 {
     ImGui_ImplSDL3_ProcessEvent(&event);
 }
-
 
 void ImGuiRenderer::ApplyEditorStyle()
 {
@@ -237,33 +292,33 @@ void ImGuiRenderer::ApplyEditorStyle()
     colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
 }
 
-
 std::string ImGuiRenderer::LoadFonts(const std::string& fontPath, float dpiScale)
 {
     if (!Path::Exists(fontPath))
     {
+        LogError("ImGuiRenderer::LoadFonts: 字体文件不存在: {}", fontPath);
         return "";
     }
 
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
 
-
+    // 主字体配置
     ImFontConfig mainConfig;
     mainConfig.FontDataOwnedByAtlas = false;
     mainConfig.SizePixels = 16.0f * dpiScale;
     mainConfig.RasterizerMultiply = dpiScale;
-
     mainConfig.GlyphRanges = io.Fonts->GetGlyphRangesChineseFull();
 
     ImFont* mainFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), mainConfig.SizePixels, &mainConfig,
                                                     mainConfig.GlyphRanges);
     if (!mainFont)
     {
+        LogError("ImGuiRenderer::LoadFonts: 加载主字体失败");
         return "";
     }
 
-
+    // Emoji 字体配置
     ImFontConfig emojiConfig;
     emojiConfig.FontDataOwnedByAtlas = false;
     emojiConfig.SizePixels = 16.0f * dpiScale;
@@ -271,13 +326,11 @@ std::string ImGuiRenderer::LoadFonts(const std::string& fontPath, float dpiScale
     emojiConfig.MergeMode = true;
     emojiConfig.GlyphMinAdvanceX = 16.0f * dpiScale;
 
-
     static const ImWchar emojiRanges[] =
     {
         0x1, 0xFFFF,
         0,
     };
-
 
     const char* emojiFontPaths[] =
     {
@@ -295,13 +348,12 @@ std::string ImGuiRenderer::LoadFonts(const std::string& fontPath, float dpiScale
         }
     }
 
-
+    // 符号字体配置
     ImFontConfig symbolConfig;
     symbolConfig.FontDataOwnedByAtlas = false;
     symbolConfig.SizePixels = 16.0f * dpiScale;
     symbolConfig.RasterizerMultiply = dpiScale;
     symbolConfig.MergeMode = true;
-
 
     static const ImWchar basicSymbolRanges[] =
     {
@@ -310,13 +362,13 @@ std::string ImGuiRenderer::LoadFonts(const std::string& fontPath, float dpiScale
     };
     io.Fonts->AddFontFromFileTTF(fontPath.c_str(), symbolConfig.SizePixels, &symbolConfig, basicSymbolRanges);
 
-
+    // 构建字体图集
     io.Fonts->Build();
-
 
     auto name = Path::GetFileNameWithoutExtension(fontPath);
     m_fonts[name] = mainFont;
 
+    LogInfo("ImGuiRenderer::LoadFonts: 成功加载字体: {}", name);
     return name;
 }
 
@@ -326,9 +378,10 @@ void ImGuiRenderer::SetFont(const std::string& fontName)
     if (it != m_fonts.end())
     {
         ImGui::GetIO().FontDefault = it->second;
+        LogInfo("ImGuiRenderer::SetFont: 设置默认字体为: {}", fontName);
     }
     else
     {
-        throw std::runtime_error("Font not found: " + fontName);
+        throw std::runtime_error("ImGuiRenderer::SetFont: 字体未找到: " + fontName);
     }
 }

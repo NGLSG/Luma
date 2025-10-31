@@ -100,6 +100,9 @@ public:
 
         /**
          * @brief 日志输出操作符，支持格式化参数。
+         * 修复点：不在 lambda 中构造 format_args 并返回，避免 format_args 指向已销毁的栈对象。
+         * 通过先 transform 参数到 tuple，然后用 std::apply 展开并直接调用 Logger::log 模板，保证参数在 vformat 调用期间有效。
+         *
          * @tparam Args 参数类型
          * @param fmt 格式化字符串
          * @param args 可变参数
@@ -112,14 +115,17 @@ public:
                 return;
             }
 
+            // 对参数进行必要的转换（例如 wstring -> string）
             auto transformedArgsTuple = std::make_tuple(transformLogArg(std::forward<Args>(args))...);
 
-            auto formatArgs = std::apply(
-                [](auto&&... targs) { return std::make_format_args(targs...); },
+            // 将 tuple 展开并直接调用接收参数包的 log 模板函数，这样 std::make_format_args 会在 Logger::log 的栈帧内被建立并立即使用，
+            // 避免了 format_args 指向 lambda 局部变量后悬垂的问题。
+            std::apply(
+                [&](auto&&... targs) {
+                    Logger::log(level, location, fmt, std::forward<decltype(targs)>(targs)...);
+                },
                 transformedArgsTuple
             );
-
-            Logger::log(level, location, fmt, formatArgs);
         }
     };
 
@@ -206,28 +212,27 @@ private:
     }
 
     /**
-     * @brief 实际日志输出实现，格式化并输出到回调和控制台。
+     * @brief 实际日志输出实现（模板版本），接受参数包并在函数内构造 format_args 并立即用于 vformat，
+     *        这样可以保证 format_args 内指针的目标在 vformat 调用期间仍然有效，从而避免悬垂指针导致的崩溃。
+     *
+     * @tparam Args 参数类型包
      * @param level 日志级别
      * @param location 源码位置信息
      * @param fmt 格式化字符串
-     * @param args 格式化参数
+     * @param args 参数包（已经经过 transform）
      */
-/**
-     * @brief 实际日志输出实现，格式化并输出到回调和控制台。
-     * @param level 日志级别
-     * @param location 源码位置信息
-     * @param fmt 格式化字符串
-     * @param args 格式化参数
-     */
+    template <typename... Args>
     static void log(LogLevel level,
                     const std::source_location& location,
                     std::string_view fmt,
-                    std::format_args args)
+                    Args&&... args)
     {
         initialize();
 
-        const std::string message = std::vformat(fmt, args);
+        // 在当前栈帧内立即构造 format_args 并用于 vformat，保证引用安全
+        const std::string message = std::vformat(fmt, std::make_format_args(std::forward<Args>(args)...));
 
+        // 触发回调，注意回调接收的是 string_view，监听方如果需要持久保存请复制内容
         OnLogMessage.Invoke(message, level);
 
         if (!consoleOutputEnabled) return;

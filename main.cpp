@@ -25,12 +25,28 @@
 #define DLL_SEARCH_PATH "GameData"
 #endif
 
-
+std::string GetCurrentExecutablePath1()
+{
+#ifdef _WIN32
+    char buffer[MAX_PATH];
+    GetModuleFileNameA(nullptr, buffer, MAX_PATH);
+    return std::filesystem::path(buffer).parent_path().string();
+#else
+    char buffer[1024];
+    ssize_t count = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+    if (count != -1)
+    {
+        buffer[count] = '\0';
+        return std::filesystem::path(buffer).parent_path().string();
+    }
+    return {};
+#endif
+}
 int main(int argc, char* argv[])
 {
     
-    
-    
+
+
 #if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER >= 0x10100000L)
     OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, nullptr);
 #endif

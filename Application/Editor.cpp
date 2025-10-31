@@ -46,6 +46,7 @@
 #include <memory>
 #include <array>
 
+#include "Path.h"
 #include "PreferenceSettings.h"
 #include "RenderableManager.h"
 #include "Editor/AIPanel.h"
@@ -203,7 +204,7 @@ void Editor::InitializeDerived()
     {
         throw std::runtime_error("无法初始化ImGui渲染器");
     }
-    m_imguiRenderer->SetFont(m_imguiRenderer->LoadFonts("Fonts/SourceBlack-Medium.otf", 1.0f));
+    m_imguiRenderer->SetFont(m_imguiRenderer->LoadFonts(Path::GetFullPath("Fonts/SourceBlack-Medium.otf"), 1.0f));
     m_sceneRenderer = std::make_unique<SceneRenderer>();
 
 

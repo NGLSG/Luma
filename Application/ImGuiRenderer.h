@@ -1,93 +1,97 @@
-#pragma once
+#ifndef IMGUI_RENDERER_H
+#define IMGUI_RENDERER_H
+
 #include <webgpu/webgpu_cpp.h>
 #include <SDL3/SDL.h>
-#include <memory>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "imgui.h"
-#include "../Renderer/GraphicsBackend.h"
 
-
-struct ImFont;
-
+// 前向声明
+class GraphicsBackend;
 
 /**
- * @brief ImGui渲染器，负责初始化、管理和渲染ImGui界面。
+ * @brief ImGui 渲染器类，负责 ImGui 与 WebGPU 后端的集成
  */
 class ImGuiRenderer
 {
 public:
     /**
-     * @brief 构造ImGui渲染器实例。
-     * @param window SDL窗口指针，用于处理输入和上下文。
-     * @param device WebGPU设备，用于创建渲染资源。
-     * @param renderTargetFormat 渲染目标的纹理格式。
+     * @brief 构造函数，初始化 ImGui 渲染器
+     * @param window SDL 窗口指针
+     * @param device WebGPU 设备对象
+     * @param renderTargetFormat 渲染目标格式
      */
     ImGuiRenderer(SDL_Window* window, const wgpu::Device& device, wgpu::TextureFormat renderTargetFormat);
+    
     /**
-     * @brief 销毁ImGui渲染器实例。
+     * @brief 析构函数，清理资源
      */
     ~ImGuiRenderer();
 
+    // 禁止拷贝和移动
+    ImGuiRenderer(const ImGuiRenderer&) = delete;
+    ImGuiRenderer& operator=(const ImGuiRenderer&) = delete;
+    ImGuiRenderer(ImGuiRenderer&&) = delete;
+    ImGuiRenderer& operator=(ImGuiRenderer&&) = delete;
 
     /**
-     * @brief 开始一个新的ImGui帧。
+     * @brief 开始新的一帧渲染
      */
     void NewFrame();
 
-
     /**
-     * @brief 将ImGui的绘制数据渲染到指定的渲染通道编码器。
-     * @param renderPass 渲染通道编码器。
+     * @brief 渲染 ImGui 绘制数据
+     * @param renderPass 渲染通道编码器
      */
     void Render(wgpu::RenderPassEncoder renderPass);
 
-
     /**
-     * @brief 结束当前的ImGui帧，并处理后端操作。
-     * @param backend 图形后端实例。
+     * @brief 结束当前帧并提交
+     * @param backend 图形后端引用
      */
     void EndFrame(const GraphicsBackend& backend);
 
-
     /**
-     * @brief 为给定的WebGPU纹理获取或创建一个ImGui纹理ID。
-     * @param texture WebGPU纹理。
-     * @return ImGui纹理ID。
+     * @brief 获取或创建纹理 ID
+     * @param texture WebGPU 纹理对象
+     * @return ImTextureID
      */
     ImTextureID GetOrCreateTextureIdFor(wgpu::Texture texture);
 
     /**
-     * @brief 处理SDL事件，供ImGui使用。
-     * @param event SDL事件。
+     * @brief 处理 SDL 事件
+     * @param event SDL 事件引用
      */
     static void ProcessEvent(const SDL_Event& event);
 
+    /**
+     * @brief 应用编辑器样式
+     */
+    static void ApplyEditorStyle();
 
     /**
-     * @brief 应用编辑器风格的ImGui样式。
+     * @brief 加载字体
+     * @param fontPath 字体文件路径
+     * @param dpiScale DPI 缩放比例
+     * @return 字体名称
      */
-    void ApplyEditorStyle();
+    std::string LoadFonts(const std::string& fontPath, float dpiScale);
+
     /**
-     * @brief 从指定路径加载字体。
-     * @param fontPath 字体文件路径。
-     * @param dpiScale DPI缩放因子。
-     * @return 加载的字体名称。
-     */
-    std::string LoadFonts(const std::string& fontPath, float dpiScale = 1.0f);
-    /**
-     * @brief 设置当前使用的字体。
-     * @param fontName 字体名称。
+     * @brief 设置默认字体
+     * @param fontName 字体名称
      */
     void SetFont(const std::string& fontName);
 
 private:
-    wgpu::Device m_device; ///< WebGPU设备实例。
-    std::unordered_map<std::string, ImFont*> m_fonts; ///< 已加载的字体映射。
-
-
-    std::unordered_map<WGPUTexture, wgpu::TextureView> m_textureCache; ///< 纹理缓存，用于将WebGPU纹理映射到ImGui纹理视图。
-
-
-    std::vector<WGPUTexture> m_activeTexturesInFrame; ///< 当前帧中活跃的WebGPU纹理列表。
+    wgpu::Device m_device;                                        ///< WebGPU 设备对象（持有引用）
+    std::unordered_map<WGPUTexture, wgpu::TextureView> m_textureCache;  ///< 纹理视图缓存
+    std::vector<WGPUTexture> m_activeTexturesInFrame;             ///< 当前帧活跃的纹理列表
+    std::unordered_map<std::string, ImFont*> m_fonts;             ///< 字体映射表
+    bool m_isInitialized;                                         ///< 初始化标志
 };
+
+#endif // IMGUI_RENDERER_H
