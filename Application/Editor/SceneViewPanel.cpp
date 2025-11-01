@@ -1631,8 +1631,10 @@ void SceneViewPanel::drawEditorGizmos(const ImVec2& viewportScreenPos, const ImV
     if (isTilemapEditingMode)
     {
         const auto& tilemap = selectedGo.GetComponent<ECS::TilemapComponent>();
-        drawTilemapGrid(drawList, tilemap);
-        drawTileBrushPreview(drawList, tilemap);
+        const auto& tilemapTransform = selectedGo.GetComponent<ECS::TransformComponent>();
+        
+        drawTilemapGrid(drawList, tilemapTransform, tilemap, viewportScreenPos, viewportSize);
+        drawTileBrushPreview(drawList, tilemapTransform, tilemap);
     }
     else
     {
@@ -1642,10 +1644,11 @@ void SceneViewPanel::drawEditorGizmos(const ImVec2& viewportScreenPos, const ImV
     drawCameraGizmo(drawList);
 }
 
-void SceneViewPanel::drawTilemapGrid(ImDrawList* drawList, const ECS::TilemapComponent& tilemap)
+void SceneViewPanel::drawTilemapGrid(ImDrawList* drawList, const ECS::TransformComponent& tilemapTransform,
+                                     const ECS::TilemapComponent& tilemap, const ImVec2& viewportScreenPos,
+                                     const ImVec2& viewportSize)
 {
     const float zoom = m_editorCameraProperties.zoom;
-    const ImVec2 viewportSize = ImGui::GetContentRegionAvail();
     const float halfW = viewportSize.x * 0.5f / zoom;
     const float halfH = viewportSize.y * 0.5f / zoom;
     const float cx = m_editorCameraProperties.position.x();
@@ -1662,48 +1665,72 @@ void SceneViewPanel::drawTilemapGrid(ImDrawList* drawList, const ECS::TilemapCom
 
     const ImU32 gridColor = IM_COL32(255, 255, 255, 40);
 
+    
+    const float offsetX = 0.5f * cellWidth;
+    const float offsetY = 0.5f * cellHeight;
 
-    const float startX = std::floor(left / cellWidth) * cellWidth;
+    
+    const float originX = tilemapTransform.position.x + offsetX;
+    const float originY = tilemapTransform.position.y + offsetY;
+
+    
+    const float startX = originX + std::floor((left - originX) / cellWidth) * cellWidth;
     for (float x = startX; x <= right; x += cellWidth)
     {
         ImVec2 pTop = worldToScreenWith(m_editorCameraProperties, {x, top});
-        ImVec2 pBottom = worldToScreenWith(m_editorCameraProperties, {x, bottom});
-        drawList->AddLine(pTop, pBottom, gridColor);
+        drawList->AddLine(
+            ImVec2(pTop.x, viewportScreenPos.y),
+            ImVec2(pTop.x, viewportScreenPos.y + viewportSize.y),
+            gridColor);
     }
 
-
-    const float startY = std::floor(top / cellHeight) * cellHeight;
+    
+    const float startY = originY + std::floor((top - originY) / cellHeight) * cellHeight;
     for (float y = startY; y <= bottom; y += cellHeight)
     {
         ImVec2 pLeft = worldToScreenWith(m_editorCameraProperties, {left, y});
-        ImVec2 pRight = worldToScreenWith(m_editorCameraProperties, {right, y});
-        drawList->AddLine(pLeft, pRight, gridColor);
+        drawList->AddLine(
+            ImVec2(viewportScreenPos.x, pLeft.y),
+            ImVec2(viewportScreenPos.x + viewportSize.x, pLeft.y),
+            gridColor);
     }
 }
-
-void SceneViewPanel::drawTileBrushPreview(ImDrawList* drawList, const ECS::TilemapComponent& tilemap)
+void SceneViewPanel::drawTileBrushPreview(ImDrawList* drawList, const ECS::TransformComponent& tilemapTransform, const ECS::TilemapComponent& tilemap)
 {
     if (!m_context->activeTileBrush.Valid()) return;
 
     ECS::Vector2f worldMousePos = screenToWorldWith(m_editorCameraProperties, ImGui::GetIO().MousePos);
-    ECS::Vector2i gridCoord = {
-        static_cast<int>(floorf(worldMousePos.x / tilemap.cellSize.x)),
-        static_cast<int>(floorf(worldMousePos.y / tilemap.cellSize.y))
+
+    
+    ECS::Vector2f localMousePos = {
+        worldMousePos.x - tilemapTransform.position.x,
+        worldMousePos.y - tilemapTransform.position.y
     };
 
-    ECS::Vector2f tileWorldPos = {gridCoord.x * tilemap.cellSize.x, gridCoord.y * tilemap.cellSize.y};
-    ECS::Vector2f tileWorldPosEnd = {(gridCoord.x + 1) * tilemap.cellSize.x, (gridCoord.y + 1) * tilemap.cellSize.y};
+    
+    ECS::Vector2i gridCoord = {
+        static_cast<int>(std::floor(localMousePos.x / tilemap.cellSize.x + 0.5f)),
+        static_cast<int>(std::floor(localMousePos.y / tilemap.cellSize.y + 0.5f))
+    };
+
+    
+    
+    ECS::Vector2f tileWorldPos = {
+        tilemapTransform.position.x + (gridCoord.x - 0.5f) * tilemap.cellSize.x,
+        tilemapTransform.position.y + (gridCoord.y - 0.5f) * tilemap.cellSize.y
+    };
+    
+    ECS::Vector2f tileWorldPosEnd = {
+        tilemapTransform.position.x + (gridCoord.x + 0.5f) * tilemap.cellSize.x,
+        tilemapTransform.position.y + (gridCoord.y + 0.5f) * tilemap.cellSize.y
+    };
 
     ImVec2 screenMin = worldToScreenWith(m_editorCameraProperties, tileWorldPos);
     ImVec2 screenMax = worldToScreenWith(m_editorCameraProperties, tileWorldPosEnd);
 
-    // TODO: 实现一个 Tile 预览缓存系统来获取笔刷的 sk_sp<SkImage>
-
-
     ImU32 previewColor = ImGui::GetIO().KeyAlt ? IM_COL32(255, 80, 80, 100) : IM_COL32(80, 255, 80, 100);
     drawList->AddRectFilled(screenMin, screenMax, previewColor);
 }
-
 void SceneViewPanel::drawEditorGrid(const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
 {
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1784,11 +1811,20 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
     if (!tilemapGo.HasComponent<ECS::TilemapComponent>()) return;
 
     auto& tilemap = tilemapGo.GetComponent<ECS::TilemapComponent>();
+    const auto& tilemapTransform = tilemapGo.GetComponent<ECS::TransformComponent>();
     const ImGuiIO& io = ImGui::GetIO();
     ECS::Vector2f worldMousePos = screenToWorldWith(m_editorCameraProperties, io.MousePos);
+
+    
+    ECS::Vector2f localMousePos = {
+        worldMousePos.x - tilemapTransform.position.x,
+        worldMousePos.y - tilemapTransform.position.y
+    };
+
+    
     ECS::Vector2i gridCoord = {
-        static_cast<int>(floorf(worldMousePos.x / tilemap.cellSize.x)),
-        static_cast<int>(floorf(worldMousePos.y / tilemap.cellSize.y))
+        static_cast<int>(std::floor(localMousePos.x / tilemap.cellSize.x + 0.5f)),
+        static_cast<int>(std::floor(localMousePos.y / tilemap.cellSize.y + 0.5f))
     };
 
     bool isErasing = io.KeyAlt;
@@ -1822,7 +1858,7 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
     {
         m_isPainting = true;
         m_paintedCoordsThisStroke.clear();
-        m_paintStartCoord = gridCoord;
+        m_paintStartCoord = gridCoord; 
         SceneManager::GetInstance().PushUndoState(m_context->activeScene);
         paintTile(gridCoord);
     }
@@ -1831,11 +1867,13 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
     {
         if (io.KeyCtrl)
         {
+            
         }
         else if (io.KeyShift)
         {
+            
         }
-        else { paintTile(gridCoord); }
+        else { paintTile(gridCoord); } 
     }
 
     if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
@@ -1844,6 +1882,7 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
         {
             if (io.KeyCtrl)
             {
+                
                 int x1 = m_paintStartCoord.x, y1 = m_paintStartCoord.y;
                 int x2 = gridCoord.x, y2 = gridCoord.y;
                 int dx = abs(x2 - x1), sx = x1 < x2 ? 1 : -1;
@@ -1868,6 +1907,7 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
             }
             else if (io.KeyShift)
             {
+                
                 int minX = std::min(m_paintStartCoord.x, gridCoord.x);
                 int maxX = std::max(m_paintStartCoord.x, gridCoord.x);
                 int minY = std::min(m_paintStartCoord.y, gridCoord.y);
@@ -1880,6 +1920,7 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
                     }
                 }
             }
+            
             EventBus::GetInstance().Publish(ComponentUpdatedEvent{
                 m_context->activeScene->GetRegistry(), tilemapGo.GetEntityHandle()
             });
@@ -1887,7 +1928,6 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
         m_isPainting = false;
     }
 }
-
 
 void SceneViewPanel::handleNavigationAndPick(const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
 {

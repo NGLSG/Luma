@@ -198,6 +198,28 @@ void TilesetPanel::drawTilesetContent()
                 m_context->activeTileBrush = handle;
             }
 
+            
+            if (ImGui::BeginPopupContextItem("TileItemContext"))
+            {
+                if (ImGui::MenuItem("删除"))
+                {
+                    auto it = std::find_if(m_tileHandles.begin(), m_tileHandles.end(), [&](const AssetHandle& h)
+                    { return h.assetGuid == handle.assetGuid; });
+                    if (it != m_tileHandles.end())
+                    {
+                        
+                        if (m_context->activeTileBrush.assetGuid == handle.assetGuid) { m_context->activeTileBrush = {}; }
+
+                        
+                        m_hydratedTiles.erase(handle.assetGuid);
+                        m_hydratedRuleTiles.erase(handle.assetGuid);
+
+                        m_tileHandles.erase(it);
+                    }
+                }
+                ImGui::EndPopup();
+            }
+
             if (isSelected)
             {
                 ImGui::PopStyleColor();

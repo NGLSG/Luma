@@ -335,6 +335,22 @@ void AssetBrowserPanel::ProcessDoubleClick(const Item& item)
             LogInfo("请求打开 Tileset 编辑器: {}", item.name);
         }
         break;
+    case AssetType::RuleTile:
+        {
+            m_context->currentEditingRuleTileGuid = item.guid;
+            auto panel = m_context->editor->GetPanelByName("规则瓦片编辑器");
+            if (panel)
+            {
+                panel->SetVisible(true);
+                panel->Focus();
+            }
+            else
+            {
+                LogError("未找到规则瓦片编辑器面板");
+            }
+            LogInfo("请求打开 RuleTile 编辑器: {}", item.name);
+        }
+        break;
     default:
         LogInfo("双击打开资产: {}", item.name);
         break;

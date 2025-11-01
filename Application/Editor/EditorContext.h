@@ -160,6 +160,7 @@ struct EditorContext
     UIDrawData* uiCallbacks = nullptr; ///< UI绘制回调数据
     bool wasSceneDirty; ///< 场景是否曾被修改过
     Guid currentEditingTilesetGuid; ///< 当前正在编辑的瓦片集Guid
+    Guid currentEditingRuleTileGuid; ///< 当前正在编辑的规则瓦片Guid
     AssetHandle activeTileBrush; ///< 当前激活的瓦片画刷句柄
     sk_sp<RuntimeTexture> activeBrushPreviewImage; ///< 激活画刷的预览图像
     SkRect activeBrushPreviewSourceRect; ///< 激活画刷预览图像的源矩形

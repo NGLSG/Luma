@@ -334,14 +334,17 @@ private:
      * @brief 绘制瓦片地图网格。
      * @param drawList ImGui绘图列表。
      * @param tilemap 瓦片地图组件。
+     * @param viewportScreenPos
+     * @param viewportSize
      */
-    void drawTilemapGrid(ImDrawList* drawList, const ECS::TilemapComponent& tilemap);
+    void drawTilemapGrid(ImDrawList* drawList, const ECS::TransformComponent& tilemapTransform, const ECS::TilemapComponent& tilemap, const
+                         ImVec2& viewportScreenPos, const ImVec2& viewportSize);
     /**
      * @brief 绘制瓦片画刷预览。
      * @param drawList ImGui绘图列表。
      * @param tilemap 瓦片地图组件。
      */
-    void drawTileBrushPreview(ImDrawList* drawList, const ECS::TilemapComponent& tilemap);
+    void drawTileBrushPreview(ImDrawList* drawList, const ECS::TransformComponent& tilemapTransform, const ECS::TilemapComponent& tilemap);
 
 
     /**
