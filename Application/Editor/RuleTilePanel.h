@@ -31,10 +31,12 @@ private:
     void drawRuleList();
 
 private:
+    void drawRuleGrid(int ruleIndex);
+
+private:
     EditorContext* m_context = nullptr;
     Guid m_currentRuleTileGuid;
     RuleTileAssetData m_editingData;
 };
 
 #endif
-
