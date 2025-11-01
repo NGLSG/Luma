@@ -257,6 +257,8 @@ namespace Systems
 
             CreateShapesForEntity(entity, registry, transform);
         }
+
+        
     }
 
     void PhysicsSystem::OnUpdate(RuntimeScene* scene, float deltaTime, EngineContext& context)
@@ -346,6 +348,29 @@ namespace Systems
             }
         }
 
+        
+        {
+            auto dynView = registry.view<ECS::TransformComponent, ECS::RigidBodyComponent>();
+            for (auto entity : dynView)
+            {
+                if (!scene->FindGameObjectByEntity(entity).IsActive()) continue;
+                auto [transform, rb] = dynView.get<ECS::TransformComponent, ECS::RigidBodyComponent>(entity);
+                if (!rb.Enable) continue;
+                if (rb.bodyType != ECS::BodyType::Dynamic || rb.runtimeBody.index1 == B2_NULL_INDEX) continue;
+
+                b2Vec2 bodyPos = b2Body_GetPosition(rb.runtimeBody);
+                float tx = transform.position.x * METER_PER_PIXEL;
+                float ty = -transform.position.y * METER_PER_PIXEL;
+                float dx = tx - bodyPos.x;
+                float dy = ty - bodyPos.y;
+                const float epsilon = 0.5f * METER_PER_PIXEL; 
+                if (dx * dx + dy * dy > epsilon * epsilon)
+                {
+                    b2Body_SetTransform(rb.runtimeBody, {tx, ty}, b2MakeRot(-transform.rotation));
+                    b2Body_SetAwake(rb.runtimeBody, true);
+                }
+            }
+        }
 
         const float maxDeltaTime = 0.032f;
         m_accumulator += std::min(deltaTime, maxDeltaTime);
@@ -834,29 +859,75 @@ namespace Systems
         {
             auto& tilemapCollider = registry.get<ECS::TilemapColliderComponent>(entity);
 
+            
+            const float thicknessMeters = METER_PER_PIXEL; 
+
             for (const auto& chain : tilemapCollider.generatedChains)
             {
                 if (chain.size() < 2) continue;
 
-                std::vector<b2Vec2> b2Vertices;
-                b2Vertices.reserve(chain.size());
-                for (const auto& v : chain)
+                
+                ECS::Vector2f v0 = chain.front();
+                ECS::Vector2f v1 = chain.back();
+
+                
+                b2Vec2 p0 = {
+                    (v0.x + tilemapCollider.offset.x) * scale.x * METER_PER_PIXEL,
+                    -(v0.y + tilemapCollider.offset.y) * scale.y * METER_PER_PIXEL
+                };
+                b2Vec2 p1 = {
+                    (v1.x + tilemapCollider.offset.x) * scale.x * METER_PER_PIXEL,
+                    -(v1.y + tilemapCollider.offset.y) * scale.y * METER_PER_PIXEL
+                };
+
+                
+                bool isHorizontal = std::abs(p0.y - p1.y) < 1e-6f;
+                bool isVertical = std::abs(p0.x - p1.x) < 1e-6f;
+                if (!isHorizontal && !isVertical)
                 {
-                    b2Vertices.push_back({
-                        (v.x + tilemapCollider.offset.x) * scale.x * METER_PER_PIXEL,
-                        -(v.y + tilemapCollider.offset.y) * scale.y * METER_PER_PIXEL
-                    });
+                    
+                    std::vector<b2Vec2> b2Vertices;
+                    b2Vertices.push_back(p0);
+                    b2Vertices.push_back(p1);
+                    
+                    b2Vec2 m1 = { (p0.x * 2.0f + p1.x) / 3.0f, (p0.y * 2.0f + p1.y) / 3.0f };
+                    b2Vec2 m2 = { (p0.x + p1.x * 2.0f) / 3.0f, (p0.y + p1.y * 2.0f) / 3.0f };
+                    b2Vertices.insert(b2Vertices.begin() + 1, m1);
+                    b2Vertices.insert(b2Vertices.begin() + 2, m2);
+                    b2ChainDef chainDef = b2DefaultChainDef();
+                    chainDef.points = b2Vertices.data();
+                    chainDef.count = static_cast<int32_t>(b2Vertices.size());
+                    chainDef.isLoop = false;
+                    b2ChainId newChainId = b2CreateChain(bodyId, &chainDef);
+                    if (newChainId.index1 != B2_NULL_INDEX) { tilemapCollider.runtimeChains.push_back(newChainId); }
+                    continue;
                 }
 
-                b2ChainDef chainDef = b2DefaultChainDef();
-                chainDef.points = b2Vertices.data();
-                chainDef.count = static_cast<int32_t>(b2Vertices.size());
-                chainDef.isLoop = false;
-
-                b2ChainId newChainId = b2CreateChain(bodyId, &chainDef);
-                if (newChainId.index1 != B2_NULL_INDEX)
+                
+                std::array<b2Vec2, 4> polyPts;
+                if (isHorizontal)
                 {
-                    tilemapCollider.runtimeChains.push_back(newChainId);
+                    float y0 = p0.y - thicknessMeters * 0.5f;
+                    float y1 = p0.y + thicknessMeters * 0.5f;
+                    float x0 = std::min(p0.x, p1.x);
+                    float x1 = std::max(p0.x, p1.x);
+                    polyPts = { b2Vec2{x0, y0}, b2Vec2{x1, y0}, b2Vec2{x1, y1}, b2Vec2{x0, y1} };
+                }
+                else 
+                {
+                    float x0 = p0.x - thicknessMeters * 0.5f;
+                    float x1 = p0.x + thicknessMeters * 0.5f;
+                    float y0 = std::min(p0.y, p1.y);
+                    float y1 = std::max(p0.y, p1.y);
+                    polyPts = { b2Vec2{x0, y0}, b2Vec2{x1, y0}, b2Vec2{x1, y1}, b2Vec2{x0, y1} };
+                }
+
+                b2Hull hull = b2ComputeHull(polyPts.data(), (int32_t)polyPts.size());
+                b2Polygon polygon = b2MakePolygon(&hull, 0.0f);
+                b2ShapeId sid = b2CreatePolygonShape(bodyId, &shapeDef, &polygon);
+                if (sid.index1 != B2_NULL_INDEX)
+                {
+                    tilemapCollider.runtimeShapes.push_back(sid);
                 }
             }
         }
@@ -912,6 +983,15 @@ namespace Systems
                 }
             }
             tmc->runtimeChains.clear();
+
+            for (b2ShapeId sid : tmc->runtimeShapes)
+            {
+                if (sid.index1 != B2_NULL_INDEX)
+                {
+                    b2DestroyShape(sid, false);
+                }
+            }
+            tmc->runtimeShapes.clear();
         }
 
 
@@ -951,7 +1031,8 @@ namespace Systems
 
         bool isAwake = (rb.sleepingMode != ECS::SleepingMode::StartAsleep);
         bool enableSleep = (rb.sleepingMode != ECS::SleepingMode::NeverSleep);
-        b2Body_SetAwake(rb.runtimeBody, enableSleep);
+        
+        b2Body_SetAwake(rb.runtimeBody, isAwake);
 
         b2MotionLocks locks;
         locks.linearX = rb.constraints.freezePositionX;

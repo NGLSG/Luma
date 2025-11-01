@@ -188,6 +188,10 @@ private:
      */
     void drawEdgeColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                  const ECS::EdgeColliderComponent& edgeCollider, ImU32 outlineColor, float thickness);
+    // 绘制Tilemap碰撞体的轮廓（由生成的链段组成）
+    void drawTilemapColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                    const ECS::TilemapColliderComponent& tilemapCollider, ImU32 outlineColor,
+                                    float thickness);
     /**
      * @brief 绘制精灵的选中轮廓。
      * @param drawList ImGui绘图列表。

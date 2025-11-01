@@ -6,6 +6,7 @@
 
 #include "IComponent.h"
 #include <unordered_map>
+#include <cmath>
 
 #include "RuleTile.h"
 #include "Tile.h"
@@ -35,13 +36,17 @@ namespace ECS
     struct Vector2fHash
     {
         /**
-         * @brief 计算给定Vector2i的哈希值（内部使用float哈希）。
-         * @param v 要计算哈希值的Vector2i对象。
+         * @brief 计算给定Vector2f的哈希值。
+         * @param v 要计算哈希值的Vector2f对象。
          * @return 计算出的哈希值。
          */
-        std::size_t operator()(const Vector2i& v) const
+        std::size_t operator()(const Vector2f& v) const
         {
-            return std::hash<float>()(v.x) ^ (std::hash<float>()(v.y) << 1);
+            // 使用量化以减少浮点误差对哈希的影响
+            const float q = 1e-3f;
+            int xi = static_cast<int>(std::round(v.x / q));
+            int yi = static_cast<int>(std::round(v.y / q));
+            return std::hash<int>()(xi) ^ (std::hash<int>()(yi) << 1);
         }
     };
 

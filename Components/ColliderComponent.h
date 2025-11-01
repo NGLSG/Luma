@@ -114,7 +114,8 @@ namespace ECS
     {
         std::vector<std::vector<Vector2f>> generatedChains; ///< 生成的瓦片地图碰撞链的顶点列表。
 
-        std::vector<b2ChainId> runtimeChains; ///< 运行时Box2D链形状的ID列表。
+        std::vector<b2ChainId> runtimeChains; ///< 运行时Box2D链形状的ID列表（兼容旧实现）。
+        std::vector<b2ShapeId> runtimeShapes; ///< 运行时Box2D多边形形状的ID列表（薄条多边形）。
     };
 }
 

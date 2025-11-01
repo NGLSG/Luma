@@ -847,91 +847,108 @@ namespace Systems
                 }, it->second.data);
             };
 
-            std::unordered_map<ECS::Vector2f, std::vector<ECS::Vector2f>, ECS::Vector2fHash> edgeGraph;
-
             const float cellWidth = tilemap.cellSize.x;
             const float cellHeight = tilemap.cellSize.y;
+            
+            const float shiftX = cellWidth * (-0.5f);
+            const float shiftY = cellHeight * (-0.5f);
 
-            for (const auto& [coord, cachedTile] : tilemap.runtimeTileCache)
+            if (!tilemap.runtimeTileCache.empty())
             {
-                if (!isSolid(coord)) continue;
-
-                const ECS::Vector2i neighbors[] = {
-                    {coord.x, coord.y - 1},
-                    {coord.x, coord.y + 1},
-                    {coord.x - 1, coord.y},
-                    {coord.x + 1, coord.y}
-                };
-
-                ECS::Vector2f topLeft = {coord.x * cellWidth, coord.y * cellHeight};
-                ECS::Vector2f topRight = {(coord.x + 1) * cellWidth, coord.y * cellHeight};
-                ECS::Vector2f bottomLeft = {coord.x * cellWidth, (coord.y + 1) * cellHeight};
-                ECS::Vector2f bottomRight = {(coord.x + 1) * cellWidth, (coord.y + 1) * cellHeight};
-
-                if (!isSolid(neighbors[0]))
+                int minX = std::numeric_limits<int>::max();
+                int maxX = std::numeric_limits<int>::lowest();
+                int minY = std::numeric_limits<int>::max();
+                int maxY = std::numeric_limits<int>::lowest();
+                for (const auto& [coord, _] : tilemap.runtimeTileCache)
                 {
-                    edgeGraph[topLeft].push_back(topRight);
-                    edgeGraph[topRight].push_back(topLeft);
+                    minX = std::min(minX, coord.x);
+                    maxX = std::max(maxX, coord.x);
+                    minY = std::min(minY, coord.y);
+                    maxY = std::max(maxY, coord.y);
                 }
 
-                if (!isSolid(neighbors[1]))
+                
+                for (int y = minY; y <= maxY + 1; ++y)
                 {
-                    edgeGraph[bottomLeft].push_back(bottomRight);
-                    edgeGraph[bottomRight].push_back(bottomLeft);
-                }
-
-                if (!isSolid(neighbors[2]))
-                {
-                    edgeGraph[topLeft].push_back(bottomLeft);
-                    edgeGraph[bottomLeft].push_back(topLeft);
-                }
-
-                if (!isSolid(neighbors[3]))
-                {
-                    edgeGraph[topRight].push_back(bottomRight);
-                    edgeGraph[bottomRight].push_back(topRight);
-                }
-            }
-
-            while (!edgeGraph.empty())
-            {
-                std::vector<ECS::Vector2f> newChain;
-                auto it = edgeGraph.begin();
-                ECS::Vector2f startPoint = it->first;
-                ECS::Vector2f currentPoint = startPoint;
-
-                while (true)
-                {
-                    newChain.push_back(currentPoint);
-                    auto& neighbors = edgeGraph.at(currentPoint);
-
-                    if (neighbors.empty())
+                    bool running = false;
+                    int runStartX = 0;
+                    for (int x = minX; x <= maxX; ++x)
                     {
-                        edgeGraph.erase(currentPoint);
-                        break;
+                        bool present = isSolid({x, y}) != isSolid({x, y - 1});
+                        if (present)
+                        {
+                            if (!running)
+                            {
+                                running = true;
+                                runStartX = x;
+                            }
+                        }
+                        else if (running)
+                        {
+                            int runEndX = x; 
+                            if (runEndX > runStartX)
+                            {
+                                std::vector<ECS::Vector2f> chain;
+                                chain.emplace_back(runStartX * cellWidth + shiftX, y * cellHeight + shiftY);
+                                chain.emplace_back(runEndX * cellWidth + shiftX, y * cellHeight + shiftY);
+                                tilemapCollider.generatedChains.push_back(std::move(chain));
+                            }
+                            running = false;
+                        }
                     }
-
-                    ECS::Vector2f nextPoint = neighbors.back();
-                    neighbors.pop_back();
-
-                    auto& neighborsOfNext = edgeGraph.at(nextPoint);
-                    auto backEdgeIt = std::find(neighborsOfNext.begin(), neighborsOfNext.end(), currentPoint);
-                    if (backEdgeIt != neighborsOfNext.end())
+                    if (running)
                     {
-                        neighborsOfNext.erase(backEdgeIt);
+                        int runEndX = maxX + 1;
+                        if (runEndX > runStartX)
+                        {
+                            std::vector<ECS::Vector2f> chain;
+                            chain.emplace_back(runStartX * cellWidth + shiftX, y * cellHeight + shiftY);
+                            chain.emplace_back(runEndX * cellWidth + shiftX, y * cellHeight + shiftY);
+                            tilemapCollider.generatedChains.push_back(std::move(chain));
+                        }
                     }
-
-                    if (neighbors.empty())
-                    {
-                        edgeGraph.erase(currentPoint);
-                    }
-
-                    currentPoint = nextPoint;
                 }
 
-                if (newChain.size() >= 2)
+                
+                for (int x = minX; x <= maxX + 1; ++x)
                 {
-                    tilemapCollider.generatedChains.push_back(newChain);
+                    bool running = false;
+                    int runStartY = 0;
+                    for (int y = minY; y <= maxY; ++y)
+                    {
+                        bool present = isSolid({x, y}) != isSolid({x - 1, y});
+                        if (present)
+                        {
+                            if (!running)
+                            {
+                                running = true;
+                                runStartY = y;
+                            }
+                        }
+                        else if (running)
+                        {
+                            int runEndY = y; 
+                            if (runEndY > runStartY)
+                            {
+                                std::vector<ECS::Vector2f> chain;
+                                chain.emplace_back(x * cellWidth + shiftX, runStartY * cellHeight + shiftY);
+                                chain.emplace_back(x * cellWidth + shiftX, runEndY * cellHeight + shiftY);
+                                tilemapCollider.generatedChains.push_back(std::move(chain));
+                            }
+                            running = false;
+                        }
+                    }
+                    if (running)
+                    {
+                        int runEndY = maxY + 1;
+                        if (runEndY > runStartY)
+                        {
+                            std::vector<ECS::Vector2f> chain;
+                            chain.emplace_back(x * cellWidth + shiftX, runStartY * cellHeight + shiftY);
+                            chain.emplace_back(x * cellWidth + shiftX, runEndY * cellHeight + shiftY);
+                            tilemapCollider.generatedChains.push_back(std::move(chain));
+                        }
+                    }
                 }
             }
 

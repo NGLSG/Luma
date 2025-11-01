@@ -530,6 +530,12 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
             drawEdgeColliderOutline(drawList, transform, edgeCollider, colliderColor, outlineThickness);
             hasVisualRepresentation = true;
         }
+        else if (gameObject.HasComponent<ECS::TilemapColliderComponent>())
+        {
+            const auto& tilemapCollider = gameObject.GetComponent<ECS::TilemapColliderComponent>();
+            drawTilemapColliderOutline(drawList, transform, tilemapCollider, colliderColor, outlineThickness);
+            hasVisualRepresentation = true;
+        }
         else if (gameObject.HasComponent<ECS::CapsuleColliderComponent>())
         {
             const auto& capsuleCollider = gameObject.GetComponent<ECS::CapsuleColliderComponent>();
@@ -865,6 +871,47 @@ void SceneViewPanel::drawEdgeColliderOutline(ImDrawList* drawList, const ECS::Tr
     for (const auto& vertex : screenVertices)
     {
         drawList->AddCircleFilled(vertex, 3.0f, outlineColor);
+    }
+}
+
+void SceneViewPanel::drawTilemapColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                               const ECS::TilemapColliderComponent& tilemapCollider, ImU32 outlineColor,
+                                               float thickness)
+{
+    if (tilemapCollider.generatedChains.empty()) return;
+
+    for (const auto& chain : tilemapCollider.generatedChains)
+    {
+        if (chain.size() < 2) continue;
+
+        std::vector<ImVec2> screenVertices;
+        screenVertices.reserve(chain.size());
+
+        for (const auto& v : chain)
+        {
+            ECS::Vector2f local = {v.x + tilemapCollider.offset.x, v.y + tilemapCollider.offset.y};
+
+            local.x *= transform.scale.x;
+            local.y *= transform.scale.y;
+
+            if (std::abs(transform.rotation) > 0.001f)
+            {
+                const float sinR = sinf(transform.rotation);
+                const float cosR = cosf(transform.rotation);
+                float tempX = local.x;
+                local.x = local.x * cosR - local.y * sinR;
+                local.y = tempX * sinR + local.y * cosR;
+            }
+
+            ECS::Vector2f worldPos = transform.position + local;
+            ImVec2 sp = worldToScreenWith(m_editorCameraProperties, worldPos);
+            screenVertices.push_back(sp);
+        }
+
+        for (size_t i = 0; i + 1 < screenVertices.size(); ++i)
+        {
+            drawList->AddLine(screenVertices[i], screenVertices[i + 1], outlineColor, thickness);
+        }
     }
 }
 
