@@ -73,7 +73,7 @@ static std::string ExecuteAndCapture(const std::string& command)
     std::array<char, 128> buffer;
     std::string result;
 
-    std::unique_ptr<FILE, decltype(&PCLOSE)> pipe(POPEN((command + " 2>&1").c_str(), "r"), PCLOSE);
+    std::unique_ptr<FILE, int(*)(FILE*)> pipe(POPEN((command + " 2>&1").c_str(), "r"), PCLOSE);
     if (!pipe)
     {
         return "Error: popen() failed!";

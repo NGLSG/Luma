@@ -95,10 +95,10 @@ uint16_t LLama::GetGPULayer()
     }
 }
 
-void LLama::BuildHistory(const std::vector<std::pair<std::string, std::string>>& history)
+void LLama::BuildHistory(const std::vector<std::pair<std::string, std::string>>& m_history)
 {
     this->history[convid_].messages.clear();
-    for (const auto& it : history)
+    for (const auto& it : m_history)
     {
         ChatMessage msg;
         msg.role = it.first;
@@ -338,7 +338,7 @@ std::string LLama::Submit(std::string prompt, size_t timeStamp, std::string role
         if (error == 0)
         {
             int n_ctx = llama_n_ctx(ctx);
-            int n_ctx_used = llama_get_kv_cache_used_cells(ctx);
+            int n_ctx_used = llama_kv_self_used_cells(ctx);
 
             if (n_ctx_used + batch.n_tokens > n_ctx)
             {

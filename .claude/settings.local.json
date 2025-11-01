@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(D:JetbrainsCLionbincmakewinx64bincmake.exe --build:*)",
+      "Bash(\"D:\\JetBrains\\CLion\\bin\\cmake\\win\\x64\\bin\\cmake.exe\" --build cmake-build-debug --target LumaEngine -j 14)",
+      "Bash(\"D:\\JetBrains\\CLion\\bin\\cmake\\win\\x64\\bin\\cmake.exe\" --build:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
