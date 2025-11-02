@@ -59,9 +59,8 @@ void GameViewPanel::Draw()
                 m_context->graphicsBackend->SetActiveRenderTarget(m_gameViewTarget);
 
 
-                std::vector<RenderPacket> renderQueue = m_context->renderQueue;
 
-                for (const auto& packet : renderQueue)
+                for (const auto& packet : m_context->renderQueue)
                 {
                     m_context->engineContext->renderSystem->Submit(packet);
                 }
@@ -69,9 +68,6 @@ void GameViewPanel::Draw()
 
                 m_context->engineContext->renderSystem->Flush();
                 m_context->graphicsBackend->Submit();
-
-
-                m_context->graphicsBackend->SetActiveRenderTarget(nullptr);
             }
             else
             {
@@ -79,7 +75,6 @@ void GameViewPanel::Draw()
 
                 m_context->engineContext->renderSystem->Clear({0.0f, 0.0f, 0.0f, 1.0f});
                 m_context->graphicsBackend->Submit();
-                m_context->graphicsBackend->SetActiveRenderTarget(nullptr);
             }
 
 

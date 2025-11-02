@@ -1,5 +1,6 @@
 #include "Camera.h"
 #include "include/core/SkCanvas.h"
+#include "fstream"
 
 SkPoint Camera::ScreenToWorld(const SkPoint& screenPoint) const
 {
@@ -32,6 +33,17 @@ void Camera::SetProperties(const CamProperties& cam_properties)
     std::unique_lock<std::shared_mutex> lock(m_mutex);
     m_properties = cam_properties;
 
+    if (!std::isfinite(m_properties.position.fX) || !std::isfinite(m_properties.position.fY))
+    {
+        LogWarn("相机位置包含无效值 (NaN/Inf)，重置为 (0,0)");
+        m_properties.position = {0.0f, 0.0f};
+    }
+
+    if (!std::isfinite(m_properties.zoom) || m_properties.zoom <= 1e-6f)
+    {
+        LogWarn("相机缩放包含无效值 (NaN/Inf/Zero/Negative)，重置为 1.0");
+        m_properties.zoom = 1.0f;
+    }
 
     if (m_properties.viewport.width() <= 0 || m_properties.viewport.height() <= 0)
     {

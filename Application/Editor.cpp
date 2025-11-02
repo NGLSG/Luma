@@ -378,8 +378,6 @@ void Editor::Update(float fixedDeltaTime)
         m_editorContext.activeScene->UpdateSimulation(fixedDeltaTime, *m_editorContext.engineContext,
                                                       m_editorContext.editorState == EditorState::Paused);
 
-        Camera::GetInstance().SetProperties(m_editorContext.activeScene->GetCameraProperties());
-
 
         SceneRenderer::ExtractToRenderableManager(m_editorContext.activeScene->GetRegistry());
     }

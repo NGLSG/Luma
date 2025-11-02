@@ -39,18 +39,16 @@
 
 namespace
 {
-    
     inline ECS::Vector2f ComputeAnchoredCenter(const ECS::TransformComponent& transform, float width, float height)
     {
-        
         float offsetX = (0.5f - transform.anchor.x) * width;
         float offsetY = (0.5f - transform.anchor.y) * height;
 
-        
+
         offsetX *= transform.scale.x;
         offsetY *= transform.scale.y;
 
-        
+
         if (std::abs(transform.rotation) > 0.0001f)
         {
             const float sinR = sinf(transform.rotation);
@@ -77,17 +75,17 @@ static bool IsPointInSprite(const ECS::Vector2f& worldPoint, const ECS::Transfor
 
     if (halfWidth <= 0 || halfHeight <= 0) return false;
 
-    
+
     const float width = halfWidth * 2.0f;
     const float height = halfHeight * 2.0f;
 
-    
+
     const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
 
-    
+
     ECS::Vector2f localPoint = worldPoint - anchoredCenter;
 
-    
+
     if (std::abs(transform.rotation) > 0.001f)
     {
         const float sinR = sinf(-transform.rotation);
@@ -97,11 +95,11 @@ static bool IsPointInSprite(const ECS::Vector2f& worldPoint, const ECS::Transfor
         localPoint.y = tempX * sinR + localPoint.y * cosR;
     }
 
-    
+
     localPoint.x /= transform.scale.x;
     localPoint.y /= transform.scale.y;
 
-    
+
     return (localPoint.x >= -halfWidth && localPoint.x <= halfWidth &&
         localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
 }
@@ -247,13 +245,13 @@ static bool isPointInButton(const ECS::Vector2f& worldPoint, const ECS::Transfor
 
     if (width <= 0 || height <= 0) return false;
 
-    
+
     const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
 
-    
+
     ECS::Vector2f localPoint = worldPoint - anchoredCenter;
 
-    
+
     if (std::abs(transform.rotation) > 0.001f)
     {
         const float sinR = sinf(-transform.rotation);
@@ -263,11 +261,11 @@ static bool isPointInButton(const ECS::Vector2f& worldPoint, const ECS::Transfor
         localPoint.y = tempX * sinR + localPoint.y * cosR;
     }
 
-    
+
     localPoint.x /= transform.scale.x;
     localPoint.y /= transform.scale.y;
 
-    
+
     const float halfWidth = width * 0.5f;
     const float halfHeight = height * 0.5f;
 
@@ -297,7 +295,7 @@ static bool isPointInUIRect(const ECS::Vector2f& worldPoint,
     if (std::abs(transform.scale.y) > 1e-5f) localPoint.y /= transform.scale.y;
 
     return (localPoint.x >= -halfWidth && localPoint.x <= halfWidth &&
-            localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
+        localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
 }
 
 entt::entity SceneViewPanel::findEntityByTransform(const ECS::TransformComponent& targetTransform)
@@ -419,6 +417,12 @@ void SceneViewPanel::Draw()
                 m_editorCameraInitialized = true;
             }
 
+            if (viewportSize.x <= 1 || viewportSize.y <= 1)
+            {
+                ImGui::End();
+                ImGui::PopStyleVar();
+                return;
+            }
             m_editorCameraProperties.viewport = SkRect::MakeXYWH(
                 viewportScreenPos.x, viewportScreenPos.y,
                 viewportSize.x, viewportSize.y
@@ -431,14 +435,12 @@ void SceneViewPanel::Draw()
 
 
             m_context->graphicsBackend->SetActiveRenderTarget(m_sceneViewTarget);
-            std::vector<RenderPacket> renderQueue = m_context->renderQueue;
-            for (const auto& packet : renderQueue)
+            for (const auto& packet : m_context->renderQueue)
             {
                 m_context->engineContext->renderSystem->Submit(packet);
             }
             m_context->engineContext->renderSystem->Flush();
             m_context->graphicsBackend->Submit();
-            m_context->graphicsBackend->SetActiveRenderTarget(nullptr);
 
 
             ImTextureID textureId = m_context->imguiRenderer->GetOrCreateTextureIdFor(m_sceneViewTarget->GetTexture());
@@ -552,7 +554,7 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
                 hasVisualRepresentation = true;
             }
         }
-        
+
         else if (gameObject.HasComponent<ECS::ButtonComponent>())
         {
             const auto& buttonComp = gameObject.GetComponent<ECS::ButtonComponent>();
@@ -652,38 +654,52 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
     }
 }
 
-void SceneViewPanel::drawUIRectOutline(ImDrawList* drawList, const ECS::TransformComponent& transform, const ECS::RectF& rect,
+void SceneViewPanel::drawUIRectOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                       const ECS::RectF& rect,
                                        ImU32 outlineColor, ImU32 fillColor, float thickness)
 {
     const float halfW = rect.z * 0.5f;
     const float halfH = rect.w * 0.5f;
     std::vector<ECS::Vector2f> local = {{-halfW, -halfH}, {halfW, -halfH}, {halfW, halfH}, {-halfW, halfH}};
-    const float sinR = sinf(transform.rotation); const float cosR = cosf(transform.rotation);
-    std::vector<ImVec2> screen; screen.reserve(4);
+    const float sinR = sinf(transform.rotation);
+    const float cosR = cosf(transform.rotation);
+    std::vector<ImVec2> screen;
+    screen.reserve(4);
     for (auto p : local)
     {
-        p.x *= transform.scale.x; p.y *= transform.scale.y;
-        if (std::abs(transform.rotation) > 0.001f) { float tx = p.x; p.x = p.x * cosR - p.y * sinR; p.y = tx * sinR + p.y * cosR; }
-        const ECS::Vector2f wp = transform.position + p; screen.push_back(worldToScreenWith(m_editorCameraProperties, wp));
+        p.x *= transform.scale.x;
+        p.y *= transform.scale.y;
+        if (std::abs(transform.rotation) > 0.001f)
+        {
+            float tx = p.x;
+            p.x = p.x * cosR - p.y * sinR;
+            p.y = tx * sinR + p.y * cosR;
+        }
+        const ECS::Vector2f wp = transform.position + p;
+        screen.push_back(worldToScreenWith(m_editorCameraProperties, wp));
     }
     drawList->AddConvexPolyFilled(screen.data(), 4, fillColor);
     drawList->AddPolyline(screen.data(), 4, outlineColor, ImDrawFlags_Closed, thickness);
 }
 
-void SceneViewPanel::drawUIRectEditHandle(ImDrawList* drawList, const ECS::TransformComponent& transform, const ECS::RectF& rect,
+void SceneViewPanel::drawUIRectEditHandle(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                          const ECS::RectF& rect,
                                           std::vector<UIRectHandle>& outHandles)
 {
     ECS::Vector2f brLocal = {rect.z * 0.5f * transform.scale.x, rect.w * 0.5f * transform.scale.y};
     if (std::abs(transform.rotation) > 0.001f)
     {
         const float sinR = sinf(transform.rotation), cosR = cosf(transform.rotation);
-        float tx = brLocal.x; brLocal.x = brLocal.x * cosR - brLocal.y * sinR; brLocal.y = tx * sinR + brLocal.y * cosR;
+        float tx = brLocal.x;
+        brLocal.x = brLocal.x * cosR - brLocal.y * sinR;
+        brLocal.y = tx * sinR + brLocal.y * cosR;
     }
     const ECS::Vector2f brWorld = transform.position + brLocal;
     const ImVec2 brScreen = worldToScreenWith(m_editorCameraProperties, brWorld);
     const float s = 12.0f;
-    ImU32 col = IM_COL32(255,255,255,255);
-    drawList->AddTriangleFilled(brScreen, ImVec2(brScreen.x + s, brScreen.y), ImVec2(brScreen.x + s, brScreen.y + s), col);
+    ImU32 col = IM_COL32(255, 255, 255, 255);
+    drawList->AddTriangleFilled(brScreen, ImVec2(brScreen.x + s, brScreen.y), ImVec2(brScreen.x + s, brScreen.y + s),
+                                col);
     entt::entity e = findEntityByTransform(transform);
     if (e != entt::null)
     {
@@ -875,8 +891,9 @@ void SceneViewPanel::drawEdgeColliderOutline(ImDrawList* drawList, const ECS::Tr
 }
 
 void SceneViewPanel::drawTilemapColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
-                                               const ECS::TilemapColliderComponent& tilemapCollider, ImU32 outlineColor,
-                                               float thickness)
+                                                const ECS::TilemapColliderComponent& tilemapCollider,
+                                                ImU32 outlineColor,
+                                                float thickness)
 {
     if (tilemapCollider.generatedChains.empty()) return;
 
@@ -926,16 +943,16 @@ void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS:
                                                                                  ? sprite.sourceRect.Height()
                                                                                  : sprite.image->getImage()->height());
 
-    
+
     const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
 
-    
+
     const float scaledWidth = width * transform.scale.x;
     const float scaledHeight = height * transform.scale.y;
     const float halfWidth = scaledWidth * 0.5f;
     const float halfHeight = scaledHeight * 0.5f;
 
-    
+
     std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight},
         {halfWidth, -halfHeight},
@@ -946,7 +963,7 @@ void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS:
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
 
-    
+
     const float sinR = sinf(transform.rotation);
     const float cosR = cosf(transform.rotation);
 
@@ -960,13 +977,13 @@ void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS:
             rotatedCorner.y = tempX * sinR + corner.y * cosR;
         }
 
-        
+
         ECS::Vector2f worldPos = anchoredCenter + rotatedCorner;
         ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, worldPos);
         screenCorners.push_back(screenPos);
     }
 
-    
+
     drawList->AddConvexPolyFilled(screenCorners.data(), 4, fillColor);
 
     for (int i = 0; i < 4; ++i)
@@ -984,16 +1001,16 @@ void SceneViewPanel::drawButtonSelectionOutline(ImDrawList* drawList, const ECS:
     const float width = buttonComp.rect.Width();
     const float height = buttonComp.rect.Height();
 
-    
+
     const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
 
-    
+
     const float scaledWidth = width * transform.scale.x;
     const float scaledHeight = height * transform.scale.y;
     const float halfWidth = scaledWidth * 0.5f;
     const float halfHeight = scaledHeight * 0.5f;
 
-    
+
     std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight}, {halfWidth, -halfHeight},
         {halfWidth, halfHeight}, {-halfWidth, halfHeight}
@@ -1002,7 +1019,7 @@ void SceneViewPanel::drawButtonSelectionOutline(ImDrawList* drawList, const ECS:
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
 
-    
+
     const float sinR = sinf(transform.rotation);
     const float cosR = cosf(transform.rotation);
 
@@ -1016,7 +1033,7 @@ void SceneViewPanel::drawButtonSelectionOutline(ImDrawList* drawList, const ECS:
             rotatedCorner.y = tempX * sinR + corner.y * cosR;
         }
 
-        
+
         ECS::Vector2f worldPos = anchoredCenter + rotatedCorner;
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
     }
@@ -1234,8 +1251,9 @@ void SceneViewPanel::drawColliderEditHandles(ImDrawList* drawList, RuntimeGameOb
         if (std::abs(transform.rotation) > 0.001f)
         {
             const float tempX = currentHandle.x;
-            currentHandle.x = currentHandle.x * cosR - currentHandle.y * sinR;
-            currentHandle.y = tempX * sinR + tempX * cosR;
+            const float tempY = currentHandle.y; 
+            currentHandle.x = tempX * cosR - tempY * sinR;
+            currentHandle.y = tempX * sinR + tempY * cosR; 
         }
 
         const ECS::Vector2f worldPos = transform.position + currentHandle;
@@ -1299,16 +1317,16 @@ void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::T
     const float width = localBounds.width();
     const float height = localBounds.height();
 
-    
+
     const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
 
-    
+
     const float scaledWidth = width * transform.scale.x;
     const float scaledHeight = height * transform.scale.y;
     const float halfWidth = scaledWidth * 0.5f;
     const float halfHeight = scaledHeight * 0.5f;
 
-    
+
     std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight},
         {halfWidth, -halfHeight},
@@ -1319,7 +1337,7 @@ void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::T
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
 
-    
+
     const float sinR = sinf(transform.rotation);
     const float cosR = cosf(transform.rotation);
 
@@ -1333,7 +1351,7 @@ void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::T
             rotatedCorner.y = tempX * sinR + corner.y * cosR;
         }
 
-        
+
         ECS::Vector2f worldPos = anchoredCenter + rotatedCorner;
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
     }
@@ -1360,16 +1378,16 @@ void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const E
     const float width = localBounds.width();
     const float height = localBounds.height();
 
-    
+
     const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
 
-    
+
     const float scaledWidth = width * transform.scale.x;
     const float scaledHeight = height * transform.scale.y;
     const float halfWidth = scaledWidth * 0.5f;
     const float halfHeight = scaledHeight * 0.5f;
 
-    
+
     std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight},
         {halfWidth, -halfHeight},
@@ -1380,7 +1398,7 @@ void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const E
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
 
-    
+
     const float sinR = sinf(transform.rotation);
     const float cosR = cosf(transform.rotation);
 
@@ -1394,7 +1412,7 @@ void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const E
             rotatedCorner.y = tempX * sinR + corner.y * cosR;
         }
 
-        
+
         ECS::Vector2f worldPos = anchoredCenter + rotatedCorner;
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
     }
@@ -1679,7 +1697,7 @@ void SceneViewPanel::drawEditorGizmos(const ImVec2& viewportScreenPos, const ImV
     {
         const auto& tilemap = selectedGo.GetComponent<ECS::TilemapComponent>();
         const auto& tilemapTransform = selectedGo.GetComponent<ECS::TransformComponent>();
-        
+
         drawTilemapGrid(drawList, tilemapTransform, tilemap, viewportScreenPos, viewportSize);
         drawTileBrushPreview(drawList, tilemapTransform, tilemap);
     }
@@ -1712,15 +1730,15 @@ void SceneViewPanel::drawTilemapGrid(ImDrawList* drawList, const ECS::TransformC
 
     const ImU32 gridColor = IM_COL32(255, 255, 255, 40);
 
-    
+
     const float offsetX = 0.5f * cellWidth;
     const float offsetY = 0.5f * cellHeight;
 
-    
+
     const float originX = tilemapTransform.position.x + offsetX;
     const float originY = tilemapTransform.position.y + offsetY;
 
-    
+
     const float startX = originX + std::floor((left - originX) / cellWidth) * cellWidth;
     for (float x = startX; x <= right; x += cellWidth)
     {
@@ -1731,7 +1749,7 @@ void SceneViewPanel::drawTilemapGrid(ImDrawList* drawList, const ECS::TransformC
             gridColor);
     }
 
-    
+
     const float startY = originY + std::floor((top - originY) / cellHeight) * cellHeight;
     for (float y = startY; y <= bottom; y += cellHeight)
     {
@@ -1742,31 +1760,32 @@ void SceneViewPanel::drawTilemapGrid(ImDrawList* drawList, const ECS::TransformC
             gridColor);
     }
 }
-void SceneViewPanel::drawTileBrushPreview(ImDrawList* drawList, const ECS::TransformComponent& tilemapTransform, const ECS::TilemapComponent& tilemap)
+
+void SceneViewPanel::drawTileBrushPreview(ImDrawList* drawList, const ECS::TransformComponent& tilemapTransform,
+                                          const ECS::TilemapComponent& tilemap)
 {
     if (!m_context->activeTileBrush.Valid()) return;
 
     ECS::Vector2f worldMousePos = screenToWorldWith(m_editorCameraProperties, ImGui::GetIO().MousePos);
 
-    
+
     ECS::Vector2f localMousePos = {
         worldMousePos.x - tilemapTransform.position.x,
         worldMousePos.y - tilemapTransform.position.y
     };
 
-    
+
     ECS::Vector2i gridCoord = {
         static_cast<int>(std::floor(localMousePos.x / tilemap.cellSize.x + 0.5f)),
         static_cast<int>(std::floor(localMousePos.y / tilemap.cellSize.y + 0.5f))
     };
 
-    
-    
+
     ECS::Vector2f tileWorldPos = {
         tilemapTransform.position.x + (gridCoord.x - 0.5f) * tilemap.cellSize.x,
         tilemapTransform.position.y + (gridCoord.y - 0.5f) * tilemap.cellSize.y
     };
-    
+
     ECS::Vector2f tileWorldPosEnd = {
         tilemapTransform.position.x + (gridCoord.x + 0.5f) * tilemap.cellSize.x,
         tilemapTransform.position.y + (gridCoord.y + 0.5f) * tilemap.cellSize.y
@@ -1778,6 +1797,7 @@ void SceneViewPanel::drawTileBrushPreview(ImDrawList* drawList, const ECS::Trans
     ImU32 previewColor = ImGui::GetIO().KeyAlt ? IM_COL32(255, 80, 80, 100) : IM_COL32(80, 255, 80, 100);
     drawList->AddRectFilled(screenMin, screenMax, previewColor);
 }
+
 void SceneViewPanel::drawEditorGrid(const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
 {
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1862,13 +1882,13 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
     const ImGuiIO& io = ImGui::GetIO();
     ECS::Vector2f worldMousePos = screenToWorldWith(m_editorCameraProperties, io.MousePos);
 
-    
+
     ECS::Vector2f localMousePos = {
         worldMousePos.x - tilemapTransform.position.x,
         worldMousePos.y - tilemapTransform.position.y
     };
 
-    
+
     ECS::Vector2i gridCoord = {
         static_cast<int>(std::floor(localMousePos.x / tilemap.cellSize.x + 0.5f)),
         static_cast<int>(std::floor(localMousePos.y / tilemap.cellSize.y + 0.5f))
@@ -1905,7 +1925,7 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
     {
         m_isPainting = true;
         m_paintedCoordsThisStroke.clear();
-        m_paintStartCoord = gridCoord; 
+        m_paintStartCoord = gridCoord;
         SceneManager::GetInstance().PushUndoState(m_context->activeScene);
         paintTile(gridCoord);
     }
@@ -1914,13 +1934,11 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
     {
         if (io.KeyCtrl)
         {
-            
         }
         else if (io.KeyShift)
         {
-            
         }
-        else { paintTile(gridCoord); } 
+        else { paintTile(gridCoord); }
     }
 
     if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
@@ -1929,7 +1947,6 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
         {
             if (io.KeyCtrl)
             {
-                
                 int x1 = m_paintStartCoord.x, y1 = m_paintStartCoord.y;
                 int x2 = gridCoord.x, y2 = gridCoord.y;
                 int dx = abs(x2 - x1), sx = x1 < x2 ? 1 : -1;
@@ -1954,7 +1971,6 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
             }
             else if (io.KeyShift)
             {
-                
                 int minX = std::min(m_paintStartCoord.x, gridCoord.x);
                 int maxX = std::max(m_paintStartCoord.x, gridCoord.x);
                 int minY = std::min(m_paintStartCoord.y, gridCoord.y);
@@ -1967,7 +1983,7 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
                     }
                 }
             }
-            
+
             EventBus::GetInstance().Publish(ComponentUpdatedEvent{
                 m_context->activeScene->GetRegistry(), tilemapGo.GetEntityHandle()
             });
@@ -2038,7 +2054,6 @@ void SceneViewPanel::handleNavigationAndPick(const ImVec2& viewportScreenPos, co
         {
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             {
-                
                 if (!handleUIRectHandlePicking(worldMousePos) && !handleColliderHandlePicking(worldMousePos))
                 {
                     m_potentialDragEntity = handleObjectPicking(worldMousePos);
@@ -2087,7 +2102,7 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
 
     std::vector<std::pair<entt::entity, int>> candidates;
 
-    
+
     auto buttonView = registry.view<ECS::TransformComponent, ECS::ButtonComponent>();
     for (auto entity : buttonView)
     {
@@ -2095,7 +2110,6 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
         const auto& button = buttonView.get<ECS::ButtonComponent>(entity);
         if (isPointInButton(worldMousePos, transform, button))
         {
-            
             candidates.emplace_back(entity, 2000);
         }
     }
@@ -2128,7 +2142,7 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
         }
     }
 
-    
+
     auto listView = registry.view<ECS::TransformComponent, ECS::ListBoxComponent>();
     for (auto entity : listView)
     {
@@ -2155,7 +2169,6 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
     auto emptyView = registry.view<ECS::TransformComponent>();
     for (auto entity : emptyView)
     {
-        
         if (registry.any_of<ECS::SpriteComponent, ECS::TextComponent, ECS::InputTextComponent,
                             ECS::ButtonComponent>(entity))
             continue;

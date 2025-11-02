@@ -24,8 +24,6 @@ GraphicsBackend::GraphicsBackend() = default;
 
 GraphicsBackend::~GraphicsBackend()
 {
-    
-    
     shutdown();
 }
 
@@ -697,10 +695,11 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
             return nullptr;
         }
 
+        
         auto surface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(),
                                                       backendTex,
                                                       kBGRA_8888_SkColorType,
-                                                      nullptr,
+                                                      SkColorSpace::MakeSRGB(),
                                                       nullptr);
         if (!surface)
         {
@@ -759,10 +758,15 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
         if (!offscreenSurface || offscreenSurface->width() != currentWidth || offscreenSurface->height() !=
             currentHeight)
         {
-            offscreenSurface = SkSurfaces::RenderTarget(graphiteRecorder.get(),
-                                                        SkImageInfo::Make(
-                                                            currentWidth, currentHeight, kRGBA_8888_SkColorType,
-                                                            kPremul_SkAlphaType));
+            
+            SkImageInfo imageInfo = SkImageInfo::Make(
+                currentWidth, currentHeight,
+                kBGRA_8888_SkColorType, 
+                kPremul_SkAlphaType,
+                SkColorSpace::MakeSRGB() 
+            );
+
+            offscreenSurface = SkSurfaces::RenderTarget(graphiteRecorder.get(), imageInfo);
             if (!offscreenSurface)
             {
                 LogError("GetSurface: 创建离屏表面失败 (尺寸: {}x{})", currentWidth, currentHeight);
@@ -911,6 +915,9 @@ void GraphicsBackend::SetQualityLevel(QualityLevel level)
 
 bool GraphicsBackend::BeginFrame()
 {
+    
+    m_activeRenderTarget = nullptr;
+
     if (isDeviceLost)
     {
         if (!Recreate())
@@ -946,7 +953,6 @@ bool GraphicsBackend::BeginFrame()
     }
     return true;
 }
-
 wgpu::TextureView GraphicsBackend::GetCurrentFrameView() const
 {
     if (!m_currentSurfaceTexture.texture)
@@ -995,7 +1001,7 @@ void GraphicsBackend::PresentFrame()
 {
     if (surface)
     {
-        surface.Present();
+        (void)surface.Present();
     }
     else if (offscreenSurface)
     {
