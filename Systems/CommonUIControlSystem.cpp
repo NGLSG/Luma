@@ -987,7 +987,7 @@ namespace Systems
                 {
                     itemsPerPage = std::max(1, itemsPerPage);
                 }
-                const bool primaryIsVertical = listBox.layout != ListBoxLayout::Horizontal;
+                bool primaryIsVertical = listBox.layout != ListBoxLayout::Horizontal;
                 const bool baseHorizontalScrollable = !primaryIsVertical && itemCount > itemsPerPage;
 
                 const float spacingX = std::max(0.0f, listBox.itemSpacing.x);
@@ -1023,6 +1023,21 @@ namespace Systems
                 float totalSpacingY = spacingY * static_cast<float>(std::max(0, rows - 1));
                 float itemWidth = (availableWidth - totalSpacingX) / static_cast<float>(columns);
                 float itemHeight = (availableHeight - totalSpacingY) / static_cast<float>(rows);
+
+                
+                
+                primaryIsVertical = listBox.layout != ListBoxLayout::Horizontal;
+                const bool drawText = (!useContainer) && (listBox.itemTemplate.typeface != nullptr);
+                if (drawText && primaryIsVertical)
+                {
+                    const float approxLineHeight = listBox.itemTemplate.fontSize > 0.0f
+                        ? (listBox.itemTemplate.fontSize * 1.4f)
+                        : 20.0f;
+                    const float paddingY = 8.0f * 2.0f; 
+                    const float actualItemHeight = std::max(1.0f, approxLineHeight + paddingY);
+                    itemHeight = actualItemHeight;
+                }
+
                 itemWidth = std::max(itemWidth, 1.0f);
                 itemHeight = std::max(itemHeight, 1.0f);
                 const float contentLeftWorld = transform.position.x - availableWidth * 0.5f;
