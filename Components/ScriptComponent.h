@@ -214,6 +214,12 @@ namespace CustomDrawing
          * @return 如果是 Luma 事件类型则返回 true，否则返回 false。
          */
         static bool IsLumaEventType(const std::string& typeName);
+
+        /**
+         * @brief 判断是否为可绑定的逻辑组件(LogicComponent)类型。
+         * @details 采用约定式判断：C# 侧逻辑组件位于命名空间 "Luma.SDK.Components" 下。
+         */
+        static bool IsLogicComponentType(const std::string& typeName);
     };
 
     /**

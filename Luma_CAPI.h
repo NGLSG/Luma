@@ -8,6 +8,7 @@
 #include "Scripting/ManagedHost.h"
 #endif
 #include "Components/AssetHandle.h"
+#include "RuntimeAsset/RuntimeScene.h"
 /**
  * @brief Luma场景的句柄类型。
  */
@@ -672,6 +673,119 @@ LUMA_API void InputTextComponent_ClearOnSubmitTargets(LumaSceneHandle scene, Lum
 LUMA_API void InputTextComponent_AddOnSubmitTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
                                                    const char* componentName, const char* methodName);
 
+// --- ToggleButton ---
+LUMA_API int ToggleButtonComponent_GetOnToggleOnTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool ToggleButtonComponent_GetOnToggleOnTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                        SerializableEventTarget_CAPI* outTarget);
+LUMA_API void ToggleButtonComponent_ClearOnToggleOnTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void ToggleButtonComponent_AddOnToggleOnTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                        const char* componentName, const char* methodName);
+
+LUMA_API int ToggleButtonComponent_GetOnToggleOffTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool ToggleButtonComponent_GetOnToggleOffTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                         SerializableEventTarget_CAPI* outTarget);
+LUMA_API void ToggleButtonComponent_ClearOnToggleOffTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void ToggleButtonComponent_AddOnToggleOffTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                         const char* componentName, const char* methodName);
+
+// --- RadioButton ---
+LUMA_API int RadioButtonComponent_GetOnSelectedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool RadioButtonComponent_GetOnSelectedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                       SerializableEventTarget_CAPI* outTarget);
+LUMA_API void RadioButtonComponent_ClearOnSelectedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void RadioButtonComponent_AddOnSelectedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                       const char* componentName, const char* methodName);
+
+LUMA_API int RadioButtonComponent_GetOnDeselectedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool RadioButtonComponent_GetOnDeselectedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                         SerializableEventTarget_CAPI* outTarget);
+LUMA_API void RadioButtonComponent_ClearOnDeselectedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void RadioButtonComponent_AddOnDeselectedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                         const char* componentName, const char* methodName);
+
+// --- CheckBox ---
+LUMA_API int CheckBoxComponent_GetOnValueChangedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool CheckBoxComponent_GetOnValueChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                        SerializableEventTarget_CAPI* outTarget);
+LUMA_API void CheckBoxComponent_ClearOnValueChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void CheckBoxComponent_AddOnValueChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                        const char* componentName, const char* methodName);
+
+// --- Slider ---
+LUMA_API int SliderComponent_GetOnValueChangedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool SliderComponent_GetOnValueChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                      SerializableEventTarget_CAPI* outTarget);
+LUMA_API void SliderComponent_ClearOnValueChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void SliderComponent_AddOnValueChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                      const char* componentName, const char* methodName);
+
+LUMA_API int SliderComponent_GetOnDragStartedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool SliderComponent_GetOnDragStartedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                     SerializableEventTarget_CAPI* outTarget);
+LUMA_API void SliderComponent_ClearOnDragStartedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void SliderComponent_AddOnDragStartedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                     const char* componentName, const char* methodName);
+
+LUMA_API int SliderComponent_GetOnDragEndedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool SliderComponent_GetOnDragEndedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                   SerializableEventTarget_CAPI* outTarget);
+LUMA_API void SliderComponent_ClearOnDragEndedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void SliderComponent_AddOnDragEndedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                   const char* componentName, const char* methodName);
+
+// --- ComboBox ---
+LUMA_API int ComboBoxComponent_GetOnSelectionChangedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool ComboBoxComponent_GetOnSelectionChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                            SerializableEventTarget_CAPI* outTarget);
+LUMA_API void ComboBoxComponent_ClearOnSelectionChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void ComboBoxComponent_AddOnSelectionChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                            const char* componentName, const char* methodName);
+
+// --- ProgressBar ---
+LUMA_API int ProgressBarComponent_GetOnValueChangedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool ProgressBarComponent_GetOnValueChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                           SerializableEventTarget_CAPI* outTarget);
+LUMA_API void ProgressBarComponent_ClearOnValueChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void ProgressBarComponent_AddOnValueChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                           const char* componentName, const char* methodName);
+
+LUMA_API int ProgressBarComponent_GetOnCompletedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool ProgressBarComponent_GetOnCompletedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                        SerializableEventTarget_CAPI* outTarget);
+LUMA_API void ProgressBarComponent_ClearOnCompletedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void ProgressBarComponent_AddOnCompletedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                        const char* componentName, const char* methodName);
+
+// --- TabControl ---
+LUMA_API int TabControlComponent_GetOnTabChangedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool TabControlComponent_GetOnTabChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                        SerializableEventTarget_CAPI* outTarget);
+LUMA_API void TabControlComponent_ClearOnTabChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void TabControlComponent_AddOnTabChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                        const char* componentName, const char* methodName);
+
+LUMA_API int TabControlComponent_GetOnTabClosedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool TabControlComponent_GetOnTabClosedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                       SerializableEventTarget_CAPI* outTarget);
+LUMA_API void TabControlComponent_ClearOnTabClosedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void TabControlComponent_AddOnTabClosedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                       const char* componentName, const char* methodName);
+
+// --- ListBox ---
+LUMA_API int ListBoxComponent_GetOnSelectionChangedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool ListBoxComponent_GetOnSelectionChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                           SerializableEventTarget_CAPI* outTarget);
+LUMA_API void ListBoxComponent_ClearOnSelectionChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void ListBoxComponent_AddOnSelectionChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                           const char* componentName, const char* methodName);
+
+LUMA_API int ListBoxComponent_GetOnItemActivatedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool ListBoxComponent_GetOnItemActivatedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
+                                                        SerializableEventTarget_CAPI* outTarget);
+LUMA_API void ListBoxComponent_ClearOnItemActivatedTargets(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void ListBoxComponent_AddOnItemActivatedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+                                                        const char* componentName, const char* methodName);
+
 LUMA_API int ScrollViewComponent_GetOnScrollChangedTargetCount(LumaSceneHandle scene, LumaEntityHandle entity);
 LUMA_API bool ScrollViewComponent_GetOnScrollChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
                                                            SerializableEventTarget_CAPI* outTarget);
@@ -696,6 +810,13 @@ LUMA_API void EdgeCollider_GetVertices(LumaSceneHandle scene, LumaEntityHandle e
 LUMA_API void EdgeCollider_SetVertices(LumaSceneHandle scene, LumaEntityHandle entity, const Vector2f_CAPI* vertices,
                                        int count);
 #ifdef __cplusplus
+}
+
+template <typename TComponent>
+static inline TComponent* TryGetComponent(RuntimeScene* runtimeScene, LumaEntityHandle entity)
+{
+    if (!runtimeScene) return nullptr;
+    return runtimeScene->GetRegistry().try_get<TComponent>((entt::entity)entity);
 }
 #endif
 

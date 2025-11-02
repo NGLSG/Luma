@@ -24,23 +24,11 @@ namespace Luma.SDK
     
     public static class AudioManager
     {
-        
-        
-        
-        
-        
         public static AudioSource? Play(PlayDesc desc)
         {
             uint voiceId = Native.AudioManager_Play(desc);
             return voiceId != 0 ? new AudioSource(voiceId) : null;
         }
-
-        
-        
-        
-        
-        
-        
         
         public static AudioSource? Play(AssetHandle handle, float volume = 1.0f, bool loop = false)
         {
@@ -53,14 +41,6 @@ namespace Luma.SDK
             };
             return Play(desc);
         }
-
-        
-        
-        
-        
-        
-        
-        
         
         public static AudioSource? PlayAtPoint(AssetHandle handle, Vector3 position, float volume = 1.0f, bool loop = false)
         {
@@ -78,10 +58,6 @@ namespace Luma.SDK
             };
             return Play(desc);
         }
-
-        
-        
-        
         public static void StopAll() => Native.AudioManager_StopAll();
     }
 }

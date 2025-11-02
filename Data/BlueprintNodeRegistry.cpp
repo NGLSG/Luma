@@ -49,12 +49,6 @@ void BlueprintNodeRegistry::RegisterAll()
     RegisterCoreNodes();
     RegisterScriptNodes();
     RegisterSDKNodes();
-
-
-    for (const auto& [name, def] : m_definitions)
-    {
-        LogInfo("Registered Blueprint Node: {} (Category: {})", name, def.Category);
-    }
 }
 
 void BlueprintNodeRegistry::RegisterNode(BlueprintNodeDefinition definition)

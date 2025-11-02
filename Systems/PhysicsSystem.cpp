@@ -532,6 +532,27 @@ namespace Systems
                 }
             }
         }
+
+        {
+            auto rbView = registry.view<ECS::RigidBodyComponent>();
+            for (auto entity : rbView)
+            {
+                if (!scene->FindGameObjectByEntity(entity).IsActive())
+                    continue;
+                auto& rb = rbView.get<ECS::RigidBodyComponent>(entity);
+                if (!rb.Enable)
+                    continue;
+                if (rb.runtimeBody.index1 == B2_NULL_INDEX)
+                    continue;
+
+                b2Vec2 v = b2Body_GetLinearVelocity(rb.runtimeBody);
+                rb.linearVelocity = {v.x, -v.y};
+                float av = b2Body_GetAngularVelocity(rb.runtimeBody);
+                rb.angularVelocity = -av;
+
+                
+            }
+        }
     }
 
     void PhysicsSystem::OnDestroy(RuntimeScene* scene)

@@ -528,6 +528,30 @@ public static class Interop
                     return;
                 }
             }
+            else if (typeof(ILogicComponent).IsAssignableFrom(memberType))
+            {
+                string? guidStr = YamlDeserializer.Deserialize<string>(valueAsYaml);
+                uint targetId = Native.Scene_FindGameObjectByGuid(instance.Self.ScenePtr, guidStr);
+                if (targetId != int.MaxValue)
+                {
+                    Entity targetEntity = new Entity(targetId, instance.Self.ScenePtr);
+                    try
+                    {
+                        finalValue = Activator.CreateInstance(memberType, targetEntity);
+                    }
+                    catch (Exception)
+                    {
+                        Debug.LogWarning($"SetExportedProperty: Failed to create logic component '{memberType.Name}' with Entity ctor for property '{propName}'.");
+                        return;
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning(
+                        $"SetExportedProperty: Entity with GUID '{guidStr}' not found in scene for property '{propName}'.");
+                    return;
+                }
+            }
             else
             {
                 finalValue = YamlDeserializer.Deserialize(valueAsYaml, memberType);

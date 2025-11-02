@@ -149,6 +149,13 @@ namespace CustomDrawing
         return typeName.find("LumaEvent") != std::string::npos;
     }
 
+    bool PropertyValueFactory::IsLogicComponentType(const std::string& typeName)
+    {
+        
+        
+        return typeName.find("Luma.SDK.Components.") != std::string::npos;
+    }
+
     bool PropertyDrawer::DrawProperty(const std::string& label, const std::string& typeName,
                                       YAML::Node& valueNode, const UIDrawData& drawData)
     {
@@ -205,6 +212,16 @@ namespace CustomDrawing
         }
         else if (ScriptMetadataRegistry::GetInstance().GetMetadata(typeName).Valid())
         {
+            Guid guid = valueNode.as<Guid>(Guid());
+            if (WidgetDrawer<Guid>::Draw(label, guid, drawData))
+            {
+                valueNode = guid.ToString();
+                return true;
+            }
+        }
+        else if (PropertyValueFactory::IsLogicComponentType(typeName))
+        {
+            
             Guid guid = valueNode.as<Guid>(Guid());
             if (WidgetDrawer<Guid>::Draw(label, guid, drawData))
             {
