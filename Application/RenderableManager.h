@@ -7,23 +7,19 @@
 #include <atomic>
 #include <chrono>
 #include <vector>
+#include <mutex>
 #include "Renderable.h"
 #include "SceneRenderer.h"
-#include "DynamicArray.h"
 
 class RenderableManager : public LazySingleton<RenderableManager>
 {
 public:
     friend class LazySingleton<RenderableManager>;
 
-    /**
-     * @brief 提交新的帧数据（DynamicArray版本）
-     * @param frameData 帧渲染数据
-     */
-    void SubmitFrame(DynamicArray<Renderable>&& frameData);
+    using RenderableFrame = const std::vector<Renderable>;
 
     /**
-     * @brief 提交新的帧数据（vector重载版本）
+     * @brief 提交新的帧数据（vector 版本）
      * @param frameData 帧渲染数据
      */
     void SubmitFrame(std::vector<Renderable>&& frameData);
@@ -42,12 +38,12 @@ public:
     void SetExternalAlpha(float a) { m_externalAlpha.store(a, std::memory_order_relaxed); }
 
 private:
-    // 帧数据存储，使用DynamicArray的无锁特性
-    DynamicArray<Renderable> prevFrame;
-    DynamicArray<Renderable> currFrame;
+    // 帧数据存储，使用 std::shared_ptr 实现线程安全的快照
+    std::shared_ptr<RenderableFrame> prevFrame;
+    std::shared_ptr<RenderableFrame> currFrame;
 
-    // 使用原子操作来管理帧切换状态
-    std::atomic<bool> isUpdatingFrames{false};
+    // 使用互斥锁保护帧数据的交换
+    std::mutex frameDataMutex;
 
     // 双缓冲内存分配器
     std::array<std::unique_ptr<FrameArena<RenderableTransform>>, 2> transformArenas = {

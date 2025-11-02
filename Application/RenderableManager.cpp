@@ -1937,83 +1937,71 @@ namespace
     };
 }
 
-void RenderableManager::SubmitFrame(DynamicArray<Renderable>&& frameData)
-{
-    while (isUpdatingFrames.exchange(true, std::memory_order_acquire))
-    {
-    }
-
-    {
-        auto currView = currFrame.GetView();
-        prevFrame.ClearAndModify([&](auto& proxy)
-        {
-            proxy.Reserve(currView.Size());
-            for (size_t i = 0; i < currView.Size(); ++i)
-            {
-                proxy.PushBack(currView[i]);
-            }
-            proxy.Sort([](const Renderable& a, const Renderable& b)
-            {
-                return static_cast<uint32_t>(a.entityId) < static_cast<uint32_t>(b.entityId);
-            });
-        });
-    }
-
-    {
-        auto newView = frameData.GetView();
-        currFrame.ClearAndModify([&](auto& proxy)
-        {
-            proxy.Reserve(newView.Size());
-            for (size_t i = 0; i < newView.Size(); ++i)
-            {
-                proxy.PushBack(newView[i]);
-            }
-            proxy.Sort([](const Renderable& a, const Renderable& b)
-            {
-                return static_cast<uint32_t>(a.entityId) < static_cast<uint32_t>(b.entityId);
-            });
-        });
-    }
-
-    prevStateTime.store(currStateTime.load(std::memory_order_relaxed), std::memory_order_relaxed);
-    currStateTime.store(std::chrono::steady_clock::now(), std::memory_order_relaxed);
-
-    prevFrameVersion.store(currFrameVersion.load(std::memory_order_relaxed), std::memory_order_relaxed);
-    currFrameVersion.fetch_add(1, std::memory_order_relaxed);
-
-    isUpdatingFrames.store(false, std::memory_order_release);
-}
-
 void RenderableManager::SubmitFrame(std::vector<Renderable>&& frameData)
 {
-    DynamicArray<Renderable> dynamicFrameData;
-    dynamicFrameData.ClearAndModify([&frameData](auto& proxy)
+    
+    
+    auto newCurrVector = std::make_shared<std::vector<Renderable>>(std::move(frameData));
+
+    
+    std::ranges::sort(*newCurrVector, [](const Renderable& a, const Renderable& b)
     {
-        proxy = std::move(frameData);
+        return static_cast<uint32_t>(a.entityId) < static_cast<uint32_t>(b.entityId);
     });
 
-    SubmitFrame(std::move(dynamicFrameData));
+    
+    std::shared_ptr<RenderableFrame> newCurrFrame = newCurrVector;
+
+    
+    {
+        std::lock_guard<std::mutex> lock(frameDataMutex);
+
+        
+        prevFrame = currFrame;
+
+        
+        currFrame = newCurrFrame;
+
+        
+        prevStateTime.store(currStateTime.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        currStateTime.store(std::chrono::steady_clock::now(), std::memory_order_relaxed);
+
+        prevFrameVersion.store(currFrameVersion.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        currFrameVersion.fetch_add(1, std::memory_order_relaxed);
+    }
 }
+
 
 const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 {
-    while (isUpdatingFrames.exchange(true, std::memory_order_acquire))
+    std::shared_ptr<RenderableFrame> localPrevFrame;
+    std::shared_ptr<RenderableFrame> localCurrFrame;
+
+    
     {
+        std::lock_guard<std::mutex> lock(frameDataMutex);
+
+        if (!needsRebuild())
+        {
+            
+            
+            return packetBuffers[activeBufferIndex.load(std::memory_order_relaxed)];
+        }
+
+        
+        localPrevFrame = prevFrame;
+        localCurrFrame = currFrame;
     }
+    
+    
+    
 
-    if (!needsRebuild())
-    {
-        isUpdatingFrames.store(false, std::memory_order_release);
-        return packetBuffers[activeBufferIndex.load(std::memory_order_relaxed)];
-    }
+    
 
-    auto prevFrameView = prevFrame.GetView();
-    auto currFrameView = currFrame.GetView();
-
-    isUpdatingFrames.store(false, std::memory_order_release);
-
-    bool hasPrevFrame = !prevFrameView.IsEmpty();
-    bool hasCurrFrame = !currFrameView.IsEmpty();
+    
+    bool hasPrevFrame = !localPrevFrame->empty();
+    
+    bool hasCurrFrame = !localCurrFrame->empty();
 
     if (!hasPrevFrame && !hasCurrFrame)
     {
@@ -2026,7 +2014,9 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     }
 
     bool shouldInterpolate = hasPrevFrame && hasCurrFrame;
-    auto baseFrameView = currFrameView;
+    
+    
+    const auto& baseFrameView = *localCurrFrame;
 
     float alpha = 0.0f;
     if (shouldInterpolate)
@@ -2063,7 +2053,8 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     spriteBatchGroups.clear();
     textBatchGroups.clear();
 
-    if (baseFrameView.IsEmpty())
+    
+    if (baseFrameView.empty())
     {
         activeBufferIndex.store(buildIndex, std::memory_order_release);
         updateCacheState();
@@ -2073,7 +2064,8 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     auto& jobSystem = JobSystem::GetInstance();
     int numJobs = jobSystem.GetThreadCount();
 
-    if (baseFrameView.Size() < 128)
+    
+    if (baseFrameView.size() < 128)
     {
         numJobs = 1;
     }
@@ -2084,7 +2076,8 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     std::vector<InterpolationAndBatchJob> jobs;
     std::vector<ThreadLocalBatchResult> threadResults(numJobs);
 
-    size_t totalSize = baseFrameView.Size();
+    
+    size_t totalSize = baseFrameView.size();
     size_t chunkSize = (totalSize + numJobs - 1) / numJobs;
 
     std::vector<std::pair<size_t, size_t>> segments;
@@ -2096,6 +2089,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         size_t end = std::min(pos + chunkSize, totalSize);
         if (end < totalSize)
         {
+            
             auto eid = baseFrameView[end - 1].entityId;
             while (end < totalSize && baseFrameView[end].entityId == eid)
             {
@@ -2119,15 +2113,21 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
         if (shouldInterpolate)
         {
-            prevStart = prevFrameView.Data();
-            prevEnd = prevFrameView.Data() + prevFrameView.Size();
-            currStart = currFrameView.Data() + start;
-            currEnd = currFrameView.Data() + end;
+            
+            prevStart = localPrevFrame->data();
+            
+            prevEnd = localPrevFrame->data() + localPrevFrame->size();
+            
+            currStart = localCurrFrame->data() + start;
+            
+            currEnd = localCurrFrame->data() + end;
         }
         else
         {
-            currStart = baseFrameView.Data() + start;
-            currEnd = baseFrameView.Data() + end;
+            
+            currStart = baseFrameView.data() + start;
+            
+            currEnd = baseFrameView.data() + end;
         }
 
         size_t chunkItems = end - start;
@@ -2147,6 +2147,8 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     }
     JobSystem::CompleteAll(jobHandles);
 
+    
+    
     size_t totalSpriteGroups = 0;
     size_t totalTextGroups = 0;
     for (const auto& result : threadResults)
@@ -2214,6 +2216,8 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
     outPackets.reserve(spriteBatchGroups.size() + textBatchGroups.size());
 
+    
+    
     for (const auto& group : spriteBatchGroups)
     {
         const size_t count = group.transforms.size();
@@ -2285,6 +2289,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         return ka < kb;
     });
 
+    
     activeBufferIndex.store(buildIndex, std::memory_order_release);
     updateCacheState();
     return outPackets;
@@ -2292,11 +2297,19 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
 RenderableManager::RenderableManager()
 {
+    
+    auto emptyFrame = std::make_shared<RenderableFrame>();
+    prevFrame = emptyFrame;
+    currFrame = emptyFrame;
+
+    
     auto now = std::chrono::steady_clock::now();
     prevStateTime.store(now, std::memory_order_relaxed);
     currStateTime.store(now, std::memory_order_relaxed);
     lastBuiltPrevTime.store(now, std::memory_order_relaxed);
     lastBuiltCurrTime.store(now, std::memory_order_relaxed);
+
+    
 }
 
 bool RenderableManager::needsRebuild() const
