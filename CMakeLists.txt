@@ -306,9 +306,9 @@ target_precompile_headers(LumaEngine PUBLIC "Utils/PCH.h")
 # =============================================================================
 if (NOT ANDROID)
     # Editor 可执行文件
-    add_executable(Editor main.cpp)
-    target_link_libraries(Editor PRIVATE LumaEngine)
-    target_compile_definitions(Editor PUBLIC
+    add_executable(LumaEditor main.cpp)
+    target_link_libraries(LumaEditor PRIVATE LumaEngine)
+    target_compile_definitions(LumaEditor PUBLIC
             LUMA_EDITOR
             GLM_ENABLE_EXPERIMENTAL
     )
@@ -325,7 +325,7 @@ if (NOT ANDROID)
 
         # 大对象文件支持
         target_compile_options(LumaEngine PRIVATE /bigobj)
-        target_compile_options(Editor PRIVATE /bigobj)
+        target_compile_options(LumaEditor PRIVATE /bigobj)
         target_compile_options(Game PRIVATE /bigobj)
     else ()
         target_link_libraries(Game PRIVATE LumaEngine)
@@ -333,7 +333,7 @@ if (NOT ANDROID)
 
     # Linux 平台链接选项
     if (UNIX AND NOT APPLE)
-        target_link_options(Editor PRIVATE
+        target_link_options(LumaEditor PRIVATE
                 -Wl,--allow-multiple-definition
                 -Wl,--export-dynamic
                 -Wl,--allow-shlib-undefined
@@ -349,7 +349,7 @@ if (NOT ANDROID)
         )
     endif ()
 
-    message(STATUS "已配置桌面平台可执行文件: Editor 和 Game")
+    message(STATUS "已配置桌面平台可执行文件: LumaEditor 和 Game")
 else ()
     message(STATUS "Android 平台: 跳过 Editor 和 Game 可执行文件")
 endif ()
@@ -394,8 +394,8 @@ endfunction()
 # =============================================================================
 # 直接编译时的资源复制
 # =============================================================================
-if (NOT ANDROID AND TARGET Editor)
-    CopyEngineAssets(Editor "$<TARGET_FILE_DIR:Editor>")
+if (NOT ANDROID AND TARGET LumaEditor)
+    CopyEngineAssets(LumaEditor "$<TARGET_FILE_DIR:LumaEditor>")
 endif ()
 
 # =============================================================================
@@ -415,7 +415,7 @@ add_custom_target(publish
 )
 
 if (NOT ANDROID)
-    add_dependencies(publish Editor Game LumaEngine)
+    add_dependencies(publish LumaEditor Game LumaEngine)
 else ()
     add_dependencies(publish LumaEngine)
 endif ()

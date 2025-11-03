@@ -7,6 +7,7 @@
 #include <mutex>
 #include "../Utils/Directory.h"
 #include "../Utils/PCH.h"
+#include "../Application/ProjectSettings.h"
 #ifdef __linux__
 #include <unistd.h>
 #include <limits.h>
@@ -35,6 +36,7 @@ namespace
     const std::wstring DispatchCollisionEventMethodName = L"DispatchCollisionEvent";
     const std::wstring CallOnEnableMethodName = L"OnEnable";
     const std::wstring CallOnDisableMethodName = L"OnDisable";
+    const std::wstring DebugWaitForDebuggerMethodName = L"Debug_WaitForDebugger";
 }
 
 std::filesystem::path get_executable_directory()
@@ -206,6 +208,19 @@ bool CoreCLRHost::Initialize(const std::filesystem::path& mainAssemblyPath, bool
         LogError("CoreCLRHost: 缓存一个或多个 C# 互操作方法失败。");
         Shutdown();
         return false;
+    }
+
+    
+    if (ProjectSettings::GetInstance().GetScriptDebugEnabled() &&
+        ProjectSettings::GetInstance().GetScriptDebugWaitForAttach())
+    {
+        auto waitFn = (DebugWaitForDebuggerFn)getManagedFunction(SdkAssemblyName, InteropTypeName,
+                                                                 DebugWaitForDebuggerMethodName);
+        if (waitFn)
+        {
+            
+            waitFn(60000);
+        }
     }
 
     LogInfo("CoreCLRHost: 宿主初始化成功。");

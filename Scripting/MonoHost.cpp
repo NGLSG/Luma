@@ -5,6 +5,7 @@
 #include <sstream>
 #include "../Utils/Directory.h"
 #include "../Utils/PCH.h"
+#include "../Application/ProjectSettings.h"
 
 #ifdef __ANDROID__
 #include <dlfcn.h>
@@ -56,6 +57,8 @@ namespace
     typedef void* (*mono_domain_get_fn)();
     typedef void* (*mono_object_unbox_fn)(void* obj);
     typedef void* (*mono_value_box_fn)(void* domain, void* klass, void* val);
+    typedef void (*mono_jit_parse_options_fn)(int argc, char* argv[]);
+    typedef void (*mono_debug_init_fn)(int format);
 
     
     void* s_monoLibHandle = nullptr;
@@ -85,6 +88,8 @@ namespace
     mono_domain_get_fn mono_domain_get = nullptr;
     mono_object_unbox_fn mono_object_unbox = nullptr;
     mono_value_box_fn mono_value_box = nullptr;
+    mono_jit_parse_options_fn mono_jit_parse_options = nullptr;
+    mono_debug_init_fn mono_debug_init = nullptr;
 
     
     struct MonoMethodContext
@@ -704,6 +709,8 @@ bool MonoHost::loadMonoRuntime()
     LOAD_MONO_FUNC(mono_domain_get);
     LOAD_MONO_FUNC(mono_object_unbox);
     LOAD_MONO_FUNC(mono_value_box);
+    LOAD_MONO_FUNC(mono_jit_parse_options);
+    LOAD_MONO_FUNC(mono_debug_init);
 
     #undef LOAD_MONO_FUNC
 
@@ -724,6 +731,37 @@ bool MonoHost::initializeMonoDomain(const std::string& domainName)
     }
 
     
+    if (mono_jit_parse_options && mono_debug_init)
+    {
+        const bool dbgEnabled = ProjectSettings::GetInstance().GetScriptDebugEnabled();
+        if (dbgEnabled)
+        {
+            std::string address = ProjectSettings::GetInstance().GetScriptDebugAddress();
+#ifdef __ANDROID__
+            
+            if (address == "127.0.0.1") address = "0.0.0.0";
+#endif
+            const int port = ProjectSettings::GetInstance().GetScriptDebugPort();
+            const bool suspend = ProjectSettings::GetInstance().GetScriptDebugWaitForAttach();
+
+            std::string agentOpt = std::format("--debugger-agent=transport=dt_socket,address={}:{}{},server=y{}",
+                                               address,
+                                               port,
+                                               "",
+                                               suspend ? ",suspend=y" : ",suspend=n");
+
+            std::string debugOpt = "--debug";
+            std::string softBpOpt = "--soft-breakpoints";
+
+            char* argv[] = { debugOpt.data(), softBpOpt.data(), agentOpt.data() };
+            mono_jit_parse_options(3, argv);
+
+            
+            mono_debug_init(2);
+            LogInfo("MonoHost: 启用Mono调试代理: {}", agentOpt);
+        }
+    }
+
     m_monoDomain = mono_jit_init(domainName.c_str());
     if (!m_monoDomain)
     {

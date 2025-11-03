@@ -24,6 +24,16 @@ namespace YAML
             node["TargetHeight"] = rhs.GetTargetHeight();
             node["IsBorderless"] = rhs.IsBorderless();
             node["EnableConsole"] = rhs.IsConsoleEnabled();
+
+            
+            {
+                Node dbg;
+                dbg["Enabled"] = rhs.GetScriptDebugEnabled();
+                dbg["WaitForAttach"] = rhs.GetScriptDebugWaitForAttach();
+                dbg["Address"] = rhs.GetScriptDebugAddress();
+                dbg["Port"] = rhs.GetScriptDebugPort();
+                node["ScriptDebug"] = dbg;
+            }
             
             if (!rhs.GetTags().empty())
             {
@@ -59,6 +69,20 @@ namespace YAML
                 tags = node["Tags"].as<std::vector<std::string>>();
             }
             rhs.SetTags(tags);
+
+            
+            if (node["ScriptDebug"]) {
+                const Node& dbg = node["ScriptDebug"];
+                rhs.SetScriptDebugEnabled(dbg["Enabled"].as<bool>(false));
+                rhs.SetScriptDebugWaitForAttach(dbg["WaitForAttach"].as<bool>(false));
+                rhs.SetScriptDebugAddress(dbg["Address"].as<std::string>("127.0.0.1"));
+                rhs.SetScriptDebugPort(dbg["Port"].as<int>(56000));
+            } else {
+                rhs.SetScriptDebugEnabled(false);
+                rhs.SetScriptDebugWaitForAttach(false);
+                rhs.SetScriptDebugAddress("127.0.0.1");
+                rhs.SetScriptDebugPort(56000);
+            }
 
             return true;
         }

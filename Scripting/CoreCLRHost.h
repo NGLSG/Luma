@@ -65,6 +65,10 @@ using CallOnDisableFn = void (LUMA_CALLBACK *)(ManagedGCHandle handle);
 using DispatchCollisionEventFn = void (LUMA_CALLBACK *)(ManagedGCHandle handlePtr, int contactType,
                                                         uint32_t otherEntityId);
 
+// Debug helpers
+using DebugWaitForDebuggerFn = void (LUMA_CALLBACK *)(int timeoutMs);
+using DebugBreakFn = void (LUMA_CALLBACK *)();
+
 
 /// 初始化托管域函数的类型别名。
 using InitializeDomainFn = void (LUMA_CALLBACK *)(const char* baseDirUtf8);

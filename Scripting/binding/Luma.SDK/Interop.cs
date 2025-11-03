@@ -7,6 +7,8 @@ using YamlDotNet.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
+using System.Threading;
 
 namespace Luma.SDK;
 
@@ -146,6 +148,44 @@ public static class Interop
         catch (Exception e)
         {
             Debug.Log($"[EXCEPTION] Debug_ListAllTypesAndMethods failed: {e.Message}");
+        }
+    }
+
+    [UnmanagedCallersOnly]
+    public static void Debug_WaitForDebugger(int timeoutMs)
+    {
+        try
+        {
+            var start = Stopwatch.StartNew();
+            int sleep = 50;
+            while (!Debugger.IsAttached)
+            {
+                if (timeoutMs >= 0 && start.ElapsedMilliseconds > timeoutMs)
+                {
+                    break;
+                }
+                Thread.Sleep(sleep);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.Log($"[EXCEPTION] Debug_WaitForDebugger failed: {e.Message}");
+        }
+    }
+
+    [UnmanagedCallersOnly]
+    public static void Debug_Break()
+    {
+        try
+        {
+            if (Debugger.IsAttached)
+            {
+                Debugger.Break();
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.Log($"[EXCEPTION] Debug_Break failed: {e.Message}");
         }
     }
 

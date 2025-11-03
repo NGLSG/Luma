@@ -202,6 +202,20 @@ public:
      */
     static TargetPlatform StringToPlatform(const std::string& platformStr);
 
+    // --------------- Scripting Debugging ---------------
+public:
+    bool GetScriptDebugEnabled() const { return m_scriptDebugEnabled; }
+    void SetScriptDebugEnabled(bool enabled) { m_scriptDebugEnabled = enabled; }
+
+    bool GetScriptDebugWaitForAttach() const { return m_scriptDebugWaitForAttach; }
+    void SetScriptDebugWaitForAttach(bool wait) { m_scriptDebugWaitForAttach = wait; }
+
+    const std::string& GetScriptDebugAddress() const { return m_scriptDebugAddress; }
+    void SetScriptDebugAddress(const std::string& address) { m_scriptDebugAddress = address; }
+
+    int GetScriptDebugPort() const { return m_scriptDebugPort; }
+    void SetScriptDebugPort(int port) { m_scriptDebugPort = port; }
+
     // ---------------- Tags ----------------
 public:
     const std::vector<std::string>& GetTags() const { return m_tags; }
@@ -229,6 +243,12 @@ private:
     TargetPlatform m_targetPlatform = TargetPlatform::Current; ///< 目标构建平台。
 
     std::filesystem::path m_projectFilePath; ///< 当前项目文件的路径。
+
+    // Scripting debugging options
+    bool m_scriptDebugEnabled = false;
+    bool m_scriptDebugWaitForAttach = false;
+    std::string m_scriptDebugAddress = "127.0.0.1";
+    int m_scriptDebugPort = 56000;
 
     // Project-wide tags used by TagComponent dropdown in Inspector
     std::vector<std::string> m_tags;
