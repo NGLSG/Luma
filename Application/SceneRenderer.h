@@ -325,6 +325,22 @@ public:
     }
 
     /**
+     * @brief 预留容量以避免后续 Allocate() 导致的重分配。
+     *
+     * 在单帧内多次 Allocate() 并将返回指针保存到外部结构时，应先调用该方法
+     * 预留足够的容量，防止 vector 发生扩容从而使先前返回的指针失效。
+     *
+     * @param total 该帧预计需要的元素总数。
+     */
+    void Reserve(size_t total)
+    {
+        if (total > m_data.capacity())
+        {
+            m_data.reserve(total);
+        }
+    }
+
+    /**
      * @brief 重置竞技场，使其可以重新分配内存。
      *
      * 如果T不是平凡可析构类型，会调用已分配对象的析构函数。

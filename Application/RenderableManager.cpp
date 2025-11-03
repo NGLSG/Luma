@@ -2217,6 +2217,18 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     outPackets.reserve(spriteBatchGroups.size() + textBatchGroups.size());
 
     
+    {
+        size_t totalTransformsNeeded = 0;
+        for (const auto& group : spriteBatchGroups) totalTransformsNeeded += group.transforms.size();
+        for (const auto& group : textBatchGroups) totalTransformsNeeded += group.transforms.size();
+        transformArenas[buildIndex]->Reserve(totalTransformsNeeded);
+
+        size_t totalTextsNeeded = 0;
+        for (const auto& group : textBatchGroups) totalTextsNeeded += group.texts.size();
+        textArenas[buildIndex]->Reserve(totalTextsNeeded);
+    }
+
+    
     
     for (const auto& group : spriteBatchGroups)
     {
