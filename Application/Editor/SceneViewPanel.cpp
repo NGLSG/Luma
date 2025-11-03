@@ -1905,6 +1905,9 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
         {
             tilemap.normalTiles.erase(coord);
             tilemap.ruleTiles.erase(coord);
+            EventBus::GetInstance().Publish(ComponentUpdatedEvent{
+                m_context->activeScene->GetRegistry(), tilemapGo.GetEntityHandle()
+            });
         }
         else
         {
@@ -1912,11 +1915,17 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
             {
                 tilemap.ruleTiles[coord] = m_context->activeTileBrush;
                 tilemap.normalTiles.erase(coord);
+                EventBus::GetInstance().Publish(ComponentUpdatedEvent{
+                    m_context->activeScene->GetRegistry(), tilemapGo.GetEntityHandle()
+                });
             }
             else if (m_context->activeTileBrush.assetType == AssetType::Tile)
             {
                 tilemap.normalTiles[coord] = m_context->activeTileBrush;
                 tilemap.ruleTiles.erase(coord);
+                EventBus::GetInstance().Publish(ComponentUpdatedEvent{
+                    m_context->activeScene->GetRegistry(), tilemapGo.GetEntityHandle()
+                });
             }
         }
     };
