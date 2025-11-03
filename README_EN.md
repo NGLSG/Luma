@@ -1,177 +1,243 @@
-# Luma Engine
+<div align="center" style="margin-top: 12px; margin-bottom: 24px;">
 
-A modern, modular, data‑driven, high‑performance real‑time 2D game engine built with C++20 and C#, designed as a capable alternative to Unity 2D.
+  <h1 style="margin: 0; font-weight: 800;">Luma Engine</h1>
 
-- [中文文档](README.md)
-- [Architecture](ARCHITECTURE_EN.md)
+  <p style="margin: 8px 0 16px; line-height: 1.6;">
+    <strong>Modern · Modular · Data-Driven · High-Performance 2D Game Engine</strong><br/>
+    Built with <strong>C++20</strong> and <strong>C# (.NET 9 CoreCLR)</strong>, designed as a powerful alternative to Unity 2D.
+  </p>
+
+  <!-- Badges Row -->
+  <p style="display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
+    <!-- Stars -->
+    <a href="https://github.com/NGLSG/Luma/stargazers" target="_blank">
+      <img alt="GitHub Stars"
+           src="https://img.shields.io/github/stars/NGLSG/Luma?style=for-the-badge&logo=github" />
+    </a>
+    <!-- Forks -->
+    <a href="https://github.com/NGLSG/Luma/fork" target="_blank">
+      <img alt="GitHub Forks"
+           src="https://img.shields.io/github/forks/NGLSG/Luma?style=for-the-badge&logo=github" />
+    </a>
+    <!-- License -->
+    <a href="LICENSE" target="_blank">
+      <img alt="License"
+           src="https://img.shields.io/github/license/NGLSG/Luma?style=for-the-badge" />
+    </a>
+    <!-- Top language (dynamic) -->
+    <img alt="Top Language"
+         src="https://img.shields.io/github/languages/top/NGLSG/Luma?style=for-the-badge&logo=cplusplus&logoColor=white" />
+  </p>
+
+</div>
 
 ---
 
-## Contents
+- [中文版本](README.md)
+- [Engine Architecture](ARCHITECTURE.md)
 
-- [Overview and Design Principles](#overview-and-design-principles)
-- [Key Capabilities and Performance](#key-capabilities-and-performance)
-  - [Performance Comparison: Luma vs. Unity DOTS](#performance-comparison-luma-vs-unity-dots)
-  - [Feature Summary](#feature-summary)
-- [Technology Stack](#technology-stack)
+---
+
+## Table of Contents
+
+- [Overview & Design Philosophy](#overview--design-philosophy)
+- [Core Features & Performance](#core-features--performance)
+  - [Performance Comparison: Luma vs Unity DOTS](#performance-comparison-luma-vs-unity-dots)
+  - [Feature Highlights](#feature-highlights)
+- [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
-  - [Environment and Dependencies](#environment-and-dependencies)
-  - [Build](#build)
-- [Core Systems](#core-systems)
-- [Project Status and Roadmap](#project-status-and-roadmap)
-- [Contributing](#contributing)
+  - [Environment & Dependencies](#environment--dependencies)
+  - [Build Instructions](#build-instructions)
+- [Editor Debugging Support](#editor-debugging-support)
+- [Core Systems Overview](#core-systems-overview)
+- [Project Status & Roadmap](#project-status--roadmap)
+- [Contribution Guidelines](#contribution-guidelines)
 - [License](#license)
+- [Community & Support](#community--support)
 
 ---
 
-## Overview and Design Principles
+## Overview & Design Philosophy
 
-Luma targets 2D projects that require top‑tier performance and a modern workflow.
+**Luma Engine** targets developers seeking ultimate performance and a modern workflow for 2D game development.  
+Core design principles include:
 
-- **Data‑driven**: scenes, entities, components, and animation are all data‑centric, enabling hot‑reload, editor extensibility, and procedural generation.
-- **Modular and extensible**: rendering, physics, audio, and other systems are decoupled for independent evolution.
-- **Performance‑first**: an ECS architecture and parallel JobSystem designed for large‑scale, real‑time workloads.
+- **Data-Driven Architecture** – All scenes, entities, components, and animations are data-centric, enabling live reloading and procedural generation.
+- **Modular & Extensible** – Rendering, physics, audio, and UI systems are fully decoupled and replaceable.
+- **Performance First** – ECS architecture and multithreaded JobSystem for large-scale real-time computation.
 
 ---
 
-## Key Capabilities and Performance
+## Core Features & Performance
 
-### Performance Comparison: Luma vs. Unity DOTS
+### Performance Comparison: Luma vs Unity DOTS
 
-> Unity version: 6.1 LTS; identical hardware and scenario settings.
+> Unity Version: 6.1 LTS — identical hardware, identical scene setup.
 
-**Scene rendering (dynamic sprites)**
-
-| Entities | Luma (FPS) | Unity DOTS (FPS) | Multiplier |
+| Entity Count | Luma (FPS) | Unity DOTS (FPS) | Multiplier |
 |:--:|:--:|:--:|:--:|
-| 100,000 | ~100 | ~30 | ~3.3× |
-| 200,000 | ~50 | ~15 | ~3.3× |
-| 1,000,000 | ~10 | ~2 | ~5.0× |
+| 100,000 | ~130 | ~30 | ~4.3× |
+| 200,000 | ~60 | ~15 | ~4.0× |
+| 1,000,000 | ~15 | ~2 | ~7.0× |
 
-**Physics (Box2D, 10,000 dynamic bodies)**
+**Physics Simulation (Box2D, 10,000 dynamic bodies)**
 
 | Metric | Luma | Unity | Multiplier |
 |:--:|:--:|:--:|:--:|
-| Total frame time | 2.40 ms | 45.45 ms | 18.9× |
+| Total Frame Time | 2.40 ms | 45.45 ms | 18.9× |
 | Theoretical FPS | ~416 | ~22 | 18.9× |
 
-> Note: Values come from internal tests under equivalent conditions. Real‑world results vary with hardware and content.
+> Note: Benchmark results are for reference only. Actual performance varies with hardware and scene complexity.
 
-### Feature Summary
+### Feature Highlights
 
-**Modern ECS**  
-- Built on EnTT, optimized for data locality and fast iteration.  
-- Clean separation of logic and data for maintainability.
-
-**High‑performance parallelism**  
-- Work‑stealing JobSystem with dynamic load balancing.  
-- C# JobSystem bindings allow parallel gameplay code.
-
-**Visual Blueprint**  
-- Node editor that emits compiled C# code (no runtime interpretation).  
-- Supports events, branches, loops, custom functions/variables.
-
-**C++/C# Interop**  
-- .NET 9 CoreCLR host for reliable bidirectional calls.  
-- Script hot‑reload supported.
-
-**Physics, Tilemap, UI, Audio**  
-- Box2D with fixed timestep; parallelized via JobSystem.  
-- Tilemap with standard/rule tiles and prefab brushes.  
-- ECS‑driven UI components (Text/Image/Button/InputText).  
-- SDL3 audio with spatialization and multi‑channel mixing.
+- **Modern ECS Architecture** (powered by EnTT)
+- **JobSystem Parallelism** (C++/C# interoperability)
+- **Visual Blueprint System** (node-based → compiled C#)
+- **C++ / C# Interop & Hot Reloading**
+- **Physics / Tilemap / UI / Audio Systems**
+- **High-Performance Rendering Pipeline (Skia + Dawn)**
 
 ---
 
-## Technology Stack
+## Tech Stack
 
-| Area | Technology | Version/Lib |
+| Category | Technology | Description |
 |:--|:--|:--|
-| Language | C++ | C++20 |
-| Scripting | C# | .NET 9 (CoreCLR) |
-| Build | CMake | 3.21+ |
-| ECS | EnTT | latest |
-| Physics | Box2D | latest |
-| Rendering | Skia + Dawn | cross‑platform wrapper |
-| Window/Input | SDL3 | cross‑platform |
-| Editor UI | Dear ImGui | immediate‑mode GUI |
-| Serialization | yaml-cpp / json | YAML/JSON |
+| Core Languages | C++20 / C# (.NET 9) | High-performance native and managed code |
+| Build System | CMake 3.21+ | Cross-platform build |
+| ECS Framework | EnTT | Data-oriented entity management |
+| Physics Engine | Box2D | Real-time 2D dynamics |
+| Renderer | Skia + Dawn | GPU-accelerated, cross-platform |
+| Audio | SDL3 Audio | Multichannel spatial mixing |
+| Editor UI | Dear ImGui | Immediate-mode editor interface |
+| Serialization | yaml-cpp / json | YAML & JSON read/write |
 
 ---
 
 ## Getting Started
 
-### Environment and Dependencies
+### Environment & Dependencies
 
-1. Install Git, CMake (≥ 3.21), Vulkan SDK, and a modern C++ toolchain (VS 2022 / GCC 11 / Clang 14).  
-2. Dependencies: **Vcpkg** is recommended; CPM.cmake supplements remaining libraries; system package managers are also fine for common libs.  
-3. Special dependencies: download prebuilt **Skia** and **CoreCLR** packages and extract them to `External/` in the repo root. Example layout:
-   ```
-   Luma/
-   ├── External/
-   │   ├── coreclr-win-x64/    # or coreclr-linux-x64/
-   │   └── skia-win/           # or skia-linux/
-   └── ...
-   ```
+1. Install: Git, CMake (≥ 3.21), Vulkan SDK, and a modern C++ compiler (VS 2022 / Clang 14 / GCC 11+).
+2. Use **Vcpkg** for dependency management.
+3. Extract **Skia** and **CoreCLR** into the `External/` directory:
 
-### Build
+```
+Luma/
+├── External/
+│   ├── coreclr-win-x64/
+│   └── skia-win/
+```
+
+### Build Instructions
 
 ```bash
 git clone https://github.com/NGLSG/Luma.git
 cd Luma
-
-# Using Vcpkg (adjust path as needed)
 mkdir build && cd build
 cmake .. -DCMAKE_TOOLCHAIN_FILE=E:/vcpkg/scripts/buildsystems/vcpkg.cmake
 cmake --build . --config Release
 ```
 
-Artifacts are located under `build/bin/Release/` (or the configured output directory).
+Build output will be located in `build/bin/Release/`.
 
 ---
 
-## Core Systems
+## Editor Debugging Support
 
-- **Assets and resources**: GUID‑based pipeline with `.meta` files; `AssetManager` and caches provide efficient runtime loading/sharing.  
-- **Scripting**: CoreCLR hosting with C‑API/PInvoke bridge; C# events, interfaces, and Job bindings.  
-- **Rendering**: simulation thread submits frame data; render thread interpolates between full frame states; batching and API dispatch in the backend.  
-- **Physics**: fixed timestep; kinematic/dynamic synchronization with consistent Transform write‑back.  
-- **Audio**: voices managed on the main thread; mixing and spatialization in the audio callback.  
-- **Parallel scheduling**: global queue plus per‑thread deques with work‑stealing; completion waits supported.  
-- **Animation and state machines**: parameterized states, transitions, and triggers; visual configuration and C# control.
+Luma Engine supports **Rider** and **Visual Studio 2022 / 2026 Insider** for in-editor breakpoint debugging.
 
-See [ARCHITECTURE_EN.md](ARCHITECTURE_EN.md) for diagrams and flows.
+### Plugin Installation
+
+```
+IDEPlugins/
+├── Rider_Debug_Plugin.jar
+└── VS_Debug_Plugin.vsix
+```
+
+- **Rider**: *Settings → Plugins → Install Plugin from Disk* → select `.jar`.
+- **Visual Studio**: Double-click `.vsix` to install.
+
+### Usage
+
+**Visual Studio**
+
+1. Open your game script project.
+2. Set breakpoints.
+3. Menu: **Tools → Attach To Luma Process**.
+4. Click “Play” in Luma Editor to enter debug mode.
+
+**Rider**
+
+1. Open the project and set breakpoints.
+2. Choose “Attach to Luma Process”.
+3. Click **Debug**, select `LumaEditor`.
+4. Click “Play” to enter debugging mode.
+
+> Supports C# hot reload, exception handling, and variable inspection.
 
 ---
 
-## Project Status and Roadmap
+## Core Systems Overview
 
-### Completed
-- Asset pipeline, ECS, JobSystem, animation state machine, visual blueprint, Tilemap, UI, spatial audio  
-- C# hosting (hot‑reload), C++/C# interop, physics integration  
-- Editor, packaging, profiler, physics visualization
+- **Asset System** – GUID-based import & caching.
+- **Scripting System** – CoreCLR hosting + PInvoke bridge.
+- **Rendering System** – Thread-safe submission, batching, interpolation.
+- **Physics System** – Fixed timestep with transform sync.
+- **Audio System** – Multithreaded mixing and spatialization.
+- **Job Scheduling** – Global task queue with work-stealing.
+- **Animation System** – Parameterized state machine and visual editor integration.
+
+---
+
+## Project Status & Roadmap
+
+### Completed Features
+
+- Asset pipeline, ECS, JobSystem, animation state machine, visual blueprints, Tilemap, UI, spatial audio
+- C# hot reloading, C++/C# interop, profiler, physics debug visualization
 
 ### Roadmap
 
-| Priority | Item | Status | Target |
+| Priority | Feature | Status | Target |
 |:--:|:--|:--|:--:|
-| Medium | C‑API expansion | Planned | 2025 Q3 |
-| Low | Editor UI modernization | Research | 2025 Q4 |
-| Low | Particle system | Planned | 2025 Q4 |
+| Medium | C-API Expansion | Planned | 2025 Q3 |
+| Low | Editor UI Modernization | Research | 2025 Q4 |
+| Low | Particle System | Planned | 2025 Q4 |
 
 ---
 
-## Contributing
+## Contribution Guidelines
 
-- Naming: PascalCase for types/functions; camelCase for variables.  
-- Comments: public APIs use Doxygen‑style documentation.  
-- Process:
-  1. Fork and branch from `master`.  
-  2. Ensure style and builds pass.  
-  3. Open a PR with motivation and implementation details.
+- **Naming**: PascalCase for types/functions, camelCase for variables.
+- **Comments**: Use Doxygen-style documentation for public APIs.
+- **Workflow**:
+  1. Create a feature branch from `master`.
+  2. Ensure builds and tests pass.
+  3. Submit a Pull Request with a detailed description.
 
 ---
 
 ## License
 
-Licensed under the [MIT](LICENSE).
+This project is licensed under the [MIT License](LICENSE).  
+Free to use, modify, and distribute.
+
+---
+
+## Community & Support
+
+Join the Luma developer community and help shape the next generation of 2D engines.
+
+| Platform | Join |
+|:--|:--|
+| <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/discord.svg" width="20"/> **Discord** | [https://discord.gg/BJBXcRkh](https://discord.gg/BJBXcRkh) |
+| <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/tencentqq.svg" width="20"/> **QQ Group** | 913635492 |
+
+For business or technical inquiries:  
+📧 **Email**: gug777514@gmail.com
+
+---
+
+**Luma Engine** — Lighting up the next generation of 2D game worlds.

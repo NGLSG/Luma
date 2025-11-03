@@ -1,6 +1,38 @@
-# Luma 引擎
+<div align="center" style="margin-top: 12px; margin-bottom: 24px;">
 
-一种基于 C++20 与 C# 的现代化、模块化、数据驱动的高性能实时 2D 游戏引擎，旨在成为 Unity 2D 的强大替代方案。
+  <h1 style="margin: 0; font-weight: 800;">Luma 引擎</h1>
+
+  <p style="margin: 8px 0 16px; line-height: 1.6;">
+    <strong>现代化 · 模块化 · 数据驱动 · 高性能 2D 游戏引擎</strong><br/>
+    基于 <strong>C++20</strong> 与 <strong>C# (.NET 9 CoreCLR)</strong> 构建，旨在成为 Unity 2D 的强大替代方案。
+  </p>
+
+  <!-- Badges Row -->
+  <p style="display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
+    <!-- Stars -->
+    <a href="https://github.com/NGLSG/Luma/stargazers" target="_blank">
+      <img alt="GitHub Stars"
+           src="https://img.shields.io/github/stars/NGLSG/Luma?style=for-the-badge&logo=github" />
+    </a>
+    <!-- Forks -->
+    <a href="https://github.com/NGLSG/Luma/fork" target="_blank">
+      <img alt="GitHub Forks"
+           src="https://img.shields.io/github/forks/NGLSG/Luma?style=for-the-badge&logo=github" />
+    </a>
+    <!-- License -->
+    <a href="LICENSE" target="_blank">
+      <img alt="License"
+           src="https://img.shields.io/github/license/NGLSG/Luma?style=for-the-badge" />
+    </a>
+    <!-- Top language (dynamic) -->
+    <img alt="Top Language"
+         src="https://img.shields.io/github/languages/top/NGLSG/Luma?style=for-the-badge&logo=cplusplus&logoColor=white" />
+  </p>
+
+</div>
+
+
+---
 
 - [English Version](README_EN.md)
 - [引擎架构](ARCHITECTURE.md)
@@ -17,20 +49,23 @@
 - [快速开始](#快速开始)
   - [环境与依赖](#环境与依赖)
   - [构建](#构建)
+- [编辑器断点调试支持](#编辑器断点调试支持)
 - [核心系统概述](#核心系统概述)
 - [项目状态与路线图](#项目状态与路线图)
 - [贡献指南](#贡献指南)
 - [许可证](#许可证)
+- [社区与支持](#社区与支持)
 
 ---
 
 ## 概览与设计哲学
 
-Luma 引擎面向需要极致性能与现代化工作流的 2D 游戏项目。核心设计原则：
+Luma 引擎面向需要极致性能与现代化工作流的 2D 游戏项目。  
+其核心设计理念包括：
 
-- **数据驱动**：场景、实体、组件与动画均以数据为中心，便于热重载、编辑器扩展与程序化生成。
-- **模块化与可扩展**：渲染、物理、音频等核心系统彼此解耦，可独立升级与替换。
-- **性能优先**：ECS 架构与并行 JobSystem 面向高并发与大规模对象的实时计算。
+- **数据驱动**：场景、实体、组件与动画均以数据为核心，支持热重载与可视化编辑。
+- **模块化与可扩展**：渲染、物理、音频、UI 等系统完全解耦，便于独立升级与替换。
+- **性能优先**：ECS 架构与并行 JobSystem，面向大规模实时运算。
 
 ---
 
@@ -40,62 +75,44 @@ Luma 引擎面向需要极致性能与现代化工作流的 2D 游戏项目。�
 
 > Unity 版本：6.1 LTS；同一硬件、等价场景设置。
 
-**场景渲染（动态精灵）**：在视野内不断生成、移动、旋转与缩放大量精灵。
-
 | 实体数量 | Luma 引擎 (FPS) | Unity DOTS (FPS) | 性能倍数 |
 |:--:|:--:|:--:|:--:|
-| 100,000 | ~100 | ~30 | ~3.3× |
-| 200,000 | ~50 | ~15 | ~3.3× |
-| 1,000,000 | ~10 | ~2 | ~5.0× |
+| 100,000 | ~130 | ~30 | ~4.3× |
+| 200,000 | ~60 | ~15 | ~4.0× |
+| 1,000,000 | ~15 | ~2 | ~7.0× |
 
-**物理模拟（Box2D，10,000 动态刚体）**：
+**物理模拟（Box2D，10,000 动态刚体）**
 
 | 指标 | Luma | Unity | 性能倍数 |
 |:--:|:--:|:--:|:--:|
 | 总帧时间 | 2.40 ms | 45.45 ms | 18.9× |
 | 理论 FPS | ~416 | ~22 | 18.9× |
 
-> 注：上述数值来源于同等条件下的内部测试，仅作为能力参考，实际效果随硬件与场景而异。
+> 注：测试结果仅供参考，实际性能因硬件和场景差异而异。
 
 ### 功能一览
 
-**现代 ECS 架构**  
-- 基于 EnTT，面向数据布局与高速遍历优化。  
-- 逻辑与数据解耦，便于维护与扩展。
-
-**高性能并行计算**  
-- 基于工作窃取的 JobSystem，动态负载均衡。  
-- 提供 C# JobSystem 绑定，脚本层可并行。
-
-**可视化蓝图**  
-- 节点式编辑器直接生成高性能 C# 代码（编译型，而非解释执行）。  
-- 支持事件、分支、循环、自定义函数与变量。
-
-**C++/C# 互操作**  
-- 采用 .NET 9 CoreCLR 宿主，稳定双向调用。  
-- 支持脚本热重载。
-
-**物理、Tilemap、UI、音频**  
-- Box2D 固定步长模拟，配合 JobSystem 并行。  
-- Tilemap 支持标准/规则瓦片与预制体笔刷。  
-- 基于 ECS 的 UI 组件（Text/Image/Button/InputText 等）。  
-- SDL3 音频回调，空间化与多声道混音。
+- **现代 ECS 架构**（基于 EnTT）
+- **JobSystem 并行计算**（C++/C# 协同）
+- **可视化蓝图系统**（节点 → 编译型 C#）
+- **C++ / C# 互操作 + 热重载**
+- **物理 / Tilemap / UI / 音频系统**
+- **高性能渲染管线（Skia + Dawn）**
 
 ---
 
 ## 技术栈
 
-| 类别 | 技术 | 版本/库 |
+| 分类 | 技术 | 说明 |
 |:--|:--|:--|
-| 核心语言 | C++ | C++20 |
-| 脚本语言 | C# | .NET 9 (CoreCLR) |
-| 构建系统 | CMake | 3.21+ |
-| ECS 框架 | EnTT | latest |
-| 2D 物理 | Box2D | latest |
-| 渲染后端 | Skia + Dawn | 跨平台图形封装 |
-| 窗口与输入 | SDL3 | 跨平台窗口管理 |
-| 编辑器 UI | Dear ImGui | 即时模式 GUI |
-| 数据序列化 | yaml-cpp / json | YAML/JSON 读写 |
+| 核心语言 | C++20 / C# (.NET 9) | 高性能与灵活性兼备 |
+| 构建系统 | CMake 3.21+ | 跨平台构建 |
+| ECS 框架 | EnTT | 高性能实体组件系统 |
+| 物理引擎 | Box2D | 实时 2D 动力学 |
+| 渲染后端 | Skia + Dawn | GPU 加速渲染 |
+| 音频系统 | SDL3 Audio | 多声道混音与空间化 |
+| 编辑器 UI | Dear ImGui | 即时模式编辑器界面 |
+| 数据序列化 | yaml-cpp / json | YAML / JSON 读写 |
 
 ---
 
@@ -103,55 +120,86 @@ Luma 引擎面向需要极致性能与现代化工作流的 2D 游戏项目。�
 
 ### 环境与依赖
 
-1. 安装：Git、CMake (≥ 3.21)、Vulkan SDK、现代 C++ 编译器（VS 2022 / GCC 11 / Clang 14）。  
-2. 依赖管理：推荐使用 **Vcpkg**；CPM.cmake 作为补充，亦可使用系统包管理器安装常见库。  
-3. 特殊依赖：**Skia** 与 **CoreCLR** 需手动获取预编译包，并解压至项目根目录 `External/`。  
-   - Releases 参考：`Luma-External` 预编译集合。  
-   - 解压完成后目录示例：
-     ```
-     Luma/
-     ├── External/
-     │   ├── coreclr-win-x64/    # 或 coreclr-linux-x64/
-     │   └── skia-win/           # 或 skia-linux/
-     └── ...
-     ```
+1. 安装：Git、CMake (≥ 3.21)、Vulkan SDK、现代 C++ 编译器（VS 2022 / Clang 14 / GCC 11+）。
+2. 使用 **Vcpkg** 管理依赖。
+3. 手动解压 **Skia** 与 **CoreCLR** 至 `External/` 目录：
+
+```
+Luma/
+├── External/
+│   ├── coreclr-win-x64/
+│   └── skia-win/
+```
 
 ### 构建
 
 ```bash
 git clone https://github.com/NGLSG/Luma.git
 cd Luma
-
-# 使用 Vcpkg（示例路径请根据本机替换）
 mkdir build && cd build
 cmake .. -DCMAKE_TOOLCHAIN_FILE=E:/vcpkg/scripts/buildsystems/vcpkg.cmake
 cmake --build . --config Release
 ```
 
-构建产物位于 `build/bin/Release/`（或对应生成目录）。
+构建产物位于 `build/bin/Release/`。
+
+---
+
+## 编辑器断点调试支持
+
+Luma 引擎支持 **Rider** 与 **Visual Studio 2022 / 2026 Insider** 的编辑器级断点调试。
+
+### 插件安装
+
+项目根目录下包含：
+
+```
+IDEPlugins/
+├── Rider_Debug_Plugin.jar
+└── VS_Debug_Plugin.vsix
+```
+
+- **Rider**：在 *Settings → Plugins → Install Plugin from Disk* 中选择 `.jar` 安装。
+- **Visual Studio**：双击 `.vsix` 完成安装。
+
+### 使用方式
+
+**Visual Studio**
+
+1. 打开引擎脚本工程。
+2. 设置 C# 断点。
+3. 菜单：**Tools → Attach To Luma Process**。
+4. 在 Luma Editor 点击“播放”进入调试模式。
+
+**Rider**
+
+1. 打开工程并设置断点。
+2. 选择“附加到 Luma 进程”。
+3. 点击 **Debug**，选择 `LumaEditor`。
+4. 点击“播放”进入调试模式。
+
+> 支持 C# 热重载、异常捕获与变量查看。
 
 ---
 
 ## 核心系统概述
 
-- **资产与资源系统**：基于 GUID 的资产管线，`.meta` 持久化导入设置与唯一标识；运行时通过 `AssetManager` 与缓存实现高效加载与共享。  
-- **脚本系统**：CoreCLR 宿主与 C-API/PInvoke 桥接；支持 C# 侧事件、接口与 Job 绑定。  
-- **渲染系统**：模拟线程提交渲染数据，渲染线程基于插值生成帧间过渡，减少撕裂与抖动；后端采用批处理与图形 API 调度。  
-- **物理系统**：固定步长、运动学/动态刚体同步策略，物理到 Transform 的回写一致。  
-- **音频系统**：主线程管理 Voice，音频回调线程混音与空间化处理。  
-- **并行调度**：全局任务队列 + 本地队列工作窃取；线程池协同，任务完成可等待。  
-- **动画与状态机**：参数化状态、过渡条件与触发器，支持可视化配置与 C# 控制。
-
-更多细节请参见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+- **资产系统**：基于 GUID 的导入与缓存机制。
+- **脚本系统**：CoreCLR 宿主 + PInvoke 桥接。
+- **渲染系统**：插值补帧、批处理、线程安全提交。
+- **物理系统**：Box2D 固定步长 + Transform 同步。
+- **音频系统**：多线程混音与空间化。
+- **任务调度**：工作窃取算法 + 全局任务队列。
+- **动画系统**：参数化状态机与可视化编辑支持。
 
 ---
 
 ## 项目状态与路线图
 
 ### 已完成功能
-- 资产管线、ECS、JobSystem、动画状态机、可视化蓝图、Tilemap、UI、空间音频  
-- C# 脚本宿主（热重载）、C++/C# 互操作、物理集成  
-- 编辑器、打包工具、Profiler、物理可视化调试
+
+- 资产管线、ECS、JobSystem、动画状态机、蓝图系统、Tilemap、UI、空间音频
+- C# 热重载、C++/C# 双向调用、Profiler、物理调试可视化
 
 ### 路线图
 
@@ -165,15 +213,34 @@ cmake --build . --config Release
 
 ## 贡献指南
 
-- 命名：类型/函数使用 PascalCase，变量使用 camelCase。  
-- 注释：公共 API 使用 Doxygen 风格注释。  
-- 提交流程：
+- **命名规范**：类型/函数用 PascalCase；变量用 camelCase。
+- **注释规范**：公共 API 使用 Doxygen 风格。
+- **提交流程**：
   1. 从 `master` 创建功能分支；
-  2. 确保符合规范并通过构建；
-  3. 提交 Pull Request，说明动机与实现。
+  2. 通过构建与测试；
+  3. 提交 Pull Request 并说明实现细节。
 
 ---
 
 ## 许可证
 
-本项目采用 [MIT](LICENSE) 许可。
+本项目基于 [MIT License](LICENSE) 开源。  
+欢迎自由使用、修改与分发。
+
+---
+
+## 社区与支持
+
+加入 Luma 开发者社区，共同构建下一代 2D 游戏生态。
+
+| 平台 | 加入方式 |
+|:--|:--|
+| <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/discord.svg" width="20"/> **Discord** | [https://discord.gg/BJBXcRkh](https://discord.gg/BJBXcRkh) |
+| <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/tencentqq.svg" width="20"/> **QQ 群** | 913635492 |
+
+如需商务合作或技术支持：  
+📧 **Email**：gug777514@gmail.com
+
+---
+
+**Luma Engine** — 点亮 2D 世界的下一代游戏引擎。
