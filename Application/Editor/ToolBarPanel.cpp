@@ -836,10 +836,21 @@ void ToolbarPanel::play()
 {
     if (m_context->editorState != EditorState::Editing) return;
 
-
-    auto switchToPlayMode = [ctx = m_context]()
+    
+    if (m_isTransitioningPlayState)
     {
-        if (ctx->editorState == EditorState::Playing) return;
+        LogWarn("正在切换到播放模式，请稍候...");
+        return;
+    }
+    m_isTransitioningPlayState = true;
+
+    auto switchToPlayMode = [this, ctx = m_context]()
+    {
+        if (ctx->editorState == EditorState::Playing)
+        {
+            m_isTransitioningPlayState = false;
+            return;
+        }
 
         ctx->editorState = EditorState::Playing;
         ctx->engineContext->appMode = ApplicationMode::PIE;
@@ -863,6 +874,8 @@ void ToolbarPanel::play()
         std::cout << "原始场景地址: " << ctx->editingScene.get() << std::endl;
         ctx->activeScene = playScene;
 
+        
+        m_isTransitioningPlayState = false;
 
         LogInfo("已通过命令队列安全进入播放模式。");
         std::cout << "场景地址: " << playScene.get() << std::endl;
@@ -881,20 +894,43 @@ void ToolbarPanel::stop()
         return;
     }
 
-    auto stopCommand = [ctx = m_context]()
+    
+    if (m_isTransitioningPlayState)
     {
-        if (ctx->editorState == EditorState::Playing)
+        LogWarn("正在切换到编辑模式，请稍候...");
+        return;
+    }
+    m_isTransitioningPlayState = true;
+
+    auto stopCommand = [this, ctx = m_context]()
+    {
+        if (ctx->editorState == EditorState::Editing)
         {
-            ctx->editorState = EditorState::Paused;
-            LogInfo("执行已暂停。");
+            m_isTransitioningPlayState = false;
+            return;
+        }
+
+        
+        if (ctx->activeScene)
+        {
+            LogInfo("停用播放场景");
+            ctx->activeScene->Deactivate();
         }
 
         ctx->editorState = EditorState::Editing;
         ctx->engineContext->appMode = ApplicationMode::Editor;
+        
+        
         ctx->activeScene.reset();
+        
+        
         ctx->activeScene = ctx->editingScene;
         SceneManager::GetInstance().SetCurrentScene(ctx->activeScene);
         ctx->editingScene.reset();
+        
+        
+        m_isTransitioningPlayState = false;
+        
         LogInfo("退出播放模式。");
     };
 

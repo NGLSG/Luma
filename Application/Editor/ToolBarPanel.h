@@ -94,6 +94,7 @@ private:
     std::future<void> m_compilationFuture; ///< 脚本编译操作的异步结果。
     bool m_packagingSuccess; ///< 指示打包是否成功。
     std::filesystem::path m_lastBuildDirectory; ///< 上次构建的目录。
+    bool m_isTransitioningPlayState = false; ///< 指示是否正在切换播放/停止状态。
 };
 
 #endif

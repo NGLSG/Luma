@@ -233,9 +233,24 @@ bool SceneManager::CanRedo() const
 void SceneManager::Shutdown()
 {
     std::unique_lock<std::shared_mutex> lock(m_currentSceneMutex);
+    
+    
+    if (m_currentScene)
+    {
+        LogInfo("关闭场景管理器，停用场景: {}", m_currentScene->GetName());
+        m_currentScene->Deactivate();
+    }
+    
     m_currentScene.reset();
     m_undoStack.clear();
     m_redoStack.clear();
+    
+    
+    std::lock_guard<std::mutex> queueLock(m_queueMutex);
+    while (!m_completedLoads.empty())
+    {
+        m_completedLoads.pop();
+    }
 }
 
 
@@ -310,6 +325,14 @@ void SceneManager::activateScene(sk_sp<RuntimeScene> scene, const Guid& guid, En
 
     auto activateFunc = [this, scene, guid, context]()
     {
+        
+        sk_sp<RuntimeScene> oldScene = GetCurrentScene();
+        if (oldScene && oldScene != scene)
+        {
+            LogInfo("停用旧场景: {}", oldScene->GetName());
+            oldScene->Deactivate();
+        }
+
         auto& runtimeSceneManager = RuntimeSceneManager::GetInstance();
         runtimeSceneManager.TryAddOrUpdateAsset(guid, scene);
 

@@ -30,6 +30,11 @@ void RuntimeScene::Activate(EngineContext& engineCtx)
     m_systemsManager.InitializeSystems(this, engineCtx);
 }
 
+void RuntimeScene::Deactivate()
+{
+    m_systemsManager.DestroySystems(this);
+}
+
 sk_sp<RuntimeScene> RuntimeScene::CreatePlayModeCopy()
 {
     auto copy = sk_make_sp<RuntimeScene>();

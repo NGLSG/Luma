@@ -314,12 +314,3 @@ graph TD
     C --> H
     C --> I
 ```
-
----
-
-## Implementation Notes
-
-- **Thread safety**: double‑buffering or frame queues for submission/reads to avoid contention.  
-- **Determinism**: fixed physics timestep and consistent time sync for replay/network parity.  
-- **Observability**: profiling and counters across assets, rendering, physics, and JobSystem.  
-- **Evolvability**: stable module interfaces to allow backend swaps (e.g., alternative graphics backends).

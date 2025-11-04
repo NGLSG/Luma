@@ -466,14 +466,25 @@ void Editor::ShutdownDerived()
     }
     m_panels.clear();
 
+    
+    if (m_editorContext.activeScene)
+    {
+        LogInfo("关闭编辑器，停用当前场景");
+        m_editorContext.activeScene->Deactivate();
+    }
+    if (m_editorContext.editingScene)
+    {
+        m_editorContext.editingScene->Deactivate();
+    }
 
+    
     SceneManager::GetInstance().Shutdown();
     RuntimeTextureManager::GetInstance().Shutdown();
     RuntimeMaterialManager::GetInstance().Shutdown();
     RuntimePrefabManager::GetInstance().Shutdown();
     RuntimeSceneManager::GetInstance().Shutdown();
 
-
+    
     m_editorContext.activeScene.reset();
     m_editorContext.editingScene.reset();
     m_imguiRenderer.reset();
@@ -496,6 +507,14 @@ void Editor::OpenProject()
 
 void Editor::LoadProject(const std::filesystem::path& projectPath)
 {
+    
+    if (m_editorContext.activeScene)
+    {
+        LogInfo("停用当前场景以切换项目");
+        m_editorContext.activeScene->Deactivate();
+    }
+
+    
     AssetManager::GetInstance().Shutdown();
     SceneManager::GetInstance().Shutdown();
     RuntimeTextureManager::GetInstance().Shutdown();
@@ -504,8 +523,11 @@ void Editor::LoadProject(const std::filesystem::path& projectPath)
     RuntimeSceneManager::GetInstance().Shutdown();
     RuntimeAnimationClipManager::GetInstance().Shutdown();
     RuntimeFontManager::GetInstance().Shutdown();
+    
+    
     m_editorContext.activeScene.reset();
     m_editorContext.editingScene.reset();
+    
     if (!std::filesystem::exists(projectPath))
     {
         LogError("项目文件不存在: {}", projectPath.string());
@@ -520,7 +542,7 @@ void Editor::LoadProject(const std::filesystem::path& projectPath)
     AssetManager::GetInstance().Initialize(ApplicationMode::Editor, settings.GetProjectRoot());
     ScriptMetadataRegistry::GetInstance().Initialize(
         settings.GetProjectRoot().string() + "/Library/ScriptMetadata.yaml");
-    SceneManager::GetInstance().Shutdown();
+    SceneManager::GetInstance().Initialize(m_editorContext.engineContext);
     RecordLastEditingProject(projectPath);
     loadStartupScene();
 }

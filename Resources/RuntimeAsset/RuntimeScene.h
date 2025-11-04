@@ -58,6 +58,11 @@ public:
     void Activate(EngineContext& engineCtx);
 
     /**
+     * @brief 停用场景，清理系统和资源。
+     */
+    void Deactivate();
+
+    /**
      * @brief 创建当前场景的一个播放模式副本。
      * @return 当前场景的智能指针副本，用于播放模式。
      */
