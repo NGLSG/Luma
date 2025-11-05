@@ -4,9 +4,7 @@
 #include "IEditorPanel.h"
 #include "../Components/Transform.h"
 #include "../Event/LumaEvent.h"
-
-
-class RuntimeGameObject;
+#include "RuntimeAsset/RuntimeGameObject.h"
 struct ComponentRegistration;
 struct PropertyRegistration;
 

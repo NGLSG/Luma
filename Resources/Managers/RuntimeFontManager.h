@@ -7,6 +7,8 @@
 #include <list>
 #include <unordered_map>
 
+#include "Events.h"
+
 /**
  * @brief 字体性能数据结构。
  * 继承自 AssetPerformanceData，用于存储字体相关的性能指标。
@@ -86,18 +88,31 @@ public:
      */
     void SetMaxFontCount(int count);
 
+    /**
+     * @brief 析构函数。
+     */
+    ~RuntimeFontManager();
+
 private:
     /**
      * @brief 默认构造函数。
      */
-    RuntimeFontManager() = default;
+    RuntimeFontManager();
 
     /**
      * @brief 执行内存预算限制。
      */
     void EnforceBudget();
 
+    /**
+     * @brief 资产更新事件回调函数。
+     * 当资产更新时被调用，用于处理字体相关的更新逻辑。
+     * @param e 资产更新事件数据。
+     */
+    void OnAssetUpdated(const AssetUpdatedEvent& e);
+
 private:
+    ListenerHandle m_onAssetUpdatedHandle; ///< 资产更新事件的监听器句柄。
     mutable FontPerformanceData m_performanceData; ///< 字体性能数据。
     mutable std::list<Guid> m_lruTracker; ///< 用于跟踪最近最少使用（LRU）顺序的列表。
     mutable std::unordered_map<Guid, std::list<Guid>::iterator> m_lruMap; ///< 将资产标识符映射到LRU跟踪器迭代器的哈希表。

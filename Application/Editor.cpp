@@ -34,7 +34,7 @@
 #include "Event/LumaEvent.h"
 
 
-#include "Editor/ToolbarPanel.h"
+#include "Editor/ToolBarPanel.h"
 #include "Editor/SceneViewPanel.h"
 #include "Editor/GameViewPanel.h"
 #include "Editor/HierarchyPanel.h"
@@ -57,6 +57,7 @@
 #include "Editor/BlueprintPanel.h"
 #include "Editor/TilesetPanel.h"
 #include "Editor/RuleTilePanel.h"
+#include "Editor/TextureSlicerPanel.h"
 #include "Managers/RuntimeAnimationClipManager.h"
 #include "Managers/RuntimeFontManager.h"
 #include "RuntimeAsset/RuntimeAnimationClip.h"
@@ -147,7 +148,7 @@ Editor::Editor(ApplicationConfig config) : ApplicationBase(config)
     });
     m_uiCallbacks->onValueChanged.AddListener([this]()
     {
-        if (this && m_editorContext.activeScene)
+        if (m_editorContext.activeScene)
             SceneManager::GetInstance().PushUndoState(m_editorContext.activeScene);
     });
 }
@@ -271,6 +272,7 @@ void Editor::initializePanels()
     m_panels.push_back(std::make_unique<AssetInspectorPanel>());
     m_panels.push_back(std::make_unique<AIPanel>());
     m_panels.push_back(std::make_unique<BlueprintPanel>());
+    m_panels.push_back(std::make_unique<TextureSlicerPanel>());
 
     for (auto& panel : m_panels)
     {
@@ -466,7 +468,7 @@ void Editor::ShutdownDerived()
     }
     m_panels.clear();
 
-    
+
     if (m_editorContext.activeScene)
     {
         LogInfo("关闭编辑器，停用当前场景");
@@ -477,14 +479,14 @@ void Editor::ShutdownDerived()
         m_editorContext.editingScene->Deactivate();
     }
 
-    
+
     SceneManager::GetInstance().Shutdown();
     RuntimeTextureManager::GetInstance().Shutdown();
     RuntimeMaterialManager::GetInstance().Shutdown();
     RuntimePrefabManager::GetInstance().Shutdown();
     RuntimeSceneManager::GetInstance().Shutdown();
 
-    
+
     m_editorContext.activeScene.reset();
     m_editorContext.editingScene.reset();
     m_imguiRenderer.reset();
@@ -507,14 +509,13 @@ void Editor::OpenProject()
 
 void Editor::LoadProject(const std::filesystem::path& projectPath)
 {
-    
     if (m_editorContext.activeScene)
     {
         LogInfo("停用当前场景以切换项目");
         m_editorContext.activeScene->Deactivate();
     }
 
-    
+
     AssetManager::GetInstance().Shutdown();
     SceneManager::GetInstance().Shutdown();
     RuntimeTextureManager::GetInstance().Shutdown();
@@ -523,11 +524,11 @@ void Editor::LoadProject(const std::filesystem::path& projectPath)
     RuntimeSceneManager::GetInstance().Shutdown();
     RuntimeAnimationClipManager::GetInstance().Shutdown();
     RuntimeFontManager::GetInstance().Shutdown();
-    
-    
+
+
     m_editorContext.activeScene.reset();
     m_editorContext.editingScene.reset();
-    
+
     if (!std::filesystem::exists(projectPath))
     {
         LogError("项目文件不存在: {}", projectPath.string());

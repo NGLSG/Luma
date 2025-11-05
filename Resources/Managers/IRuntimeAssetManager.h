@@ -3,7 +3,8 @@
 #include "../../Utils/LazySingleton.h"
 #include <include/core/SkRefCnt.h>
 #include <unordered_map>
-
+#include "EventBus.h"
+#include "Events.h"
 #include "../../Utils/Guid.h"
 
 /**

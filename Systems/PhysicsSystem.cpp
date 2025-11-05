@@ -9,7 +9,7 @@
 
 #include "../Components/ColliderComponent.h"
 #include "../Components/IDComponent.h"
-#include "../Components/RigidBody.h"
+#include "../Components/Rigidbody.h"
 #include "../Components/Transform.h"
 
 

@@ -9,7 +9,7 @@
 
 #include "Transform.h"
 #ifndef B2_NULL_INDEX
-#define B2_NULL_INDEX ( -1 )
+inline static constexpr uint16_t B2_NULL_INDEX = -1;
 #endif
 namespace Systems
 {
@@ -139,7 +139,8 @@ namespace Systems
          * @param tags 可选的标签列表，用于过滤检测结果。只有具有这些标签的实体才会被考虑。
          */
         std::optional<RayCastResult> CircleCheck(const ECS::Vector2f& center, float radius,
-                                                 entt::registry& registry, const std::vector<std::string>& tags = {}) const;
+                                                 entt::registry& registry,
+                                                 const std::vector<std::string>& tags = {}) const;
         /**
          * @brief 对指定实体施加力或冲量。
          * @param entity 要施加力的实体。
@@ -149,7 +150,8 @@ namespace Systems
         void ApplyForce(entt::entity entity, const ECS::Vector2f& force, ForceMode mode);
 
     private:
-        void CreateShapesForEntity(entt::entity entity, entt::registry& registry, const ECS::TransformComponent& transform);
+        void CreateShapesForEntity(entt::entity entity, entt::registry& registry,
+                                   const ECS::TransformComponent& transform);
         void RecreateAllShapesForEntity(entt::entity entity, entt::registry& registry);
         void OnComponentUpdate(const ComponentUpdatedEvent& event);
         void SyncRigidBodyProperties(entt::entity entity, entt::registry& registry);

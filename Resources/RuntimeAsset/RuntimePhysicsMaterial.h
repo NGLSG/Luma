@@ -2,7 +2,7 @@
 #define RUNTIMEPHYSICSMATERIAL_H
 
 #include "IRuntimeAsset.h"
-#include "Box2D/types.h"
+#include "box2d/types.h"
 
 /**
  * @brief 运行时物理材质类。

@@ -76,6 +76,145 @@ namespace Systems
             }));
 
         
+        m_listeners.push_back(EventBus::GetInstance().Subscribe<AssetUpdatedEvent>(
+            [this](const AssetUpdatedEvent& event)
+            {
+                auto currentScene = SceneManager::GetInstance().GetCurrentScene();
+                if (!currentScene) return;
+                
+                auto& registry = currentScene->GetRegistry();
+                
+                
+                if (event.assetType == AssetType::Texture)
+                {
+                    
+                    auto spriteView = registry.view<ECS::SpriteComponent>();
+                    for (auto entity : spriteView)
+                    {
+                        auto& sprite = spriteView.get<ECS::SpriteComponent>(entity);
+                        if (sprite.textureHandle.assetGuid == event.guid)
+                        {
+                            OnSpriteUpdated(registry, entity);
+                        }
+                    }
+                    
+                    
+                    auto buttonView = registry.view<ECS::ButtonComponent>();
+                    for (auto entity : buttonView)
+                    {
+                        auto& button = buttonView.get<ECS::ButtonComponent>(entity);
+                        if (button.backgroundImage.assetGuid == event.guid)
+                        {
+                            OnButtonUpdated(registry, entity);
+                        }
+                    }
+                    
+                    auto inputTextView = registry.view<ECS::InputTextComponent>();
+                    for (auto entity : inputTextView)
+                    {
+                        auto& inputText = inputTextView.get<ECS::InputTextComponent>(entity);
+                        if (inputText.backgroundImage.assetGuid == event.guid)
+                        {
+                            OnInputTextUpdated(registry, entity);
+                        }
+                    }
+                    
+                    auto toggleButtonView = registry.view<ECS::ToggleButtonComponent>();
+                    for (auto entity : toggleButtonView)
+                    {
+                        OnToggleButtonUpdated(registry, entity);
+                    }
+                    
+                    auto radioButtonView = registry.view<ECS::RadioButtonComponent>();
+                    for (auto entity : radioButtonView)
+                    {
+                        OnRadioButtonUpdated(registry, entity);
+                    }
+                    
+                    auto checkBoxView = registry.view<ECS::CheckBoxComponent>();
+                    for (auto entity : checkBoxView)
+                    {
+                        OnCheckBoxUpdated(registry, entity);
+                    }
+                    
+                    auto sliderView = registry.view<ECS::SliderComponent>();
+                    for (auto entity : sliderView)
+                    {
+                        OnSliderUpdated(registry, entity);
+                    }
+                    
+                    auto comboBoxView = registry.view<ECS::ComboBoxComponent>();
+                    for (auto entity : comboBoxView)
+                    {
+                        OnComboBoxUpdated(registry, entity);
+                    }
+                    
+                    auto expanderView = registry.view<ECS::ExpanderComponent>();
+                    for (auto entity : expanderView)
+                    {
+                        OnExpanderUpdated(registry, entity);
+                    }
+                    
+                    auto progressBarView = registry.view<ECS::ProgressBarComponent>();
+                    for (auto entity : progressBarView)
+                    {
+                        OnProgressBarUpdated(registry, entity);
+                    }
+                    
+                    auto tabControlView = registry.view<ECS::TabControlComponent>();
+                    for (auto entity : tabControlView)
+                    {
+                        OnTabControlUpdated(registry, entity);
+                    }
+                    
+                    auto listBoxView = registry.view<ECS::ListBoxComponent>();
+                    for (auto entity : listBoxView)
+                    {
+                        OnListBoxUpdated(registry, entity);
+                    }
+                }
+                else if (event.assetType == AssetType::Material)
+                {
+                    
+                    auto spriteView = registry.view<ECS::SpriteComponent>();
+                    for (auto entity : spriteView)
+                    {
+                        auto& sprite = spriteView.get<ECS::SpriteComponent>(entity);
+                        if (sprite.materialHandle.assetGuid == event.guid)
+                        {
+                            OnSpriteUpdated(registry, entity);
+                        }
+                    }
+                }
+                else if (event.assetType == AssetType::Font)
+                {
+                    
+                    auto textView = registry.view<ECS::TextComponent>();
+                    for (auto entity : textView)
+                    {
+                        auto& text = textView.get<ECS::TextComponent>(entity);
+                        if (text.fontHandle.assetGuid == event.guid)
+                        {
+                            OnTextUpdated(registry, entity);
+                        }
+                    }
+                    
+                    auto inputTextView = registry.view<ECS::InputTextComponent>();
+                    for (auto entity : inputTextView)
+                    {
+                        auto& inputText = inputTextView.get<ECS::InputTextComponent>(entity);
+                        if (inputText.text.fontHandle.assetGuid == event.guid ||
+                            inputText.placeholder.fontHandle.assetGuid == event.guid)
+                        {
+                            OnInputTextUpdated(registry, entity);
+                        }
+                    }
+                }
+                
+                LogInfo("资产已更新，场景中的相关组件已刷新: {}", event.guid.ToString());
+            }));
+
+        
         for (auto entity : registry.storage<entt::entity>())
         {
             processEntity(entity);

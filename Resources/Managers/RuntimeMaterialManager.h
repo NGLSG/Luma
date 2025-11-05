@@ -69,9 +69,23 @@ public:
      */
     void DrawDebugUI();
 
-private:
-    RuntimeMaterialManager() = default;
+    /**
+     * @brief 析构函数。
+     */
+    ~RuntimeMaterialManager();
 
+private:
+    RuntimeMaterialManager();
+
+    /**
+     * @brief 资产更新事件回调函数。
+     * 当资产更新时被调用，用于处理材质相关的更新逻辑。
+     * @param e 资产更新事件数据。
+     */
+    void OnAssetUpdated(const AssetUpdatedEvent& e);
+
+private:
+    ListenerHandle m_onAssetUpdatedHandle; ///< 资产更新事件的监听器句柄。
     mutable MaterialPerformanceData m_performanceData; ///< 材质性能数据。
 };
 

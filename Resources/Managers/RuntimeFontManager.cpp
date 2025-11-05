@@ -1,6 +1,22 @@
 #include "RuntimeFontManager.h"
 #include <imgui.h>
 
+#include "EventBus.h"
+#include "Event/Events.h"
+
+RuntimeFontManager::RuntimeFontManager()
+{
+    m_onAssetUpdatedHandle = EventBus::GetInstance().Subscribe<AssetUpdatedEvent>([this](const AssetUpdatedEvent& e)
+    {
+        OnAssetUpdated(e);
+    });
+}
+
+RuntimeFontManager::~RuntimeFontManager()
+{
+    EventBus::GetInstance().Unsubscribe(m_onAssetUpdatedHandle);
+}
+
 sk_sp<SkTypeface> RuntimeFontManager::TryGetAsset(const Guid& guid) const
 {
     auto asset = RuntimeAssetManagerBase<SkTypeface>::TryGetAsset(guid);
@@ -132,4 +148,13 @@ void RuntimeFontManager::SetMaxFontCount(int count)
 {
     m_performanceData.maxFontCount = count;
     EnforceBudget();
+}
+
+void RuntimeFontManager::OnAssetUpdated(const AssetUpdatedEvent& e)
+{
+    if (e.assetType == AssetType::Font)
+    {
+        
+        TryRemoveAsset(e.guid);
+    }
 }

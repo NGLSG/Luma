@@ -467,6 +467,14 @@ bool ConsolePanel::shouldShowLogEntry(const LogEntry& entry) const
     case LogLevel::Debug:
         if (!filter.showDebug) return false;
         break;
+    case LogLevel::Trace:
+        if (!filter.showDebug) return false;
+        break;
+    case LogLevel::Critical:
+        if (!filter.showError) return false;
+        break;
+    default:
+        break;
     }
 
 
@@ -497,13 +505,16 @@ ImVec4 ConsolePanel::getLogLevelColor(LogLevel level) const
     case LogLevel::Warning:
         return ImVec4(1.0f, 0.8f, 0.0f, 1.0f);
     case LogLevel::Error:
+    case LogLevel::Critical: 
         return ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
     case LogLevel::Debug:
+    case LogLevel::Trace: 
         return ImVec4(0.4f, 1.0f, 0.4f, 1.0f);
     default:
         return ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
     }
 }
+
 
 const char* ConsolePanel::getLogLevelIcon(LogLevel level) const
 {
@@ -514,8 +525,10 @@ const char* ConsolePanel::getLogLevelIcon(LogLevel level) const
     case LogLevel::Warning:
         return "⚠";
     case LogLevel::Error:
+    case LogLevel::Critical: 
         return "❌";
     case LogLevel::Debug:
+    case LogLevel::Trace: 
         return "🐛";
     default:
         return "?";
@@ -532,12 +545,17 @@ const char* ConsolePanel::getLogLevelText(LogLevel level) const
         return "警告";
     case LogLevel::Error:
         return "错误";
+    case LogLevel::Critical: 
+        return "严重";
     case LogLevel::Debug:
         return "调试";
+    case LogLevel::Trace: 
+        return "追踪";
     default:
         return "未知";
     }
 }
+
 
 std::string ConsolePanel::formatTimestamp(const std::chrono::steady_clock::time_point& timestamp) const
 {
@@ -579,10 +597,15 @@ void ConsolePanel::updateLogCounts()
             warningCount += multiplier;
             break;
         case LogLevel::Error:
+        case LogLevel::Critical: 
             errorCount += multiplier;
             break;
         case LogLevel::Debug:
+        case LogLevel::Trace: 
             debugCount += multiplier;
+            break;
+        default:
+            
             break;
         }
     }

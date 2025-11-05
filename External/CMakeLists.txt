@@ -218,7 +218,8 @@ if (ANDROID)
             "SDL_STATIC ON"
             "SDL_TEST OFF"
             "SDL_EXAMPLES OFF"
-            "SDL_VULKAN ON"
+            "SDL_VULKAN OFF"
+            "SDL_ANDROID ON"
     )
 else ()
     CPMAddPackage(

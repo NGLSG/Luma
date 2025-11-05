@@ -228,6 +228,8 @@ public:
      */
     virtual std::string sendRequest(std::string data, size_t ts) =0;
 
+    virtual ~ChatBot() = default;
+
 protected:
     long long lastTimeStamp = 0; ///< 上次操作的时间戳。
     std::mutex fileAccessMutex; ///< 用于文件访问的互斥锁。

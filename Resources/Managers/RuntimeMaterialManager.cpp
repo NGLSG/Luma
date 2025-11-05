@@ -1,5 +1,19 @@
 #include "RuntimeMaterialManager.h"
 #include <imgui.h>
+#include "Event/Events.h"
+
+RuntimeMaterialManager::RuntimeMaterialManager()
+{
+    m_onAssetUpdatedHandle = EventBus::GetInstance().Subscribe<AssetUpdatedEvent>([this](const AssetUpdatedEvent& e)
+    {
+        OnAssetUpdated(e);
+    });
+}
+
+RuntimeMaterialManager::~RuntimeMaterialManager()
+{
+    EventBus::GetInstance().Unsubscribe(m_onAssetUpdatedHandle);
+}
 
 sk_sp<Material> RuntimeMaterialManager::TryGetAsset(const Guid& guid) const
 {
@@ -88,4 +102,13 @@ void RuntimeMaterialManager::DrawDebugUI()
         }
     }
     ImGui::End();
+}
+
+void RuntimeMaterialManager::OnAssetUpdated(const AssetUpdatedEvent& e)
+{
+    if (e.assetType == AssetType::Material || e.assetType == AssetType::Texture)
+    {
+        
+        TryRemoveAsset(e.guid);
+    }
 }

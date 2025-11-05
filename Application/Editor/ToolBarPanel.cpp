@@ -1,4 +1,4 @@
-#include "ToolbarPanel.h"
+#include "ToolBarPanel.h"
 #include "PopupManager.h"
 #include "AnimationSystem.h"
 #include "AssetManager.h"
@@ -779,6 +779,13 @@ void ToolbarPanel::newScene()
 
     auto queueNewScene = [ctx = m_context]()
     {
+        
+        if (ctx->activeScene)
+        {
+            LogInfo("停用旧场景以创建新场景");
+            ctx->activeScene->Deactivate();
+        }
+
         sk_sp<RuntimeScene> newScene = sk_make_sp<RuntimeScene>();
         newScene->SetName("NewScene");
         newScene->AddEssentialSystem<Systems::HydrateResources>();

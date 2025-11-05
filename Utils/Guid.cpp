@@ -1,8 +1,12 @@
 #include "Guid.h"
-#include "Guid.h"
 #include <stdexcept>
 #include <format>
 #include <openssl/rand.h>
+#include <charconv> 
+#include <system_error> 
+#include <unordered_map>
+#include <mutex>
+#include <compare> 
 
 Guid::Guid() : m_data{}
 {
@@ -28,10 +32,10 @@ Guid Guid::NewGuid()
     }
 
 
-    bytes[6] = (bytes[6] & 0x0F) | 0x40;
+    bytes[6] = (bytes[6] & 0x0F) | 0x40; 
 
 
-    bytes[8] = (bytes[8] & 0x3F) | 0x80;
+    bytes[8] = (bytes[8] & 0x3F) | 0x80; 
 
     return Guid(bytes);
 }
@@ -110,6 +114,7 @@ Guid Guid::FromString(const std::string& str)
 
 std::string Guid::ToString() const
 {
+    
     return std::format("{:02x}{:02x}{:02x}{:02x}-"
                        "{:02x}{:02x}-"
                        "{:02x}{:02x}-"
@@ -131,7 +136,8 @@ const char* Guid::c_str() const
 
 bool Guid::Valid() const
 {
-    return m_data != std::array<uint8_t, 16>{} || this == &Invalid();
+    
+    return m_data != std::array<uint8_t, 16>{};
 }
 
 bool Guid::operator==(const Guid& other) const
@@ -142,6 +148,12 @@ bool Guid::operator==(const Guid& other) const
 bool Guid::operator!=(const Guid& other) const
 {
     return !(*this == other);
+}
+
+std::strong_ordering Guid::operator<=>(const Guid& other) const
+{
+    
+    return m_data <=> other.m_data;
 }
 
 const std::array<uint8_t, 16>& Guid::GetBytes() const

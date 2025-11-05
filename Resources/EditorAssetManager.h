@@ -17,7 +17,6 @@
 #include "AssetMetadata.h"
 #include "IAssetManager.h"
 
-
 class IAssetImporter;
 
 /**

@@ -7,7 +7,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include "ComponentRegistry.h"
-#include "Box2D/id.h"
+#include "box2d/id.h"
 
 
 namespace ECS

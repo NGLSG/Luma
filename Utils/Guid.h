@@ -2,7 +2,7 @@
 #include <string>
 #include <array>
 #include <cstdint>
-#include <compare>
+#include <compare> // 用于 std::strong_ordering
 
 #include "yaml-cpp/yaml.h"
 #include "Platform.h"
@@ -83,6 +83,13 @@ public:
      * @return 不相等返回 true，否则返回 false
      */
     bool operator!=(const Guid& other) const;
+
+    /**
+     * @brief 三向比较运算符。
+     * @param other 另一个 Guid
+     * @return 比较结果 (std::strong_ordering)
+     */
+    std::strong_ordering operator<=>(const Guid& other) const;
 
     /**
      * @brief Guid 隐式转换为字符串。

@@ -1,68 +1,120 @@
-#ifndef LUMAENGINE_ASSETINSPECTORPANEL_H
-#define LUMAENGINE_ASSETINSPECTORPANEL_H
+#pragma once
 
-#include "EditorContext.h"
-#include "IEditorPanel.h"
-#include "Resources/AssetMetadata.h"
-#include <unordered_set>
+#include "IEditorPanel.h" // 包含 IEditorPanel 基类
+#include "Resources/AssetMetadata.h" // 包含 AssetType 和 AssetMetadata
+#include "EventBus.h"
+#include <filesystem>
+#include <vector>
+#include <set>
+#include <any> // 用于类型擦除的 m_deserializedSettings
+#include <yaml-cpp/yaml.h>
+
+// 前向声明
+class EditorContext;
 
 /**
- * @brief 资产检查器面板，用于显示和编辑资产的元数据和设置。
+ * @brief 资产检视器面板
+ *
+ * 负责在编辑器中显示和编辑所选资产（Assets）的导入设置（Importer Settings）。
+ * 支持多选相同类型的资产并批量编辑。
+ * 使用类型擦除（std::any）来存储反序列化后的设置，以优化性能。
  */
 class AssetInspectorPanel : public IEditorPanel
 {
 public:
     /**
-     * @brief 初始化资产检查器面板。
+     * @brief 默认构造函数。
+     */
+    AssetInspectorPanel() = default;
+
+    /**
+     * @brief 默认析构函数。
+     */
+    ~AssetInspectorPanel() override = default;
+
+    /**
+     * @brief 初始化面板。
      * @param context 编辑器上下文指针。
      */
     void Initialize(EditorContext* context) override;
 
     /**
-     * @brief 绘制资产检查器面板的用户界面。
+     * @brief 更新面板状态（此面板中当前未使用）。
+     * @param deltaTime 帧间时间。
+     */
+    void Update(float deltaTime) override;
+
+    /**
+     * @brief 绘制面板的ImGui界面。
      */
     void Draw() override;
 
     /**
-     * @brief 关闭资产检查器面板。
+     * @brief 关闭面板并清理资源。
      */
     void Shutdown() override;
 
     /**
-     * @brief 更新资产检查器面板的状态。
-     * @param deltaTime 帧之间的时间间隔。
+     * @brief 获取面板的显示名称。
+     * @return 面板名称。
      */
-    void Update(float deltaTime) override
-    {
-    }
+    const char* GetPanelName() const override { return "资产检视器"; }
+
+private:
+    /**
+     * @brief 当编辑器的资产选择发生变化时，重置面板内部状态。
+     *
+     * 这是面板的核心性能优化点之一。
+     * 它会执行一次昂贵的反序列化（Deserialize），将YAML::Node转换为
+     * 存储在 m_deserializedSettings (std::any) 中的C++结构体。
+     */
+    void resetStateFromSelection();
 
     /**
-     * @brief 获取面板的名称。
-     * @return 面板的名称字符串。
+     * @brief 绘制检视器的主UI。
+     *
+     * 此函数现在只对已反序列化的C++对象（通过 void*）进行操作，
+     * 避免了在循环中进行昂贵的 `settings.as<T>()` 调用。
      */
-    const char* GetPanelName() const override { return "资产设置"; }
-
-private:
-    /// @brief 绘制检查器用户界面。
     void drawInspectorUI();
-    /// @brief 应用所有更改。
+
+    /**
+     * @brief 应用所有已修改（"dirty"）的属性。
+     *
+     * 此函数会执行一次昂贵的序列化（Serialize），将C++结构体
+     * (m_deserializedSettings) 转换回 YAML::Node，
+     * 然后仅将已更改的属性写回 .meta 文件。
+     */
     void applyChanges();
-    /// @brief 根据当前选择重置面板状态。
-    void resetStateFromSelection();
-    /// @brief 将元数据和设置保存到文件。
-    /// @param metadata 要保存的资产元数据。
-    /// @param settings 要保存的YAML设置。
-    void saveMetadataToFile(const AssetMetadata& metadata, const YAML::Node& settings);
+
+    /**
+     * @brief 将新的设置保存到资产的 .meta 文件，并触发重新导入。
+     * @param originalMetadata 原始的资产元数据。
+     * @param newSettings 包含已更改属性的新 YAML::Node。
+     */
+    void saveMetadataToFile(const AssetMetadata& originalMetadata, const YAML::Node& newSettings);
+
+    /**
+     * @brief 打开纹理切片编辑器（仅用于纹理资产）。
+     */
+    void openTextureSlicer();
 
 private:
-    EditorContext* m_context = nullptr; ///< 编辑器上下文指针。
+    ///< 当前在面板中编辑的资产路径列表。
+    std::vector<std::filesystem::path> m_currentEditingPaths;
 
-    std::vector<std::filesystem::path> m_currentEditingPaths; ///< 当前正在编辑的资产文件路径列表。
-    YAML::Node m_editingSettings; ///< 当前正在编辑的资产设置。
-    AssetType m_editingAssetType = AssetType::Unknown; ///< 当前正在编辑的资产类型。
+    ///< 当前编辑的资产类型。
+    AssetType m_editingAssetType = AssetType::Unknown;
 
-    std::unordered_set<std::string> m_mixedValueProperties; ///< 具有混合值的属性集合（当多选资产时）。
-    std::unordered_set<std::string> m_dirtyProperties; ///< 已修改的属性集合。
+    ///< 存储类型擦除后的C++设置对象（例如 TextureImporterSettings）。
+    std::any m_deserializedSettings;
+
+    ///< 标记 m_deserializedSettings 是否有效。
+    bool m_isDeserialized = false;
+
+    ///< 存储在多选时具有混合值的属性名称。
+    std::set<std::string> m_mixedValueProperties;
+
+    ///< 存储在UI中被修改过的属性名称。
+    std::set<std::string> m_dirtyProperties;
 };
-
-#endif

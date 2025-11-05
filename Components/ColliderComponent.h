@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "ComponentRegistry.h"
-#include "Box2D/id.h"
+#include "box2d/id.h"
 
 /**
  * @brief Box2D形状的前向声明。

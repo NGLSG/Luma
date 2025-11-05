@@ -1,5 +1,6 @@
 #ifndef PCH_H
 #define PCH_H
+#define _LIBCPP_ENABLE_EXPERIMENTAL
 #include "Logger.h"
 #include "Directory.h"
 #include "Guid.h"

@@ -1,5 +1,41 @@
 cmake_minimum_required(VERSION 3.21)
+# VCPKG 和 NDK 的配置应在 project() 之前，以便工具链被正确加载
+# 但 CLion 的 --target 修复必须在 project() 之后
+if (ANDROID)
+    set(ANDROID_NDK_HOME "E:\\Android\\Sdk\\ndk\\27.0.12077973")
+    set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake")
+    set(VCPKG_TARGET_TRIPLET "arm64-android")
+endif ()
+
 project(LumaEngine CXX)
+
+# CLion NDK --target 修复 (必须在 project() 之后)
+if (ANDROID)
+    set(ANDROID_LIBS log android)
+    if (CMAKE_ANDROID_ARCH_ABI AND ANDROID_PLATFORM)
+        set(NDK_TARGET_ARCH "")
+        set(NDK_TARGET_SUFFIX "-linux-android")
+
+        if (CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+            set(NDK_TARGET_ARCH "aarch64")
+        elseif (CMAKE_ANDROID_ARCH_ABI STREQUAL "armeabi-v7a")
+            set(NDK_TARGET_ARCH "armv7a")
+            set(NDK_TARGET_SUFFIX "-linux-androideabi") # ARMv7a 使用不同的 eabi 后缀
+        elseif (CMAKE_ANDROID_ARCH_ABI STREQUAL "x86_64")
+            set(NDK_TARGET_ARCH "x86_64")
+        elseif (CMAKE_ANDROID_ARCH_ABI STREQUAL "x86")
+            set(NDK_TARGET_ARCH "i686")
+        endif ()
+
+        string(REGEX REPLACE "android-([0-9]+)" "\\1" ANDROID_API_LEVEL "${ANDROID_PLATFORM}")
+        set(NDK_TARGET_TRIPLE "${NDK_TARGET_ARCH}${NDK_TARGET_SUFFIX}${ANDROID_API_LEVEL}")
+
+        message(STATUS "CLion NDK Fix: 正在强制 --target=${NDK_TARGET_TRIPLE}")
+        # 修正：将新标志追加到现有标志之后，而不是覆盖
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --target=${NDK_TARGET_TRIPLE}")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=${NDK_TARGET_TRIPLE}")
+    endif ()
+endif ()
 
 # =============================================================================
 # 全局设置
@@ -45,6 +81,7 @@ elseif (UNIX AND NOT APPLE)
 elseif (APPLE)
     add_compile_definitions(LUMA_PLATFORM_MACOS)
 endif ()
+
 
 if (LUMA_ARCH_NAME STREQUAL "arm64")
     add_compile_definitions(LUMA_ARM64)
@@ -297,8 +334,10 @@ if (UNIX AND NOT APPLE)
             -Wl,--gc-sections
     )
 endif ()
-
-# 预编译头
+if (ANDROID)
+    # 确保 target 层也取消定义该宏以覆盖局部定义
+    target_compile_options(LumaEngine PRIVATE -U_LIBCPP_HAS_NO_EXPERIMENTAL_STOP_TOKEN)
+endif ()
 target_precompile_headers(LumaEngine PUBLIC "Utils/PCH.h")
 
 # =============================================================================
