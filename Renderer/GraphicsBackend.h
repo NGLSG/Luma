@@ -109,7 +109,7 @@ private:
     bool isDeviceLost = false; ///< 设备是否丢失的标志。
 
     wgpu::Surface surface; ///< WebGPU 表面。
-    wgpu::TextureFormat surfaceFormat = wgpu::TextureFormat::BGRA8Unorm; ///< 表面纹理格式。
+    wgpu::TextureFormat surfaceFormat = wgpu::TextureFormat::RGBA8Unorm; ///< 表面纹理格式。
     wgpu::SurfaceTexture m_currentSurfaceTexture; ///< 当前表面纹理。
 
 

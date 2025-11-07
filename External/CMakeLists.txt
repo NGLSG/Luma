@@ -214,11 +214,9 @@ if (ANDROID)
             GITHUB_REPOSITORY libsdl-org/SDL
             GIT_TAG 2ef79441701c87c801fe0e1456321a791f4b2faf
             OPTIONS
-            "SDL_SHARED OFF"
-            "SDL_STATIC ON"
+            "SDL_SHARED ON"
             "SDL_TEST OFF"
             "SDL_EXAMPLES OFF"
-            "SDL_VULKAN OFF"
             "SDL_ANDROID ON"
     )
 else ()

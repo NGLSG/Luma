@@ -10,7 +10,7 @@
  *
  * 该类用于对数据进行加密和解密操作，内部包含密钥派生、数据加解密、MAC 计算与校验、随机字节生成等功能。
  */
-class EngineCrypto : public LazySingleton<EngineCrypto>
+class LUMA_API EngineCrypto : public LazySingleton<EngineCrypto>
 {
 public:
     friend class LazySingleton<EngineCrypto>;

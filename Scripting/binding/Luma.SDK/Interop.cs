@@ -35,6 +35,7 @@ public static class Interop
 
             Debug.Log($"[Domain] InitializeDomain: {baseDir}");
             DomainManager.Initialize(baseDir);
+            Debug.Log("[Domain] InitializeDomain: Completed.");
         }
         catch (Exception e)
         {
@@ -164,6 +165,7 @@ public static class Interop
                 {
                     break;
                 }
+
                 Thread.Sleep(sleep);
             }
         }
@@ -193,18 +195,36 @@ public static class Interop
     {
         try
         {
+            Debug.Log($"[ResolveType] 开始解析 - assemblyName: {assemblyName}, typeName: {typeName}");
+
             Type? type = DomainManager.ResolveType(assemblyName, typeName);
             if (type != null)
             {
+                Debug.Log($"[ResolveType] 从 DomainManager 成功解析类型：{type.FullName}");
                 return type;
             }
+
+            Debug.Log($"[ResolveType] DomainManager 未找到类型，尝试从已加载的程序集查找...");
 
             Assembly? assembly = AppDomain.CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => a.GetName().Name == assemblyName);
 
             if (assembly == null)
             {
-                assembly = Assembly.Load(assemblyName);
+                Debug.Log($"[ResolveType] 已加载的程序集中未找到 '{assemblyName}'，尝试动态加载...");
+                try
+                {
+                    assembly = Assembly.Load(assemblyName);
+                    Debug.Log($"[ResolveType] 成功动态加载程序集 '{assemblyName}'");
+                }
+                catch (Exception loadEx)
+                {
+                    Debug.Log($"[ResolveType] 动态加载程序集失败: {loadEx.Message}");
+                }
+            }
+            else
+            {
+                Debug.Log($"[ResolveType] 在已加载程序集中找到 '{assemblyName}'");
             }
 
             if (assembly != null)
@@ -212,18 +232,31 @@ public static class Interop
                 Type? t = assembly.GetType(typeName, throwOnError: false, ignoreCase: false);
                 if (t != null)
                 {
+                    Debug.Log($"[ResolveType] 成功从程序集解析类型：{t.FullName}");
                     return t;
+                }
+                else
+                {
+                    Debug.Log($"[ResolveType] 程序集中未找到类型 '{typeName}'");
+
+                    
+                    Debug.Log($"[ResolveType] 程序集 '{assemblyName}' 中可用的类型：");
+                    foreach (var availableType in assembly.GetTypes())
+                    {
+                        Debug.Log($"  - {availableType.FullName}");
+                    }
                 }
             }
         }
         catch (Exception e)
         {
-            Debug.Log($"[EXCEPTION] ResolveType failed for '{typeName}' in '{assemblyName}': {e.Message}");
+            Debug.Log($"[EXCEPTION] ResolveType 失败，类型 '{typeName}'，程序集 '{assemblyName}': {e.Message}\n{e.StackTrace}");
         }
 
-        Debug.Log($"[ERROR] Failed to find type '{typeName}' in assembly '{assemblyName}'.");
+        Debug.Log($"[ERROR] 最终未能找到类型 '{typeName}' in '{assemblyName}'");
         return null;
     }
+
 
     internal static Script? GetScriptInstance(IntPtr scenePtr, uint entityId, Type scriptType)
     {
@@ -271,58 +304,75 @@ public static class Interop
     public static IntPtr CreateScriptInstance(IntPtr scenePtr, uint entityId, IntPtr typeNamePtr,
         IntPtr assemblyNamePtr)
     {
+        Debug.Log($"[CreateScriptInstance] 调用开始...");
         try
         {
             string? typeName = Marshal.PtrToStringUTF8(typeNamePtr);
             string? assemblyName = Marshal.PtrToStringUTF8(assemblyNamePtr);
+
+            Debug.Log(
+                $"[CreateScriptInstance] 开始创建实例 - typeName: {typeName}, assemblyName: {assemblyName}, scenePtr: {scenePtr}, entityId: {entityId}");
+
             if (string.IsNullOrEmpty(typeName) || string.IsNullOrEmpty(assemblyName))
             {
-                Debug.Log("CreateScriptInstance failed: typeName or assemblyName is null or empty.");
+                Debug.Log("[CreateScriptInstance] 失败：typeName 或 assemblyName 为空");
                 return IntPtr.Zero;
             }
 
             if (scenePtr == IntPtr.Zero)
             {
-                Debug.Log("CreateScriptInstance failed: scenePtr is null.");
+                Debug.Log("[CreateScriptInstance] 失败：scenePtr 为 null");
                 return IntPtr.Zero;
             }
 
+            Debug.Log($"[CreateScriptInstance] 调用 ResolveType...");
             Type? type = ResolveType(assemblyName, typeName);
 
-            if (type == null || !typeof(Script).IsAssignableFrom(type))
+            if (type == null)
             {
-                Debug.Log(
-                    $"CreateScriptInstance failed: Type '{typeName}' not found in assembly '{assemblyName}' or does not inherit from Luma.SDK.Script.");
+                Debug.Log($"[CreateScriptInstance] 失败：ResolveType 返回 null，无法找到类型 '{typeName}' in '{assemblyName}'");
                 return IntPtr.Zero;
             }
 
+            Debug.Log($"[CreateScriptInstance] 成功解析类型：{type.FullName}");
+
+            if (!typeof(Script).IsAssignableFrom(type))
+            {
+                Debug.Log($"[CreateScriptInstance] 失败：类型 '{typeName}' 不继承自 Script");
+                return IntPtr.Zero;
+            }
+
+            Debug.Log($"[CreateScriptInstance] 创建实例...");
             var inst = Activator.CreateInstance(type);
             if (inst is not Script instance)
             {
-                Debug.Log(
-                    $"CreateScriptInstance failed: Could not create instance or instance is not a Script for type '{typeName}'.");
+                Debug.Log($"[CreateScriptInstance] 失败：无法创建实例或实例不是 Script 类型");
                 return IntPtr.Zero;
             }
 
+            Debug.Log($"[CreateScriptInstance] 设置 Entity...");
             try
             {
                 var entity = new Entity(entityId, scenePtr);
                 instance.Self = entity;
+                Debug.Log($"[CreateScriptInstance] Entity 设置成功");
             }
             catch (Exception ex)
             {
                 Debug.Log(
-                    $"CreateScriptInstance failed: Could not create Entity for entityId {entityId}: {ex.Message}");
+                    $"[CreateScriptInstance] 失败：无法创建 Entity，entityId={entityId}, 异常: {ex.Message}\n{ex.StackTrace}");
                 return IntPtr.Zero;
             }
 
+            Debug.Log($"[CreateScriptInstance] 分配 GCHandle...");
             GCHandle handle = GCHandle.Alloc(instance);
             IntPtr handlePtr = GCHandle.ToIntPtr(handle);
+
             lock (s_instanceLock)
             {
                 if (s_liveInstances.ContainsKey(handlePtr))
                 {
-                    Debug.LogWarning($"CreateScriptInstance: Handle {handlePtr} already exists, freeing new handle.");
+                    Debug.LogWarning($"[CreateScriptInstance] 警告：Handle {handlePtr} 已存在，释放新 handle");
                     handle.Free();
                     return IntPtr.Zero;
                 }
@@ -330,14 +380,16 @@ public static class Interop
                 s_liveInstances[handlePtr] = instance;
             }
 
+            Debug.Log($"[CreateScriptInstance] 成功创建实例，handle: {handlePtr}");
             return handlePtr;
         }
         catch (Exception e)
         {
-            Debug.Log($"[EXCEPTION] CreateScriptInstance failed: {e.Message}\nStackTrace: {e.StackTrace}");
+            Debug.Log($"[EXCEPTION] CreateScriptInstance 发生异常: {e.Message}\n堆栈跟踪: {e.StackTrace}");
             return IntPtr.Zero;
         }
     }
+
 
     [UnmanagedCallersOnly]
     public static void OnCreate(IntPtr handleValue)
@@ -581,7 +633,8 @@ public static class Interop
                     }
                     catch (Exception)
                     {
-                        Debug.LogWarning($"SetExportedProperty: Failed to create logic component '{memberType.Name}' with Entity ctor for property '{propName}'.");
+                        Debug.LogWarning(
+                            $"SetExportedProperty: Failed to create logic component '{memberType.Name}' with Entity ctor for property '{propName}'.");
                         return;
                     }
                 }

@@ -184,6 +184,11 @@ public:
      */
     static std::unique_ptr<PlatformWindow> Create(const std::string& title, int width, int height);
 
+#if defined(SDL_PLATFORM_ANDROID)
+    // Android: allow injecting an existing ANativeWindow* from Java/Kotlin layer
+    static void SetAndroidNativeWindow(void* nativeWindow);
+#endif
+
     /**
      * @brief 设置或取消窗口的全屏模式。
      * @param fullscreen 如果为true，则进入全屏模式；否则退出全屏模式。

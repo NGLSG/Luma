@@ -34,5 +34,8 @@ public:
      * @return 解包后的资产元数据数据库，键为资产路径，值为资产元数据。
      */
     static std::unordered_map<std::string, AssetMetadata> Unpack(const std::filesystem::path& packageManifestPath);
+private:
+    static std::vector<unsigned char> ReadChunkFile(const std::filesystem::path& chunkPath);
+
 };
 #endif

@@ -89,7 +89,7 @@ namespace ImGui
 
     struct MarkdownConfig
     {
-        static const int NUMHEADINGS = 3;
+        static constexpr int NUMHEADINGS = 3;
 
         MarkdownLinkCallback* linkCallback = NULL;
         MarkdownTooltipCallback* tooltipCallback = NULL;

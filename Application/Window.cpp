@@ -12,6 +12,10 @@
 #include <shellapi.h>
 #endif
 
+#if defined(SDL_PLATFORM_ANDROID)
+static void* g_androidNativeWindow = nullptr;
+#endif
+
 
 PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
 {
@@ -20,12 +24,29 @@ PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
         throw std::runtime_error("Failed to initialize SDL: " + std::string(SDL_GetError()));
     }
 
-    sdlWindow = SDL_CreateWindow(
-        title.c_str(),
-        width,
-        height,
-        SDL_WINDOW_RESIZABLE
-    );
+    
+#if defined(SDL_PLATFORM_ANDROID)
+    if (g_androidNativeWindow)
+    {
+        SDL_PropertiesID props = SDL_CreateProperties();
+        SDL_SetPointerProperty(props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, g_androidNativeWindow);
+        SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING  , title.c_str());
+        SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, width);
+        SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height);
+        sdlWindow = SDL_CreateWindowWithProperties(props);
+        SDL_DestroyProperties(props);
+        g_androidNativeWindow = nullptr;
+    }
+    else
+#endif
+    {
+        sdlWindow = SDL_CreateWindow(
+            title.c_str(),
+            width,
+            height,
+            SDL_WINDOW_RESIZABLE
+        );
+    }
 
     if (!sdlWindow)
     {
@@ -67,6 +88,13 @@ PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
     }
 #endif
 }
+
+#if defined(SDL_PLATFORM_ANDROID)
+void PlatformWindow::SetAndroidNativeWindow(void* nativeWindow)
+{
+    g_androidNativeWindow = nativeWindow;
+}
+#endif
 
 PlatformWindow::~PlatformWindow()
 {

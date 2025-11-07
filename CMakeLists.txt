@@ -291,6 +291,9 @@ add_library(LumaEngine SHARED
         ${LUMA_ENGINE_SOURCES}
         Luma_CAPI.cpp
         Luma_CAPI.h
+        GameEntry.cpp
+        EditorEntry.cpp
+        EngineEntry.h
 )
 
 # 设置包含目录

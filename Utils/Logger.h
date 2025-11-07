@@ -15,6 +15,11 @@
 #include <windows.h>
 #endif
 
+// 检查是否为 Android 平台
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 #include "../Components/Core.h"
 #include "../Event/LumaEvent.h"
 
@@ -38,6 +43,7 @@ using LoggingCallback = LumaEvent<std::string_view, LogLevel>;
 
 /**
  * @brief Logger 日志工具类，支持多级别日志输出、回调、控制台彩色输出等功能。
+ * (已修改：支持 Android logcat 输出)
  */
 class Logger
 {
@@ -58,10 +64,16 @@ public:
     static LogLevel GetLevel() { return minLevel; }
 
     /**
-     * @brief 启用或禁用控制台输出。
-     * @param enabled 是否启用控制台输出
+     * @brief 启用或禁用控制台 / Logcat 输出。
+     * @param enabled 是否启用控制台 / Logcat 输出
      */
     static void EnableConsoleOutput(bool enabled) { consoleOutputEnabled = enabled; }
+
+    /**
+     * @brief [新增] 设置 Android Logcat 使用的 TAG。
+     * @param tag Logcat TAG
+     */
+    static void SetLogTag(const char* tag) { logTag = tag; }
 
     /**
      * @brief 获取日志消息回调对象。
@@ -115,11 +127,8 @@ public:
                 return;
             }
 
-            // 对参数进行必要的转换（例如 wstring -> string）
             auto transformedArgsTuple = std::make_tuple(transformLogArg(std::forward<Args>(args))...);
 
-            // 将 tuple 展开并直接调用接收参数包的 log 模板函数，这样 std::make_format_args 会在 Logger::log 的栈帧内被建立并立即使用，
-            // 避免了 format_args 指向 lambda 局部变量后悬垂的问题。
             std::apply(
                 [&](auto&&... targs) {
                     Logger::log(level, location, fmt, std::forward<decltype(targs)>(targs)...);
@@ -213,7 +222,7 @@ private:
 
     /**
      * @brief 实际日志输出实现（模板版本），接受参数包并在函数内构造 format_args 并立即用于 vformat，
-     *        这样可以保证 format_args 内指针的目标在 vformat 调用期间仍然有效，从而避免悬垂指针导致的崩溃。
+     * 这样可以保证 format_args 内指针的目标在 vformat 调用期间仍然有效，从而避免悬垂指针导致的崩溃。
      *
      * @tparam Args 参数类型包
      * @param level 日志级别
@@ -229,14 +238,26 @@ private:
     {
         initialize();
 
-        // 在当前栈帧内立即构造 format_args 并用于 vformat，保证引用安全
         const std::string message = std::vformat(fmt, std::make_format_args(std::forward<Args>(args)...));
 
-        // 触发回调，注意回调接收的是 string_view，监听方如果需要持久保存请复制内容
         OnLogMessage.Invoke(message, level);
 
         if (!consoleOutputEnabled) return;
+        std::string_view fileName = location.file_name();
+        if (const auto pos = fileName.find_last_of("/\\"); pos != std::string_view::npos)
+        {
+            fileName.remove_prefix(pos + 1);
+        }
+        const std::string sourceInfo = std::format("{}:{}", fileName, location.line());
 
+
+#ifdef __ANDROID__
+        __android_log_print(getAndroidPriority(level),
+                            logTag,
+                            "[%s] %s",
+                            sourceInfo.c_str(),
+                            message.c_str());
+#else
         const auto now = std::chrono::system_clock::now();
         const auto timeT = std::chrono::system_clock::to_time_t(now);
         const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
@@ -252,15 +273,8 @@ private:
         std::strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", &timeInfo);
         const std::string timestamp = std::format("{}.{:03}", timeBuffer, ms.count());
 
-        std::string_view fileName = location.file_name();
-        if (const auto pos = fileName.find_last_of("/\\"); pos != std::string_view::npos)
-        {
-            fileName.remove_prefix(pos + 1);
-        }
-
         auto [levelStr, color] = getLevelMetadata(level);
 
-        const std::string sourceInfo = std::format("{}:{}", fileName, location.line());
         const std::string fullMessage = std::format("[{}] [{:<8}] [{}] {}",
                                                     timestamp, levelStr, sourceInfo, message);
 
@@ -269,10 +283,31 @@ private:
             << static_cast<int>(color.g * 255) << ";"
             << static_cast<int>(color.b * 255) << "m"
             << fullMessage << "\033[0m" << std::endl;
+#endif
     }
 
+#ifdef __ANDROID__
     /**
-     * @brief 获取日志级别对应的字符串和颜色。
+     * @brief 获取 Android Logcat 对应的日志优先级。
+     * @param level 自定义日志级别
+     * @return Android 日志优先级
+     */
+    static android_LogPriority getAndroidPriority(LogLevel level)
+    {
+        switch (level)
+        {
+        case LogLevel::Trace:    return ANDROID_LOG_VERBOSE;
+        case LogLevel::Debug:    return ANDROID_LOG_DEBUG;
+        case LogLevel::Info:     return ANDROID_LOG_INFO;
+        case LogLevel::Warning:  return ANDROID_LOG_WARN;
+        case LogLevel::Error:    return ANDROID_LOG_ERROR;
+        case LogLevel::Critical: return ANDROID_LOG_FATAL;
+        default:                 return ANDROID_LOG_DEFAULT;
+        }
+    }
+#else
+    /**
+     * @brief 获取日志级别对应的字符串和颜色 (非 Android 平台)。
      * @param level 日志级别
      * @return 日志级别字符串和颜色
      */
@@ -289,17 +324,23 @@ private:
         default: return {"UNKNOWN", {1.0f, 1.0f, 1.0f}};
         }
     }
+#endif
 
     static inline LogLevel minLevel = LogLevel::Trace;           ///< 当前最小日志级别
-    static inline std::mutex coutMutex;                          ///< 控制台输出互斥锁
-    static inline bool consoleOutputEnabled = true;              ///< 是否启用控制台输出
+    static inline bool consoleOutputEnabled = true;              ///< 是否启用控制台/Logcat输出
     static inline LoggingCallback OnLogMessage;                  ///< 日志消息回调
+    static inline const char* logTag = "LumaEngine";             ///< [新增] Android Logcat TAG
+
+#if !defined(__ANDROID__)
+    static inline std::mutex coutMutex;                          ///< 控制台输出互斥锁 (非 Android)
+#endif
 };
 
 /**
  * @brief 日志输出宏，自动带源码位置信息。
  */
 #define LogTrace(fmt, ...)    Logger::LogProxy{LogLevel::Trace,    std::source_location::current()}(fmt, ##__VA_ARGS__)
+#define LogDebug(fmt, ...)    Logger::LogProxy{LogLevel::Debug,    std::source_location::current()}(fmt, ##__VA_ARGS__) // 建议添加 Debug 级别
 #define LogInfo(fmt, ...)     Logger::LogProxy{LogLevel::Info,     std::source_location::current()}(fmt, ##__VA_ARGS__)
 #define LogWarn(fmt, ...)     Logger::LogProxy{LogLevel::Warning,  std::source_location::current()}(fmt, ##__VA_ARGS__)
 #define LogError(fmt, ...)    Logger::LogProxy{LogLevel::Error,    std::source_location::current()}(fmt, ##__VA_ARGS__)

@@ -8,4 +8,3 @@ using ManagedHost = MonoHost;
 #include "CoreCLRHost.h"
 using ManagedHost = CoreCLRHost;
 #endif
-

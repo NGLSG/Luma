@@ -42,7 +42,7 @@ namespace Systems
         auto view = registry.view<ECS::ScriptsComponent>();
         CSharpScriptLoader scriptLoader;
 
-        
+
         for (auto entity : view)
         {
             auto& scriptsComp = view.get<ECS::ScriptsComponent>(entity);
@@ -58,7 +58,7 @@ namespace Systems
             }
         }
 
-        
+
         for (auto entity : view)
         {
             auto& scriptsComp = view.get<ECS::ScriptsComponent>(entity);
@@ -74,13 +74,15 @@ namespace Systems
                     LogError("ScriptingSystem: CreateInstanceFn 不可用，跳过实例创建。");
                     continue;
                 }
-
+                LogInfo("ScriptingSystem: 为实体ID: {} 创建脚本实例，类型: {}", static_cast<uint32_t>(entity),
+                         scriptAsset->GetScriptClassName());
                 ManagedGCHandle handle = host->GetCreateInstanceFn()(
                     m_currentScene,
                     static_cast<uint32_t>(entity),
                     scriptAsset->GetScriptClassName().c_str(),
                     scriptAsset->GetAssemblyName().c_str()
                 );
+
 
                 if (handle != 0)
                 {
@@ -95,7 +97,7 @@ namespace Systems
             }
         }
 
-        
+
         for (auto entity : view)
         {
             auto& scriptsComp = view.get<ECS::ScriptsComponent>(entity);
@@ -103,7 +105,7 @@ namespace Systems
             {
                 if (!scriptComp.managedGCHandle) continue;
 
-                
+
                 if (scriptComp.propertyOverrides.IsMap())
                 {
                     if (auto setPropertyFn = host->GetSetPropertyFn())
@@ -118,10 +120,10 @@ namespace Systems
                     }
                 }
 
-                
+
                 setupEventLinks(scriptComp, static_cast<uint32_t>(entity));
 
-                
+
                 if (auto onCreateFn = host->GetOnCreateFn())
                 {
                     onCreateFn(*scriptComp.managedGCHandle);
@@ -179,12 +181,12 @@ namespace Systems
 
         auto setPropertyFn = host->GetSetPropertyFn();
 
-        
+
         for (const auto& [eventName, targets] : scriptComp.eventLinks)
         {
             if (targets.empty()) continue;
 
-            
+
             YAML::Node eventTargetsNode;
             eventTargetsNode = YAML::Node(YAML::NodeType::Sequence);
 
@@ -205,12 +207,12 @@ namespace Systems
                 YAML::Emitter emitter;
                 emitter << eventTargetsNode;
 
-                
+
                 std::string eventLinkPropertyName = "__EventLink_" + eventName;
                 setPropertyFn(*scriptComp.managedGCHandle, eventLinkPropertyName.c_str(), emitter.c_str());
 
                 LogInfo("ScriptingSystem: 为实体 {} 的事件 '{}' 设置了 {} 个目标",
-                       entityId, eventName, targets.size());
+                        entityId, eventName, targets.size());
             }
         }
     }
@@ -332,7 +334,7 @@ namespace Systems
             m_managedHandles.push_back(handle);
             scriptComp->managedGCHandle = &m_managedHandles.back();
 
-            
+
             setupEventLinks(*scriptComp, entityId);
         }
         else

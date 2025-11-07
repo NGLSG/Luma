@@ -27,7 +27,7 @@ GraphicsBackend::~GraphicsBackend()
     shutdown();
 }
 
-wgpu::Device GraphicsBackend::CreateDevice(const GraphicsBackendOptions& options,
+wgpu::Device GraphicsBackend::CreateDevice(const GraphicsBackendOptions& opts,
                                            const std::unique_ptr<dawn::native::Instance>& instance)
 {
     if (!instance)
@@ -51,7 +51,7 @@ wgpu::Device GraphicsBackend::CreateDevice(const GraphicsBackendOptions& options
     adapterOptions.nextInChain = &togglesDesc;
     adapterOptions.featureLevel = wgpu::FeatureLevel::Core;
 
-    switch (options.qualityLevel)
+    switch (opts.qualityLevel)
     {
     case QualityLevel::Low:
         adapterOptions.powerPreference = wgpu::PowerPreference::LowPower;
@@ -384,7 +384,11 @@ void GraphicsBackend::configureSurface(uint16_t width, uint16_t height)
         config.presentMode = wgpu::PresentMode::Fifo;
     else
     {
+#ifdef __ANDROID__
+        config.presentMode = wgpu::PresentMode::Fifo;
+#else
         config.presentMode = wgpu::PresentMode::Mailbox;
+#endif
     }
 
     surface.Configure(&config);
@@ -449,9 +453,9 @@ void GraphicsBackend::updateQualitySettings()
     LogInfo("更新质量设置 - MSAA 样本数: {} -> {}", previousSampleCount, m_msaaSampleCount);
 }
 
-void GraphicsBackend::initialize(const GraphicsBackendOptions& options)
+void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
 {
-    this->options = options;
+    this->options = opts;
     isDeviceLost = false;
     enableVSync = options.enableVSync;
     updateQualitySettings();
@@ -695,17 +699,17 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
             return nullptr;
         }
 
-        
-        auto surface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(),
-                                                      backendTex,
-                                                      kBGRA_8888_SkColorType,
-                                                      SkColorSpace::MakeSRGB(),
-                                                      nullptr);
-        if (!surface)
+
+        auto m_surface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(),
+                                                        backendTex,
+                                                        kRGBA_8888_SkColorType,
+                                                        SkColorSpace::MakeSRGB(),
+                                                        nullptr);
+        if (!m_surface)
         {
             LogError("GetSurface: 包装活动渲染目标失败");
         }
-        return surface;
+        return m_surface;
     }
 
     if (surface)
@@ -720,7 +724,7 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
             }
 
             auto skSurface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(), backendTex,
-                                                            kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
+                                                            kRGBA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
             if (!skSurface)
             {
                 LogError("GetSurface: 包装 MSAA 纹理失败");
@@ -745,7 +749,7 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
             }
 
             auto skSurface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(), backendTex,
-                                                            kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
+                                                            kRGBA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
             if (!skSurface)
             {
                 LogError("GetSurface: 包装表面纹理失败");
@@ -758,12 +762,11 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
         if (!offscreenSurface || offscreenSurface->width() != currentWidth || offscreenSurface->height() !=
             currentHeight)
         {
-            
             SkImageInfo imageInfo = SkImageInfo::Make(
                 currentWidth, currentHeight,
-                kBGRA_8888_SkColorType, 
+                kRGBA_8888_SkColorType,
                 kPremul_SkAlphaType,
-                SkColorSpace::MakeSRGB() 
+                SkColorSpace::MakeSRGB()
             );
 
             offscreenSurface = SkSurfaces::RenderTarget(graphiteRecorder.get(), imageInfo);
@@ -915,7 +918,6 @@ void GraphicsBackend::SetQualityLevel(QualityLevel level)
 
 bool GraphicsBackend::BeginFrame()
 {
-    
     m_activeRenderTarget = nullptr;
 
     if (isDeviceLost)
@@ -940,7 +942,6 @@ bool GraphicsBackend::BeginFrame()
     m_currentSurfaceTexture = {};
 
     surface.GetCurrentTexture(&m_currentSurfaceTexture);
-
     if (m_currentSurfaceTexture.status != wgpu::SurfaceGetCurrentTextureStatus::SuccessOptimal)
     {
         LogWarn("BeginFrame: 获取表面纹理失败,状态码: {}", static_cast<int>(m_currentSurfaceTexture.status));
@@ -953,6 +954,7 @@ bool GraphicsBackend::BeginFrame()
     }
     return true;
 }
+
 wgpu::TextureView GraphicsBackend::GetCurrentFrameView() const
 {
     if (!m_currentSurfaceTexture.texture)
