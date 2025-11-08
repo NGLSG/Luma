@@ -39,10 +39,21 @@ namespace
         }
     }
 
+    std::string OrientationToMetaValue(AndroidScreenOrientation orientation)
+    {
+        switch (orientation)
+        {
+        case AndroidScreenOrientation::LandscapeLeft: return "landscape_left";
+        case AndroidScreenOrientation::LandscapeRight: return "landscape_right";
+        default: return "portrait";
+        }
+    }
+
     std::string BuildAndroidManifestTemplate(const ProjectSettings& settings)
     {
         std::ostringstream oss;
         const std::string orientationValue = OrientationToManifestValue(settings.GetAndroidScreenOrientation());
+        const std::string orientationMeta = OrientationToMetaValue(settings.GetAndroidScreenOrientation());
 
         oss << R"(<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -88,6 +99,10 @@ namespace
             android:preferMinimalPostProcessing="true"
             android:exported="true"
             android:screenOrientation=")" << orientationValue << R"(">
+
+            <meta-data
+                android:name="com.lumaengine.orientation"
+                android:value=")" << orientationMeta << R"(" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -157,6 +172,7 @@ namespace YAML
             androidNode["KeyPassword"] = rhs.GetAndroidKeyPassword();
             androidNode["UseCustomManifest"] = rhs.IsCustomAndroidManifestEnabled();
             androidNode["UseCustomGradleProperties"] = rhs.IsCustomGradlePropertiesEnabled();
+            androidNode["ApkName"] = rhs.GetAndroidApkName();
 
             if (!rhs.GetAndroidIconMap().empty())
             {
@@ -243,6 +259,7 @@ namespace YAML
                 if (android["MinVersion"]) rhs.SetAndroidMinVersion(android["MinVersion"].as<int>(rhs.GetAndroidMinVersion()));
                 if (android["VersionCode"]) rhs.SetAndroidVersionCode(android["VersionCode"].as<int>(rhs.GetAndroidVersionCode()));
                 if (android["VersionName"]) rhs.SetAndroidVersionName(android["VersionName"].as<std::string>(rhs.GetAndroidVersionName()));
+                if (android["ApkName"]) rhs.SetAndroidApkName(android["ApkName"].as<std::string>(rhs.GetAndroidApkName()));
 
                 if (android["KeystorePath"])
                     rhs.SetAndroidKeystorePath(android["KeystorePath"].as<std::string>());
@@ -698,6 +715,18 @@ void ProjectSettings::SetCustomGradlePropertiesEnabled(bool enabled)
             std::ofstream out(propsPath);
             out << "# Custom gradle.properties\n";
         }
+    }
+}
+
+void ProjectSettings::SetAndroidApkName(const std::string& value)
+{
+    if (value.empty())
+    {
+        m_androidApkName = "LumaAndroid";
+    }
+    else
+    {
+        m_androidApkName = value;
     }
 }
 

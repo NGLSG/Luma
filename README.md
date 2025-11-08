@@ -1,36 +1,7 @@
-<div align="center" style="margin-top: 12px; margin-bottom: 24px;">
+# Luma 引擎
 
-  <h1 style="margin: 0; font-weight: 800;">Luma 引擎</h1>
-
-  <p style="margin: 8px 0 16px; line-height: 1.6;">
-    <strong>现代化 · 模块化 · 数据驱动 · 高性能 2D 游戏引擎</strong><br/>
-    基于 <strong>C++20</strong> 与 <strong>C# (.NET 9 CoreCLR)</strong> 构建，旨在成为 Unity 2D 的强大替代方案。
-  </p>
-
-  <!-- Badges Row -->
-  <p style="display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
-    <!-- Stars -->
-    <a href="https://github.com/NGLSG/Luma/stargazers" target="_blank">
-      <img alt="GitHub Stars"
-           src="https://img.shields.io/github/stars/NGLSG/Luma?style=for-the-badge&logo=github" />
-    </a>
-    <!-- Forks -->
-    <a href="https://github.com/NGLSG/Luma/fork" target="_blank">
-      <img alt="GitHub Forks"
-           src="https://img.shields.io/github/forks/NGLSG/Luma?style=for-the-badge&logo=github" />
-    </a>
-    <!-- License -->
-    <a href="LICENSE" target="_blank">
-      <img alt="License"
-           src="https://img.shields.io/github/license/NGLSG/Luma?style=for-the-badge" />
-    </a>
-    <!-- Top language (dynamic) -->
-    <img alt="Top Language"
-         src="https://img.shields.io/github/languages/top/NGLSG/Luma?style=for-the-badge&logo=cplusplus&logoColor=white" />
-  </p>
-
-</div>
-
+**现代化 · 模块化 · 数据驱动 · 高性能 2D 游戏引擎**  
+基于 **C++20** 与 **C# (.NET 9 CoreCLR)** 构建，旨在成为 Unity 2D 的强大替代方案。
 
 ---
 
@@ -98,6 +69,8 @@ Luma 引擎面向需要极致性能与现代化工作流的 2D 游戏项目。
 - **C++ / C# 互操作 + 热重载**
 - **物理 / Tilemap / UI / 音频系统**
 - **高性能渲染管线（Skia + Dawn）**
+- **跨平台编辑器支持**：Windows / Linux / Android（需外接鼠标）
+- **多平台发行包支持**：Windows(DX12, DX11) / Linux(Vulkan, OpenGL) / Android(Vulkan, OpenGL ES)
 
 ---
 
@@ -149,37 +122,6 @@ cmake --build . --config Release
 
 Luma 引擎支持 **Rider** 与 **Visual Studio 2022 / 2026 Insider** 的编辑器级断点调试。
 
-### 插件安装
-
-项目根目录下包含：
-
-```
-IDEPlugins/
-├── Rider_Debug_Plugin.jar
-└── VS_Debug_Plugin.vsix
-```
-
-- **Rider**：在 *Settings → Plugins → Install Plugin from Disk* 中选择 `.jar` 安装。
-- **Visual Studio**：双击 `.vsix` 完成安装。
-
-### 使用方式
-
-**Visual Studio**
-
-1. 打开引擎脚本工程。
-2. 设置 C# 断点。
-3. 菜单：**Tools → Attach To Luma Process**。
-4. 在 Luma Editor 点击“播放”进入调试模式。
-
-**Rider**
-
-1. 打开工程并设置断点。
-2. 选择“附加到 Luma 进程”。
-3. 点击 **Debug**，选择 `LumaEditor`。
-4. 点击“播放”进入调试模式。
-
-> 支持 C# 热重载、异常捕获与变量查看。
-
 ---
 
 ## 核心系统概述
@@ -200,6 +142,8 @@ IDEPlugins/
 
 - 资产管线、ECS、JobSystem、动画状态机、蓝图系统、Tilemap、UI、空间音频
 - C# 热重载、C++/C# 双向调用、Profiler、物理调试可视化
+- 跨平台编辑器（Windows/Linux/Android）
+- 多后端渲染管线发行支持（DX12/DX11/Vulkan/OpenGL/GL ES）
 
 ### 路线图
 
@@ -235,8 +179,8 @@ IDEPlugins/
 
 | 平台 | 加入方式 |
 |:--|:--|
-| <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/discord.svg" width="20"/> **Discord** | [https://discord.gg/BJBXcRkh](https://discord.gg/BJBXcRkh) |
-| <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/tencentqq.svg" width="20"/> **QQ 群** | 913635492 |
+| **Discord** | [https://discord.gg/BJBXcRkh](https://discord.gg/BJBXcRkh) |
+| **QQ 群** | 913635492 |
 
 如需商务合作或技术支持：  
 📧 **Email**：gug777514@gmail.com

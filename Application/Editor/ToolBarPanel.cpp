@@ -113,7 +113,7 @@ namespace
         {
             if (ch == '"')
             {
-                result.push_back('"'); 
+                result.push_back('"');
             }
             result.push_back(ch);
         }
@@ -221,6 +221,51 @@ static constexpr AndroidPermissionOption kAndroidPermissionOptions[] = {
     {"写存储 (WRITE_EXTERNAL_STORAGE)", "android.permission.WRITE_EXTERNAL_STORAGE", "写入共享存储"},
     {"通知 (POST_NOTIFICATIONS)", "android.permission.POST_NOTIFICATIONS", "发送通知 (Android 13+)"},
 };
+
+static void UpdateAndroidStringsXml(const std::filesystem::path& resDir, const std::string& appName)
+{
+    const std::filesystem::path valuesDir = resDir / "values";
+    std::error_code ec;
+    std::filesystem::create_directories(valuesDir, ec);
+
+    const std::filesystem::path stringsXmlPath = valuesDir / "strings.xml";
+    
+    std::ofstream oss(stringsXmlPath, std::ios::trunc);
+    if (!oss.is_open())
+    {
+        LogError("无法写入 strings.xml: {}", stringsXmlPath.string());
+        return;
+    }
+
+    
+    oss << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+    oss << "<resources>\n";
+    
+    std::string escapedName = appName;
+    size_t pos = 0;
+    while ((pos = escapedName.find("&", pos)) != std::string::npos)
+    {
+        escapedName.replace(pos, 1, "&amp;");
+        pos += 5;
+    }
+    pos = 0;
+    while ((pos = escapedName.find("<", pos)) != std::string::npos)
+    {
+        escapedName.replace(pos, 1, "&lt;");
+        pos += 4;
+    }
+    pos = 0;
+    while ((pos = escapedName.find(">", pos)) != std::string::npos)
+    {
+        escapedName.replace(pos, 1, "&gt;");
+        pos += 4;
+    }
+
+    oss << "    <string name=\"app_name\">" << escapedName << "</string>\n";
+    oss << "</resources>\n";
+
+    LogInfo("已更新 Android 应用名称为: {}", appName);
+}
 
 static bool ExecuteCommand(const std::string& command, const std::string& logPrefix)
 {
@@ -916,6 +961,13 @@ void ToolbarPanel::drawSettingsWindow()
             settings.SetAndroidPackageName(packageBuffer);
         }
 
+        char apkNameBuffer[128]{};
+        copyStringToBuffer(apkNameBuffer, sizeof(apkNameBuffer), settings.GetAndroidApkName());
+        if (ImGui::InputText("APK 文件名 (不含 .apk)", apkNameBuffer, sizeof(apkNameBuffer)))
+        {
+            settings.SetAndroidApkName(apkNameBuffer);
+        }
+
         const char* orientationNames[] = {"竖屏", "左横屏", "右横屏"};
         AndroidScreenOrientation orientations[] = {
             AndroidScreenOrientation::Portrait,
@@ -1022,15 +1074,7 @@ void ToolbarPanel::drawSettingsWindow()
                 SDL_ShowOpenFileDialog(OnKeystoreFileSelected, this, window, filters, 2, nullptr, false);
             }
         }
-        ImGui::SameLine();
-        if (ImGui::Button("选择现有 Keystore..."))
-        {
-            refreshKeystoreCandidates(projectRoot);
-            std::fill(m_keystorePickerBuffer.begin(), m_keystorePickerBuffer.end(), 0);
-            copyStringToBuffer(m_keystorePickerBuffer.data(), m_keystorePickerBuffer.size(),
-                               settings.GetAndroidKeystorePath().string());
-            m_shouldOpenKeystorePicker = true;
-        }
+        
 
         drawStringField("Keystore 口令", settings.GetAndroidKeystorePassword(),
                         [&](const std::string& pwd) { settings.SetAndroidKeystorePassword(pwd); },
@@ -1684,7 +1728,6 @@ void ToolbarPanel::startPackagingProcess()
             std::filesystem::path templateDir;
             templateDir = editorRoot / "Publish" / targetPlatformStr;
 
-
             if (!std::filesystem::exists(templateDir))
             {
                 throw std::runtime_error("引擎模板包未找到，请先使用CMake构建'publish'目标。\n路径: " + templateDir.string());
@@ -1816,7 +1859,12 @@ void ToolbarPanel::startPackagingProcess()
             {
                 if (sourcePath.empty() || !std::filesystem::exists(sourcePath)) return;
                 const auto destDir = platformOutputDir / "app/src/main/res" / bucketName;
-                if (!std::filesystem::exists(destDir)) return;
+
+                
+                if (!std::filesystem::exists(destDir))
+                {
+                    std::filesystem::create_directories(destDir);
+                }
 
                 auto cleanExisting = [&]()
                 {
@@ -1844,6 +1892,17 @@ void ToolbarPanel::startPackagingProcess()
             auto configureAndroidIcons = [&]()
             {
                 if (targetPlatform != TargetPlatform::Android) return;
+
+                
+                const auto resDir = platformOutputDir / "app/src/main/res";
+                std::error_code ec;
+                std::filesystem::remove_all(resDir / "mipmap-anydpi-v26", ec);
+                std::filesystem::remove_all(resDir / "mipmap-anydpi", ec);
+                
+                std::filesystem::remove(resDir / "drawable/ic_launcher_background.xml", ec);
+                std::filesystem::remove(resDir / "drawable/ic_launcher_foreground.xml", ec);
+                std::filesystem::remove(resDir / "drawable-v24/ic_launcher_foreground.xml", ec);
+
                 const auto& iconMap = settings.GetAndroidIconMap();
                 const auto assetsDir = settings.GetAssetsDirectory();
                 std::unordered_set<int> customizedSizes;
@@ -1881,7 +1940,11 @@ void ToolbarPanel::startPackagingProcess()
             if (targetPlatform == TargetPlatform::Android)
             {
                 m_packagingProgress = 0.8f;
-                m_packagingStatus = "正在配置 Android 图标...";
+                m_packagingStatus = "正在配置 Android 资源...";
+
+                
+                UpdateAndroidStringsXml(platformOutputDir / "app/src/main/res", settings.GetAndroidApkName());
+
                 configureAndroidIcons();
             }
             else
@@ -1969,6 +2032,7 @@ void ToolbarPanel::startPackagingProcess()
                 {
                     std::ofstream manifestOut(manifestDest, std::ios::binary | std::ios::trunc);
                     manifestOut << settings.GenerateAndroidManifest();
+                    LogInfo("已生成 AndroidManifest.xml (包含屏幕方向设置)");
                 };
 
                 bool copiedCustomManifest = false;
@@ -1980,6 +2044,11 @@ void ToolbarPanel::startPackagingProcess()
                         std::filesystem::copy(manifestSource, manifestDest,
                                               std::filesystem::copy_options::overwrite_existing);
                         copiedCustomManifest = true;
+                        LogInfo("已使用自定义 AndroidManifest.xml");
+                    }
+                    else
+                    {
+                        LogWarn("自定义 AndroidManifest.xml 已启用但文件不存在，将回退到自动生成。");
                     }
                 }
 
@@ -2021,7 +2090,16 @@ void ToolbarPanel::startPackagingProcess()
 
                 if (!apkSource.empty())
                 {
-                    const auto apkDest = buildRoot / apkSource.filename();
+                    std::string apkName = settings.GetAndroidApkName();
+                    if (apkName.empty())
+                    {
+                        apkName = apkSource.filename().string();
+                    }
+                    if (std::filesystem::path(apkName).extension() != ".apk")
+                    {
+                        apkName += ".apk";
+                    }
+                    const auto apkDest = buildRoot / apkName;
                     std::error_code apkEc;
                     if (!apkDest.parent_path().empty())
                     {
@@ -2243,7 +2321,6 @@ void ToolbarPanel::drawCreateKeystorePopup()
 
                 if (!m_keystorePopupState.errorMessage.empty())
                 {
-                    
                 }
                 else if (storePassword.empty())
                 {
@@ -2474,7 +2551,8 @@ useLegacyJniPacking=true
 )";
 }
 
-void ToolbarPanel::updateAndroidGradleProperties(const std::filesystem::path& platformOutputDir, const ProjectSettings& settings)
+void ToolbarPanel::updateAndroidGradleProperties(const std::filesystem::path& platformOutputDir,
+                                                 const ProjectSettings& settings)
 {
     const auto gradlePropsPath = platformOutputDir / "gradle.properties";
 
@@ -2547,8 +2625,7 @@ android.nonTransitiveRClass=true
     {
         std::error_code ec;
         keystorePath = std::filesystem::absolute(keystorePath, ec);
-        keystorePath.make_preferred();
-        keystorePathStr = keystorePath.string();
+        keystorePathStr = keystorePath.generic_string();
     }
 
     outFile << "# --- Signing ---\n";
@@ -2562,7 +2639,8 @@ android.nonTransitiveRClass=true
     LogInfo("已生成 gradle.properties: {}", gradlePropsPath.string());
 }
 
-std::filesystem::path ToolbarPanel::signAndroidApk(const std::filesystem::path& unsignedApk, const ProjectSettings& settings)
+std::filesystem::path ToolbarPanel::signAndroidApk(const std::filesystem::path& unsignedApk,
+                                                   const ProjectSettings& settings)
 {
     if (unsignedApk.empty())
     {
@@ -2645,7 +2723,7 @@ std::filesystem::path ToolbarPanel::signAndroidApk(const std::filesystem::path& 
     keystorePath = std::filesystem::absolute(keystorePath, ec);
     keystorePath.make_preferred();
 
-    std::string command =apksignerPath.make_preferred().string();
+    std::string command = apksignerPath.make_preferred().string();
     command += " sign";
     command += " --ks " + QuoteCommandArg(keystorePath.string());
     command += " --ks-pass pass:" + settings.GetAndroidKeystorePassword();

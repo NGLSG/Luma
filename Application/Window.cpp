@@ -30,23 +30,36 @@ PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
     {
         SDL_PropertiesID props = SDL_CreateProperties();
         SDL_SetPointerProperty(props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, g_androidNativeWindow);
-        SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING  , title.c_str());
-        SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, width);
-        SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height);
+        SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title.c_str());
+        
+        SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, 0);
+        SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, 0);
+        
+        SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_FULLSCREEN_BOOLEAN, true);
         sdlWindow = SDL_CreateWindowWithProperties(props);
         SDL_DestroyProperties(props);
         g_androidNativeWindow = nullptr;
     }
     else
-#endif
     {
+        
+        
         sdlWindow = SDL_CreateWindow(
             title.c_str(),
-            width,
-            height,
-            SDL_WINDOW_RESIZABLE
+            0,
+            0,
+            SDL_WINDOW_FULLSCREEN
         );
     }
+#else
+    
+    sdlWindow = SDL_CreateWindow(
+        title.c_str(),
+        width,
+        height,
+        SDL_WINDOW_RESIZABLE
+    );
+#endif
 
     if (!sdlWindow)
     {

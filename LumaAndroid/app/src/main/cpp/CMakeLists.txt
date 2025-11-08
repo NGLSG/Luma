@@ -197,6 +197,7 @@ else()
             android
             log
             LumaEngine
+            SDL3::SDL3
     )
 endif()
 

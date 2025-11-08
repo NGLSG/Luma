@@ -275,6 +275,8 @@ public:
     bool IsCustomGradlePropertiesEnabled() const { return m_useCustomGradleProperties; }
     void SetCustomGradlePropertiesEnabled(bool enabled);
     std::filesystem::path GetCustomGradlePropertiesPath() const;
+    const std::string& GetAndroidApkName() const { return m_androidApkName; }
+    void SetAndroidApkName(const std::string& value);
 
     // --------------- Scripting Debugging ---------------
 public:
@@ -346,6 +348,7 @@ private:
     int m_androidVersionCode = 1;
     std::string m_androidVersionName = "1.0";
     bool m_useCustomGradleProperties = false;
+    std::string m_androidApkName = "LumaAndroid";
 };
 
 #endif

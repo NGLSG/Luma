@@ -782,7 +782,9 @@ void TextureSlicerPanel::generateGridSlices()
             slice.rect = SimpleRect(x, y, w, h);
 
             char nameBuf[256];
-            snprintf(nameBuf, sizeof(nameBuf), "%s_%d_%d", m_namePrefix, row, col);
+            auto formatted = std::format("{}_{}_{}", m_namePrefix, row, col);
+            std::strncpy(nameBuf, formatted.c_str(), sizeof(nameBuf) - 1);
+            nameBuf[sizeof(nameBuf) - 1] = '\0';
             slice.name = nameBuf;
 
             m_slices.push_back(slice);
@@ -837,7 +839,9 @@ void TextureSlicerPanel::generatePixelSizeSlices(int sliceW, int sliceH)
             slice.rect = SimpleRect(x, y, w, h);
 
             char nameBuf[256];
-            snprintf(nameBuf, sizeof(nameBuf), "%s_%d_%d", m_namePrefix, r, c);
+            auto formatted = std::format("{}_{}_{}", m_namePrefix, r, c);
+            std::strncpy(nameBuf, formatted.c_str(), sizeof(nameBuf) - 1);
+            nameBuf[sizeof(nameBuf) - 1] = '\0';
             slice.name = nameBuf;
 
             m_slices.push_back(slice);
@@ -900,8 +904,11 @@ void TextureSlicerPanel::handleManualSlicing(ImVec2 imagePos, ImVec2 imageSize, 
             if (slice.rect.width() > 5 && slice.rect.height() > 5)
             {
                 char nameBuf[256];
-                snprintf(nameBuf, sizeof(nameBuf), "%s_%d", m_namePrefix,
-                         static_cast<int>(m_slices.size()));
+                std::string name = std::format("{}_{}", m_namePrefix, m_slices.size());
+
+                auto formatted = std::format("{}_{}", m_namePrefix, m_slices.size());
+                std::strncpy(nameBuf, formatted.c_str(), sizeof(nameBuf) - 1);
+                nameBuf[sizeof(nameBuf) - 1] = '\0';
                 slice.name = nameBuf;
 
                 m_slices.push_back(slice);

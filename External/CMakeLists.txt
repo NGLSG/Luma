@@ -385,6 +385,11 @@ if (ASTCENC_STATIC_TARGET)
     if (UNIX AND NOT APPLE)
         target_link_options(${ASTCENC_STATIC_TARGET} INTERFACE -Wl,--allow-multiple-definition)
     endif ()
+
+    if (NOT MSVC)
+        target_compile_options(${ASTCENC_STATIC_TARGET} PRIVATE -Wno-error -Wno-maybe-uninitialized)
+    endif()
+
     message(STATUS "已配置 ASTC Encoder: ${ASTCENC_STATIC_TARGET}")
 else ()
     message(WARNING "未找到 ASTC Encoder 目标")
