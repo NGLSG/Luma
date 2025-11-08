@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-# VCPKG 和 NDK 的配置应在 project() 之前，以便工具链被正确加载
+# VCPKG 和 NDK 的配置应在 project() 之前,以便工具链被正确加载
 # 但 CLion 的 --target 修复必须在 project() 之后
 if (ANDROID)
     set(ANDROID_NDK_HOME "E:\\Android\\Sdk\\ndk\\27.0.12077973")
@@ -8,6 +8,23 @@ if (ANDROID)
 endif ()
 
 project(LumaEngine CXX)
+
+# =============================================================================
+# 轻量化构建选项
+# =============================================================================
+option(ENABLE_LIGHTWEIGHT_BUILD "启用轻量化构建（剥离符号并使用 shared libc++）" OFF)
+
+if(ENABLE_LIGHTWEIGHT_BUILD)
+    message(STATUS "========================================")
+    message(STATUS "轻量化构建模式: 已启用")
+    message(STATUS "========================================")
+
+    # Android 平台强制使用 shared libc++
+    if(ANDROID)
+        set(ANDROID_STL "c++_shared" CACHE STRING "Android STL 类型" FORCE)
+        message(STATUS "已设置 Android STL 为 c++_shared")
+    endif()
+endif()
 
 # CLion NDK --target 修复 (必须在 project() 之后)
 if (ANDROID)
@@ -31,7 +48,7 @@ if (ANDROID)
         set(NDK_TARGET_TRIPLE "${NDK_TARGET_ARCH}${NDK_TARGET_SUFFIX}${ANDROID_API_LEVEL}")
 
         message(STATUS "CLion NDK Fix: 正在强制 --target=${NDK_TARGET_TRIPLE}")
-        # 修正：将新标志追加到现有标志之后，而不是覆盖
+        # 修正：将新标志追加到现有标志之后,而不是覆盖
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --target=${NDK_TARGET_TRIPLE}")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=${NDK_TARGET_TRIPLE}")
     endif ()
@@ -337,11 +354,38 @@ if (UNIX AND NOT APPLE)
             -Wl,--gc-sections
     )
 endif ()
+
 if (ANDROID)
     # 确保 target 层也取消定义该宏以覆盖局部定义
     target_compile_options(LumaEngine PRIVATE -U_LIBCPP_HAS_NO_EXPERIMENTAL_STOP_TOKEN)
 endif ()
+
 target_precompile_headers(LumaEngine PUBLIC "Utils/PCH.h")
+
+# =============================================================================
+# 轻量化构建：符号剥离
+# =============================================================================
+if(ENABLE_LIGHTWEIGHT_BUILD)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+            # Release 模式使用 --strip-all 完全剥离符号
+            add_custom_command(TARGET LumaEngine POST_BUILD
+                    COMMAND ${CMAKE_STRIP} --strip-all $<TARGET_FILE:LumaEngine>
+                    COMMENT "正在剥离 LumaEngine 的所有符号（Release 模式）..."
+            )
+        endif()
+    else()
+        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+            # Debug 模式使用 --strip-debug 仅剥离调试符号
+            add_custom_command(TARGET LumaEngine POST_BUILD
+                    COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:LumaEngine>
+                    COMMENT "正在剥离 LumaEngine 的调试符号（Debug 模式）..."
+            )
+        endif()
+    endif()
+
+    message(STATUS "已启用符号剥离（${CMAKE_BUILD_TYPE} 模式）")
+endif()
 
 # =============================================================================
 # 桌面平台可执行文件 (Editor 和 Game)
@@ -631,6 +675,30 @@ if (WIN32)
     )
 endif ()
 
+# =============================================================================
+# 轻量化构建：额外的发布优化
+# =============================================================================
+if(ENABLE_LIGHTWEIGHT_BUILD AND ANDROID)
+    # 在 Android 发布包中也剥离 libc++_shared.so 的符号
+    add_custom_command(TARGET publish POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E echo "正在为轻量化构建优化发布包..."
+            COMMENT "轻量化构建: 优化发布包..."
+    )
+
+    # 查找并剥离 libc++_shared.so
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_custom_command(TARGET publish POST_BUILD
+                COMMAND bash -c "find ${PUBLISH_GAMEDATA_DIR} -name 'libc++_shared.so' -exec ${CMAKE_STRIP} --strip-all {} \\;"
+                COMMENT "正在剥离 libc++_shared.so 的符号..."
+        )
+    else()
+        add_custom_command(TARGET publish POST_BUILD
+                COMMAND bash -c "find ${PUBLISH_GAMEDATA_DIR} -name 'libc++_shared.so' -exec ${CMAKE_STRIP} --strip-debug {} \\;"
+                COMMENT "正在剥离 libc++_shared.so 的调试符号..."
+        )
+    endif()
+endif()
+
 message(STATUS "========================================")
 message(STATUS "Luma Engine 配置完成")
 if (ENABLE_AVX512)
@@ -638,4 +706,13 @@ if (ENABLE_AVX512)
 else ()
     message(STATUS "AVX512 指令集: 未启用 (使用 -DENABLE_AVX512=ON 启用)")
 endif ()
+if(ENABLE_LIGHTWEIGHT_BUILD)
+    message(STATUS "轻量化构建: 已启用")
+    if(ANDROID)
+        message(STATUS "  - 使用 shared libc++")
+        message(STATUS "  - 符号剥离: ${CMAKE_BUILD_TYPE} 模式")
+    endif()
+else()
+    message(STATUS "轻量化构建: 未启用 (使用 -DENABLE_LIGHTWEIGHT_BUILD=ON 启用)")
+endif()
 message(STATUS "========================================")

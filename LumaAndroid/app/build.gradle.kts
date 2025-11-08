@@ -33,7 +33,8 @@ android {
                     "-DCMAKE_TOOLCHAIN_FILE=E:/vcpkg/scripts/buildsystems/vcpkg.cmake",
                     "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=E:/Android/Sdk/ndk/27.0.12077973/build/cmake/android.toolchain.cmake",
                     "-DVCPKG_TARGET_TRIPLET=arm64-android",
-                    "-DUSE_PREBUILT_ENGINE=OFF"
+                    "-DUSE_PREBUILT_ENGINE=OFF",
+                    "-DENABLE_LIGHTWEIGHT_BUILD=ON"  // 启用轻量化构建
                 )
                 cFlags += listOf("-v")
                 cppFlags += listOf("-v", "-std=c++20")
@@ -83,8 +84,8 @@ android {
         jniLibs {
             // 改为 true 以确保 Mono 共享库被正确打包
             useLegacyPackaging = true
-            // 保留所有调试符号
-            keepDebugSymbols += listOf("**/*.so")
+            // 轻量化构建时不保留调试符号
+            // keepDebugSymbols += listOf("**/*.so")
         }
     }
 

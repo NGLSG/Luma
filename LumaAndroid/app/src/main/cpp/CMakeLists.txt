@@ -10,6 +10,46 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # 选项: 选择使用预编译引擎库还是从源码编译引擎
 # =====================================================================
 option(USE_PREBUILT_ENGINE "使用预编译的引擎库而非从源码编译" OFF)
+option(ENABLE_LIGHTWEIGHT_BUILD "启用轻量化构建（剥离符号并使用 shared libc++）" OFF)
+
+# =====================================================================
+# 轻量化构建配置
+# =====================================================================
+if(ENABLE_LIGHTWEIGHT_BUILD)
+    message(STATUS "========================================")
+    message(STATUS "Android 轻量化构建模式: 已启用")
+    message(STATUS "========================================")
+
+    # 强制使用 shared libc++
+    set(ANDROID_STL "c++_shared" CACHE STRING "Android STL 类型" FORCE)
+    message(STATUS "已设置 Android STL 为 c++_shared")
+
+    # 添加优化编译选项
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        # Release 模式的额外优化
+        add_compile_options(
+                -Oz                    # 优化体积
+                -ffunction-sections    # 函数独立段
+                -fdata-sections        # 数据独立段
+        )
+        add_link_options(
+                -Wl,--gc-sections      # 链接时删除未使用的段
+                -Wl,--as-needed        # 只链接需要的库
+        )
+        message(STATUS "已启用 Release 模式体积优化选项")
+    else()
+        # Debug 模式保留基本调试能力
+        add_compile_options(
+                -Os                    # 优化体积（保留调试信息）
+                -ffunction-sections
+                -fdata-sections
+        )
+        add_link_options(
+                -Wl,--gc-sections
+        )
+        message(STATUS "已启用 Debug 模式体积优化选项")
+    endif()
+endif()
 
 if(USE_PREBUILT_ENGINE)
     message(STATUS "========================================")
@@ -47,6 +87,36 @@ if(USE_PREBUILT_ENGINE)
 
         message(STATUS "已导入预编译库: ${LIB_NAME} -> ${LIB_PATH}")
     endforeach()
+
+    # 如果是轻量化构建，对预编译库进行符号剥离
+    if(ENABLE_LIGHTWEIGHT_BUILD)
+        message(STATUS "正在为预编译库配置符号剥离...")
+        foreach(LIB_NAME ${PREBUILT_LIBS})
+            set(LIB_PATH "${PREBUILT_ENGINE_DIR}/lib${LIB_NAME}.so")
+            if(EXISTS "${LIB_PATH}")
+                if(CMAKE_BUILD_TYPE STREQUAL "Release")
+                    # Release 模式完全剥离
+                    add_custom_command(
+                            OUTPUT "${LIB_PATH}.stripped"
+                            COMMAND ${CMAKE_STRIP} --strip-all "${LIB_PATH}"
+                            COMMAND ${CMAKE_COMMAND} -E touch "${LIB_PATH}.stripped"
+                            DEPENDS "${LIB_PATH}"
+                            COMMENT "正在剥离 ${LIB_NAME} 的所有符号..."
+                    )
+                else()
+                    # Debug 模式仅剥离调试符号
+                    add_custom_command(
+                            OUTPUT "${LIB_PATH}.stripped"
+                            COMMAND ${CMAKE_STRIP} --strip-debug "${LIB_PATH}"
+                            COMMAND ${CMAKE_COMMAND} -E touch "${LIB_PATH}.stripped"
+                            DEPENDS "${LIB_PATH}"
+                            COMMENT "正在剥离 ${LIB_NAME} 的调试符号..."
+                    )
+                endif()
+                list(APPEND STRIPPED_LIBS "${LIB_PATH}.stripped")
+            endif()
+        endforeach()
+    endif()
 
     # 头文件目录（只需要 EngineEntry.h）
     set(LUMA_ENGINE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -91,6 +161,12 @@ if(USE_PREBUILT_ENGINE)
             ggml
             llama
     )
+
+    # 轻量化构建：添加依赖关系
+    if(ENABLE_LIGHTWEIGHT_BUILD AND STRIPPED_LIBS)
+        add_custom_target(strip_prebuilt_libs ALL DEPENDS ${STRIPPED_LIBS})
+        add_dependencies(main strip_prebuilt_libs)
+    endif()
 else()
     # 源码编译模式：引擎会自动处理依赖
     target_link_libraries(main
@@ -104,6 +180,39 @@ target_include_directories(main PRIVATE ${LUMA_ENGINE_ROOT})
 
 target_compile_features(main PRIVATE cxx_std_20)
 
+# =====================================================================
+# 轻量化构建：主模块符号剥离
+# =====================================================================
+if(ENABLE_LIGHTWEIGHT_BUILD)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        # Release 模式使用 --strip-all
+        add_custom_command(TARGET main POST_BUILD
+                COMMAND ${CMAKE_STRIP} --strip-all $<TARGET_FILE:main>
+                COMMENT "正在剥离 main 模块的所有符号（Release 模式）..."
+        )
+    else()
+        # Debug 模式使用 --strip-debug
+        add_custom_command(TARGET main POST_BUILD
+                COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:main>
+                COMMENT "正在剥离 main 模块的调试符号（Debug 模式）..."
+        )
+    endif()
+
+    message(STATUS "已为 main 模块启用符号剥离")
+endif()
+
 message(STATUS "========================================")
 message(STATUS "LumaAndroid 项目配置完成")
+if(ENABLE_LIGHTWEIGHT_BUILD)
+    message(STATUS "轻量化构建: 已启用")
+    message(STATUS "  - STL: ${ANDROID_STL}")
+    message(STATUS "  - 符号剥离: ${CMAKE_BUILD_TYPE} 模式")
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        message(STATUS "  - 优化级别: -Oz (最小体积)")
+    else()
+        message(STATUS "  - 优化级别: -Os (体积优化)")
+    endif()
+else()
+    message(STATUS "轻量化构建: 未启用")
+endif()
 message(STATUS "========================================")

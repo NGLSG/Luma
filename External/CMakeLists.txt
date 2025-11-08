@@ -11,6 +11,23 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(cmake/CPM.cmake)
 
 # =============================================================================
+# 0.1 轻量化构建选项
+# =============================================================================
+option(ENABLE_LIGHTWEIGHT_BUILD "启用轻量化构建（剥离符号并使用 shared libc++）" OFF)
+
+if(ENABLE_LIGHTWEIGHT_BUILD)
+    message(STATUS "========================================")
+    message(STATUS "轻量化构建模式: 已启用")
+    message(STATUS "========================================")
+
+    # Android 平台强制使用 shared libc++
+    if(ANDROID)
+        set(ANDROID_STL "c++_shared" CACHE STRING "Android STL 类型" FORCE)
+        message(STATUS "已设置 Android STL 为 c++_shared")
+    endif()
+endif()
+
+# =============================================================================
 # 1. 平台与架构检测（统一在此处完成）
 # =============================================================================
 message(STATUS "========================================")
@@ -589,4 +606,7 @@ message(STATUS "第三方依赖配置完成")
 message(STATUS "平台: ${PLATFORM_FULL_NAME}-${ARCH_NAME}")
 message(STATUS ".NET Runtime: ${DOTNET_RUNTIME_TARGET}")
 message(STATUS "GPU 加速: ${GGML_CUDA}${GGML_VULKAN}")
+if(ENABLE_LIGHTWEIGHT_BUILD)
+    message(STATUS "轻量化构建: 已启用")
+endif()
 message(STATUS "========================================")
