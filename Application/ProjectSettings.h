@@ -4,6 +4,10 @@
 #include "Utils/PCH.h"
 #include "Utils/Guid.h"
 #include <filesystem>
+#include <map>
+#include <vector>
+#include <vector>
+#include <map>
 
 // 目标平台枚举
 enum class TargetPlatform
@@ -13,6 +17,19 @@ enum class TargetPlatform
     Linux,
     Android,
     Current // 当前宿主平台
+};
+
+enum class AndroidScreenOrientation
+{
+    Portrait,
+    LandscapeLeft,
+    LandscapeRight
+};
+
+struct AndroidAliasEntry
+{
+    std::string alias;
+    std::string password;
 };
 
 /**
@@ -202,6 +219,63 @@ public:
      */
     static TargetPlatform StringToPlatform(const std::string& platformStr);
 
+    const std::string& GetAndroidPackageName() const { return m_androidPackageName; }
+    void SetAndroidPackageName(const std::string& name) { m_androidPackageName = name; }
+
+    AndroidScreenOrientation GetAndroidScreenOrientation() const { return m_androidScreenOrientation; }
+    void SetAndroidScreenOrientation(AndroidScreenOrientation orientation) { m_androidScreenOrientation = orientation; }
+
+    const std::filesystem::path& GetAndroidKeystorePath() const { return m_androidKeystorePath; }
+    void SetAndroidKeystorePath(const std::filesystem::path& path) { m_androidKeystorePath = path; }
+
+    const std::string& GetAndroidKeystorePassword() const { return m_androidKeystorePassword; }
+    void SetAndroidKeystorePassword(const std::string& password) { m_androidKeystorePassword = password; }
+
+    const std::string& GetAndroidKeyAlias() const { return m_androidKeyAlias; }
+    void SetAndroidKeyAlias(const std::string& alias);
+
+    const std::string& GetAndroidKeyPassword() const { return m_androidKeyPassword; }
+    void SetAndroidKeyPassword(const std::string& password);
+
+    bool IsCustomAndroidManifestEnabled() const { return m_useCustomAndroidManifest; }
+    void SetCustomAndroidManifestEnabled(bool enabled, bool ensureTemplate = true);
+    std::filesystem::path GetProjectAndroidDirectory() const;
+    std::filesystem::path GetCustomAndroidManifestPath() const;
+
+    const std::filesystem::path& GetAndroidIconPath(int size) const;
+    void SetAndroidIconPath(int size, const std::filesystem::path& path);
+    void ClearAndroidIconPath(int size);
+    const std::map<int, std::filesystem::path>& GetAndroidIconMap() const { return m_androidIconPaths; }
+    const std::vector<std::string>& GetAndroidPermissions() const { return m_androidPermissions; }
+    void SetAndroidPermissions(const std::vector<std::string>& permissions);
+    void AddAndroidPermission(const std::string& permission);
+    void RemoveAndroidPermission(const std::string& permission);
+    bool HasAndroidPermission(const std::string& permission) const;
+    std::string GenerateAndroidManifest() const;
+    const std::vector<AndroidAliasEntry>& GetAndroidAliasEntries() const { return m_androidAliasEntries; }
+    void SetAndroidAliasEntries(const std::vector<AndroidAliasEntry>& entries);
+    void AddAndroidAliasEntry(const std::string& alias, const std::string& password);
+    void RemoveAndroidAliasEntry(size_t index);
+    int GetActiveAndroidAliasIndex() const { return m_activeAndroidAliasIndex; }
+    void SetActiveAndroidAliasIndex(int index);
+    int GetAndroidCompileSdk() const { return m_androidCompileSdk; }
+    void SetAndroidCompileSdk(int value) { m_androidCompileSdk = std::max(1, value); }
+    int GetAndroidTargetSdk() const { return m_androidTargetSdk; }
+    void SetAndroidTargetSdk(int value) { m_androidTargetSdk = std::max(1, value); }
+    int GetAndroidMinSdk() const { return m_androidMinSdk; }
+    void SetAndroidMinSdk(int value) { m_androidMinSdk = std::max(1, value); }
+    int GetAndroidMaxVersion() const { return m_androidMaxVersion; }
+    void SetAndroidMaxVersion(int value) { m_androidMaxVersion = std::max(1, value); }
+    int GetAndroidMinVersion() const { return m_androidMinVersion; }
+    void SetAndroidMinVersion(int value) { m_androidMinVersion = std::max(1, value); }
+    int GetAndroidVersionCode() const { return m_androidVersionCode; }
+    void SetAndroidVersionCode(int value) { m_androidVersionCode = std::max(1, value); }
+    const std::string& GetAndroidVersionName() const { return m_androidVersionName; }
+    void SetAndroidVersionName(const std::string& value) { m_androidVersionName = value.empty() ? std::string("1.0") : value; }
+    bool IsCustomGradlePropertiesEnabled() const { return m_useCustomGradleProperties; }
+    void SetCustomGradlePropertiesEnabled(bool enabled);
+    std::filesystem::path GetCustomGradlePropertiesPath() const;
+
     // --------------- Scripting Debugging ---------------
 public:
     bool GetScriptDebugEnabled() const { return m_scriptDebugEnabled; }
@@ -252,6 +326,26 @@ private:
 
     // Project-wide tags used by TagComponent dropdown in Inspector
     std::vector<std::string> m_tags;
+
+    std::string m_androidPackageName = "com.lumaengine.game";
+    AndroidScreenOrientation m_androidScreenOrientation = AndroidScreenOrientation::Portrait;
+    std::filesystem::path m_androidKeystorePath;
+    std::string m_androidKeystorePassword;
+    std::string m_androidKeyAlias = "luma_key";
+    std::string m_androidKeyPassword;
+    bool m_useCustomAndroidManifest = false;
+    std::map<int, std::filesystem::path> m_androidIconPaths;
+    std::vector<std::string> m_androidPermissions = {"android.permission.VIBRATE"};
+    std::vector<AndroidAliasEntry> m_androidAliasEntries;
+    int m_activeAndroidAliasIndex = -1;
+    int m_androidCompileSdk = 36;
+    int m_androidTargetSdk = 36;
+    int m_androidMinSdk = 28;
+    int m_androidMaxVersion = 36;
+    int m_androidMinVersion = 28;
+    int m_androidVersionCode = 1;
+    std::string m_androidVersionName = "1.0";
+    bool m_useCustomGradleProperties = false;
 };
 
 #endif

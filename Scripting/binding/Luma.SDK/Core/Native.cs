@@ -79,6 +79,16 @@ internal static class Native
     internal static extern void Event_InvokeWithArgs(IntPtr scenePtr, uint entityId, string eventName,
         string argsAsYaml);
 
+    [DllImport(DllName, EntryPoint = "Platform_HasPermissions")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool Platform_HasPermissions(
+        [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPStr)] string[] permissions, int count);
+
+    [DllImport(DllName, EntryPoint = "Platform_RequestPermissions")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool Platform_RequestPermissions(
+        [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPStr)] string[] permissions, int count);
+
 
     [DllImport(DllName, CharSet = CharSet.Ansi)]
     [return: MarshalAs(UnmanagedType.I1)]

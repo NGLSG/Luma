@@ -6,35 +6,36 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # =============================================================================
-# 0. 引入 CPM.cmake
+# 引入 CPM.cmake
 # =============================================================================
 include(cmake/CPM.cmake)
 
 # =============================================================================
-# 0.1 轻量化构建选项
+# Android 平台全局强制使用 shared libc++
 # =============================================================================
-option(ENABLE_LIGHTWEIGHT_BUILD "启用轻量化构建（剥离符号并使用 shared libc++）" OFF)
+if(ANDROID)
+    set(ANDROID_STL "c++_shared" CACHE STRING "Android STL 类型" FORCE)
+    message(STATUS "Android 平台：已设置全局使用 c++_shared")
+endif()
+
+# =============================================================================
+# 轻量化构建选项（仅影响符号剥离和体积优化）
+# =============================================================================
+option(ENABLE_LIGHTWEIGHT_BUILD "启用轻量化构建（剥离符号并优化体积）" OFF)
 
 if(ENABLE_LIGHTWEIGHT_BUILD)
     message(STATUS "========================================")
     message(STATUS "轻量化构建模式: 已启用")
     message(STATUS "========================================")
-
-    # Android 平台强制使用 shared libc++
-    if(ANDROID)
-        set(ANDROID_STL "c++_shared" CACHE STRING "Android STL 类型" FORCE)
-        message(STATUS "已设置 Android STL 为 c++_shared")
-    endif()
 endif()
 
 # =============================================================================
-# 1. 平台与架构检测（统一在此处完成）
+# 平台与架构检测
 # =============================================================================
 message(STATUS "========================================")
 message(STATUS "开始配置 Luma 第三方依赖")
 message(STATUS "========================================")
 
-# 检测平台
 if (ANDROID)
     set(PLATFORM_NAME "android")
     set(PLATFORM_FULL_NAME "Android")
@@ -54,9 +55,7 @@ else ()
     message(FATAL_ERROR "检测到不支持的平台")
 endif ()
 
-# 检测架构（统一逻辑）
 if (ANDROID)
-    # Android 使用 NDK 的 ABI 定义
     if (CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
         set(ARCH_NAME "arm64")
     elseif (CMAKE_ANDROID_ARCH_ABI STREQUAL "x86_64")
@@ -69,7 +68,6 @@ if (ANDROID)
         message(FATAL_ERROR "不支持的 Android ABI: ${CMAKE_ANDROID_ARCH_ABI}")
     endif ()
 else ()
-    # 桌面平台使用 CMake 的标准检测
     if (CMAKE_SIZEOF_VOID_P EQUAL 8)
         if (CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64|arm64|ARM64)")
             set(ARCH_NAME "arm64")
@@ -87,22 +85,18 @@ message(STATUS "平台: ${PLATFORM_FULL_NAME}")
 message(STATUS "架构: ${ARCH_NAME}")
 
 # =============================================================================
-# 2. 设置全局编译选项
+# 设置全局编译选项
 # =============================================================================
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(USE_CUDA "启用 CUDA 进行 GPU 加速" OFF)
 
-# 编译器特定选项
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 
-    # Linux/Android 平台的符号可见性设置
     if (UNIX AND NOT APPLE)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=default")
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=default")
-
-        # 链接器选项（处理符号冲突）
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--allow-multiple-definition")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--allow-multiple-definition")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--allow-shlib-undefined")
@@ -110,7 +104,6 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--export-dynamic")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections")
-
         message(STATUS "已为 Linux/Android 平台配置符号可见性和链接器选项")
     endif ()
 
@@ -118,27 +111,23 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif ()
 
 # =============================================================================
-# 3. 配置依赖项路径
+# 配置依赖项路径
 # =============================================================================
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif ()
 
-# 构建平台特定的 SDK 路径
 set(Skia_DIR "${CMAKE_CURRENT_SOURCE_DIR}/skia-${PLATFORM_NAME}")
 
 if (PLATFORM_NAME STREQUAL "android")
-    # Android 使用 Mono 运行时
     set(DotNetRuntime_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mono-${PLATFORM_NAME}-${ARCH_NAME}")
 else ()
-    # 桌面平台使用 CoreCLR
     set(DotNetRuntime_DIR "${CMAKE_CURRENT_SOURCE_DIR}/coreclr-${PLATFORM_NAME}-${ARCH_NAME}")
 endif ()
 
 message(STATUS "Skia SDK 路径: ${Skia_DIR}")
 message(STATUS ".NET Runtime 路径: ${DotNetRuntime_DIR}")
 
-# 检查路径有效性
 if (NOT EXISTS "${Skia_DIR}")
     message(WARNING "Skia SDK 路径不存在: ${Skia_DIR}")
 endif ()
@@ -147,10 +136,8 @@ if (NOT EXISTS "${DotNetRuntime_DIR}")
 endif ()
 
 # =============================================================================
-# 4. 查找预编译依赖包
+# 查找预编译依赖包
 # =============================================================================
-
-# 4.1 Vulkan
 find_package(Vulkan REQUIRED)
 if (Vulkan_FOUND)
     message(STATUS "✅ Vulkan: ${Vulkan_LIBRARY}")
@@ -158,11 +145,9 @@ else ()
     message(WARNING "⚠️  Vulkan 未找到，将禁用 GPU 加速")
 endif ()
 
-# 4.2 Skia
 find_package(Skia REQUIRED)
-
-# 4.3 .NET Runtime
 find_package(DotNetRuntime REQUIRED)
+
 if (PLATFORM_NAME STREQUAL "android")
     set(DOTNET_RUNTIME_TARGET DotNet::Mono)
     message(STATUS "✅ .NET Runtime: Mono")
@@ -171,7 +156,6 @@ else ()
     message(STATUS "✅ .NET Runtime: CoreCLR")
 endif ()
 
-# 4.4 OpenSSL
 find_package(OpenSSL REQUIRED)
 if (OpenSSL_FOUND)
     message(STATUS "✅ OpenSSL: ${OPENSSL_VERSION}")
@@ -179,7 +163,6 @@ else ()
     message(FATAL_ERROR "❌ 无法找到 OpenSSL")
 endif ()
 
-# 4.5 CURL
 find_package(CURL REQUIRED)
 if (CURL_FOUND)
     message(STATUS "✅ CURL: ${CURL_VERSION_STRING}")
@@ -187,9 +170,7 @@ else ()
     message(FATAL_ERROR "❌ 无法找到 CURL")
 endif ()
 
-# 4.6 FFmpeg（平台特定处理）
 if (WIN32 OR ANDROID OR APPLE)
-    # 使用 vcpkg 提供的 FFmpeg
     find_package(FFMPEG REQUIRED)
     if (FFMPEG_FOUND)
         set(FFMPEG_TARGET_LIBS ${FFMPEG_LIBRARIES})
@@ -198,7 +179,6 @@ if (WIN32 OR ANDROID OR APPLE)
         message(FATAL_ERROR "❌ 无法找到 FFmpeg")
     endif ()
 elseif (UNIX AND NOT APPLE)
-    # Linux 使用系统包管理器提供的 FFmpeg
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(FFMPEG REQUIRED
             libavformat>=58.0.0
@@ -220,11 +200,10 @@ elseif (UNIX AND NOT APPLE)
 endif ()
 
 # =============================================================================
-# 5. 使用 CPM 获取第三方源代码依赖
+# 使用 CPM 获取第三方源代码依赖
 # =============================================================================
 message(STATUS "正在通过 CPM 获取第三方源代码依赖...")
 
-# 5.1 SDL（Android 平台需要特殊配置）
 if (ANDROID)
     CPMAddPackage(
             NAME SDL
@@ -281,7 +260,6 @@ CPMAddPackage(
         "BOX2D_BUILD_DOCS OFF"
 )
 
-# 5.2 ASTC Encoder（Android 需要禁用 native 架构检测）
 if (ANDROID)
     CPMAddPackage(
             NAME astc-encoder
@@ -331,14 +309,13 @@ CPMAddPackage(
 )
 
 # =============================================================================
-# 6. GPU 加速与 Llama.cpp 配置
+# GPU 加速与 Llama.cpp 配置
 # =============================================================================
 if (USE_CUDA)
     message(STATUS "【GPU加速】使用 CUDA")
     set(GGML_CUDA ON CACHE BOOL "启用 CUDA 支持" FORCE)
     set(GGML_VULKAN OFF CACHE BOOL "禁用 Vulkan 支持" FORCE)
 elseif (Vulkan_FOUND AND NOT ANDROID)
-    # Android 平台暂不启用 Vulkan 后端
     message(STATUS "【GPU加速】使用 Vulkan")
     set(GGML_VULKAN ON CACHE BOOL "启用 Vulkan 支持" FORCE)
     set(GGML_CUDA OFF CACHE BOOL "禁用 CUDA 支持" FORCE)
@@ -348,7 +325,6 @@ else ()
     set(GGML_CUDA OFF CACHE BOOL "禁用 CUDA 支持" FORCE)
 endif ()
 
-# 6.1 Llama.cpp（Android 需要特殊配置）
 if (ANDROID)
     CPMAddPackage(
             NAME llama-cpp
@@ -374,7 +350,6 @@ else ()
     )
 endif ()
 
-# 为 llama 目标设置 C++17 标准
 if (TARGET llama)
     set_target_properties(llama PROPERTIES
             CXX_STANDARD 17
@@ -388,18 +363,14 @@ if (TARGET llama)
 endif ()
 
 # =============================================================================
-# 7. 配置从源码构建的库
+# 配置从源码构建的库
 # =============================================================================
-
-# 7.1 ASTC Encoder
 set(ASTCENC_STATIC_TARGET "")
 if (ANDROID)
-    # Android 平台使用无 SIMD 优化的版本
     if (TARGET astcenc-none-static)
         set(ASTCENC_STATIC_TARGET astcenc-none-static)
     endif ()
 else ()
-    # 桌面平台优先使用优化版本
     if (TARGET astcenc-avx2-static)
         set(ASTCENC_STATIC_TARGET astcenc-avx2-static)
     elseif (TARGET astcenc-native-static)
@@ -419,7 +390,6 @@ else ()
     message(WARNING "未找到 ASTC Encoder 目标")
 endif ()
 
-# 7.2 ImGui
 add_library(ImGui_lib STATIC
         "${imgui_SOURCE_DIR}/imgui.cpp"
         "${imgui_SOURCE_DIR}/imgui_draw.cpp"
@@ -441,7 +411,6 @@ if (UNIX AND NOT APPLE)
     target_link_options(ImGui_lib PRIVATE -Wl,--allow-multiple-definition)
 endif ()
 
-# 7.3 ImGui Node Editor
 add_library(imgui_node_editor STATIC
         "${imgui-node-editor_SOURCE_DIR}/crude_json.cpp"
         "${imgui-node-editor_SOURCE_DIR}/imgui_canvas.cpp"
@@ -455,7 +424,6 @@ if (UNIX AND NOT APPLE)
     target_link_options(imgui_node_editor PRIVATE -Wl,--allow-multiple-definition)
 endif ()
 
-# 7.4 ImGuizmo
 add_library(ImGuizmo STATIC "${ImGuizmo_SOURCE_DIR}/ImGuizmo.cpp")
 target_include_directories(ImGuizmo PUBLIC "${ImGuizmo_SOURCE_DIR}")
 target_link_libraries(ImGuizmo PUBLIC ImGui_lib)
@@ -465,17 +433,15 @@ if (UNIX AND NOT APPLE)
 endif ()
 
 # =============================================================================
-# 8. 核心第三方库聚合器
+# 核心第三方库聚合器
 # =============================================================================
 add_library(Luma3rd INTERFACE)
 
-# 收集所有静态库
 set(STATIC_LIBS_TO_LINK imgui_node_editor ImGui_lib ImGuizmo llama)
 if (ASTCENC_STATIC_TARGET)
     list(APPEND STATIC_LIBS_TO_LINK ${ASTCENC_STATIC_TARGET})
 endif ()
 
-# Linux/Android 平台使用静态库组合
 if (UNIX AND NOT APPLE)
     add_library(StaticLibsGroup STATIC)
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/static_libs_group_dummy.cpp"
@@ -504,7 +470,6 @@ if (UNIX AND NOT APPLE)
             nlohmann_json::nlohmann_json
     )
 else ()
-    # 其他平台直接链接
     target_link_libraries(Luma3rd INTERFACE
             ${STATIC_LIBS_TO_LINK}
             Skia::Skia
@@ -523,7 +488,6 @@ else ()
     )
 endif ()
 
-# 添加包含目录
 target_include_directories(Luma3rd INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if (Vulkan_FOUND)
@@ -536,7 +500,7 @@ if (UNIX AND NOT APPLE AND NOT ANDROID)
 endif ()
 
 # =============================================================================
-# 9. 平台特定系统库链接
+# 平台特定系统库链接
 # =============================================================================
 if (WIN32)
     target_link_libraries(Luma3rd INTERFACE
@@ -573,7 +537,7 @@ elseif (APPLE)
 endif ()
 
 # =============================================================================
-# 10. GPU 加速编译定义
+# GPU 加速编译定义
 # =============================================================================
 if (GGML_CUDA)
     target_compile_definitions(Luma3rd INTERFACE HAVE_CUDA=1)
@@ -587,7 +551,7 @@ else ()
 endif ()
 
 # =============================================================================
-# 11. 构建类型编译定义
+# 构建类型编译定义
 # =============================================================================
 target_compile_definitions(Luma3rd INTERFACE
         $<$<CONFIG:Debug>:LDEBUG=1>
@@ -595,7 +559,7 @@ target_compile_definitions(Luma3rd INTERFACE
 )
 
 # =============================================================================
-# 12. 导出变量供主项目使用
+# 导出变量供主项目使用
 # =============================================================================
 set(LUMA_PLATFORM_NAME ${PLATFORM_FULL_NAME} PARENT_SCOPE)
 set(LUMA_ARCH_NAME ${ARCH_NAME} PARENT_SCOPE)
@@ -605,7 +569,10 @@ message(STATUS "========================================")
 message(STATUS "第三方依赖配置完成")
 message(STATUS "平台: ${PLATFORM_FULL_NAME}-${ARCH_NAME}")
 message(STATUS ".NET Runtime: ${DOTNET_RUNTIME_TARGET}")
-message(STATUS "GPU 加速: ${GGML_CUDA}${GGML_VULKAN}")
+message(STATUS "GPU 加速: CUDA:${GGML_CUDA},Vulkan:${GGML_VULKAN}")
+if(ANDROID)
+    message(STATUS "Android STL: c++_shared (全局启用)")
+endif()
 if(ENABLE_LIGHTWEIGHT_BUILD)
     message(STATUS "轻量化构建: 已启用")
 endif()

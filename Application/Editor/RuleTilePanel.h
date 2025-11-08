@@ -1,7 +1,5 @@
 #ifndef LUMAENGINE_RULETILEPANEL_H
 #define LUMAENGINE_RULETILEPANEL_H
-
-#pragma once
 #include "IEditorPanel.h"
 #include "EditorContext.h"
 #include "Data/RuleTile.h"

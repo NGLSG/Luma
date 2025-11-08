@@ -24,10 +24,29 @@
 #include "Renderer/GraphicsBackend.h"
 #include "Renderer/RenderSystem.h"
 #include "Renderer/Camera.h"
+#include "Utils/AndroidPermissions.h"
 #ifdef __ANDROID__
 #include <android/native_window.h>
 #endif
 
+static std::vector<std::string> BuildPermissionList(const char** permissions, int count)
+{
+    std::vector<std::string> output;
+    if (!permissions || count <= 0)
+    {
+        return output;
+    }
+    output.reserve(static_cast<size_t>(count));
+    for (int i = 0; i < count; ++i)
+    {
+        const char* entry = permissions[i];
+        if (entry && entry[0] != '\0')
+        {
+            output.emplace_back(entry);
+        }
+    }
+    return output;
+}
 
 static inline RuntimeScene* AsScene(LumaSceneHandle handle)
 {
@@ -86,6 +105,38 @@ static inline SerializableEventTarget_CAPI ToSerializableEventTargetCAPI(const E
     result.targetComponentName = target.targetComponentName.c_str();
     result.targetMethodName = target.targetMethodName.c_str();
     return result;
+}
+
+LUMA_API bool Platform_HasPermissions(const char** permissions, int count)
+{
+#if defined(__ANDROID__)
+    auto list = BuildPermissionList(permissions, count);
+    if (list.empty())
+    {
+        return true;
+    }
+    return Platform::Android::HasPermissions(list);
+#else
+    (void)permissions;
+    (void)count;
+    return true;
+#endif
+}
+
+LUMA_API bool Platform_RequestPermissions(const char** permissions, int count)
+{
+#if defined(__ANDROID__)
+    auto list = BuildPermissionList(permissions, count);
+    if (list.empty())
+    {
+        return true;
+    }
+    return Platform::Android::AcquirePermissions(list);
+#else
+    (void)permissions;
+    (void)count;
+    return true;
+#endif
 }
 
 

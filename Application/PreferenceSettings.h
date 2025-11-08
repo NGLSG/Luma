@@ -47,6 +47,12 @@ public:
      */
     void SetPreferredIDE(IDE ide);
 
+    const std::filesystem::path& GetAndroidSdkPath() const { return m_androidSdkPath; }
+    const std::filesystem::path& GetAndroidNdkPath() const { return m_androidNdkPath; }
+    void SetAndroidSdkPath(const std::filesystem::path& path);
+    void SetAndroidNdkPath(const std::filesystem::path& path);
+    std::filesystem::path GetLibcxxSharedPath(const std::string& abi) const;
+
     /**
      * @brief 默认构造函数。
      */
@@ -62,6 +68,8 @@ private:
 
     /// 用户首选的集成开发环境 (IDE)。
     IDE m_preferredIDE = IDE::Unknown;
+    std::filesystem::path m_androidSdkPath;
+    std::filesystem::path m_androidNdkPath;
 
     /// 配置文件的路径。
     std::filesystem::path m_configPath;

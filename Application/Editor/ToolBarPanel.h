@@ -2,12 +2,15 @@
 #define TOOLBARPANEL_H
 
 #include <future>
+#include <vector>
+#include <array>
 
 #include "IEditorPanel.h"
 #include <string>
 #include <filesystem>
 
 enum class TargetPlatform;
+class ProjectSettings;
 /**
  * @brief 工具栏面板类。
  *
@@ -53,7 +56,7 @@ public:
      * @return 面板名称字符串。
      */
     const char* GetPanelName() const override { return "工具栏"; }
-
+    void OnKeystoreSavePathChosen(const std::filesystem::path& path);
 private:
     void drawMainMenuBar();
     void drawProjectMenu();
@@ -80,6 +83,14 @@ private:
     void handleShortcuts();
     void startPackagingProcess();
     bool runScriptCompilationLogicForPackaging(std::string& statusMessage, TargetPlatform targetPlatform);
+    void updateAndroidGradleProperties(const std::filesystem::path& platformOutputDir, const ProjectSettings& settings);
+    std::filesystem::path signAndroidApk(const std::filesystem::path& unsignedApk, const ProjectSettings& settings);
+    void refreshKeystoreCandidates(const std::filesystem::path& projectRoot);
+    void drawKeystorePickerPopup(const std::filesystem::path& projectRoot);
+    void drawCreateKeystorePopup();
+    void drawCreateAliasPopup();
+    SDL_Window* getSDLWindow() const;
+
 
     bool m_isPackaging = false; ///< 指示当前是否正在打包。
     std::string m_packagingStatus; ///< 打包状态信息。
@@ -95,6 +106,29 @@ private:
     bool m_packagingSuccess; ///< 指示打包是否成功。
     std::filesystem::path m_lastBuildDirectory; ///< 上次构建的目录。
     bool m_isTransitioningPlayState = false; ///< 指示是否正在切换播放/停止状态。
+    bool m_shouldOpenKeystorePicker = false;
+    std::vector<std::filesystem::path> m_keystoreCandidates;
+    std::array<char, 512> m_keystorePickerBuffer{};
+    struct KeystorePopupState
+    {
+        bool openRequested = false;
+        char path[512] = "";
+        char storePassword[128] = "";
+        char storePasswordConfirm[128] = "";
+        char alias[128] = "luma_key";
+        char aliasPassword[128] = "";
+        char aliasPasswordConfirm[128] = "";
+        std::string errorMessage;
+    } m_keystorePopupState;
+
+    struct AliasPopupState
+    {
+        bool openRequested = false;
+        char alias[128] = "";
+        char password[128] = "";
+        char passwordConfirm[128] = "";
+        std::string errorMessage;
+    } m_aliasPopupState;
 };
 
 #endif

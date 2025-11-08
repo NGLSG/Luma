@@ -1,46 +1,89 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
 }
 
+val gradleProps = Properties().apply {
+    val propsFile = rootProject.file("gradle.properties")
+    if (propsFile.exists()) {
+        propsFile.inputStream().use { load(it) }
+    }
+}
+
+fun prop(key: String, defaultValue: String) = gradleProps.getProperty(key, defaultValue)
+fun propInt(key: String, defaultValue: String) = prop(key, defaultValue).toInt()
+fun propBool(key: String, defaultValue: String) = prop(key, defaultValue).toBoolean()
+fun propList(key: String): List<String> =
+    gradleProps.getProperty(key)?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+
+val appNamespace = prop("appNamespace", "com.lumaengine.lumaandroid")
+val applicationIdValue = prop("applicationId", appNamespace)
+val minVersionValue = prop("minVersion", prop("minSdk", "28"))
+val maxVersionValue = prop("maxVersion", prop("targetSdk", "36"))
+val signingStoreFile = prop("signingStoreFile", "")
+val signingStorePassword = prop("signingStorePassword", "")
+val signingKeyAlias = prop("signingKeyAlias", "")
+val signingKeyPassword = prop("signingKeyPassword", "")
+
 android {
-    namespace = "com.lumaengine.lumaandroid"
-    compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    namespace = appNamespace
+    compileSdk = propInt("compileSdk", maxVersionValue)
+    ndkVersion = prop("ndkVersion", "27.0.12077973")
 
     defaultConfig {
-        applicationId = "com.lumaengine.lumaandroid"
-        minSdk = 28
-        targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        applicationId = applicationIdValue
+        minSdk = propInt("minSdk", minVersionValue)
+        targetSdk = propInt("targetSdk", maxVersionValue)
+        versionCode = propInt("versionCode", "1")
+        versionName = prop("versionName", "1.0")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 仅构建 arm64-v8a
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            val abiFiltersValues = propList("abiFilters")
+            if (abiFiltersValues.isNotEmpty()) {
+                abiFilters.clear()
+                abiFilters.addAll(abiFiltersValues)
+            }
         }
 
-        // 传递 CMake 参数
         externalNativeBuild {
             cmake {
-                arguments += listOf(
-                    "-DANDROID_ABI=arm64-v8a",
-                    "-DANDROID_PLATFORM=android-28",
-                    "-DCMAKE_SYSTEM_NAME=Android",
-                    "-DCMAKE_SUPPRESS_DEVELOPER_WARNINGS=TRUE",
-                    "-DCMAKE_TOOLCHAIN_FILE=E:/vcpkg/scripts/buildsystems/vcpkg.cmake",
-                    "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=E:/Android/Sdk/ndk/27.0.12077973/build/cmake/android.toolchain.cmake",
-                    "-DVCPKG_TARGET_TRIPLET=arm64-android",
-                    "-DUSE_PREBUILT_ENGINE=OFF",
-                    "-DENABLE_LIGHTWEIGHT_BUILD=ON"  // 启用轻量化构建
-                )
-                cFlags += listOf("-v")
-                cppFlags += listOf("-v", "-std=c++20")
+                val cmakeArgsValues = propList("cmakeArgs")
+                if (cmakeArgsValues.isNotEmpty()) {
+                    arguments.clear()
+                    arguments.addAll(cmakeArgsValues)
+                }
+
+                val cFlagsValues = propList("cFlags")
+                if (cFlagsValues.isNotEmpty()) {
+                    cFlags.clear()
+                    cFlags.addAll(cFlagsValues)
+                }
+
+                val cppFlagsValues = propList("cppFlags")
+                if (cppFlagsValues.isNotEmpty()) {
+                    cppFlags.clear()
+                    cppFlags.addAll(cppFlagsValues)
+                }
             }
         }
     }
+
+    val releaseSigningConfig = if (signingStoreFile.isNotBlank() && signingKeyAlias.isNotBlank()) {
+        signingConfigs.create("release").apply {
+            storeFile = file(signingStoreFile)
+            storePassword = signingStorePassword
+            keyAlias = signingKeyAlias
+            keyPassword = signingKeyPassword
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+        }
+    } else null
 
     buildTypes {
         release {
@@ -49,6 +92,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (releaseSigningConfig != null) {
+                signingConfig = releaseSigningConfig
+            } else {
+                println("Warning: 未配置签名信息，Release APK 将不会签名。")
+            }
         }
         debug {
             isDebuggable = true
@@ -68,7 +116,7 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+            version = prop("cmakeVersion", "3.22.1")
         }
     }
 
@@ -76,25 +124,19 @@ android {
         viewBinding = true
     }
 
-    // AGP 8+ 打包配置
     packaging {
         resources {
             excludes += setOf("META-INF/**")
         }
         jniLibs {
-            // 改为 true 以确保 Mono 共享库被正确打包
-            useLegacyPackaging = true
-            // 轻量化构建时不保留调试符号
-            // keepDebugSymbols += listOf("**/*.so")
+            useLegacyPackaging = propBool("useLegacyJniPacking", "true")
         }
     }
 
-    // 不压缩的资源文件
     androidResources {
         noCompress += listOf("luma_pack", "lproj", "dll", "json", "manifest", "jar")
     }
 
-    // 源码集配置
     sourceSets {
         getByName("main") {
             jniLibs.setSrcDirs(listOf("src/main/jniLibs"))

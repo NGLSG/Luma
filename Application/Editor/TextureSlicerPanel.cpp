@@ -14,7 +14,7 @@
 
 #include "Utils/stb_image.h"
 #include "Utils/stb_image_write.h"
-
+#include "Resources/RuntimeAsset/RuntimeScene.h"
 
 constexpr size_t SLICE_PREVIEW_PERF_THRESHOLD = 500;
 

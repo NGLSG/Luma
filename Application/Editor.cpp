@@ -628,6 +628,11 @@ IEditorPanel* Editor::GetPanelByName(const std::string& name)
     return nullptr;
 }
 
+PlatformWindow* Editor::GetPlatWindow()
+{
+    return m_window.get();
+}
+
 void Editor::drawAddComponentPopupContent()
 {
     static char searchBuffer[256] = {0};

@@ -82,6 +82,7 @@ public:
      * @return 指向指定名称面板的指针，如果未找到则可能返回nullptr。
      */
     IEditorPanel* GetPanelByName(const std::string& name);
+    PlatformWindow* GetPlatWindow();
 
 protected:
     /**

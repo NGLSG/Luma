@@ -7,10 +7,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # =====================================================================
+# Android 平台全局强制使用 shared libc++
+# =====================================================================
+set(ANDROID_STL "c++_shared" CACHE STRING "Android STL 类型" FORCE)
+message(STATUS "Android 项目：已设置全局使用 c++_shared")
+
+# =====================================================================
 # 选项: 选择使用预编译引擎库还是从源码编译引擎
 # =====================================================================
 option(USE_PREBUILT_ENGINE "使用预编译的引擎库而非从源码编译" OFF)
-option(ENABLE_LIGHTWEIGHT_BUILD "启用轻量化构建（剥离符号并使用 shared libc++）" OFF)
+option(ENABLE_LIGHTWEIGHT_BUILD "启用轻量化构建（剥离符号并优化体积）" OFF)
 
 # =====================================================================
 # 轻量化构建配置
@@ -20,11 +26,7 @@ if(ENABLE_LIGHTWEIGHT_BUILD)
     message(STATUS "Android 轻量化构建模式: 已启用")
     message(STATUS "========================================")
 
-    # 强制使用 shared libc++
-    set(ANDROID_STL "c++_shared" CACHE STRING "Android STL 类型" FORCE)
-    message(STATUS "已设置 Android STL 为 c++_shared")
-
-    # 添加优化编译选项
+    # 添加体积优化编译选项
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
         # Release 模式的额外优化
         add_compile_options(
@@ -36,7 +38,7 @@ if(ENABLE_LIGHTWEIGHT_BUILD)
                 -Wl,--gc-sections      # 链接时删除未使用的段
                 -Wl,--as-needed        # 只链接需要的库
         )
-        message(STATUS "已启用 Release 模式体积优化选项")
+        message(STATUS "已启用 Release 模式体积优化选项 (-Oz)")
     else()
         # Debug 模式保留基本调试能力
         add_compile_options(
@@ -47,7 +49,7 @@ if(ENABLE_LIGHTWEIGHT_BUILD)
         add_link_options(
                 -Wl,--gc-sections
         )
-        message(STATUS "已启用 Debug 模式体积优化选项")
+        message(STATUS "已启用 Debug 模式体积优化选项 (-Os)")
     endif()
 endif()
 
@@ -59,7 +61,7 @@ if(USE_PREBUILT_ENGINE)
     # 预编译库路径
     set(PREBUILT_ENGINE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${CMAKE_ANDROID_ARCH_ABI}")
 
-    # 定义所有需要导入的预编译库（除了 mono 相关库）
+    # 定义所有需要导入的预编译库
     set(PREBUILT_LIBS
             "LumaEngine"
             "SDL3"
@@ -88,30 +90,51 @@ if(USE_PREBUILT_ENGINE)
         message(STATUS "已导入预编译库: ${LIB_NAME} -> ${LIB_PATH}")
     endforeach()
 
-    # 如果是轻量化构建，对预编译库进行符号剥离
+    # 如果是轻量化构建，对预编译库进行智能符号剥离
     if(ENABLE_LIGHTWEIGHT_BUILD)
         message(STATUS "正在为预编译库配置符号剥离...")
         foreach(LIB_NAME ${PREBUILT_LIBS})
             set(LIB_PATH "${PREBUILT_ENGINE_DIR}/lib${LIB_NAME}.so")
             if(EXISTS "${LIB_PATH}")
-                if(CMAKE_BUILD_TYPE STREQUAL "Release")
-                    # Release 模式完全剥离
-                    add_custom_command(
-                            OUTPUT "${LIB_PATH}.stripped"
-                            COMMAND ${CMAKE_STRIP} --strip-all "${LIB_PATH}"
-                            COMMAND ${CMAKE_COMMAND} -E touch "${LIB_PATH}.stripped"
-                            DEPENDS "${LIB_PATH}"
-                            COMMENT "正在剥离 ${LIB_NAME} 的所有符号..."
-                    )
+                # 根据库的类型选择剥离策略
+                if(LIB_NAME STREQUAL "SDL3" OR LIB_NAME STREQUAL "LumaEngine")
+                    # SDL3 和 LumaEngine 需要保留 JNI 符号
+                    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+                        add_custom_command(
+                                OUTPUT "${LIB_PATH}.stripped"
+                                COMMAND ${CMAKE_STRIP} --strip-unneeded "${LIB_PATH}"
+                                COMMAND ${CMAKE_COMMAND} -E touch "${LIB_PATH}.stripped"
+                                DEPENDS "${LIB_PATH}"
+                                COMMENT "正在剥离 ${LIB_NAME} 的未使用符号（保留 JNI）..."
+                        )
+                    else()
+                        add_custom_command(
+                                OUTPUT "${LIB_PATH}.stripped"
+                                COMMAND ${CMAKE_STRIP} --strip-debug "${LIB_PATH}"
+                                COMMAND ${CMAKE_COMMAND} -E touch "${LIB_PATH}.stripped"
+                                DEPENDS "${LIB_PATH}"
+                                COMMENT "正在剥离 ${LIB_NAME} 的调试符号（Debug）..."
+                        )
+                    endif()
                 else()
-                    # Debug 模式仅剥离调试符号
-                    add_custom_command(
-                            OUTPUT "${LIB_PATH}.stripped"
-                            COMMAND ${CMAKE_STRIP} --strip-debug "${LIB_PATH}"
-                            COMMAND ${CMAKE_COMMAND} -E touch "${LIB_PATH}.stripped"
-                            DEPENDS "${LIB_PATH}"
-                            COMMENT "正在剥离 ${LIB_NAME} 的调试符号..."
-                    )
+                    # 其他库可以完全剥离
+                    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+                        add_custom_command(
+                                OUTPUT "${LIB_PATH}.stripped"
+                                COMMAND ${CMAKE_STRIP} --strip-all "${LIB_PATH}"
+                                COMMAND ${CMAKE_COMMAND} -E touch "${LIB_PATH}.stripped"
+                                DEPENDS "${LIB_PATH}"
+                                COMMENT "正在剥离 ${LIB_NAME} 的所有符号..."
+                        )
+                    else()
+                        add_custom_command(
+                                OUTPUT "${LIB_PATH}.stripped"
+                                COMMAND ${CMAKE_STRIP} --strip-debug "${LIB_PATH}"
+                                COMMAND ${CMAKE_COMMAND} -E touch "${LIB_PATH}.stripped"
+                                DEPENDS "${LIB_PATH}"
+                                COMMENT "正在剥离 ${LIB_NAME} 的调试符号..."
+                        )
+                    endif()
                 endif()
                 list(APPEND STRIPPED_LIBS "${LIB_PATH}.stripped")
             endif()
@@ -146,6 +169,7 @@ endif()
 # =====================================================================
 add_library(main SHARED
         sdl_main_wrapper.cpp
+        sdl_env_compat.cpp
 )
 
 if(USE_PREBUILT_ENGINE)
@@ -181,36 +205,45 @@ target_include_directories(main PRIVATE ${LUMA_ENGINE_ROOT})
 target_compile_features(main PRIVATE cxx_std_20)
 
 # =====================================================================
-# 轻量化构建：主模块符号剥离
+# 轻量化构建：主模块智能符号剥离（保留 JNI 符号）
 # =====================================================================
 if(ENABLE_LIGHTWEIGHT_BUILD)
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        # Release 模式使用 --strip-all
+        # Release 模式使用 --strip-unneeded 保留 JNI 导出符号
         add_custom_command(TARGET main POST_BUILD
-                COMMAND ${CMAKE_STRIP} --strip-all $<TARGET_FILE:main>
-                COMMENT "正在剥离 main 模块的所有符号（Release 模式）..."
+                COMMAND ${CMAKE_STRIP} --strip-unneeded $<TARGET_FILE:main>
+                COMMENT "正在剥离 main 模块的未使用符号（保留 JNI 导出）..."
         )
+        message(STATUS "已为 main 模块启用符号剥离 (--strip-unneeded)")
     else()
         # Debug 模式使用 --strip-debug
         add_custom_command(TARGET main POST_BUILD
                 COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:main>
                 COMMENT "正在剥离 main 模块的调试符号（Debug 模式）..."
         )
+        message(STATUS "已为 main 模块启用符号剥离 (--strip-debug)")
     endif()
-
-    message(STATUS "已为 main 模块启用符号剥离")
 endif()
 
 message(STATUS "========================================")
 message(STATUS "LumaAndroid 项目配置完成")
+message(STATUS "Android STL: c++_shared (全局启用)")
+if(USE_PREBUILT_ENGINE)
+    message(STATUS "引擎模式: 预编译库")
+else()
+    message(STATUS "引擎模式: 源码编译")
+endif()
 if(ENABLE_LIGHTWEIGHT_BUILD)
     message(STATUS "轻量化构建: 已启用")
-    message(STATUS "  - STL: ${ANDROID_STL}")
-    message(STATUS "  - 符号剥离: ${CMAKE_BUILD_TYPE} 模式")
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
         message(STATUS "  - 优化级别: -Oz (最小体积)")
+        message(STATUS "  - 符号剥离策略:")
+        message(STATUS "    • SDL3/LumaEngine: --strip-unneeded (保留 JNI)")
+        message(STATUS "    • 其他库: --strip-all (完全剥离)")
+        message(STATUS "    • main 模块: --strip-unneeded (保留 JNI)")
     else()
         message(STATUS "  - 优化级别: -Os (体积优化)")
+        message(STATUS "  - 符号剥离: --strip-debug (所有模块)")
     endif()
 else()
     message(STATUS "轻量化构建: 未启用")

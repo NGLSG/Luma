@@ -2,6 +2,7 @@
 #include "../Utils/Logger.h"
 #include "../Utils/Utils.h"
 #include <algorithm>
+#include <array>
 #include <iostream>
 
 #include "BlueprintData.h"
@@ -112,10 +113,34 @@ void EditorAssetManager::ScanDirectoryTask()
     }
 
     std::vector<std::filesystem::path> pathsToProcess;
+    const std::array<std::string, 2> excludedDirs = {"Raw", "Android"};
+    auto shouldSkipDir = [&](const std::filesystem::path& directory)
+    {
+        std::error_code ec;
+        auto relative = std::filesystem::relative(directory, m_assetsRoot, ec);
+        if (ec) return false;
+        auto it = relative.begin();
+        if (it == relative.end()) return false;
+        std::string topName = it->string();
+        return std::find(excludedDirs.begin(), excludedDirs.end(), topName) != excludedDirs.end();
+    };
+
     try
     {
-        for (const auto& entry : std::filesystem::recursive_directory_iterator(m_assetsRoot))
+        for (std::filesystem::recursive_directory_iterator it(
+                 m_assetsRoot, std::filesystem::directory_options::skip_permission_denied), end;
+             it != end; ++it)
         {
+            const auto& entry = *it;
+            if (entry.is_directory())
+            {
+                if (shouldSkipDir(entry.path()))
+                {
+                    it.disable_recursion_pending();
+                }
+                continue;
+            }
+
             if (entry.is_regular_file() && entry.path().extension() != ".meta")
             {
                 pathsToProcess.push_back(entry.path());

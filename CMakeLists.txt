@@ -1,7 +1,12 @@
 cmake_minimum_required(VERSION 3.21)
-# VCPKG 和 NDK 的配置应在 project() 之前,以便工具链被正确加载
-# 但 CLion 的 --target 修复必须在 project() 之后
+
+# =============================================================================
+# Android 平台全局强制使用 shared libc++
+# =============================================================================
 if (ANDROID)
+    set(ANDROID_STL "c++_shared" CACHE STRING "Android STL 类型" FORCE)
+    message(STATUS "Android 平台：已设置全局使用 c++_shared")
+
     set(ANDROID_NDK_HOME "E:\\Android\\Sdk\\ndk\\27.0.12077973")
     set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake")
     set(VCPKG_TARGET_TRIPLET "arm64-android")
@@ -10,19 +15,24 @@ endif ()
 project(LumaEngine CXX)
 
 # =============================================================================
-# 轻量化构建选项
+# 轻量化构建选项（仅影响符号剥离和体积优化）
 # =============================================================================
-option(ENABLE_LIGHTWEIGHT_BUILD "启用轻量化构建（剥离符号并使用 shared libc++）" OFF)
+option(ENABLE_LIGHTWEIGHT_BUILD "启用轻量化构建（剥离符号并优化体积）" OFF)
 
 if(ENABLE_LIGHTWEIGHT_BUILD)
     message(STATUS "========================================")
     message(STATUS "轻量化构建模式: 已启用")
     message(STATUS "========================================")
 
-    # Android 平台强制使用 shared libc++
-    if(ANDROID)
-        set(ANDROID_STL "c++_shared" CACHE STRING "Android STL 类型" FORCE)
-        message(STATUS "已设置 Android STL 为 c++_shared")
+    # 体积优化编译选项
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(-Oz -ffunction-sections -fdata-sections)
+        add_link_options(-Wl,--gc-sections -Wl,--as-needed)
+        message(STATUS "Release 模式：使用 -Oz 优化体积")
+    else()
+        add_compile_options(-Os -ffunction-sections -fdata-sections)
+        add_link_options(-Wl,--gc-sections)
+        message(STATUS "Debug 模式：使用 -Os 优化体积")
     endif()
 endif()
 
@@ -37,7 +47,7 @@ if (ANDROID)
             set(NDK_TARGET_ARCH "aarch64")
         elseif (CMAKE_ANDROID_ARCH_ABI STREQUAL "armeabi-v7a")
             set(NDK_TARGET_ARCH "armv7a")
-            set(NDK_TARGET_SUFFIX "-linux-androideabi") # ARMv7a 使用不同的 eabi 后缀
+            set(NDK_TARGET_SUFFIX "-linux-androideabi")
         elseif (CMAKE_ANDROID_ARCH_ABI STREQUAL "x86_64")
             set(NDK_TARGET_ARCH "x86_64")
         elseif (CMAKE_ANDROID_ARCH_ABI STREQUAL "x86")
@@ -48,7 +58,6 @@ if (ANDROID)
         set(NDK_TARGET_TRIPLE "${NDK_TARGET_ARCH}${NDK_TARGET_SUFFIX}${ANDROID_API_LEVEL}")
 
         message(STATUS "CLion NDK Fix: 正在强制 --target=${NDK_TARGET_TRIPLE}")
-        # 修正：将新标志追加到现有标志之后,而不是覆盖
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --target=${NDK_TARGET_TRIPLE}")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=${NDK_TARGET_TRIPLE}")
     endif ()
@@ -99,7 +108,6 @@ elseif (APPLE)
     add_compile_definitions(LUMA_PLATFORM_MACOS)
 endif ()
 
-
 if (LUMA_ARCH_NAME STREQUAL "arm64")
     add_compile_definitions(LUMA_ARM64)
 elseif (LUMA_ARCH_NAME STREQUAL "x64")
@@ -109,13 +117,11 @@ elseif (LUMA_ARCH_NAME STREQUAL "x86")
 endif ()
 
 # =============================================================================
-# 编译器警告设置 (将警告视为错误)
+# 编译器警告设置
 # =============================================================================
 if (MSVC)
-    # 将警告视为错误
     add_compile_options(/WX)
 else ()
-    # 将警告视为错误 (GCC/Clang)
     add_compile_options(-Werror)
 endif ()
 
@@ -142,20 +148,16 @@ endif ()
 # x86/x64 平台的 SIMD 扩展检测
 if (NOT ANDROID AND LUMA_ARCH_NAME MATCHES "(x64|x86)")
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        # 检测 SSE 系列指令集
         check_cxx_compiler_flag("-msse" HAS_SSE)
         check_cxx_compiler_flag("-msse2" HAS_SSE2)
         check_cxx_compiler_flag("-msse3" HAS_SSE3)
         check_cxx_compiler_flag("-mssse3" HAS_SSSE3)
         check_cxx_compiler_flag("-msse4.1" HAS_SSE41)
         check_cxx_compiler_flag("-msse4.2" HAS_SSE42)
-
-        # 检测 AVX 系列指令集
         check_cxx_compiler_flag("-mavx" HAS_AVX)
         check_cxx_compiler_flag("-mavx2" HAS_AVX2)
         check_cxx_compiler_flag("-mavx512f" HAS_AVX512)
 
-        # 按优先级选择最佳指令集 (AVX512 需要显式启用)
         if (ENABLE_AVX512 AND HAS_AVX512)
             add_compile_definitions(LUMA_AVX512)
             list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX512")
@@ -204,44 +206,32 @@ if (NOT ANDROID AND LUMA_ARCH_NAME MATCHES "(x64|x86)")
         endif ()
 
     elseif (MSVC)
-        # MSVC 的指令集检测和选择
-        # MSVC 在 x64 下默认支持 SSE2
         if (LUMA_ARCH_NAME STREQUAL "x64")
             add_compile_definitions(LUMA_SSE2)
             list(APPEND LUMA_SUPPORTED_EXTENSIONS "SSE2")
         endif ()
 
-        # 检测 AVX 支持
         set(TEST_AVX_FILE ${CMAKE_BINARY_DIR}/test_avx.cpp)
         file(WRITE ${TEST_AVX_FILE}
                 "#include <immintrin.h>\n"
                 "int main() { __m256 test = _mm256_setzero_ps(); return 0; }\n"
         )
-        try_compile(HAS_AVX ${CMAKE_BINARY_DIR} ${TEST_AVX_FILE}
-                CMAKE_FLAGS "/arch:AVX"
-        )
+        try_compile(HAS_AVX ${CMAKE_BINARY_DIR} ${TEST_AVX_FILE} CMAKE_FLAGS "/arch:AVX")
 
-        # 检测 AVX2 支持
         set(TEST_AVX2_FILE ${CMAKE_BINARY_DIR}/test_avx2.cpp)
         file(WRITE ${TEST_AVX2_FILE}
                 "#include <immintrin.h>\n"
                 "int main() { __m256i test = _mm256_abs_epi32(_mm256_setzero_si256()); return 0; }\n"
         )
-        try_compile(HAS_AVX2 ${CMAKE_BINARY_DIR} ${TEST_AVX2_FILE}
-                CMAKE_FLAGS "/arch:AVX2"
-        )
+        try_compile(HAS_AVX2 ${CMAKE_BINARY_DIR} ${TEST_AVX2_FILE} CMAKE_FLAGS "/arch:AVX2")
 
-        # 检测 AVX512 支持
         set(TEST_AVX512_FILE ${CMAKE_BINARY_DIR}/test_avx512.cpp)
         file(WRITE ${TEST_AVX512_FILE}
                 "#include <immintrin.h>\n"
                 "int main() { __m512 test = _mm512_setzero_ps(); return 0; }\n"
         )
-        try_compile(HAS_AVX512 ${CMAKE_BINARY_DIR} ${TEST_AVX512_FILE}
-                CMAKE_FLAGS "/arch:AVX512"
-        )
+        try_compile(HAS_AVX512 ${CMAKE_BINARY_DIR} ${TEST_AVX512_FILE} CMAKE_FLAGS "/arch:AVX512")
 
-        # 按优先级选择最佳指令集
         if (ENABLE_AVX512 AND HAS_AVX512)
             add_compile_definitions(LUMA_AVX512)
             list(APPEND LUMA_SUPPORTED_EXTENSIONS "AVX512")
@@ -291,13 +281,11 @@ list(FILTER LUMA_ENGINE_SOURCES EXCLUDE REGEX ".*/Discarded/.*")
 
 # 添加脚本系统源文件
 if (ANDROID)
-    # Android 平台排除 CoreCLR 主机
     file(GLOB_RECURSE LUMA_SCRIPTING_SOURCES CONFIGURE_DEPENDS "Scripting/*.cpp" "Scripting/*.h")
     list(FILTER LUMA_SCRIPTING_SOURCES EXCLUDE REGEX ".*/CoreCLRHost\\..*")
     list(APPEND LUMA_ENGINE_SOURCES ${LUMA_SCRIPTING_SOURCES})
     message(STATUS "Android 平台: 使用 Mono 脚本主机")
 else ()
-    # 桌面平台使用 CoreCLR 主机
     file(GLOB_RECURSE LUMA_SCRIPTING_SOURCES CONFIGURE_DEPENDS "Scripting/*.cpp" "Scripting/*.h")
     list(APPEND LUMA_ENGINE_SOURCES ${LUMA_SCRIPTING_SOURCES})
     message(STATUS "桌面平台: 使用 CoreCLR 脚本主机")
@@ -356,42 +344,36 @@ if (UNIX AND NOT APPLE)
 endif ()
 
 if (ANDROID)
-    # 确保 target 层也取消定义该宏以覆盖局部定义
     target_compile_options(LumaEngine PRIVATE -U_LIBCPP_HAS_NO_EXPERIMENTAL_STOP_TOKEN)
 endif ()
 
 target_precompile_headers(LumaEngine PUBLIC "Utils/PCH.h")
 
 # =============================================================================
-# 轻量化构建：符号剥离
+# 轻量化构建：智能符号剥离（保留 JNI 符号）
 # =============================================================================
 if(ENABLE_LIGHTWEIGHT_BUILD)
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-            # Release 模式使用 --strip-all 完全剥离符号
-            add_custom_command(TARGET LumaEngine POST_BUILD
-                    COMMAND ${CMAKE_STRIP} --strip-all $<TARGET_FILE:LumaEngine>
-                    COMMENT "正在剥离 LumaEngine 的所有符号（Release 模式）..."
-            )
-        endif()
+        # Release 模式使用 --strip-unneeded 保留 JNI 符号
+        add_custom_command(TARGET LumaEngine POST_BUILD
+                COMMAND ${CMAKE_STRIP} --strip-unneeded $<TARGET_FILE:LumaEngine>
+                COMMENT "正在剥离 LumaEngine 的未使用符号（保留动态符号）..."
+        )
+        message(STATUS "已启用 Release 模式符号剥离 (--strip-unneeded)")
     else()
-        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-            # Debug 模式使用 --strip-debug 仅剥离调试符号
-            add_custom_command(TARGET LumaEngine POST_BUILD
-                    COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:LumaEngine>
-                    COMMENT "正在剥离 LumaEngine 的调试符号（Debug 模式）..."
-            )
-        endif()
+        # Debug 模式仅剥离调试符号
+        add_custom_command(TARGET LumaEngine POST_BUILD
+                COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:LumaEngine>
+                COMMENT "正在剥离 LumaEngine 的调试符号（Debug 模式）..."
+        )
+        message(STATUS "已启用 Debug 模式符号剥离 (--strip-debug)")
     endif()
-
-    message(STATUS "已启用符号剥离（${CMAKE_BUILD_TYPE} 模式）")
 endif()
 
 # =============================================================================
 # 桌面平台可执行文件 (Editor 和 Game)
 # =============================================================================
 if (NOT ANDROID)
-    # Editor 可执行文件
     add_executable(LumaEditor main.cpp)
     target_link_libraries(LumaEditor PRIVATE LumaEngine)
     target_compile_definitions(LumaEditor PUBLIC
@@ -399,17 +381,12 @@ if (NOT ANDROID)
             GLM_ENABLE_EXPERIMENTAL
     )
 
-    # Game 可执行文件
     add_executable(Game main.cpp)
     target_compile_definitions(Game PRIVATE GLM_ENABLE_EXPERIMENTAL)
 
-    # 平台特定链接配置
     if (WIN32 AND MSVC)
-        # Windows 延迟加载
         target_link_libraries(Game PRIVATE LumaEngine delayimp.lib)
         target_link_options(Game PRIVATE "/DELAYLOAD:LumaEngine.dll")
-
-        # 大对象文件支持
         target_compile_options(LumaEngine PRIVATE /bigobj)
         target_compile_options(LumaEditor PRIVATE /bigobj)
         target_compile_options(Game PRIVATE /bigobj)
@@ -417,7 +394,6 @@ if (NOT ANDROID)
         target_link_libraries(Game PRIVATE LumaEngine)
     endif ()
 
-    # Linux 平台链接选项
     if (UNIX AND NOT APPLE)
         target_link_options(LumaEditor PRIVATE
                 -Wl,--allow-multiple-definition
@@ -444,7 +420,6 @@ endif ()
 # 资源复制函数
 # =============================================================================
 function(CopyEngineAssets TARGET_NAME OUTPUT_DIR)
-    # 复制 .NET Runtime
     if (EXISTS "${LUMA_DOTNET_RUNTIME_DIR}/bin")
         add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -455,14 +430,12 @@ function(CopyEngineAssets TARGET_NAME OUTPUT_DIR)
         message(WARNING "找不到 .NET Runtime bin 目录: ${LUMA_DOTNET_RUNTIME_DIR}/bin")
     endif ()
 
-    # 复制 LumaEngine 动态库
     add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:LumaEngine>" "${OUTPUT_DIR}"
             COMMENT "正在为 ${TARGET_NAME} 复制 LumaEngine 动态库..."
     )
 
-    # 复制资源文件夹
     set(RESOURCE_FOLDERS Icons Fonts Tools template)
     foreach (FOLDER ${RESOURCE_FOLDERS})
         if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${FOLDER}")
@@ -487,15 +460,12 @@ endif ()
 # =============================================================================
 # 统一的打包与发布目标 (publish)
 # =============================================================================
-
-# 定义目录结构
 set(PACKAGE_ROOT_DIR "${CMAKE_SOURCE_DIR}/Build")
 set(PACKAGE_PLATFORM_DIR "${PACKAGE_ROOT_DIR}/${LUMA_PLATFORM_NAME}")
 set(PUBLISH_ROOT_DIR "${CMAKE_SOURCE_DIR}/Publish")
 set(PUBLISH_PLATFORM_DIR "${PUBLISH_ROOT_DIR}/${LUMA_PLATFORM_NAME}")
 set(PUBLISH_GAMEDATA_DIR "${PUBLISH_PLATFORM_DIR}/GameData")
 
-# 创建 publish 目标
 add_custom_target(publish
         COMMENT "正在统一执行打包和发布..."
 )
@@ -506,14 +476,12 @@ else ()
     add_dependencies(publish LumaEngine)
 endif ()
 
-# 清理旧目录
 add_custom_command(TARGET publish PRE_BUILD
         COMMAND ${CMAKE_COMMAND} -E remove_directory "${PACKAGE_PLATFORM_DIR}"
         COMMAND ${CMAKE_COMMAND} -E remove_directory "${PUBLISH_PLATFORM_DIR}"
         COMMENT "正在清理旧的打包和发布目录..."
 )
 
-# 创建目录结构
 add_custom_command(TARGET publish POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "${PACKAGE_PLATFORM_DIR}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${PUBLISH_PLATFORM_DIR}"
@@ -524,8 +492,6 @@ add_custom_command(TARGET publish POST_BUILD
 # =============================================================================
 # 步骤 A: 创建 Build/Platform 完整包
 # =============================================================================
-
-# A.1: 复制所有编译产物
 if (WIN32)
     file(GLOB BUILD_EXECUTABLES CONFIGURE_DEPENDS "${CMAKE_BINARY_DIR}/*.exe")
     file(GLOB BUILD_LIBRARIES CONFIGURE_DEPENDS "${CMAKE_BINARY_DIR}/*.dll")
@@ -534,7 +500,6 @@ elseif (UNIX AND NOT APPLE AND NOT ANDROID)
     file(GLOB BUILD_LIBRARIES CONFIGURE_DEPENDS "${CMAKE_BINARY_DIR}/lib*.so*")
     set(ALL_BUILD_ARTIFACTS ${BUILD_LIBRARIES})
 
-    # 明确添加可执行文件
     if (TARGET Game)
         list(APPEND ALL_BUILD_ARTIFACTS "$<TARGET_FILE:Game>")
     endif ()
@@ -542,7 +507,6 @@ elseif (UNIX AND NOT APPLE AND NOT ANDROID)
         list(APPEND ALL_BUILD_ARTIFACTS "$<TARGET_FILE:Editor>")
     endif ()
 
-    # 添加其他无后缀文件 (如 apphost)
     file(GLOB OTHER_FILES CONFIGURE_DEPENDS LIST_DIRECTORIES false "${CMAKE_BINARY_DIR}/*")
     foreach (FILE_PATH ${OTHER_FILES})
         get_filename_component(FILE_NAME ${FILE_PATH} NAME)
@@ -568,7 +532,6 @@ add_custom_command(TARGET publish POST_BUILD
         COMMENT "正在复制编译产物到 Build/${LUMA_PLATFORM_NAME}..."
 )
 
-# A.2: 复制资源文件夹
 set(FOLDERS_TO_COPY Tools template Fonts Icons)
 foreach (FOLDER ${FOLDERS_TO_COPY})
     if (EXISTS "${CMAKE_SOURCE_DIR}/${FOLDER}")
@@ -583,7 +546,6 @@ add_custom_command(TARGET publish POST_BUILD
         COMMENT "正在复制资源文件夹到 Build/${LUMA_PLATFORM_NAME}..."
 )
 
-# A.3: 复制配置文件
 if (EXISTS "${CMAKE_BINARY_DIR}/imgui.ini")
     add_custom_command(TARGET publish POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -598,16 +560,13 @@ add_custom_command(TARGET publish POST_BUILD
 # =============================================================================
 # 步骤 B: 创建 Publish/Platform 分发包
 # =============================================================================
-
 if (NOT ANDROID)
-    # B.1: 复制 Game 可执行文件
     add_custom_command(TARGET publish POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:Game>" "${PUBLISH_PLATFORM_DIR}/"
             COMMENT "正在复制 Game 可执行文件到 Publish/${LUMA_PLATFORM_NAME}..."
     )
 endif ()
 
-# B.2: 复制核心依赖到 GameData
 set(FILES_TO_COPY_TO_GAMEDATA "")
 if (WIN32)
     file(GLOB PUBLISH_EXECUTABLES CONFIGURE_DEPENDS "${CMAKE_BINARY_DIR}/*.exe")
@@ -636,7 +595,6 @@ add_custom_command(TARGET publish POST_BUILD
         COMMENT "正在复制核心依赖到 Publish/${LUMA_PLATFORM_NAME}/GameData..."
 )
 
-# B.3: 复制 .NET SDK 文件
 set(SDK_SOURCE_DIR "${CMAKE_BINARY_DIR}/Tools/${LUMA_PLATFORM_NAME}")
 set(SDK_FILES
         "Luma.SDK.deps.json"
@@ -662,7 +620,6 @@ add_custom_command(TARGET publish POST_BUILD
         COMMENT "正在复制 .NET SDK 文件到 Publish/${LUMA_PLATFORM_NAME}/GameData..."
 )
 
-# B.4: 清理调试文件 (仅 Windows)
 if (WIN32)
     add_custom_command(TARGET publish POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E remove -f
@@ -675,32 +632,11 @@ if (WIN32)
     )
 endif ()
 
-# =============================================================================
-# 轻量化构建：额外的发布优化
-# =============================================================================
-if(ENABLE_LIGHTWEIGHT_BUILD AND ANDROID)
-    # 在 Android 发布包中也剥离 libc++_shared.so 的符号
-    add_custom_command(TARGET publish POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E echo "正在为轻量化构建优化发布包..."
-            COMMENT "轻量化构建: 优化发布包..."
-    )
-
-    # 查找并剥离 libc++_shared.so
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        add_custom_command(TARGET publish POST_BUILD
-                COMMAND bash -c "find ${PUBLISH_GAMEDATA_DIR} -name 'libc++_shared.so' -exec ${CMAKE_STRIP} --strip-all {} \\;"
-                COMMENT "正在剥离 libc++_shared.so 的符号..."
-        )
-    else()
-        add_custom_command(TARGET publish POST_BUILD
-                COMMAND bash -c "find ${PUBLISH_GAMEDATA_DIR} -name 'libc++_shared.so' -exec ${CMAKE_STRIP} --strip-debug {} \\;"
-                COMMENT "正在剥离 libc++_shared.so 的调试符号..."
-        )
-    endif()
-endif()
-
 message(STATUS "========================================")
 message(STATUS "Luma Engine 配置完成")
+if (ANDROID)
+    message(STATUS "Android STL: c++_shared (全局启用)")
+endif()
 if (ENABLE_AVX512)
     message(STATUS "AVX512 指令集: 已显式启用")
 else ()
@@ -708,9 +644,12 @@ else ()
 endif ()
 if(ENABLE_LIGHTWEIGHT_BUILD)
     message(STATUS "轻量化构建: 已启用")
-    if(ANDROID)
-        message(STATUS "  - 使用 shared libc++")
-        message(STATUS "  - 符号剥离: ${CMAKE_BUILD_TYPE} 模式")
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        message(STATUS "  - 优化级别: -Oz (最小体积)")
+        message(STATUS "  - 符号剥离: --strip-unneeded (保留 JNI)")
+    else()
+        message(STATUS "  - 优化级别: -Os (体积优化)")
+        message(STATUS "  - 符号剥离: --strip-debug")
     endif()
 else()
     message(STATUS "轻量化构建: 未启用 (使用 -DENABLE_LIGHTWEIGHT_BUILD=ON 启用)")

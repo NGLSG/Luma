@@ -6,7 +6,7 @@
 #include "Utils/Logger.h"
 #include "Utils/InspectorUI.h"
 #include <fstream>
-
+#include "Resources/RuntimeAsset/RuntimeScene.h"
 void RuleTilePanel::Initialize(EditorContext* context)
 {
     m_context = context;

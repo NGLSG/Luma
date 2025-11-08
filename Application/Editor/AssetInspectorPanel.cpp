@@ -7,7 +7,7 @@
 #include "Profiler.h"
 #include <fstream>
 #include <any> 
-
+#include "Resources/RuntimeAsset/RuntimeScene.h"
 
 #include "Editor.h"
 #include "TextureSlicerPanel.h"

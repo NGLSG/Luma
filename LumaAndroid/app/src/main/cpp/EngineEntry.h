@@ -12,9 +12,11 @@
 #endif
 
 // 游戏运行时入口
-ENTRY_API int LumaEngine_Game_Entry(int argc, char* argv[], const char* currentExePath = nullptr);
+ENTRY_API int LumaEngine_Game_Entry(int argc, char* argv[], const char* currentExePath = nullptr,
+                                    const char* androidPackageName = nullptr);
 
 // 编辑器入口
-ENTRY_API int LumaEngine_Editor_Entry(int argc, char* argv[], const char* currentExePath = nullptr);
+ENTRY_API int LumaEngine_Editor_Entry(int argc, char* argv[], const char* currentExePath = nullptr,
+                                      const char* androidPackageName = nullptr);
 
 #endif // LUMAENGINE_ENGINEENTRY_H

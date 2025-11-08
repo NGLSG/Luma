@@ -3,7 +3,7 @@
 int main(int argc, char* argv[])
 {
 #ifdef LUMA_EDITOR
-    return LumaEngine_Editor_Entry(argc, argv);
+    return LumaEngine_Editor_Entry(argc, argv, nullptr, nullptr);
 #else
 #if defined(OPENSSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER >= 0x10100000L)
     OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, nullptr);
@@ -19,6 +19,6 @@ int main(int argc, char* argv[])
     }
 #endif
 
-    return LumaEngine_Game_Entry(argc, argv);
+    return LumaEngine_Game_Entry(argc, argv, nullptr, nullptr);
 #endif
 }

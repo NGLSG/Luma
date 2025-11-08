@@ -93,6 +93,9 @@ struct PlayDesc_CAPI
 extern "C" {
 #endif
 
+LUMA_API bool Platform_HasPermissions(const char** permissions, int count);
+LUMA_API bool Platform_RequestPermissions(const char** permissions, int count);
+
 /**
  * @brief 检查实体是否拥有指定名称的组件。
  * @param scene 场景句柄。

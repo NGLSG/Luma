@@ -15,11 +15,49 @@
 #include "Application/Game.h"
 #include "Application/ProjectSettings.h"
 #include "Utils/Logger.h"
+#include "Utils/PathUtils.h"
 
 #ifndef DLL_SEARCH_PATH
 #define DLL_SEARCH_PATH "GameData"
 #endif
 
+
+namespace
+{
+    void ConfigureWorkingDirectory(const char* executablePath)
+    {
+        if (!executablePath || executablePath[0] == '\0')
+        {
+            return;
+        }
+
+        std::filesystem::path inputPath(executablePath);
+        std::filesystem::path workingDir;
+        std::error_code ec;
+        if (std::filesystem::is_directory(inputPath, ec))
+        {
+            workingDir = inputPath;
+        }
+        else
+        {
+            workingDir = inputPath.parent_path();
+        }
+
+        if (!workingDir.empty())
+        {
+            std::error_code changeEc;
+            std::filesystem::current_path(workingDir, changeEc);
+            if (changeEc)
+            {
+                LogError("Failed to set working directory to '{}': {}", workingDir.string(), changeEc.message());
+            }
+            else
+            {
+                LogInfo("Working directory set to '{}'", workingDir.string());
+            }
+        }
+    }
+}
 
 static int GameEntryImpl(int argc, char* argv[], const char* executablePath)
 {
@@ -28,6 +66,7 @@ static int GameEntryImpl(int argc, char* argv[], const char* executablePath)
 
     ProjectSettings::GetInstance().LoadInRuntime();
     auto& settings = ProjectSettings::GetInstance();
+    PathUtils::Initialize(settings.GetAppName());
 
 #if defined(_WIN32) || defined(_WIN64)
     if (!settings.IsConsoleEnabled())
@@ -64,8 +103,15 @@ static int GameEntryImpl(int argc, char* argv[], const char* executablePath)
 
 
 
-ENTRY_API int LumaEngine_Game_Entry(int argc, char* argv[], const char* currentExePath)
+ENTRY_API int LumaEngine_Game_Entry(int argc, char* argv[], const char* currentExePath,
+                                    const char* androidPackageName)
 {
+#if defined(__ANDROID__)
+    PathUtils::InjectAndroidPackageName(androidPackageName ? androidPackageName : "");
+#else
+    (void)androidPackageName;
+#endif
+
     std::string executablePath;
     if (!currentExePath)
     {
@@ -75,6 +121,7 @@ ENTRY_API int LumaEngine_Game_Entry(int argc, char* argv[], const char* currentE
     {
         executablePath = currentExePath;
     }
+    ConfigureWorkingDirectory(executablePath.c_str());
     LogInfo("Executable Path: {}", executablePath);
     return GameEntryImpl(argc, argv, executablePath.c_str());
 }

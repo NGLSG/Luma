@@ -6,6 +6,7 @@
 #include <sstream>
 #include "../Utils/Directory.h"
 #include "../Utils/PCH.h"
+#include "../Utils/PathUtils.h"
 #include "../Application/ProjectSettings.h"
 #include <jni.h>
 #include <android/log.h>
@@ -74,14 +75,14 @@ bool MonoHost::Initialize(const std::filesystem::path& mainAssemblyPath, bool is
     m_scriptAssembliesPath = Directory::GetAbsolutePath(effectiveAssemblyDir.string());
     LogInfo("MonoHost: 脚本程序集路径: {}", m_scriptAssembliesPath.string());
 
-    
+
     if (!initializeDelegates())
     {
         LogError("MonoHost: 初始化委托失败");
         return false;
     }
 
-    
+
     if (m_initializeDomainFn)
     {
         std::string pathUtf8 = pathToUtf8(m_scriptAssembliesPath);
@@ -117,11 +118,10 @@ bool MonoHost::bootstrapRuntimeIfNeeded(const std::filesystem::path& sdkDir)
         return true;
     }
 
-    
-    std::string appDataDir = "/data/data/com.lumaengine.lumaandroid/files";
-    std::filesystem::path bclPath = std::filesystem::path(appDataDir) / "mono-bcl" / "net9.0";
 
-    
+    std::filesystem::path bclPath = PathUtils::GetAndroidInternalDataDir() / "mono-bcl" / "net9.0";
+
+
     std::error_code ec;
     if (!std::filesystem::exists(bclPath, ec))
     {
@@ -129,7 +129,7 @@ bool MonoHost::bootstrapRuntimeIfNeeded(const std::filesystem::path& sdkDir)
         return false;
     }
 
-    
+
     std::filesystem::path corlibPath = bclPath / "System.Private.CoreLib.dll";
     if (!std::filesystem::exists(corlibPath, ec))
     {
@@ -140,7 +140,7 @@ bool MonoHost::bootstrapRuntimeIfNeeded(const std::filesystem::path& sdkDir)
     LogInfo("MonoHost: 找到 BCL 路径: {}", bclPath.string());
     LogInfo("MonoHost: 找到核心库: {}", corlibPath.string());
 
-    
+
     if (ProjectSettings::GetInstance().GetScriptDebugEnabled())
     {
         const char* monoOptions[] = {
@@ -152,16 +152,16 @@ bool MonoHost::bootstrapRuntimeIfNeeded(const std::filesystem::path& sdkDir)
         LogInfo("MonoHost: Mono 调试模式已启用，监听端口 55555");
     }
 
-    
+
     std::string bclPathUtf8 = pathToUtf8(bclPath);
     setenv("MONO_PATH", bclPathUtf8.c_str(), 1);
     LogInfo("MonoHost: 已设置 MONO_PATH: {}", bclPathUtf8);
 
-    
+
     mono_set_assemblies_path(bclPathUtf8.c_str());
     LogInfo("MonoHost: 已设置程序集搜索路径: {}", bclPathUtf8);
 
-    
+
     m_monoDomain = mono_jit_init("LumaMonoDomain");
     if (!m_monoDomain)
     {
@@ -171,10 +171,10 @@ bool MonoHost::bootstrapRuntimeIfNeeded(const std::filesystem::path& sdkDir)
 
     LogInfo("MonoHost: Mono 域初始化成功");
 
-    
+
     mono_thread_attach(m_monoDomain);
 
-    
+
     std::filesystem::path sdkAssemblyPath = sdkDir / "Luma.SDK.dll";
     if (!std::filesystem::exists(sdkAssemblyPath, ec))
     {
@@ -205,7 +205,6 @@ bool MonoHost::bootstrapRuntimeIfNeeded(const std::filesystem::path& sdkDir)
 
 void MonoHost::Shutdown()
 {
-    
     if (m_unloadDomainFn)
     {
         try
@@ -219,7 +218,7 @@ void MonoHost::Shutdown()
         }
     }
 
-    
+
     m_initializeDomainFn = nullptr;
     m_unloadDomainFn = nullptr;
     m_createInstanceFn = nullptr;
@@ -233,12 +232,12 @@ void MonoHost::Shutdown()
     m_callOnDisableFn = nullptr;
     m_callOnEnableFn = nullptr;
 
-    
+
     m_sdkAssembly = nullptr;
     m_sdkImage = nullptr;
     m_methodCache.clear();
 
-    
+
     if (m_monoDomain)
     {
         m_monoDomain = nullptr;
@@ -263,22 +262,22 @@ MonoMethod* MonoHost::getManagedMethod(
         return nullptr;
     }
 
-    
+
     std::string namespaceUtf8 = "Luma.SDK";
     std::string classUtf8 = "Interop";
     std::string methodUtf8 = wideToUtf8(methodName);
 
-    
+
     std::string cacheKey = namespaceUtf8 + "::" + classUtf8 + "::" + methodUtf8;
 
-    
+
     auto it = m_methodCache.find(cacheKey);
     if (it != m_methodCache.end())
     {
         return it->second;
     }
 
-    
+
     MonoClass* klass = mono_class_from_name(m_sdkImage, namespaceUtf8.c_str(), classUtf8.c_str());
     if (!klass)
     {
@@ -286,7 +285,7 @@ MonoMethod* MonoHost::getManagedMethod(
         return nullptr;
     }
 
-    
+
     MonoMethod* method = mono_class_get_method_from_name(klass, methodUtf8.c_str(), -1);
     if (!method)
     {
@@ -294,7 +293,7 @@ MonoMethod* MonoHost::getManagedMethod(
         return nullptr;
     }
 
-    
+
     m_methodCache[cacheKey] = method;
     return method;
 }
@@ -306,7 +305,7 @@ bool MonoHost::checkAndLogException(MonoObject* exception) const
     MonoClass* exceptionClass = mono_object_get_class(exception);
     const char* exceptionName = mono_class_get_name(exceptionClass);
 
-    
+
     MonoProperty* messageProp = mono_class_get_property_from_name(exceptionClass, "Message");
     if (messageProp)
     {
@@ -324,7 +323,7 @@ bool MonoHost::checkAndLogException(MonoObject* exception) const
         LogError("MonoHost: 托管异常 [{}]", exceptionName);
     }
 
-    
+
     MonoProperty* stackTraceProp = mono_class_get_property_from_name(exceptionClass, "StackTrace");
     if (stackTraceProp)
     {
@@ -342,7 +341,6 @@ bool MonoHost::checkAndLogException(MonoObject* exception) const
 }
 
 
-
 void MonoHost::wrapperInitializeDomain(const char* baseDirUtf8)
 {
     auto* instance = GetInstance();
@@ -351,7 +349,7 @@ void MonoHost::wrapperInitializeDomain(const char* baseDirUtf8)
     MonoMethod* method = instance->getManagedMethod(L"Luma.SDK", L"Luma.SDK.Interop", L"InitializeDomain");
     if (!method) return;
 
-    
+
     void* pathPtr = (void*)baseDirUtf8;
     void* args[1];
     args[0] = &pathPtr;
@@ -383,15 +381,15 @@ ManagedGCHandle MonoHost::wrapperCreateInstance(void* scenePtr, uint32_t entityI
     MonoMethod* method = instance->getManagedMethod(L"Luma.SDK", L"Luma.SDK.Interop", L"CreateScriptInstance");
     if (!method) return 0;
 
-    
+
     void* typeNamePtr = (void*)typeName;
     void* assemblyNamePtr = (void*)assemblyName;
 
     void* args[4];
-    args[0] = &scenePtr;           
-    args[1] = &entityId;           
-    args[2] = &typeNamePtr;        
-    args[3] = &assemblyNamePtr;    
+    args[0] = &scenePtr;
+    args[1] = &entityId;
+    args[2] = &typeNamePtr;
+    args[3] = &assemblyNamePtr;
 
     MonoObject* exception = nullptr;
     MonoObject* result = mono_runtime_invoke(method, nullptr, args, &exception);
@@ -403,7 +401,7 @@ ManagedGCHandle MonoHost::wrapperCreateInstance(void* scenePtr, uint32_t entityI
 
     if (!result) return 0;
 
-    
+
     return *(intptr_t*)mono_object_unbox(result);
 }
 
@@ -467,7 +465,7 @@ void MonoHost::wrapperSetProperty(ManagedGCHandle handle, const char* propName, 
     MonoMethod* method = instance->getManagedMethod(L"Luma.SDK", L"Luma.SDK.Interop", L"SetExportedProperty");
     if (!method) return;
 
-    
+
     void* handlePtr = (void*)handle;
     void* propNamePtr = (void*)propName;
     void* valuePtr = (void*)valueAsYaml;
@@ -490,7 +488,7 @@ void MonoHost::wrapperDebugList(const char* assemblyPath)
     MonoMethod* method = instance->getManagedMethod(L"Luma.SDK", L"Luma.SDK.Interop", L"Debug_ListAllTypesAndMethods");
     if (!method) return;
 
-    
+
     void* pathPtr = (void*)assemblyPath;
     void* args[1];
     args[0] = &pathPtr;
@@ -508,7 +506,7 @@ void MonoHost::wrapperInvokeMethod(ManagedGCHandle handle, const char* methodNam
     MonoMethod* method = instance->getManagedMethod(L"Luma.SDK", L"Luma.SDK.Interop", L"InvokeMethod");
     if (!method) return;
 
-    
+
     void* handlePtr = (void*)handle;
     void* methodNamePtr = (void*)methodName;
     void* argsPtr = (void*)argsAsYaml;
@@ -580,7 +578,7 @@ bool MonoHost::initializeDelegates()
 {
     LogInfo("MonoHost: 开始初始化委托函数指针");
 
-    
+
     m_initializeDomainFn = &MonoHost::wrapperInitializeDomain;
     m_unloadDomainFn = &MonoHost::wrapperUnloadDomain;
     m_createInstanceFn = &MonoHost::wrapperCreateInstance;

@@ -19,6 +19,44 @@
 #include "Application/Editor.h"
 #include "Application/ProjectSettings.h"
 #include "Utils/Logger.h"
+#include "Utils/PathUtils.h"
+
+namespace
+{
+    void ConfigureWorkingDirectory(const char* executablePath)
+    {
+        if (!executablePath || executablePath[0] == '\0')
+        {
+            return;
+        }
+
+        std::filesystem::path path(executablePath);
+        std::filesystem::path workDir;
+        std::error_code ec;
+        if (std::filesystem::is_directory(path, ec))
+        {
+            workDir = path;
+        }
+        else
+        {
+            workDir = path.parent_path();
+        }
+
+        if (!workDir.empty())
+        {
+            std::error_code changeEc;
+            std::filesystem::current_path(workDir, changeEc);
+            if (changeEc)
+            {
+                LogError("设置工作目录失败: {}", changeEc.message());
+            }
+            else
+            {
+                LogInfo("工作目录已设置为: {}", workDir.string());
+            }
+        }
+    }
+}
 
 
 static int EditorEntryImpl(int argc, char* argv[], const char* executablePath)
@@ -36,21 +74,8 @@ static int EditorEntryImpl(int argc, char* argv[], const char* executablePath)
     SetConsoleOutputCP(CP_UTF8);
 #endif
 
-    
-    if (executablePath && executablePath[0] != '\0')
-    {
-        std::filesystem::path exePath(executablePath);
-        std::filesystem::path workDir = exePath.parent_path();
-        try
-        {
-            std::filesystem::current_path(workDir);
-            LogInfo("工作目录已设置为: {}", workDir.string());
-        }
-        catch (const std::exception& e)
-        {
-            LogError("设置工作目录失败: {}", e.what());
-        }
-    }
+    ConfigureWorkingDirectory(executablePath);
+    PathUtils::Initialize("Luma Editor");
 
     
     LogInfo("正在以编辑器模式启动...");
@@ -82,8 +107,15 @@ static int EditorEntryImpl(int argc, char* argv[], const char* executablePath)
 
 
 
-ENTRY_API int LumaEngine_Editor_Entry(int argc, char* argv[], const char* currentExePath)
+ENTRY_API int LumaEngine_Editor_Entry(int argc, char* argv[], const char* currentExePath,
+                                      const char* androidPackageName)
 {
+#if defined(__ANDROID__)
+    PathUtils::InjectAndroidPackageName(androidPackageName ? androidPackageName : "");
+#else
+    (void)androidPackageName;
+#endif
+
     std::string executablePath;
     if (!currentExePath)
     {
@@ -91,7 +123,6 @@ ENTRY_API int LumaEngine_Editor_Entry(int argc, char* argv[], const char* curren
     }
     else
     {
-
         executablePath = currentExePath;
     }
     return EditorEntryImpl(argc, argv, executablePath.c_str());
