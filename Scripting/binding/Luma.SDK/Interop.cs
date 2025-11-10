@@ -35,7 +35,6 @@ public static class Interop
 
             Debug.Log($"[Domain] InitializeDomain: {baseDir}");
             DomainManager.Initialize(baseDir);
-            Debug.Log("[Domain] InitializeDomain: Completed.");
         }
         catch (Exception e)
         {
@@ -195,16 +194,13 @@ public static class Interop
     {
         try
         {
-            Debug.Log($"[ResolveType] 开始解析 - assemblyName: {assemblyName}, typeName: {typeName}");
 
             Type? type = DomainManager.ResolveType(assemblyName, typeName);
             if (type != null)
             {
-                Debug.Log($"[ResolveType] 从 DomainManager 成功解析类型：{type.FullName}");
                 return type;
             }
-
-            Debug.Log($"[ResolveType] DomainManager 未找到类型，尝试从已加载的程序集查找...");
+            
 
             Assembly? assembly = AppDomain.CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => a.GetName().Name == assemblyName);
@@ -222,17 +218,12 @@ public static class Interop
                     Debug.Log($"[ResolveType] 动态加载程序集失败: {loadEx.Message}");
                 }
             }
-            else
-            {
-                Debug.Log($"[ResolveType] 在已加载程序集中找到 '{assemblyName}'");
-            }
 
             if (assembly != null)
             {
                 Type? t = assembly.GetType(typeName, throwOnError: false, ignoreCase: false);
                 if (t != null)
                 {
-                    Debug.Log($"[ResolveType] 成功从程序集解析类型：{t.FullName}");
                     return t;
                 }
                 else
@@ -304,15 +295,11 @@ public static class Interop
     public static IntPtr CreateScriptInstance(IntPtr scenePtr, uint entityId, IntPtr typeNamePtr,
         IntPtr assemblyNamePtr)
     {
-        Debug.Log($"[CreateScriptInstance] 调用开始...");
         try
         {
             string? typeName = Marshal.PtrToStringUTF8(typeNamePtr);
             string? assemblyName = Marshal.PtrToStringUTF8(assemblyNamePtr);
-
-            Debug.Log(
-                $"[CreateScriptInstance] 开始创建实例 - typeName: {typeName}, assemblyName: {assemblyName}, scenePtr: {scenePtr}, entityId: {entityId}");
-
+            
             if (string.IsNullOrEmpty(typeName) || string.IsNullOrEmpty(assemblyName))
             {
                 Debug.Log("[CreateScriptInstance] 失败：typeName 或 assemblyName 为空");
@@ -324,8 +311,7 @@ public static class Interop
                 Debug.Log("[CreateScriptInstance] 失败：scenePtr 为 null");
                 return IntPtr.Zero;
             }
-
-            Debug.Log($"[CreateScriptInstance] 调用 ResolveType...");
+            
             Type? type = ResolveType(assemblyName, typeName);
 
             if (type == null)
@@ -333,24 +319,18 @@ public static class Interop
                 Debug.Log($"[CreateScriptInstance] 失败：ResolveType 返回 null，无法找到类型 '{typeName}' in '{assemblyName}'");
                 return IntPtr.Zero;
             }
-
-            Debug.Log($"[CreateScriptInstance] 成功解析类型：{type.FullName}");
-
+            
             if (!typeof(Script).IsAssignableFrom(type))
             {
                 Debug.Log($"[CreateScriptInstance] 失败：类型 '{typeName}' 不继承自 Script");
                 return IntPtr.Zero;
             }
-
-            Debug.Log($"[CreateScriptInstance] 创建实例...");
             var inst = Activator.CreateInstance(type);
             if (inst is not Script instance)
             {
                 Debug.Log($"[CreateScriptInstance] 失败：无法创建实例或实例不是 Script 类型");
                 return IntPtr.Zero;
             }
-
-            Debug.Log($"[CreateScriptInstance] 设置 Entity...");
             try
             {
                 var entity = new Entity(entityId, scenePtr);
@@ -363,8 +343,7 @@ public static class Interop
                     $"[CreateScriptInstance] 失败：无法创建 Entity，entityId={entityId}, 异常: {ex.Message}\n{ex.StackTrace}");
                 return IntPtr.Zero;
             }
-
-            Debug.Log($"[CreateScriptInstance] 分配 GCHandle...");
+            
             GCHandle handle = GCHandle.Alloc(instance);
             IntPtr handlePtr = GCHandle.ToIntPtr(handle);
 

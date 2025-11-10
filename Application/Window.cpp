@@ -1,11 +1,9 @@
 #include "Window.h"
 #include <stdexcept>
 #include <vector>
-
 #include "stb_image.h"
 #include "Event/EventBus.h"
 #include "Event/Events.h"
-
 
 #if defined(SDL_PLATFORM_WINDOWS)
 #include <windows.h>
@@ -16,7 +14,6 @@
 static void* g_androidNativeWindow = nullptr;
 #endif
 
-
 PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
 {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
@@ -24,17 +21,14 @@ PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
         throw std::runtime_error("Failed to initialize SDL: " + std::string(SDL_GetError()));
     }
 
-    
 #if defined(SDL_PLATFORM_ANDROID)
     if (g_androidNativeWindow)
     {
         SDL_PropertiesID props = SDL_CreateProperties();
         SDL_SetPointerProperty(props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, g_androidNativeWindow);
         SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title.c_str());
-        
         SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, 0);
         SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, 0);
-        
         SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_FULLSCREEN_BOOLEAN, true);
         sdlWindow = SDL_CreateWindowWithProperties(props);
         SDL_DestroyProperties(props);
@@ -42,8 +36,6 @@ PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
     }
     else
     {
-        
-        
         sdlWindow = SDL_CreateWindow(
             title.c_str(),
             0,
@@ -52,7 +44,6 @@ PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
         );
     }
 #else
-    
     sdlWindow = SDL_CreateWindow(
         title.c_str(),
         width,
@@ -67,13 +58,11 @@ PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
         throw std::runtime_error("Failed to create window: " + std::string(SDL_GetError()));
     }
 
-
     SDL_SetEventEnabled(SDL_EVENT_DROP_BEGIN, true);
     SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, true);
     SDL_SetEventEnabled(SDL_EVENT_DROP_COMPLETE, true);
 
 #if defined(SDL_PLATFORM_WINDOWS)
-
     {
         BOOL elevated = FALSE;
         HANDLE token = nullptr;
@@ -91,7 +80,6 @@ PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
                         "Process is running elevated (Administrator). Windows will block file drag-and-drop from a non-elevated Explorer.");
         }
     }
-
 
     {
         SDL_PropertiesID props = SDL_GetWindowProperties(sdlWindow);
@@ -151,7 +139,6 @@ void PlatformWindow::BroaderLess(bool broaderLess)
 void PlatformWindow::SetIcon(const std::string& iconPath)
 {
     int width, height, channels;
-
     unsigned char* pixels = stbi_load(iconPath.c_str(), &width, &height, &channels, 4);
 
     if (!pixels)
@@ -159,7 +146,6 @@ void PlatformWindow::SetIcon(const std::string& iconPath)
         LogError("使用 stb_image 加载图标失败 '{}': {}", iconPath, stbi_failure_reason());
         return;
     }
-
 
     SDL_Surface* iconSurface = SDL_CreateSurfaceFrom(
         width,
@@ -176,14 +162,10 @@ void PlatformWindow::SetIcon(const std::string& iconPath)
         return;
     }
 
-
     SDL_SetWindowIcon(sdlWindow, iconSurface);
-
-
     SDL_DestroySurface(iconSurface);
     stbi_image_free(pixels);
 }
-
 
 void PlatformWindow::PollEvents()
 {
@@ -197,7 +179,6 @@ void PlatformWindow::PollEvents()
 void PlatformWindow::handleEvent(const SDL_Event& event)
 {
     OnAnyEvent.Invoke(event);
-
 
     static bool s_dropInProgress = false;
     static std::vector<std::string> s_dropBatchPaths;
@@ -246,7 +227,6 @@ void PlatformWindow::handleEvent(const SDL_Event& event)
         OnTextInput.Invoke(event.text.text);
         break;
 
-
     case SDL_EVENT_DROP_BEGIN:
         s_dropInProgress = true;
         s_dropBatchPaths.clear();
@@ -259,7 +239,6 @@ void PlatformWindow::handleEvent(const SDL_Event& event)
             s_dropBatchPaths.emplace_back(event.drop.data);
         }
         SDL_Log("DROP_FILE (count=%d)", (int)s_dropBatchPaths.size());
-
 
         if (!s_dropInProgress && !s_dropBatchPaths.empty())
         {
@@ -278,9 +257,118 @@ void PlatformWindow::handleEvent(const SDL_Event& event)
         s_dropInProgress = false;
         break;
 
+    case SDL_EVENT_FINGER_DOWN:
+    case SDL_EVENT_FINGER_UP:
+    case SDL_EVENT_FINGER_MOTION:
+        handleTouchEvent(event);
+        break;
+
     default:
         break;
     }
+}
+
+void PlatformWindow::handleTouchEvent(const SDL_Event& event)
+{
+#if defined(SDL_PLATFORM_ANDROID)
+    int windowWidth, windowHeight;
+    SDL_GetWindowSizeInPixels(sdlWindow, &windowWidth, &windowHeight);
+
+    switch (event.type)
+    {
+    case SDL_EVENT_FINGER_DOWN:
+        {
+            TouchPoint touch;
+            touch.fingerId = event.tfinger.fingerID;
+            touch.x = event.tfinger.x;
+            touch.y = event.tfinger.y;
+            touch.pressure = event.tfinger.pressure;
+            activeTouches[touch.fingerId] = touch;
+
+            
+            OnTouchDown.Invoke(touch.fingerId, touch.x, touch.y, touch.pressure);
+
+            
+            if (activeTouches.size() == 1)
+            {
+                int pixelX = static_cast<int>(touch.x * windowWidth);
+                int pixelY = static_cast<int>(touch.y * windowHeight);
+                inputState.mousePosition = {pixelX, pixelY};
+                inputState.isLeftMouseDown = true;
+                OnMouseButtonDown.Invoke(SDL_BUTTON_LEFT, pixelX, pixelY);
+            }
+
+            SDL_Log("FINGER_DOWN: ID=%lld, x=%.3f, y=%.3f, pressure=%.3f, total=%zu",
+                    (long long)touch.fingerId, touch.x, touch.y, touch.pressure, activeTouches.size());
+            break;
+        }
+
+    case SDL_EVENT_FINGER_UP:
+        {
+            SDL_FingerID fingerId = event.tfinger.fingerID;
+            float x = event.tfinger.x;
+            float y = event.tfinger.y;
+
+            auto it = activeTouches.find(fingerId);
+            if (it != activeTouches.end())
+            {
+                activeTouches.erase(it);
+            }
+
+            
+            OnTouchUp.Invoke(fingerId, x, y);
+
+            
+            if (activeTouches.empty())
+            {
+                int pixelX = static_cast<int>(x * windowWidth);
+                int pixelY = static_cast<int>(y * windowHeight);
+                inputState.mousePosition = {pixelX, pixelY};
+                inputState.isLeftMouseDown = false;
+                OnMouseButtonUp.Invoke(SDL_BUTTON_LEFT, pixelX, pixelY);
+            }
+
+            SDL_Log("FINGER_UP: ID=%lld, x=%.3f, y=%.3f, remaining=%zu",
+                    (long long)fingerId, x, y, activeTouches.size());
+            break;
+        }
+
+    case SDL_EVENT_FINGER_MOTION:
+        {
+            SDL_FingerID fingerId = event.tfinger.fingerID;
+            float x = event.tfinger.x;
+            float y = event.tfinger.y;
+            float dx = event.tfinger.dx;
+            float dy = event.tfinger.dy;
+            float pressure = event.tfinger.pressure;
+
+            auto it = activeTouches.find(fingerId);
+            if (it != activeTouches.end())
+            {
+                it->second.x = x;
+                it->second.y = y;
+                it->second.pressure = pressure;
+            }
+
+            
+            OnTouchMove.Invoke(fingerId, x, y, dx, dy, pressure);
+
+            
+            if (!activeTouches.empty() && activeTouches.begin()->first == fingerId)
+            {
+                int pixelX = static_cast<int>(x * windowWidth);
+                int pixelY = static_cast<int>(y * windowHeight);
+                inputState.mousePosition = {pixelX, pixelY};
+                OnMouseMove.Invoke(pixelX, pixelY);
+            }
+
+            break;
+        }
+
+    default:
+        break;
+    }
+#endif
 }
 
 bool PlatformWindow::ShouldClose() const
@@ -311,13 +399,12 @@ NativeWindowHandle PlatformWindow::GetNativeWindowHandle() const
     }
 
 #elif defined(SDL_PLATFORM_MACOS)
-
     handle.metalLayer = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
 
 #elif defined(SDL_PLATFORM_LINUX) && !defined(SDL_PLATFORM_ANDROID)
-
     handle.x11Display = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
     handle.x11Window = SDL_GetNumberProperty(props, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
+
 #elif defined(SDL_PLATFORM_ANDROID)
     handle.aNativeWindow = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, NULL);
 

@@ -263,72 +263,98 @@ public readonly struct Guid : IEquatable<Guid>, IComparable<Guid>
 public enum AssetType
 {
     Unknown = 0,
-
-
     Texture,
-
-
     Material,
-
-
     CSharpScript,
-
-
     Scene,
-
-
     Prefab,
-
-
     Audio,
-
-
     Video,
-
-
     AnimationClip,
-
-
     AnimationController,
-
-
     PhysicsMaterial,
-
-
     LocalGameObject,
-
-
     Blueprint,
-
-
     Tile,
-
-
     Tileset,
-
-
     RuleTile,
-
-
     Font,
 };
 
+
+
+
 [StructLayout(LayoutKind.Sequential)]
-public struct AssetHandle
+public struct AssetHandle : IEquatable<AssetHandle>
 {
-    [YamlMember(Alias = "guid")] public Guid AssetGuid;
+    [YamlMember(Alias = "guid")]
+    public Guid AssetGuid;
 
-    [YamlMember(Alias = "type")] public AssetType AssetType;
-
+    [YamlMember(Alias = "type")]
+    public AssetType AssetType;
 
     public AssetHandle(Guid guid, AssetType type = AssetType.Unknown)
     {
-        AssetGuid = (guid);
+        AssetGuid = guid;
         AssetType = type;
     }
-
 
     public bool IsValid() => AssetGuid != Guid.Empty;
 
     public static AssetHandle Invalid => new(Guid.Empty, AssetType.Unknown);
+
+    #region Static Helpers
+
+    public static AssetHandle TextureHandle(Guid guid) => new(guid, AssetType.Texture);
+    public static AssetHandle MaterialHandle(Guid guid) => new(guid, AssetType.Material);
+    public static AssetHandle CSharpScriptHandle(Guid guid) => new(guid, AssetType.CSharpScript);
+    public static AssetHandle SceneHandle(Guid guid) => new(guid, AssetType.Scene);
+    public static AssetHandle PrefabHandle(Guid guid) => new(guid, AssetType.Prefab);
+    public static AssetHandle AudioHandle(Guid guid) => new(guid, AssetType.Audio);
+    public static AssetHandle VideoHandle(Guid guid) => new(guid, AssetType.Video);
+    public static AssetHandle AnimationClipHandle(Guid guid) => new(guid, AssetType.AnimationClip);
+    public static AssetHandle AnimationControllerHandle(Guid guid) => new(guid, AssetType.AnimationController);
+    public static AssetHandle PhysicsMaterialHandle(Guid guid) => new(guid, AssetType.PhysicsMaterial);
+    public static AssetHandle LocalGameObjectHandle(Guid guid) => new(guid, AssetType.LocalGameObject);
+    public static AssetHandle BlueprintHandle(Guid guid) => new(guid, AssetType.Blueprint);
+    public static AssetHandle TileHandle(Guid guid) => new(guid, AssetType.Tile);
+    public static AssetHandle TilesetHandle(Guid guid) => new(guid, AssetType.Tileset);
+    public static AssetHandle RuleTileHandle(Guid guid) => new(guid, AssetType.RuleTile);
+    public static AssetHandle FontHandle(Guid guid) => new(guid, AssetType.Font);
+
+    #endregion
+
+    #region Equality Members
+
+    public bool Equals(AssetHandle other)
+    {
+        return AssetGuid.Equals(other.AssetGuid) && AssetType == other.AssetType;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is AssetHandle other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(AssetGuid, (int)AssetType);
+    }
+
+    public static bool operator ==(AssetHandle left, AssetHandle right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(AssetHandle left, AssetHandle right)
+    {
+        return !left.Equals(right);
+    }
+
+    #endregion
+
+    public override string ToString()
+    {
+        return $"AssetHandle(Guid: {AssetGuid}, Type: {AssetType})";
+    }
 }

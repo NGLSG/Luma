@@ -229,7 +229,7 @@ static void UpdateAndroidStringsXml(const std::filesystem::path& resDir, const s
     std::filesystem::create_directories(valuesDir, ec);
 
     const std::filesystem::path stringsXmlPath = valuesDir / "strings.xml";
-    
+
     std::ofstream oss(stringsXmlPath, std::ios::trunc);
     if (!oss.is_open())
     {
@@ -237,10 +237,10 @@ static void UpdateAndroidStringsXml(const std::filesystem::path& resDir, const s
         return;
     }
 
-    
+
     oss << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
     oss << "<resources>\n";
-    
+
     std::string escapedName = appName;
     size_t pos = 0;
     while ((pos = escapedName.find("&", pos)) != std::string::npos)
@@ -441,12 +441,13 @@ void ToolbarPanel::rebuildScripts()
     });
 }
 
-bool ToolbarPanel::runScriptCompilationLogic(std::string& statusMessage)
+bool ToolbarPanel::runScriptCompilationLogic(std::string& statusMessage, const std::filesystem::path& outPath)
 {
     const std::filesystem::path projectRoot = ProjectSettings::GetInstance().GetProjectRoot();
     const std::filesystem::path editorRoot = ".";
-    const std::filesystem::path libraryDir = projectRoot / "Library";
 
+    
+    const std::filesystem::path libraryDir = outPath.empty() ? (projectRoot / "Library") : outPath;
 
     TargetPlatform hostPlatform = ProjectSettings::GetCurrentHostPlatform();
     std::string platformSubDir = ProjectSettings::PlatformToString(hostPlatform);
@@ -480,10 +481,8 @@ bool ToolbarPanel::runScriptCompilationLogic(std::string& statusMessage)
 
         std::string dotnetRid = (hostPlatform == TargetPlatform::Windows) ? "win-x64" : "linux-x64";
 
-
         std::string projectRootStr = projectRoot.string();
         std::string libraryDirStr = libraryDir.string();
-
 
 #ifdef _WIN32
         char shortProjectPath[MAX_PATH];
@@ -509,7 +508,6 @@ bool ToolbarPanel::runScriptCompilationLogic(std::string& statusMessage)
 
         statusMessage = "正在提取脚本元数据...";
 
-
         std::string toolExecutableName = (hostPlatform == TargetPlatform::Windows)
                                              ? "YamlExtractor.exe"
                                              : "YamlExtractor";
@@ -528,16 +526,14 @@ bool ToolbarPanel::runScriptCompilationLogic(std::string& statusMessage)
 
         if (!std::filesystem::exists(absGameScriptsDll))
         {
-            throw std::runtime_error("编译产物 GameScripts.dll 未在 Library 目录中找到: " + gameScriptsDll.string());
+            throw std::runtime_error("编译产物 GameScripts.dll 未在输出目录中找到: " + gameScriptsDll.string());
         }
-
 
         std::string toolsExeStr = absToolsExe.string();
         std::string gameScriptsDllStr = absGameScriptsDll.string();
         std::string metadataYamlStr = absMetadataYaml.string();
 
 #ifdef _WIN32
-
         char shortToolPath[MAX_PATH];
         char shortDllPath[MAX_PATH];
         char shortYamlPath[MAX_PATH];
@@ -574,7 +570,6 @@ bool ToolbarPanel::runScriptCompilationLogic(std::string& statusMessage)
         return false;
     }
 }
-
 void ToolbarPanel::drawPreferencesPopup()
 {
     ImGui::Text("外部工具");
@@ -1074,7 +1069,7 @@ void ToolbarPanel::drawSettingsWindow()
                 SDL_ShowOpenFileDialog(OnKeystoreFileSelected, this, window, filters, 2, nullptr, false);
             }
         }
-        
+
 
         drawStringField("Keystore 口令", settings.GetAndroidKeystorePassword(),
                         [&](const std::string& pwd) { settings.SetAndroidKeystorePassword(pwd); },
@@ -1776,13 +1771,23 @@ void ToolbarPanel::startPackagingProcess()
             if (targetPlatform == TargetPlatform::Android)
             {
                 const auto projectAndroidDir = settings.GetProjectAndroidDirectory();
-                const bool hasCustomAndroidProject = std::filesystem::exists(projectAndroidDir);
-                const std::filesystem::path& androidSourceDir = hasCustomAndroidProject
-                                                                    ? projectAndroidDir
-                                                                    : templateDir;
-                std::filesystem::copy(androidSourceDir, platformOutputDir,
+                std::filesystem::copy(templateDir, platformOutputDir,
                                       std::filesystem::copy_options::recursive |
                                       std::filesystem::copy_options::overwrite_existing);
+                if (settings.IsCustomAndroidManifestEnabled())
+                {
+                    std::filesystem::copy(settings.GetCustomAndroidManifestPath(),
+                                          platformOutputDir / "app/src/main/AndroidManifest.xml",
+                                          std::filesystem::copy_options::recursive |
+                                          std::filesystem::copy_options::overwrite_existing);
+                }
+                if (settings.IsCustomGradlePropertiesEnabled())
+                {
+                    std::filesystem::copy(settings.GetCustomGradlePropertiesPath(),
+                                          platformOutputDir / "gradle.properties",
+                                          std::filesystem::copy_options::recursive |
+                                          std::filesystem::copy_options::overwrite_existing);
+                }
                 stageLibcxxShared("arm64-v8a");
             }
             else
@@ -1838,7 +1843,7 @@ void ToolbarPanel::startPackagingProcess()
 
             m_packagingProgress = 0.6f;
             m_packagingStatus = "正在复制 C# 程序集...";
-            const std::filesystem::path csharpSourceDir = projectRoot / "Library";
+            const std::filesystem::path csharpSourceDir = projectRoot / "Library/Temp";
             if (!std::filesystem::exists(csharpSourceDir))
                 throw std::runtime_error("项目的 Library 目录不存在，请先编译脚本。");
 
@@ -1860,7 +1865,7 @@ void ToolbarPanel::startPackagingProcess()
                 if (sourcePath.empty() || !std::filesystem::exists(sourcePath)) return;
                 const auto destDir = platformOutputDir / "app/src/main/res" / bucketName;
 
-                
+
                 if (!std::filesystem::exists(destDir))
                 {
                     std::filesystem::create_directories(destDir);
@@ -1893,12 +1898,12 @@ void ToolbarPanel::startPackagingProcess()
             {
                 if (targetPlatform != TargetPlatform::Android) return;
 
-                
+
                 const auto resDir = platformOutputDir / "app/src/main/res";
                 std::error_code ec;
                 std::filesystem::remove_all(resDir / "mipmap-anydpi-v26", ec);
                 std::filesystem::remove_all(resDir / "mipmap-anydpi", ec);
-                
+
                 std::filesystem::remove(resDir / "drawable/ic_launcher_background.xml", ec);
                 std::filesystem::remove(resDir / "drawable/ic_launcher_foreground.xml", ec);
                 std::filesystem::remove(resDir / "drawable-v24/ic_launcher_foreground.xml", ec);
@@ -1942,7 +1947,7 @@ void ToolbarPanel::startPackagingProcess()
                 m_packagingProgress = 0.8f;
                 m_packagingStatus = "正在配置 Android 资源...";
 
-                
+
                 UpdateAndroidStringsXml(platformOutputDir / "app/src/main/res", settings.GetAndroidApkName());
 
                 configureAndroidIcons();
@@ -1967,18 +1972,6 @@ void ToolbarPanel::startPackagingProcess()
                     {
                         LogWarn("应用图标文件 '{}' 未找到，已跳过。", iconSourceFullPath.string());
                     }
-                }
-            }
-
-            if (targetPlatform == TargetPlatform::Android)
-            {
-                const auto customAndroidProjectDir = projectRoot / "Android";
-                if (std::filesystem::exists(customAndroidProjectDir))
-                {
-                    m_packagingStatus = "正在合并自定义 Android 工程...";
-                    std::filesystem::copy(customAndroidProjectDir, platformOutputDir,
-                                          std::filesystem::copy_options::recursive |
-                                          std::filesystem::copy_options::overwrite_existing);
                 }
             }
 
@@ -2746,7 +2739,7 @@ bool ToolbarPanel::runScriptCompilationLogicForPackaging(std::string& statusMess
 {
     const std::filesystem::path projectRoot = ProjectSettings::GetInstance().GetProjectRoot();
     const std::filesystem::path editorRoot = ".";
-    const std::filesystem::path libraryDir = projectRoot / "Library";
+    const std::filesystem::path libraryDir = projectRoot / "Library/Temp";
     const std::filesystem::path metadataYaml = libraryDir / "ScriptMetadata.yaml";
 
     if (std::filesystem::exists(libraryDir))
@@ -2761,7 +2754,7 @@ bool ToolbarPanel::runScriptCompilationLogicForPackaging(std::string& statusMess
 
     statusMessage = "正在构建宿主平台脚本 (用于生成元数据)...";
     std::string hostStatus;
-    if (!runScriptCompilationLogic(hostStatus))
+    if (!runScriptCompilationLogic(hostStatus,libraryDir))
     {
         statusMessage = "宿主平台脚本编译失败: " + hostStatus;
         return false;

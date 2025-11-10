@@ -128,7 +128,9 @@ void EditorAssetManager::ScanDirectoryTask()
     try
     {
         for (std::filesystem::recursive_directory_iterator it(
-                 m_assetsRoot, std::filesystem::directory_options::skip_permission_denied), end;
+                                                               m_assetsRoot,
+                                                               std::filesystem::directory_options::skip_permission_denied)
+                                                           , end;
              it != end; ++it)
         {
             const auto& entry = *it;
@@ -374,6 +376,33 @@ void EditorAssetManager::ReImport(const AssetMetadata& metadata)
     std::lock_guard<std::mutex> lock(m_dbMutex);
     m_guidToMeta[newMetadata.guid.ToString()] = newMetadata;
     m_pathToGuid[newMetadata.assetPath.generic_string()] = newMetadata.guid;
+}
+
+Guid EditorAssetManager::LoadAsset(const std::filesystem::path& assetPath)
+{
+    if (!std::filesystem::exists(assetPath))
+    {
+        LogError("AssetManager: 无法加载资产 {}，文件不存在。", assetPath.string());
+        return Guid::Invalid();
+    }
+
+    IAssetImporter* importer = FindImporterFor(assetPath);
+    if (!importer)
+    {
+        LogError("AssetManager: 无法加载资产 {}，没有找到合适的导入器。", assetPath.string());
+        return Guid::Invalid();
+    }
+
+    AssetMetadata metadata = importer->Import(assetPath);
+    importer->WriteMetadata(metadata);
+
+    {
+        std::lock_guard<std::mutex> lock(m_dbMutex);
+        m_guidToMeta[metadata.guid.ToString()] = metadata;
+        m_pathToGuid[metadata.assetPath.generic_string()] = metadata.guid;
+    }
+
+    return metadata.guid;
 }
 
 IAssetImporter* EditorAssetManager::FindImporterFor(const std::filesystem::path& filePath)

@@ -3,7 +3,8 @@
  * @brief 声明了InputTextSystem类，用于处理输入文本组件的系统。
  */
 
-#pragma once
+#ifndef INPUTTEXTSYSTEM_H
+#define INPUTTEXTSYSTEM_H
 
 #include "ISystem.h"
 #include "entt/entt.hpp"
@@ -50,3 +51,4 @@ namespace Systems
         EngineContext* ctx = nullptr;
     };
 }
+#endif

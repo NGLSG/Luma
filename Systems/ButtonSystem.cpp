@@ -10,10 +10,6 @@
 namespace
 {
     
-    
-    
-    
-    
     void InvokeTargets(RuntimeScene* scene, const std::vector<ECS::SerializableEventTarget>& targets)
     {
         for (const auto& target : targets)
@@ -35,12 +31,20 @@ namespace
             }
         }
     }
+
+    
+    bool IsPlatformSupportHover()
+    {
+#if defined(SDL_PLATFORM_ANDROID) || defined(SDL_PLATFORM_IOS)
+        return false; 
+#else
+        return true; 
+#endif
+    }
 }
 
 namespace Systems
 {
-    
-    
     
     void ButtonSystem::OnCreate(RuntimeScene* scene, EngineContext& context)
     {
@@ -48,13 +52,13 @@ namespace Systems
     }
 
     
-    
-    
     void ButtonSystem::OnUpdate(RuntimeScene* scene, float deltaTime, EngineContext& context)
     {
         auto& registry = scene->GetRegistry();
-        
+
         auto buttonView = registry.view<ECS::ButtonComponent>();
+
+        const bool supportHover = IsPlatformSupportHover();
 
         for (auto entity : buttonView)
         {
@@ -66,38 +70,68 @@ namespace Systems
             const auto previousState = button.currentState;
 
             
+            bool hasExited = registry.all_of<PointerExitEvent>(entity);
+            bool hasEntered = registry.all_of<PointerEnterEvent>(entity);
+            bool isPressedDown = registry.all_of<PointerDownEvent>(entity);
+            bool isPressedUp = registry.all_of<PointerUpEvent>(entity);
+            bool isClicked = registry.all_of<PointerClickEvent>(entity);
+
             
             if (!button.Enable || !button.isInteractable)
             {
-                button.currentState = ECS::ButtonState::Disabled;
+                if (button.currentState != ECS::ButtonState::Disabled)
+                {
+                    button.currentState = ECS::ButtonState::Disabled;
+                }
             }
             else
             {
                 
-                
-                bool hasExited = registry.all_of<PointerExitEvent>(entity);
-                bool hasEntered = registry.all_of<PointerEnterEvent>(entity);
-                bool isPressedDown = registry.all_of<PointerDownEvent>(entity);
-
-                
                 switch (button.currentState)
                 {
                 case ECS::ButtonState::Normal:
-                    if (hasEntered) button.currentState = ECS::ButtonState::Hovered;
+                    if (isPressedDown)
+                    {
+                        
+                        button.currentState = ECS::ButtonState::Pressed;
+                    }
+                    else if (hasEntered && supportHover)
+                    {
+                        
+                        button.currentState = ECS::ButtonState::Hovered;
+                    }
                     break;
 
                 case ECS::ButtonState::Hovered:
-                    if (hasExited) button.currentState = ECS::ButtonState::Normal;
-                    else if (isPressedDown) button.currentState = ECS::ButtonState::Pressed;
+                    if (isPressedDown)
+                    {
+                        button.currentState = ECS::ButtonState::Pressed;
+                    }
+                    else if (hasExited)
+                    {
+                        button.currentState = ECS::ButtonState::Normal;
+                    }
                     break;
 
                 case ECS::ButtonState::Pressed:
-                    if (hasExited) button.currentState = ECS::ButtonState::Normal;
-                    
-                    
-                    if (!isPressedDown && !registry.all_of<PointerUpEvent>(entity))
+                    if (isPressedUp)
                     {
-                        button.currentState = ECS::ButtonState::Hovered;
+                        
+                        if (supportHover && hasEntered)
+                        {
+                            
+                            button.currentState = ECS::ButtonState::Hovered;
+                        }
+                        else
+                        {
+                            
+                            button.currentState = ECS::ButtonState::Normal;
+                        }
+                    }
+                    else if (hasExited)
+                    {
+                        
+                        button.currentState = ECS::ButtonState::Normal;
                     }
                     break;
 
@@ -119,16 +153,14 @@ namespace Systems
                 }
                 
                 else if ((previousState == ECS::ButtonState::Hovered || previousState == ECS::ButtonState::Pressed) &&
-                    (button.currentState == ECS::ButtonState::Normal || button.currentState ==
-                        ECS::ButtonState::Disabled))
+                    (button.currentState == ECS::ButtonState::Normal || button.currentState == ECS::ButtonState::Disabled))
                 {
                     InvokeTargets(scene, button.onHoverExitTargets);
                 }
             }
 
             
-            
-            if (button.isInteractable && registry.all_of<PointerClickEvent>(entity))
+            if (button.isInteractable && isClicked)
             {
                 InvokeTargets(scene, button.onClickTargets);
             }

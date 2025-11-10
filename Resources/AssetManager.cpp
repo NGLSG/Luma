@@ -79,3 +79,56 @@ void AssetManager::Shutdown()
         LogInfo("AssetManager: Shutdown complete.");
     }
 }
+
+bool AssetManager::StartPreload()
+{
+    if (m_implementation)
+    {
+        return m_implementation->StartPreload();
+    }
+    return false;
+}
+
+void AssetManager::StopPreload()
+{
+    if (m_implementation)
+    {
+        m_implementation->StopPreload();
+    }
+}
+
+std::pair<int, int> AssetManager::GetPreloadProgress() const
+{
+    if (m_implementation)
+    {
+        return m_implementation->GetPreloadProgress();
+    }
+    return std::make_pair(0, 0);
+}
+
+bool AssetManager::IsPreloadComplete() const
+{
+    if (m_implementation)
+    {
+        return m_implementation->IsPreloadComplete();
+    }
+    return false;
+}
+
+bool AssetManager::IsPreloadRunning() const
+{
+    if (m_implementation)
+    {
+        return m_implementation->IsPreloadRunning();
+    }
+    return false;
+}
+
+Guid AssetManager::LoadAsset(const std::filesystem::path& assetPath)
+{
+    if (m_implementation)
+    {
+        return m_implementation->LoadAsset(assetPath);
+    }
+    return Guid::Invalid();
+}

@@ -82,12 +82,14 @@ internal static class Native
     [DllImport(DllName, EntryPoint = "Platform_HasPermissions")]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static extern bool Platform_HasPermissions(
-        [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPStr)] string[] permissions, int count);
+        [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPStr)]
+        string[] permissions, int count);
 
     [DllImport(DllName, EntryPoint = "Platform_RequestPermissions")]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static extern bool Platform_RequestPermissions(
-        [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPStr)] string[] permissions, int count);
+        [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPStr)]
+        string[] permissions, int count);
 
 
     [DllImport(DllName, CharSet = CharSet.Ansi)]
@@ -262,7 +264,7 @@ internal static class Native
     [DllImport(DllName, CharSet = CharSet.Ansi)]
     internal static extern void TagComponent_SetName(IntPtr scene, uint entityId, string name);
 
-    
+
     [DllImport(DllName)]
     internal static extern IntPtr InputTextComponent_GetText(IntPtr scene, uint entityId);
 
@@ -283,7 +285,7 @@ internal static class Native
         public IntPtr targetMethodName;
     }
 
-    
+
     [DllImport(DllName)]
     internal static extern int ButtonComponent_GetOnClickTargetCount(IntPtr scene, uint entityId);
 
@@ -299,7 +301,7 @@ internal static class Native
     internal static extern void ButtonComponent_AddOnClickTarget(IntPtr scene, uint entityId, Guid guid,
         string componentName, string methodName);
 
-    
+
     [DllImport(DllName)]
     internal static extern int InputTextComponent_GetOnTextChangedTargetCount(IntPtr scene, uint entityId);
 
@@ -350,107 +352,275 @@ internal static class Native
     internal static extern void EdgeCollider_SetVertices(IntPtr scene, uint entityId, [In] Vector2[] vertices,
         int count);
 
-    
-    
-    [DllImport(DllName)] internal static extern int ToggleButtonComponent_GetOnToggleOnTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool ToggleButtonComponent_GetOnToggleOnTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void ToggleButtonComponent_ClearOnToggleOnTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void ToggleButtonComponent_AddOnToggleOnTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
 
-    [DllImport(DllName)] internal static extern int ToggleButtonComponent_GetOnToggleOffTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool ToggleButtonComponent_GetOnToggleOffTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void ToggleButtonComponent_ClearOnToggleOffTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void ToggleButtonComponent_AddOnToggleOffTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    internal static extern int ToggleButtonComponent_GetOnToggleOnTargetCount(IntPtr scene, uint entity);
 
-    
-    [DllImport(DllName)] internal static extern int RadioButtonComponent_GetOnSelectedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool RadioButtonComponent_GetOnSelectedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void RadioButtonComponent_ClearOnSelectedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void RadioButtonComponent_AddOnSelectedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool ToggleButtonComponent_GetOnToggleOnTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
 
-    [DllImport(DllName)] internal static extern int RadioButtonComponent_GetOnDeselectedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool RadioButtonComponent_GetOnDeselectedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void RadioButtonComponent_ClearOnDeselectedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void RadioButtonComponent_AddOnDeselectedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    internal static extern void ToggleButtonComponent_ClearOnToggleOnTargets(IntPtr scene, uint entity);
 
-    
-    [DllImport(DllName)] internal static extern int CheckBoxComponent_GetOnValueChangedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool CheckBoxComponent_GetOnValueChangedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void CheckBoxComponent_ClearOnValueChangedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void CheckBoxComponent_AddOnValueChangedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    internal static extern void ToggleButtonComponent_AddOnToggleOnTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
 
-    
-    [DllImport(DllName)] internal static extern int SliderComponent_GetOnValueChangedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool SliderComponent_GetOnValueChangedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void SliderComponent_ClearOnValueChangedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void SliderComponent_AddOnValueChangedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    internal static extern int ToggleButtonComponent_GetOnToggleOffTargetCount(IntPtr scene, uint entity);
 
-    [DllImport(DllName)] internal static extern int SliderComponent_GetOnDragStartedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool SliderComponent_GetOnDragStartedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void SliderComponent_ClearOnDragStartedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void SliderComponent_AddOnDragStartedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool ToggleButtonComponent_GetOnToggleOffTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
 
-    [DllImport(DllName)] internal static extern int SliderComponent_GetOnDragEndedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool SliderComponent_GetOnDragEndedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void SliderComponent_ClearOnDragEndedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void SliderComponent_AddOnDragEndedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    internal static extern void ToggleButtonComponent_ClearOnToggleOffTargets(IntPtr scene, uint entity);
 
-    
-    [DllImport(DllName)] internal static extern int ComboBoxComponent_GetOnSelectionChangedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool ComboBoxComponent_GetOnSelectionChangedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void ComboBoxComponent_ClearOnSelectionChangedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void ComboBoxComponent_AddOnSelectionChangedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    internal static extern void ToggleButtonComponent_AddOnToggleOffTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
 
-    
-    [DllImport(DllName)] internal static extern int ProgressBarComponent_GetOnValueChangedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool ProgressBarComponent_GetOnValueChangedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void ProgressBarComponent_ClearOnValueChangedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void ProgressBarComponent_AddOnValueChangedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
 
-    [DllImport(DllName)] internal static extern int ProgressBarComponent_GetOnCompletedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool ProgressBarComponent_GetOnCompletedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void ProgressBarComponent_ClearOnCompletedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void ProgressBarComponent_AddOnCompletedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    internal static extern int RadioButtonComponent_GetOnSelectedTargetCount(IntPtr scene, uint entity);
 
-    
-    [DllImport(DllName)] internal static extern int TabControlComponent_GetOnTabChangedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool TabControlComponent_GetOnTabChangedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void TabControlComponent_ClearOnTabChangedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void TabControlComponent_AddOnTabChangedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool RadioButtonComponent_GetOnSelectedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
 
-    [DllImport(DllName)] internal static extern int TabControlComponent_GetOnTabClosedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool TabControlComponent_GetOnTabClosedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void TabControlComponent_ClearOnTabClosedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void TabControlComponent_AddOnTabClosedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    internal static extern void RadioButtonComponent_ClearOnSelectedTargets(IntPtr scene, uint entity);
 
-    
-    [DllImport(DllName)] internal static extern int ListBoxComponent_GetOnSelectionChangedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool ListBoxComponent_GetOnSelectionChangedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void ListBoxComponent_ClearOnSelectionChangedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void ListBoxComponent_AddOnSelectionChangedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    internal static extern void RadioButtonComponent_AddOnSelectedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
 
-    [DllImport(DllName)] internal static extern int ListBoxComponent_GetOnItemActivatedTargetCount(IntPtr scene, uint entity);
-    [DllImport(DllName)] [return: MarshalAs(UnmanagedType.I1)]
-    internal static extern bool ListBoxComponent_GetOnItemActivatedTarget(IntPtr scene, uint entity, int index, out SerializableEventTargetNative outTarget);
-    [DllImport(DllName)] internal static extern void ListBoxComponent_ClearOnItemActivatedTargets(IntPtr scene, uint entity);
-    [DllImport(DllName)] internal static extern void ListBoxComponent_AddOnItemActivatedTarget(IntPtr scene, uint entity, Guid guid, string componentName, string methodName);
+    [DllImport(DllName)]
+    internal static extern int RadioButtonComponent_GetOnDeselectedTargetCount(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool RadioButtonComponent_GetOnDeselectedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
+
+    [DllImport(DllName)]
+    internal static extern void RadioButtonComponent_ClearOnDeselectedTargets(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void RadioButtonComponent_AddOnDeselectedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
+
+
+    [DllImport(DllName)]
+    internal static extern int CheckBoxComponent_GetOnValueChangedTargetCount(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool CheckBoxComponent_GetOnValueChangedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
+
+    [DllImport(DllName)]
+    internal static extern void CheckBoxComponent_ClearOnValueChangedTargets(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void CheckBoxComponent_AddOnValueChangedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
+
+
+    [DllImport(DllName)]
+    internal static extern int SliderComponent_GetOnValueChangedTargetCount(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool SliderComponent_GetOnValueChangedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
+
+    [DllImport(DllName)]
+    internal static extern void SliderComponent_ClearOnValueChangedTargets(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void SliderComponent_AddOnValueChangedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
+
+    [DllImport(DllName)]
+    internal static extern int SliderComponent_GetOnDragStartedTargetCount(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool SliderComponent_GetOnDragStartedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
+
+    [DllImport(DllName)]
+    internal static extern void SliderComponent_ClearOnDragStartedTargets(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void SliderComponent_AddOnDragStartedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
+
+    [DllImport(DllName)]
+    internal static extern int SliderComponent_GetOnDragEndedTargetCount(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool SliderComponent_GetOnDragEndedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
+
+    [DllImport(DllName)]
+    internal static extern void SliderComponent_ClearOnDragEndedTargets(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void SliderComponent_AddOnDragEndedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
+
+
+    [DllImport(DllName)]
+    internal static extern int ComboBoxComponent_GetOnSelectionChangedTargetCount(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool ComboBoxComponent_GetOnSelectionChangedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
+
+    [DllImport(DllName)]
+    internal static extern void ComboBoxComponent_ClearOnSelectionChangedTargets(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void ComboBoxComponent_AddOnSelectionChangedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
+
+
+    [DllImport(DllName)]
+    internal static extern int ProgressBarComponent_GetOnValueChangedTargetCount(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool ProgressBarComponent_GetOnValueChangedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
+
+    [DllImport(DllName)]
+    internal static extern void ProgressBarComponent_ClearOnValueChangedTargets(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void ProgressBarComponent_AddOnValueChangedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
+
+    [DllImport(DllName)]
+    internal static extern int ProgressBarComponent_GetOnCompletedTargetCount(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool ProgressBarComponent_GetOnCompletedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
+
+    [DllImport(DllName)]
+    internal static extern void ProgressBarComponent_ClearOnCompletedTargets(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void ProgressBarComponent_AddOnCompletedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
+
+
+    [DllImport(DllName)]
+    internal static extern int TabControlComponent_GetOnTabChangedTargetCount(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool TabControlComponent_GetOnTabChangedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
+
+    [DllImport(DllName)]
+    internal static extern void TabControlComponent_ClearOnTabChangedTargets(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void TabControlComponent_AddOnTabChangedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
+
+    [DllImport(DllName)]
+    internal static extern int TabControlComponent_GetOnTabClosedTargetCount(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool TabControlComponent_GetOnTabClosedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
+
+    [DllImport(DllName)]
+    internal static extern void TabControlComponent_ClearOnTabClosedTargets(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void TabControlComponent_AddOnTabClosedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
+
+
+    [DllImport(DllName)]
+    internal static extern int ListBoxComponent_GetOnSelectionChangedTargetCount(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool ListBoxComponent_GetOnSelectionChangedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
+
+    [DllImport(DllName)]
+    internal static extern void ListBoxComponent_ClearOnSelectionChangedTargets(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void ListBoxComponent_AddOnSelectionChangedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
+
+    [DllImport(DllName)]
+    internal static extern int ListBoxComponent_GetOnItemActivatedTargetCount(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool ListBoxComponent_GetOnItemActivatedTarget(IntPtr scene, uint entity, int index,
+        out SerializableEventTargetNative outTarget);
+
+    [DllImport(DllName)]
+    internal static extern void ListBoxComponent_ClearOnItemActivatedTargets(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void ListBoxComponent_AddOnItemActivatedTarget(IntPtr scene, uint entity, Guid guid,
+        string componentName, string methodName);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool AssetManager_StartPreload();
+
+    [DllImport(DllName)]
+    internal static extern void AssetManager_StopPreload();
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool AssetManager_IsPreloadComplete();
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool AssetManager_IsPreloadRunning();
+
+    [DllImport(DllName)]
+    internal static extern void AssetManager_GetPreloadProgress(out int outTotalCount, out int outLoadedCount);
+
+    [DllImport(DllName)]
+    internal static extern Guid AssetManager_LoadAsset(string path);
+
+    [DllImport(DllName)]
+    internal static extern IntPtr PathUtils_GetExecutableDir();
+
+    [DllImport(DllName)]
+    internal static extern IntPtr PathUtils_GetPersistentDataDir();
+
+    [DllImport(DllName)]
+    internal static extern IntPtr PathUtils_GetCacheDir();
+
+    [DllImport(DllName)]
+    internal static extern IntPtr PathUtils_GetContentDir();
+
+    [DllImport(DllName)]
+    internal static extern IntPtr PathUtils_GetAndroidInternalDataDir();
+
+    [DllImport(DllName)]
+    internal static extern IntPtr PathUtils_GetAndroidExternalDataDir();
 }
-
-
-
-
-

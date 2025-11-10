@@ -75,5 +75,50 @@ public:
     virtual void ReImport(const AssetMetadata& metadata)
     {
     }
+
+    /**
+ * @brief 手动启动后台预加载
+ * @return 如果成功启动返回 true,如果已在运行或已完成返回 false
+ */
+    virtual bool StartPreload()
+    {
+        return true;
+    }
+
+    /**
+     * @brief 停止后台预加载
+     */
+    virtual void StopPreload()
+    {
+    }
+
+    /**
+     * @brief 获取预加载进度
+     * @return pair<总数, 已处理数>
+     */
+    virtual std::pair<int, int> GetPreloadProgress() const
+    {
+        return std::make_pair(0, 0);
+    }
+
+    /**
+     * @brief 检查预加载是否完成
+     * @return 如果预加载完成返回 true,否则返回 false
+     */
+    virtual bool IsPreloadComplete() const
+    {
+        return true;
+    }
+
+    /**
+     * @brief 检查预加载是否正在运行
+     * @return 如果预加载正在运行返回 true,否则返回 false
+     */
+    virtual bool IsPreloadRunning() const
+    {
+        return false;
+    }
+
+    virtual Guid LoadAsset(const std::filesystem::path& assetPath) =0;
 };
 #endif

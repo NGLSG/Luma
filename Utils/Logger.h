@@ -340,7 +340,7 @@ private:
  * @brief 日志输出宏，自动带源码位置信息。
  */
 #define LogTrace(fmt, ...)    Logger::LogProxy{LogLevel::Trace,    std::source_location::current()}(fmt, ##__VA_ARGS__)
-#define LogDebug(fmt, ...)    Logger::LogProxy{LogLevel::Debug,    std::source_location::current()}(fmt, ##__VA_ARGS__) // 建议添加 Debug 级别
+#define LogDebug(fmt, ...)    Logger::LogProxy{LogLevel::Debug,    std::source_location::current()}(fmt, ##__VA_ARGS__)
 #define LogInfo(fmt, ...)     Logger::LogProxy{LogLevel::Info,     std::source_location::current()}(fmt, ##__VA_ARGS__)
 #define LogWarn(fmt, ...)     Logger::LogProxy{LogLevel::Warning,  std::source_location::current()}(fmt, ##__VA_ARGS__)
 #define LogError(fmt, ...)    Logger::LogProxy{LogLevel::Error,    std::source_location::current()}(fmt, ##__VA_ARGS__)

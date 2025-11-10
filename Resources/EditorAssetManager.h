@@ -25,7 +25,7 @@ class IAssetImporter;
 struct ScanResult
 {
     std::unordered_map<std::string, AssetMetadata> guidToMeta; ///< GUID到资产元数据的映射。
-    std::unordered_map<std::string, Guid> pathToGuid;           ///< 资产路径到GUID的映射。
+    std::unordered_map<std::string, Guid> pathToGuid; ///< 资产路径到GUID的映射。
 };
 
 /**
@@ -104,6 +104,12 @@ public:
      * @param metadata 需要重新导入的资产的元数据。
      */
     void ReImport(const AssetMetadata& metadata) override;
+    /**
+     * @brief 根据资产路径加载资产并返回其GUID
+     * @param assetPath 资产的文件系统路径
+     * @return 资产的GUID
+     */
+    Guid LoadAsset(const std::filesystem::path& assetPath) override;
 
 private:
     /**
@@ -137,25 +143,25 @@ private:
     void WorkerLoop();
 
 private:
-    std::filesystem::path m_assetsRoot;                                ///< 资产的根目录路径。
-    std::vector<std::unique_ptr<IAssetImporter>> m_importers;          ///< 注册的资产导入器列表。
+    std::filesystem::path m_assetsRoot; ///< 资产的根目录路径。
+    std::vector<std::unique_ptr<IAssetImporter>> m_importers; ///< 注册的资产导入器列表。
 
-    std::unordered_map<std::string, AssetMetadata> m_guidToMeta;      ///< GUID到资产元数据的映射数据库。
-    std::unordered_map<std::string, Guid> m_pathToGuid;                ///< 资产路径到GUID的映射数据库。
-    mutable std::mutex m_dbMutex;                                      ///< 保护资产数据库的互斥锁。
+    std::unordered_map<std::string, AssetMetadata> m_guidToMeta; ///< GUID到资产元数据的映射数据库。
+    std::unordered_map<std::string, Guid> m_pathToGuid; ///< 资产路径到GUID的映射数据库。
+    mutable std::mutex m_dbMutex; ///< 保护资产数据库的互斥锁。
 
-    std::atomic<bool> m_isScanning = false;                            ///< 指示当前是否正在进行资产扫描。
-    float m_rescanTimer = 0.0f;                                        ///< 重新扫描计时器。
-    static constexpr float RESCAN_INTERVAL = 0.f;                      ///< 重新扫描的时间间隔。
+    std::atomic<bool> m_isScanning = false; ///< 指示当前是否正在进行资产扫描。
+    float m_rescanTimer = 0.0f; ///< 重新扫描计时器。
+    static constexpr float RESCAN_INTERVAL = 0.f; ///< 重新扫描的时间间隔。
 
-    std::unique_ptr<ScanResult> m_scanResult;                          ///< 存储最新扫描结果的智能指针。
-    std::mutex m_scanResultMutex;                                      ///< 保护扫描结果的互斥锁。
+    std::unique_ptr<ScanResult> m_scanResult; ///< 存储最新扫描结果的智能指针。
+    std::mutex m_scanResultMutex; ///< 保护扫描结果的互斥锁。
 
-    std::vector<std::jthread> m_workerThreads;                         ///< 用于并行处理资产的工作线程。
-    std::queue<std::function<void()>> m_taskQueue;                    ///< 存储待执行任务的队列。
-    std::mutex m_taskQueueMutex;                                       ///< 保护任务队列的互斥锁。
-    std::condition_variable m_taskCondition;                           ///< 用于工作线程等待任务的条件变量。
-    std::atomic<bool> m_stopThreads = false;                           ///< 原子标志，指示是否停止所有工作线程。
+    std::vector<std::jthread> m_workerThreads; ///< 用于并行处理资产的工作线程。
+    std::queue<std::function<void()>> m_taskQueue; ///< 存储待执行任务的队列。
+    std::mutex m_taskQueueMutex; ///< 保护任务队列的互斥锁。
+    std::condition_variable m_taskCondition; ///< 用于工作线程等待任务的条件变量。
+    std::atomic<bool> m_stopThreads = false; ///< 原子标志，指示是否停止所有工作线程。
 };
 
 #endif

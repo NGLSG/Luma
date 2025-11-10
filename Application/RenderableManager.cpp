@@ -33,7 +33,6 @@ namespace
 
     static inline uint64_t hash_combine_u64(uint64_t seed, uint64_t v)
     {
-
         const uint64_t kMul = 0x9ddfea08eb382d69ULL;
         uint64_t a = (v ^ seed) * kMul;
         a ^= (a >> 47);
@@ -124,12 +123,12 @@ namespace
             }
             else if constexpr (std::is_same_v<T, RawDrawBatch>)
             {
-
                 seed = hash_combine_u64(seed, 0xDEADBEEFULL);
             }
         }, p.batchData);
         return seed;
     }
+
     struct ThreadLocalBatchResult
     {
         std::unordered_map<FastSpriteBatchKey, size_t> spriteGroupIndices;
@@ -313,9 +312,16 @@ namespace
                 {
                     if (!canvas) return;
 
-                    ECS::RectF worldRect = data.rect;
-                    worldRect.x = trans.position.x - data.rect.Width() * 0.5f;
-                    worldRect.y = trans.position.y - data.rect.Height() * 0.5f;
+                    // 应用transform
+                    canvas->save();
+                    canvas->translate(trans.position.x, trans.position.y);
+                    canvas->rotate(SkRadiansToDegrees(trans.rotation));
+                    canvas->scale(trans.scale.x, trans.scale.y);
+
+                    // 在局部空间中绘制
+                    ECS::RectF localRect = data.rect;
+                    localRect.x = -data.rect.Width() * 0.5f;
+                    localRect.y = -data.rect.Height() * 0.5f;
 
                     ECS::Color tintColor;
                     switch (data.currentState)
@@ -333,25 +339,25 @@ namespace
 
                     SkPaint paint;
                     paint.setAntiAlias(true);
-                    SkRect skRect = SkRect::MakeXYWH(worldRect.x, worldRect.y, worldRect.Width(), worldRect.Height());
+                    SkRect skRect = SkRect::MakeXYWH(localRect.x, localRect.y, localRect.Width(), localRect.Height());
 
                     if (data.backgroundImage)
                     {
                         paint.setColorFilter(SkColorFilters::Blend(tintColor, SkBlendMode::kModulate));
-                        canvas->save();
                         canvas->clipRRect(SkRRect::MakeRectXY(skRect, data.roundness, data.roundness), true);
                         canvas->drawImageRect(
                             data.backgroundImage,
                             skRect,
                             SkSamplingOptions(SkFilterMode::kLinear)
                         );
-                        canvas->restore();
                     }
                     else
                     {
                         paint.setColor4f({tintColor.r, tintColor.g, tintColor.b, tintColor.a}, nullptr);
                         canvas->drawRRect(SkRRect::MakeRectXY(skRect, data.roundness, data.roundness), paint);
                     }
+
+                    canvas->restore();
                 }
             );
 
@@ -376,13 +382,18 @@ namespace
                 {
                     if (!canvas) return;
 
-                    ECS::RectF worldRect = data.rect;
-                    worldRect.x = trans.position.x - data.rect.Width() * 0.5f;
-                    worldRect.y = trans.position.y - data.rect.Height() * 0.5f;
+                    canvas->save();
+                    canvas->translate(trans.position.x, trans.position.y);
+                    canvas->rotate(SkRadiansToDegrees(trans.rotation));
+                    canvas->scale(trans.scale.x, trans.scale.y);
+
+                    ECS::RectF localRect = data.rect;
+                    localRect.x = -data.rect.Width() * 0.5f;
+                    localRect.y = -data.rect.Height() * 0.5f;
 
                     SkPaint paint;
                     paint.setAntiAlias(true);
-                    SkRect skRect = SkRect::MakeXYWH(worldRect.x, worldRect.y, worldRect.Width(), worldRect.Height());
+                    SkRect skRect = SkRect::MakeXYWH(localRect.x, localRect.y, localRect.Width(), localRect.Height());
 
                     ECS::Color bgColor = data.isReadOnly
                                              ? data.readOnlyBackgroundColor
@@ -393,10 +404,8 @@ namespace
                     if (data.backgroundImage)
                     {
                         paint.setColorFilter(SkColorFilters::Blend(bgColor, SkBlendMode::kModulate));
-                        canvas->save();
                         canvas->clipRRect(SkRRect::MakeRectXY(skRect, data.roundness, data.roundness), true);
                         canvas->drawImageRect(data.backgroundImage, skRect, SkSamplingOptions(SkFilterMode::kLinear));
-                        canvas->restore();
                     }
                     else
                     {
@@ -407,12 +416,16 @@ namespace
                     bool isShowingPlaceholder = data.inputBuffer.empty() && !data.isFocused;
                     const auto& textToDrawData = isShowingPlaceholder ? data.placeholder : data.text;
 
-                    if (!textToDrawData.typeface) return;
+                    if (!textToDrawData.typeface)
+                    {
+                        canvas->restore();
+                        return;
+                    }
 
                     SkFont font(textToDrawData.typeface, textToDrawData.fontSize);
                     SkFontMetrics metrics{};
                     font.getMetrics(&metrics);
-                    float textY = worldRect.y + worldRect.Height() / 2.0f - (metrics.fAscent + metrics.fDescent) / 2.0f;
+                    float textY = localRect.y + localRect.Height() / 2.0f - (metrics.fAscent + metrics.fDescent) / 2.0f;
 
                     std::string displayText = isShowingPlaceholder
                                                   ? textToDrawData.text
@@ -425,9 +438,8 @@ namespace
                         textToDrawData.color.r, textToDrawData.color.g, textToDrawData.color.b, textToDrawData.color.a
                     });
 
-                    canvas->save();
                     canvas->clipRect(skRect);
-                    canvas->drawString(displayText.c_str(), worldRect.x + 5.0f, textY, font, textPaint);
+                    canvas->drawString(displayText.c_str(), localRect.x + 5.0f, textY, font, textPaint);
 
                     if (data.isFocused && data.isCursorVisible)
                     {
@@ -439,7 +451,7 @@ namespace
                         font.measureText(textBeforeCursor.c_str(), textBeforeCursor.size(), SkTextEncoding::kUTF8,
                                          &bounds);
 
-                        float cursorX = worldRect.x + 5.0f + bounds.width();
+                        float cursorX = localRect.x + 5.0f + bounds.width();
 
                         SkPaint cursorPaint;
                         cursorPaint.setColor4f({
@@ -450,6 +462,7 @@ namespace
                         canvas->drawLine(cursorX, textY + metrics.fAscent, cursorX, textY + metrics.fDescent,
                                          cursorPaint);
                     }
+
                     canvas->restore();
                 }
             );
@@ -474,9 +487,14 @@ namespace
                 {
                     if (!canvas) return;
 
-                    ECS::RectF worldRect = button.rect;
-                    worldRect.x = trans.position.x - button.rect.Width() * 0.5f;
-                    worldRect.y = trans.position.y - button.rect.Height() * 0.5f;
+                    canvas->save();
+                    canvas->translate(trans.position.x, trans.position.y);
+                    canvas->rotate(SkRadiansToDegrees(trans.rotation));
+                    canvas->scale(trans.scale.x, trans.scale.y);
+
+                    ECS::RectF localRect = button.rect;
+                    localRect.x = -button.rect.Width() * 0.5f;
+                    localRect.y = -button.rect.Height() * 0.5f;
 
                     ECS::Color tintColor = button.normalColor;
                     if (!button.isToggled)
@@ -510,23 +528,23 @@ namespace
                         }
                     }
 
-                    SkRect skRect = SkRect::MakeXYWH(worldRect.x, worldRect.y, worldRect.Width(), worldRect.Height());
+                    SkRect skRect = SkRect::MakeXYWH(localRect.x, localRect.y, localRect.Width(), localRect.Height());
                     SkPaint paint;
                     paint.setAntiAlias(true);
 
                     if (button.backgroundImage)
                     {
                         paint.setColorFilter(SkColorFilters::Blend(tintColor, SkBlendMode::kModulate));
-                        canvas->save();
                         canvas->clipRRect(SkRRect::MakeRectXY(skRect, button.roundness, button.roundness), true);
                         canvas->drawImageRect(button.backgroundImage, skRect, SkSamplingOptions(SkFilterMode::kLinear));
-                        canvas->restore();
                     }
                     else
                     {
                         paint.setColor4f({tintColor.r, tintColor.g, tintColor.b, tintColor.a}, nullptr);
                         canvas->drawRRect(SkRRect::MakeRectXY(skRect, button.roundness, button.roundness), paint);
                     }
+
+                    canvas->restore();
                 }
             );
 
@@ -550,15 +568,20 @@ namespace
                 {
                     if (!canvas) return;
 
-                    ECS::RectF worldRect = radio.rect;
-                    worldRect.x = trans.position.x - radio.rect.Width() * 0.5f;
-                    worldRect.y = trans.position.y - radio.rect.Height() * 0.5f;
+                    canvas->save();
+                    canvas->translate(trans.position.x, trans.position.y);
+                    canvas->rotate(SkRadiansToDegrees(trans.rotation));
+                    canvas->scale(trans.scale.x, trans.scale.y);
 
-                    const float circleDiameter = std::min(worldRect.Height(), worldRect.Width() * 0.4f);
+                    ECS::RectF localRect = radio.rect;
+                    localRect.x = -radio.rect.Width() * 0.5f;
+                    localRect.y = -radio.rect.Height() * 0.5f;
+
+                    const float circleDiameter = std::min(localRect.Height(), localRect.Width() * 0.4f);
                     const float circleRadius = circleDiameter * 0.5f;
                     const float padding = 6.0f;
-                    const float circleCenterX = worldRect.x + circleRadius + padding;
-                    const float circleCenterY = worldRect.y + worldRect.Height() * 0.5f;
+                    const float circleCenterX = localRect.x + circleRadius + padding;
+                    const float circleCenterY = localRect.y + localRect.Height() * 0.5f;
 
                     ECS::Color baseColor = radio.normalColor;
                     if (radio.currentState == ECS::ButtonState::Hovered) baseColor = radio.hoverColor;
@@ -577,11 +600,9 @@ namespace
                     if (radio.backgroundImage)
                     {
                         paint.setColorFilter(SkColorFilters::Blend(baseColor, SkBlendMode::kModulate));
-                        canvas->save();
                         canvas->clipRRect(SkRRect::MakeOval(circleRect), true);
                         canvas->drawImageRect(radio.backgroundImage, circleRect,
                                               SkSamplingOptions(SkFilterMode::kLinear));
-                        canvas->restore();
                     }
                     else
                     {
@@ -631,6 +652,8 @@ namespace
 
                         canvas->drawString(radio.label.text.c_str(), textStartX, baseline, font, textPaint);
                     }
+
+                    canvas->restore();
                 }
             );
 
@@ -654,14 +677,19 @@ namespace
                 {
                     if (!canvas) return;
 
-                    ECS::RectF worldRect = checkbox.rect;
-                    worldRect.x = trans.position.x - checkbox.rect.Width() * 0.5f;
-                    worldRect.y = trans.position.y - checkbox.rect.Height() * 0.5f;
+                    canvas->save();
+                    canvas->translate(trans.position.x, trans.position.y);
+                    canvas->rotate(SkRadiansToDegrees(trans.rotation));
+                    canvas->scale(trans.scale.x, trans.scale.y);
 
-                    const float boxSize = std::min(worldRect.Height(), worldRect.Width() * 0.35f);
+                    ECS::RectF localRect = checkbox.rect;
+                    localRect.x = -checkbox.rect.Width() * 0.5f;
+                    localRect.y = -checkbox.rect.Height() * 0.5f;
+
+                    const float boxSize = std::min(localRect.Height(), localRect.Width() * 0.35f);
                     const float padding = 6.0f;
-                    const float boxX = worldRect.x + padding;
-                    const float boxY = worldRect.y + (worldRect.Height() - boxSize) * 0.5f;
+                    const float boxX = localRect.x + padding;
+                    const float boxY = localRect.y + (localRect.Height() - boxSize) * 0.5f;
 
                     ECS::Color baseColor = checkbox.normalColor;
                     if (checkbox.currentState == ECS::ButtonState::Hovered) baseColor = checkbox.hoverColor;
@@ -676,11 +704,9 @@ namespace
                     if (checkbox.backgroundImage)
                     {
                         paint.setColorFilter(SkColorFilters::Blend(baseColor, SkBlendMode::kModulate));
-                        canvas->save();
                         canvas->clipRRect(SkRRect::MakeRectXY(boxRect, checkbox.roundness, checkbox.roundness), true);
                         canvas->drawImageRect(checkbox.backgroundImage, boxRect,
                                               SkSamplingOptions(SkFilterMode::kLinear));
-                        canvas->restore();
                     }
                     else
                     {
@@ -751,6 +777,8 @@ namespace
 
                         canvas->drawString(checkbox.label.text.c_str(), textX, baseline, font, textPaint);
                     }
+
+                    canvas->restore();
                 }
             );
 
@@ -774,9 +802,14 @@ namespace
                 {
                     if (!canvas) return;
 
-                    ECS::RectF worldRect = slider.rect;
-                    worldRect.x = trans.position.x - slider.rect.Width() * 0.5f;
-                    worldRect.y = trans.position.y - slider.rect.Height() * 0.5f;
+                    canvas->save();
+                    canvas->translate(trans.position.x, trans.position.y);
+                    canvas->rotate(SkRadiansToDegrees(trans.rotation));
+                    canvas->scale(trans.scale.x, trans.scale.y);
+
+                    ECS::RectF localRect = slider.rect;
+                    localRect.x = -slider.rect.Width() * 0.5f;
+                    localRect.y = -slider.rect.Height() * 0.5f;
 
                     const bool enabled = slider.isInteractable;
                     const ECS::Color trackColor = enabled ? slider.trackColor : slider.disabledColor;
@@ -788,10 +821,10 @@ namespace
 
                     if (!slider.isVertical)
                     {
-                        const float trackHeight = std::max(2.5f, worldRect.Height() * 0.25f);
-                        const float trackY = worldRect.y + (worldRect.Height() - trackHeight) * 0.5f;
+                        const float trackHeight = std::max(2.5f, localRect.Height() * 0.25f);
+                        const float trackY = localRect.y + (localRect.Height() - trackHeight) * 0.5f;
 
-                        SkRect trackRect = SkRect::MakeXYWH(worldRect.x, trackY, worldRect.Width(), trackHeight);
+                        SkRect trackRect = SkRect::MakeXYWH(localRect.x, trackY, localRect.Width(), trackHeight);
                         if (slider.trackImage)
                         {
                             paint.setColorFilter(SkColorFilters::Blend(trackColor, SkBlendMode::kModulate));
@@ -804,10 +837,10 @@ namespace
                             canvas->drawRoundRect(trackRect, trackHeight * 0.5f, trackHeight * 0.5f, paint);
                         }
 
-                        const float fillWidth = std::clamp(slider.normalizedValue, 0.0f, 1.0f) * worldRect.Width();
+                        const float fillWidth = std::clamp(slider.normalizedValue, 0.0f, 1.0f) * localRect.Width();
                         if (fillWidth > 0.0f)
                         {
-                            SkRect fillRect = SkRect::MakeXYWH(worldRect.x, trackY, fillWidth, trackHeight);
+                            SkRect fillRect = SkRect::MakeXYWH(localRect.x, trackY, fillWidth, trackHeight);
                             if (slider.fillImage)
                             {
                                 paint.setColorFilter(SkColorFilters::Blend(fillColor, SkBlendMode::kModulate));
@@ -821,9 +854,9 @@ namespace
                             }
                         }
 
-                        const float thumbRadius = std::max(worldRect.Height(), trackHeight) * 0.35f;
-                        const float thumbCenterX = worldRect.x + fillWidth;
-                        const float thumbCenterY = worldRect.y + worldRect.Height() * 0.5f;
+                        const float thumbRadius = std::max(localRect.Height(), trackHeight) * 0.35f;
+                        const float thumbCenterX = localRect.x + fillWidth;
+                        const float thumbCenterY = localRect.y + localRect.Height() * 0.5f;
 
                         if (slider.thumbImage)
                         {
@@ -845,10 +878,10 @@ namespace
                     }
                     else
                     {
-                        const float trackWidth = std::max(2.5f, worldRect.Width() * 0.25f);
-                        const float trackX = worldRect.x + (worldRect.Width() - trackWidth) * 0.5f;
+                        const float trackWidth = std::max(2.5f, localRect.Width() * 0.25f);
+                        const float trackX = localRect.x + (localRect.Width() - trackWidth) * 0.5f;
 
-                        SkRect trackRect = SkRect::MakeXYWH(trackX, worldRect.y, trackWidth, worldRect.Height());
+                        SkRect trackRect = SkRect::MakeXYWH(trackX, localRect.y, trackWidth, localRect.Height());
                         if (slider.trackImage)
                         {
                             paint.setColorFilter(SkColorFilters::Blend(trackColor, SkBlendMode::kModulate));
@@ -861,10 +894,10 @@ namespace
                             canvas->drawRoundRect(trackRect, trackWidth * 0.5f, trackWidth * 0.5f, paint);
                         }
 
-                        const float fillHeight = std::clamp(slider.normalizedValue, 0.0f, 1.0f) * worldRect.Height();
+                        const float fillHeight = std::clamp(slider.normalizedValue, 0.0f, 1.0f) * localRect.Height();
                         if (fillHeight > 0.0f)
                         {
-                            SkRect fillRect = SkRect::MakeXYWH(trackX, worldRect.y + worldRect.Height() - fillHeight,
+                            SkRect fillRect = SkRect::MakeXYWH(trackX, localRect.y + localRect.Height() - fillHeight,
                                                                trackWidth, fillHeight);
                             if (slider.fillImage)
                             {
@@ -879,9 +912,9 @@ namespace
                             }
                         }
 
-                        const float thumbRadius = std::max(worldRect.Width(), trackWidth) * 0.35f;
-                        const float thumbCenterX = worldRect.x + worldRect.Width() * 0.5f;
-                        const float thumbCenterY = worldRect.y + worldRect.Height() - fillHeight;
+                        const float thumbRadius = std::max(localRect.Width(), trackWidth) * 0.35f;
+                        const float thumbCenterX = localRect.x + localRect.Width() * 0.5f;
+                        const float thumbCenterY = localRect.y + localRect.Height() - fillHeight;
 
                         if (slider.thumbImage)
                         {
@@ -901,6 +934,8 @@ namespace
                             canvas->drawCircle(thumbCenterX, thumbCenterY, thumbRadius, paint);
                         }
                     }
+
+                    canvas->restore();
                 }
             );
 
@@ -924,9 +959,14 @@ namespace
                 {
                     if (!canvas || !combo.displayText.typeface) return;
 
-                    ECS::RectF worldRect = combo.rect;
-                    worldRect.x = trans.position.x - combo.rect.Width() * 0.5f;
-                    worldRect.y = trans.position.y - combo.rect.Height() * 0.5f;
+                    canvas->save();
+                    canvas->translate(trans.position.x, trans.position.y);
+                    canvas->rotate(SkRadiansToDegrees(trans.rotation));
+                    canvas->scale(trans.scale.x, trans.scale.y);
+
+                    ECS::RectF localRect = combo.rect;
+                    localRect.x = -combo.rect.Width() * 0.5f;
+                    localRect.y = -combo.rect.Height() * 0.5f;
 
                     ECS::Color baseColor = combo.normalColor;
                     switch (combo.currentState)
@@ -945,14 +985,12 @@ namespace
                     SkPaint paint;
                     paint.setAntiAlias(true);
 
-                    SkRect boxRect = SkRect::MakeXYWH(worldRect.x, worldRect.y, worldRect.Width(), worldRect.Height());
+                    SkRect boxRect = SkRect::MakeXYWH(localRect.x, localRect.y, localRect.Width(), localRect.Height());
                     if (combo.backgroundImage)
                     {
                         paint.setColorFilter(SkColorFilters::Blend(baseColor, SkBlendMode::kModulate));
-                        canvas->save();
                         canvas->clipRRect(SkRRect::MakeRectXY(boxRect, combo.roundness, combo.roundness), true);
                         canvas->drawImageRect(combo.backgroundImage, boxRect, SkSamplingOptions(SkFilterMode::kLinear));
-                        canvas->restore();
                     }
                     else
                     {
@@ -972,20 +1010,22 @@ namespace
 
                     SkFontMetrics metrics;
                     font.getMetrics(&metrics);
-                    const float baseline = worldRect.y + worldRect.Height() * 0.5f - (metrics.fAscent + metrics.
-                        fDescent) * 0.5f;
+                    const float baseline = localRect.y + localRect.Height() * 0.5f - (metrics.fAscent + metrics.
+                            fDescent) *
+                        0.5f;
                     const float contentPadding = 8.0f;
-                    const float iconSize = std::min(worldRect.Height() * 0.5f, 18.0f);
-                    const float iconX = worldRect.x + worldRect.Width() - contentPadding - iconSize;
-                    const float iconY = worldRect.y + (worldRect.Height() - iconSize) * 0.5f;
+                    const float iconSize = std::min(localRect.Height() * 0.5f, 18.0f);
+                    const float iconX = localRect.x + localRect.Width() - contentPadding - iconSize;
+                    const float iconY = localRect.y + (localRect.Height() - iconSize) * 0.5f;
 
                     std::string display = combo.displayText.text;
                     if (display.empty() && combo.selectedIndex >= 0 && combo.selectedIndex < static_cast<int>(combo.
-                        items.size()))
+                        items.
+                        size()))
                     {
                         display = combo.items[combo.selectedIndex];
                     }
-                    canvas->drawString(display.c_str(), worldRect.x + contentPadding, baseline, font, textPaint);
+                    canvas->drawString(display.c_str(), localRect.x + contentPadding, baseline, font, textPaint);
 
                     if (combo.dropdownIcon)
                     {
@@ -1011,8 +1051,16 @@ namespace
                         canvas->drawPath(triangle, paint);
                     }
 
+                    // 下拉列表绘制（需要在世界空间绘制，不受transform影响）
+                    canvas->restore();
+
                     if (combo.isDropdownOpen && !combo.items.empty())
                     {
+                        // 计算世界坐标
+                        ECS::RectF worldRect = combo.rect;
+                        worldRect.x = trans.position.x - combo.rect.Width() * 0.5f;
+                        worldRect.y = trans.position.y - combo.rect.Height() * 0.5f;
+
                         const float itemHeight = combo.displayText.fontSize * 1.4f + 6.0f;
                         const float dropdownHeight = itemHeight * static_cast<float>(combo.items.size());
                         SkRect dropdownRect = SkRect::MakeXYWH(worldRect.x,
@@ -1059,7 +1107,8 @@ namespace
                             canvas->drawString(combo.items[i].c_str(),
                                                itemRect.left() + contentPadding,
                                                itemRect.top() + itemHeight * 0.5f - (metrics.fAscent + metrics.fDescent)
-                                               * 0.5f,
+                                               *
+                                               0.5f,
                                                font,
                                                textPaint);
                         }
@@ -1088,13 +1137,18 @@ namespace
                 {
                     if (!canvas || !expander.header.typeface) return;
 
-                    ECS::RectF worldRect = expander.rect;
-                    worldRect.x = trans.position.x - expander.rect.Width() * 0.5f;
-                    worldRect.y = trans.position.y - expander.rect.Height() * 0.5f;
+                    canvas->save();
+                    canvas->translate(trans.position.x, trans.position.y);
+                    canvas->rotate(SkRadiansToDegrees(trans.rotation));
+                    canvas->scale(trans.scale.x, trans.scale.y);
 
-                    const float headerHeight = std::min(worldRect.Height(),
+                    ECS::RectF localRect = expander.rect;
+                    localRect.x = -expander.rect.Width() * 0.5f;
+                    localRect.y = -expander.rect.Height() * 0.5f;
+
+                    const float headerHeight = std::min(localRect.Height(),
                                                         std::max(28.0f, expander.header.fontSize * 1.8f));
-                    SkRect headerRect = SkRect::MakeXYWH(worldRect.x, worldRect.y, worldRect.Width(), headerHeight);
+                    SkRect headerRect = SkRect::MakeXYWH(localRect.x, localRect.y, localRect.Width(), headerHeight);
 
                     SkPaint paint;
                     paint.setAntiAlias(true);
@@ -1107,10 +1161,10 @@ namespace
 
                     if (expander.isExpanded)
                     {
-                        SkRect bodyRect = SkRect::MakeXYWH(worldRect.x,
-                                                           worldRect.y + headerHeight,
-                                                           worldRect.Width(),
-                                                           std::max(0.0f, worldRect.Height() - headerHeight));
+                        SkRect bodyRect = SkRect::MakeXYWH(localRect.x,
+                                                           localRect.y + headerHeight,
+                                                           localRect.Width(),
+                                                           std::max(0.0f, localRect.Height() - headerHeight));
                         paint.setColor4f({
                             expander.expandedColor.r, expander.expandedColor.g,
                             expander.expandedColor.b, expander.expandedColor.a
@@ -1119,10 +1173,10 @@ namespace
                     }
                     else
                     {
-                        SkRect bodyRect = SkRect::MakeXYWH(worldRect.x,
-                                                           worldRect.y + headerHeight,
-                                                           worldRect.Width(),
-                                                           std::max(0.0f, worldRect.Height() - headerHeight));
+                        SkRect bodyRect = SkRect::MakeXYWH(localRect.x,
+                                                           localRect.y + headerHeight,
+                                                           localRect.Width(),
+                                                           std::max(0.0f, localRect.Height() - headerHeight));
                         paint.setColor4f({
                             expander.collapsedColor.r, expander.collapsedColor.g,
                             expander.collapsedColor.b, expander.collapsedColor.a
@@ -1176,6 +1230,8 @@ namespace
                                        baseline,
                                        font,
                                        textPaint);
+
+                    canvas->restore();
                 }
             );
 
@@ -1199,13 +1255,18 @@ namespace
                 {
                     if (!canvas) return;
 
-                    ECS::RectF worldRect = progress.rect;
-                    worldRect.x = trans.position.x - progress.rect.Width() * 0.5f;
-                    worldRect.y = trans.position.y - progress.rect.Height() * 0.5f;
+                    canvas->save();
+                    canvas->translate(trans.position.x, trans.position.y);
+                    canvas->rotate(SkRadiansToDegrees(trans.rotation));
+                    canvas->scale(trans.scale.x, trans.scale.y);
 
-                    SkRect barRect = SkRect::MakeXYWH(worldRect.x, worldRect.y,
-                                                      std::max(0.0f, worldRect.Width()),
-                                                      std::max(0.0f, worldRect.Height()));
+                    ECS::RectF localRect = progress.rect;
+                    localRect.x = -progress.rect.Width() * 0.5f;
+                    localRect.y = -progress.rect.Height() * 0.5f;
+
+                    SkRect barRect = SkRect::MakeXYWH(localRect.x, localRect.y,
+                                                      std::max(0.0f, localRect.Width()),
+                                                      std::max(0.0f, localRect.Height()));
 
                     SkPaint paint;
                     paint.setAntiAlias(true);
@@ -1288,6 +1349,8 @@ namespace
                         progress.borderColor.b, progress.borderColor.a
                     });
                     canvas->drawRect(barRect, paint);
+
+                    canvas->restore();
                 }
             );
 
@@ -1311,9 +1374,14 @@ namespace
                 {
                     if (!canvas) return;
 
-                    ECS::RectF worldRect = tabs.rect;
-                    worldRect.x = trans.position.x - tabs.rect.Width() * 0.5f;
-                    worldRect.y = trans.position.y - tabs.rect.Height() * 0.5f;
+                    canvas->save();
+                    canvas->translate(trans.position.x, trans.position.y);
+                    canvas->rotate(SkRadiansToDegrees(trans.rotation));
+                    canvas->scale(trans.scale.x, trans.scale.y);
+
+                    ECS::RectF localRect = tabs.rect;
+                    localRect.x = -tabs.rect.Width() * 0.5f;
+                    localRect.y = -tabs.rect.Height() * 0.5f;
 
                     SkPaint paint;
                     paint.setAntiAlias(true);
@@ -1321,7 +1389,7 @@ namespace
                         tabs.backgroundColor.r, tabs.backgroundColor.g,
                         tabs.backgroundColor.b, tabs.backgroundColor.a
                     });
-                    SkRect fullRect = SkRect::MakeXYWH(worldRect.x, worldRect.y, worldRect.Width(), worldRect.Height());
+                    SkRect fullRect = SkRect::MakeXYWH(localRect.x, localRect.y, localRect.Width(), localRect.Height());
                     if (tabs.backgroundImage)
                     {
                         paint.setColorFilter(SkColorFilters::Blend(tabs.backgroundColor, SkBlendMode::kModulate));
@@ -1334,7 +1402,7 @@ namespace
                     }
 
                     const float headerHeight = tabs.tabHeight;
-                    float cursor = worldRect.x + 4.0f;
+                    float cursor = localRect.x + 4.0f;
 
                     SkFont font(nullptr, headerHeight * 0.42f);
                     font.setEdging(SkFont::Edging::kAntiAlias);
@@ -1349,8 +1417,8 @@ namespace
 
                         const float titleFactor = static_cast<float>(tabItem.title.size()) * 0.6f + 2.0f;
                         const float tabWidth = std::clamp(headerHeight * titleFactor, headerHeight * 1.8f,
-                                                          worldRect.Width());
-                        SkRect tabRect = SkRect::MakeXYWH(cursor, worldRect.y, tabWidth, headerHeight);
+                                                          localRect.Width());
+                        SkRect tabRect = SkRect::MakeXYWH(cursor, localRect.y, tabWidth, headerHeight);
 
                         ECS::Color tabColor = tabs.tabColor;
                         if (!tabItem.isEnabled)
@@ -1399,6 +1467,8 @@ namespace
 
                         cursor += tabWidth + tabs.tabSpacing;
                     }
+
+                    canvas->restore();
                 }
             );
 
@@ -1422,22 +1492,25 @@ namespace
                 {
                     if (!canvas) return;
 
-                    ECS::RectF worldRect = listBox.rect;
-                    worldRect.x = trans.position.x - listBox.rect.Width() * 0.5f;
-                    worldRect.y = trans.position.y - listBox.rect.Height() * 0.5f;
+                    canvas->save();
+                    canvas->translate(trans.position.x, trans.position.y);
+                    canvas->rotate(SkRadiansToDegrees(trans.rotation));
+                    canvas->scale(trans.scale.x, trans.scale.y);
 
-                    SkRect boxRect = SkRect::MakeXYWH(worldRect.x, worldRect.y, worldRect.Width(), worldRect.Height());
+                    ECS::RectF localRect = listBox.rect;
+                    localRect.x = -listBox.rect.Width() * 0.5f;
+                    localRect.y = -listBox.rect.Height() * 0.5f;
+
+                    SkRect boxRect = SkRect::MakeXYWH(localRect.x, localRect.y, localRect.Width(), localRect.Height());
 
                     SkPaint paint;
                     paint.setAntiAlias(true);
                     if (listBox.backgroundImage)
                     {
                         paint.setColorFilter(SkColorFilters::Blend(listBox.backgroundColor, SkBlendMode::kModulate));
-                        canvas->save();
                         canvas->clipRRect(SkRRect::MakeRectXY(boxRect, listBox.roundness, listBox.roundness), true);
                         canvas->drawImageRect(listBox.backgroundImage, boxRect,
                                               SkSamplingOptions(SkFilterMode::kLinear), &paint);
-                        canvas->restore();
                     }
                     else
                     {
@@ -1467,6 +1540,7 @@ namespace
                     int rows = 1;
                     int itemsPerPage = 0;
 
+                    // 根据布局计算行列
                     switch (listBox.layout)
                     {
                     case ECS::ListBoxLayout::Horizontal:
@@ -1540,7 +1614,6 @@ namespace
                         }
                         break;
                     }
-
 
                     if (listBox.visibleItemCount <= 0)
                     {
@@ -1654,7 +1727,6 @@ namespace
                     columns = std::max(1, columns);
                     rows = std::max(1, rows);
 
-
                     float itemWidth = 0.0f;
                     float itemHeight = 0.0f;
 
@@ -1664,14 +1736,12 @@ namespace
                         const float paddingY = 8.0f;
                         const float actualItemHeight = textHeight + paddingY * 2.0f;
 
-
                         float totalSpacingX = spacingX * static_cast<float>(std::max(0, columns - 1));
                         float totalSpacingY = spacingY * static_cast<float>(std::max(0, rows - 1));
 
                         itemWidth = columns > 0
                                         ? (availableWidth - totalSpacingX) / static_cast<float>(columns)
                                         : availableWidth;
-
 
                         if (primaryIsVertical)
                         {
@@ -1760,6 +1830,7 @@ namespace
                         canvas->restore();
                     }
 
+                    // 绘制垂直滚动条
                     if (showVertical && availableHeight > 0.0f)
                     {
                         SkRect trackRect = SkRect::MakeXYWH(contentRight + trackSpacing,
@@ -1804,6 +1875,7 @@ namespace
                                           thumbPaint);
                     }
 
+                    // 绘制水平滚动条
                     if (showHorizontal && availableWidth > 0.0f)
                     {
                         SkRect trackRect = SkRect::MakeXYWH(contentLeft,
@@ -1851,6 +1923,8 @@ namespace
                         canvas->drawRRect(SkRRect::MakeRectXY(thumbRect, trackThickness * 0.5f, trackThickness * 0.5f),
                                           thumbPaint);
                     }
+
+                    canvas->restore();
                 }
             );
 
@@ -1858,6 +1932,43 @@ namespace
                 .zIndex = batch.zIndex,
                 .batchData = std::move(batch)
             });
+        }
+
+        void processTextData(const Renderable* currIt, const ECS::TransformComponent& transform,
+                             const TextRenderData& textData)
+        {
+            FastTextBatchKey key(const_cast<SkTypeface*>(textData.typeface), textData.fontSize,
+                                 static_cast<TextAlignment>(textData.alignment), textData.color,
+                                 currIt->zIndex);
+
+            auto keyIt = result->textGroupIndices.find(key);
+            size_t groupIndex;
+
+            if (keyIt == result->textGroupIndices.end())
+            {
+                groupIndex = result->textBatchGroups.size();
+                result->textGroupIndices[key] = groupIndex;
+
+                result->textBatchGroups.emplace_back();
+                auto& group = result->textBatchGroups.back();
+                group.typeface = const_cast<SkTypeface*>(textData.typeface);
+                group.fontSize = textData.fontSize;
+                group.color = textData.color;
+                group.alignment = static_cast<TextAlignment>(textData.alignment);
+                group.zIndex = currIt->zIndex;
+                group.transforms.reserve(16);
+                group.texts.reserve(16);
+            }
+            else
+            {
+                groupIndex = keyIt->second;
+            }
+
+            auto& group = result->textBatchGroups[groupIndex];
+            group.transforms.emplace_back(
+                transform.position, transform.scale.x, transform.scale.y,
+                sinf(transform.rotation), cosf(transform.rotation));
+            group.texts.emplace_back(textData.text);
         }
 
         void processSpriteData(const Renderable* currIt, const ECS::TransformComponent& transform,
@@ -1897,72 +2008,33 @@ namespace
                 transform.position, transform.scale.x, transform.scale.y,
                 sinf(transform.rotation), cosf(transform.rotation));
         }
-
-        void processTextData(const Renderable* currIt, const ECS::TransformComponent& transform,
-                             const TextRenderData& textData)
-        {
-            FastTextBatchKey key(const_cast<SkTypeface*>(textData.typeface), textData.fontSize,
-                                 static_cast<TextAlignment>(textData.alignment), textData.color,
-                                 currIt->zIndex);
-
-            auto keyIt = result->textGroupIndices.find(key);
-            size_t groupIndex;
-
-            if (keyIt == result->textGroupIndices.end())
-            {
-                groupIndex = result->textBatchGroups.size();
-                result->textGroupIndices[key] = groupIndex;
-
-                result->textBatchGroups.emplace_back();
-                auto& group = result->textBatchGroups.back();
-                group.typeface = const_cast<SkTypeface*>(textData.typeface);
-                group.fontSize = textData.fontSize;
-                group.color = textData.color;
-                group.alignment = static_cast<TextAlignment>(textData.alignment);
-                group.zIndex = currIt->zIndex;
-                group.transforms.reserve(16);
-                group.texts.reserve(16);
-            }
-            else
-            {
-                groupIndex = keyIt->second;
-            }
-
-            auto& group = result->textBatchGroups[groupIndex];
-            group.transforms.emplace_back(
-                transform.position, transform.scale.x, transform.scale.y,
-                sinf(transform.rotation), cosf(transform.rotation));
-            group.texts.emplace_back(textData.text);
-        }
     };
 }
 
 void RenderableManager::SubmitFrame(std::vector<Renderable>&& frameData)
 {
-    
-    
     auto newCurrVector = std::make_shared<std::vector<Renderable>>(std::move(frameData));
 
-    
+
     std::ranges::sort(*newCurrVector, [](const Renderable& a, const Renderable& b)
     {
         return static_cast<uint32_t>(a.entityId) < static_cast<uint32_t>(b.entityId);
     });
 
-    
+
     std::shared_ptr<RenderableFrame> newCurrFrame = newCurrVector;
 
-    
+
     {
         std::lock_guard<std::mutex> lock(frameDataMutex);
 
-        
+
         prevFrame = currFrame;
 
-        
+
         currFrame = newCurrFrame;
 
-        
+
         prevStateTime.store(currStateTime.load(std::memory_order_relaxed), std::memory_order_relaxed);
         currStateTime.store(std::chrono::steady_clock::now(), std::memory_order_relaxed);
 
@@ -1977,30 +2049,23 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     std::shared_ptr<RenderableFrame> localPrevFrame;
     std::shared_ptr<RenderableFrame> localCurrFrame;
 
-    
+
     {
         std::lock_guard<std::mutex> lock(frameDataMutex);
 
         if (!needsRebuild())
         {
-            
-            
             return packetBuffers[activeBufferIndex.load(std::memory_order_relaxed)];
         }
 
-        
+
         localPrevFrame = prevFrame;
         localCurrFrame = currFrame;
     }
-    
-    
-    
 
-    
 
-    
     bool hasPrevFrame = !localPrevFrame->empty();
-    
+
     bool hasCurrFrame = !localCurrFrame->empty();
 
     if (!hasPrevFrame && !hasCurrFrame)
@@ -2014,8 +2079,8 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     }
 
     bool shouldInterpolate = hasPrevFrame && hasCurrFrame;
-    
-    
+
+
     const auto& baseFrameView = *localCurrFrame;
 
     float alpha = 0.0f;
@@ -2053,7 +2118,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     spriteBatchGroups.clear();
     textBatchGroups.clear();
 
-    
+
     if (baseFrameView.empty())
     {
         activeBufferIndex.store(buildIndex, std::memory_order_release);
@@ -2064,7 +2129,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     auto& jobSystem = JobSystem::GetInstance();
     int numJobs = jobSystem.GetThreadCount();
 
-    
+
     if (baseFrameView.size() < 128)
     {
         numJobs = 1;
@@ -2076,7 +2141,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     std::vector<InterpolationAndBatchJob> jobs;
     std::vector<ThreadLocalBatchResult> threadResults(numJobs);
 
-    
+
     size_t totalSize = baseFrameView.size();
     size_t chunkSize = (totalSize + numJobs - 1) / numJobs;
 
@@ -2089,7 +2154,6 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         size_t end = std::min(pos + chunkSize, totalSize);
         if (end < totalSize)
         {
-            
             auto eid = baseFrameView[end - 1].entityId;
             while (end < totalSize && baseFrameView[end].entityId == eid)
             {
@@ -2113,20 +2177,18 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
         if (shouldInterpolate)
         {
-            
             prevStart = localPrevFrame->data();
-            
+
             prevEnd = localPrevFrame->data() + localPrevFrame->size();
-            
+
             currStart = localCurrFrame->data() + start;
-            
+
             currEnd = localCurrFrame->data() + end;
         }
         else
         {
-            
             currStart = baseFrameView.data() + start;
-            
+
             currEnd = baseFrameView.data() + end;
         }
 
@@ -2147,8 +2209,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     }
     JobSystem::CompleteAll(jobHandles);
 
-    
-    
+
     size_t totalSpriteGroups = 0;
     size_t totalTextGroups = 0;
     for (const auto& result : threadResults)
@@ -2160,14 +2221,14 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     spriteBatchGroups.reserve(totalSpriteGroups);
     textBatchGroups.reserve(totalTextGroups);
 
-        for (const auto& result : threadResults)
+    for (const auto& result : threadResults)
+    {
+        for (const auto& threadGroup : result.spriteBatchGroups)
         {
-            for (const auto& threadGroup : result.spriteBatchGroups)
-            {
-                FastSpriteBatchKey key(threadGroup.image, threadGroup.material, threadGroup.color,
-                                       static_cast<ECS::FilterQuality>(threadGroup.filterQuality),
-                                       static_cast<ECS::WrapMode>(threadGroup.wrapMode),
-                                       threadGroup.sourceRect, threadGroup.ppuScaleFactor, threadGroup.zIndex);
+            FastSpriteBatchKey key(threadGroup.image, threadGroup.material, threadGroup.color,
+                                   static_cast<ECS::FilterQuality>(threadGroup.filterQuality),
+                                   static_cast<ECS::WrapMode>(threadGroup.wrapMode),
+                                   threadGroup.sourceRect, threadGroup.ppuScaleFactor, threadGroup.zIndex);
 
             auto it = spriteGroupIndices.find(key);
             if (it == spriteGroupIndices.end())
@@ -2186,13 +2247,13 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         }
     }
 
-        for (const auto& result : threadResults)
+    for (const auto& result : threadResults)
+    {
+        for (const auto& threadGroup : result.textBatchGroups)
         {
-            for (const auto& threadGroup : result.textBatchGroups)
-            {
-                FastTextBatchKey key(threadGroup.typeface, threadGroup.fontSize,
-                                     threadGroup.alignment, threadGroup.color,
-                                     threadGroup.zIndex);
+            FastTextBatchKey key(threadGroup.typeface, threadGroup.fontSize,
+                                 threadGroup.alignment, threadGroup.color,
+                                 threadGroup.zIndex);
 
             auto it = textGroupIndices.find(key);
             if (it == textGroupIndices.end())
@@ -2216,7 +2277,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
     outPackets.reserve(spriteBatchGroups.size() + textBatchGroups.size());
 
-    
+
     {
         size_t totalTransformsNeeded = 0;
         for (const auto& group : spriteBatchGroups) totalTransformsNeeded += group.transforms.size();
@@ -2228,8 +2289,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         textArenas[buildIndex]->Reserve(totalTextsNeeded);
     }
 
-    
-    
+
     for (const auto& group : spriteBatchGroups)
     {
         const size_t count = group.transforms.size();
@@ -2301,7 +2361,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         return ka < kb;
     });
 
-    
+
     activeBufferIndex.store(buildIndex, std::memory_order_release);
     updateCacheState();
     return outPackets;
@@ -2309,19 +2369,16 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
 RenderableManager::RenderableManager()
 {
-    
     auto emptyFrame = std::make_shared<RenderableFrame>();
     prevFrame = emptyFrame;
     currFrame = emptyFrame;
 
-    
+
     auto now = std::chrono::steady_clock::now();
     prevStateTime.store(now, std::memory_order_relaxed);
     currStateTime.store(now, std::memory_order_relaxed);
     lastBuiltPrevTime.store(now, std::memory_order_relaxed);
     lastBuiltCurrTime.store(now, std::memory_order_relaxed);
-
-    
 }
 
 bool RenderableManager::needsRebuild() const

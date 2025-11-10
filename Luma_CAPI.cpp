@@ -9,6 +9,7 @@
 
 #include "AnimationControllerComponent.h"
 #include "ColliderComponent.h"
+#include "PathUtils.h"
 #include "UIComponents.h"
 #include "PhysicsSystem.h"
 #include "SceneManager.h"
@@ -256,18 +257,26 @@ LUMA_API bool ToggleButtonComponent_GetOnToggleOnTarget(LumaSceneHandle scene, L
 LUMA_API void ToggleButtonComponent_ClearOnToggleOnTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::ToggleButtonComponent>(s, entity)) { c->onToggleOnTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::ToggleButtonComponent>(s, entity))
+    {
+        c->onToggleOnTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void ToggleButtonComponent_AddOnToggleOnTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void ToggleButtonComponent_AddOnToggleOnTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                        Guid_CAPI targetGuid,
                                                         const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::ToggleButtonComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onToggleOnTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onToggleOnTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -293,18 +302,26 @@ LUMA_API bool ToggleButtonComponent_GetOnToggleOffTarget(LumaSceneHandle scene, 
 LUMA_API void ToggleButtonComponent_ClearOnToggleOffTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::ToggleButtonComponent>(s, entity)) { c->onToggleOffTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::ToggleButtonComponent>(s, entity))
+    {
+        c->onToggleOffTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void ToggleButtonComponent_AddOnToggleOffTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void ToggleButtonComponent_AddOnToggleOffTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                         Guid_CAPI targetGuid,
                                                          const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::ToggleButtonComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onToggleOffTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onToggleOffTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -331,18 +348,26 @@ LUMA_API bool RadioButtonComponent_GetOnSelectedTarget(LumaSceneHandle scene, Lu
 LUMA_API void RadioButtonComponent_ClearOnSelectedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::RadioButtonComponent>(s, entity)) { c->onSelectedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::RadioButtonComponent>(s, entity))
+    {
+        c->onSelectedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void RadioButtonComponent_AddOnSelectedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void RadioButtonComponent_AddOnSelectedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                       Guid_CAPI targetGuid,
                                                        const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::RadioButtonComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onSelectedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onSelectedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -368,18 +393,26 @@ LUMA_API bool RadioButtonComponent_GetOnDeselectedTarget(LumaSceneHandle scene, 
 LUMA_API void RadioButtonComponent_ClearOnDeselectedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::RadioButtonComponent>(s, entity)) { c->onDeselectedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::RadioButtonComponent>(s, entity))
+    {
+        c->onDeselectedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void RadioButtonComponent_AddOnDeselectedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void RadioButtonComponent_AddOnDeselectedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                         Guid_CAPI targetGuid,
                                                          const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::RadioButtonComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onDeselectedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onDeselectedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -406,18 +439,26 @@ LUMA_API bool CheckBoxComponent_GetOnValueChangedTarget(LumaSceneHandle scene, L
 LUMA_API void CheckBoxComponent_ClearOnValueChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::CheckBoxComponent>(s, entity)) { c->onValueChangedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::CheckBoxComponent>(s, entity))
+    {
+        c->onValueChangedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void CheckBoxComponent_AddOnValueChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void CheckBoxComponent_AddOnValueChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                        Guid_CAPI targetGuid,
                                                         const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::CheckBoxComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onValueChangedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onValueChangedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -444,18 +485,26 @@ LUMA_API bool SliderComponent_GetOnValueChangedTarget(LumaSceneHandle scene, Lum
 LUMA_API void SliderComponent_ClearOnValueChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::SliderComponent>(s, entity)) { c->onValueChangedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::SliderComponent>(s, entity))
+    {
+        c->onValueChangedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void SliderComponent_AddOnValueChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void SliderComponent_AddOnValueChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                      Guid_CAPI targetGuid,
                                                       const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::SliderComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onValueChangedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onValueChangedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -481,18 +530,26 @@ LUMA_API bool SliderComponent_GetOnDragStartedTarget(LumaSceneHandle scene, Luma
 LUMA_API void SliderComponent_ClearOnDragStartedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::SliderComponent>(s, entity)) { c->onDragStartedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::SliderComponent>(s, entity))
+    {
+        c->onDragStartedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void SliderComponent_AddOnDragStartedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void SliderComponent_AddOnDragStartedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                     Guid_CAPI targetGuid,
                                                      const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::SliderComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onDragStartedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onDragStartedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -518,7 +575,11 @@ LUMA_API bool SliderComponent_GetOnDragEndedTarget(LumaSceneHandle scene, LumaEn
 LUMA_API void SliderComponent_ClearOnDragEndedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::SliderComponent>(s, entity)) { c->onDragEndedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::SliderComponent>(s, entity))
+    {
+        c->onDragEndedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
 LUMA_API void SliderComponent_AddOnDragEndedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
@@ -527,9 +588,12 @@ LUMA_API void SliderComponent_AddOnDragEndedTarget(LumaSceneHandle scene, LumaEn
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::SliderComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onDragEndedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onDragEndedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -556,18 +620,26 @@ LUMA_API bool ComboBoxComponent_GetOnSelectionChangedTarget(LumaSceneHandle scen
 LUMA_API void ComboBoxComponent_ClearOnSelectionChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::ComboBoxComponent>(s, entity)) { c->onSelectionChangedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::ComboBoxComponent>(s, entity))
+    {
+        c->onSelectionChangedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void ComboBoxComponent_AddOnSelectionChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void ComboBoxComponent_AddOnSelectionChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                            Guid_CAPI targetGuid,
                                                             const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::ComboBoxComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onSelectionChangedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onSelectionChangedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -594,18 +666,26 @@ LUMA_API bool ProgressBarComponent_GetOnValueChangedTarget(LumaSceneHandle scene
 LUMA_API void ProgressBarComponent_ClearOnValueChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::ProgressBarComponent>(s, entity)) { c->onValueChangedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::ProgressBarComponent>(s, entity))
+    {
+        c->onValueChangedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void ProgressBarComponent_AddOnValueChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void ProgressBarComponent_AddOnValueChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                           Guid_CAPI targetGuid,
                                                            const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::ProgressBarComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onValueChangedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onValueChangedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -631,18 +711,26 @@ LUMA_API bool ProgressBarComponent_GetOnCompletedTarget(LumaSceneHandle scene, L
 LUMA_API void ProgressBarComponent_ClearOnCompletedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::ProgressBarComponent>(s, entity)) { c->onCompletedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::ProgressBarComponent>(s, entity))
+    {
+        c->onCompletedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void ProgressBarComponent_AddOnCompletedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void ProgressBarComponent_AddOnCompletedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                        Guid_CAPI targetGuid,
                                                         const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::ProgressBarComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onCompletedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onCompletedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -669,18 +757,26 @@ LUMA_API bool TabControlComponent_GetOnTabChangedTarget(LumaSceneHandle scene, L
 LUMA_API void TabControlComponent_ClearOnTabChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::TabControlComponent>(s, entity)) { c->onTabChangedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::TabControlComponent>(s, entity))
+    {
+        c->onTabChangedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void TabControlComponent_AddOnTabChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void TabControlComponent_AddOnTabChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                        Guid_CAPI targetGuid,
                                                         const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::TabControlComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onTabChangedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onTabChangedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -706,18 +802,26 @@ LUMA_API bool TabControlComponent_GetOnTabClosedTarget(LumaSceneHandle scene, Lu
 LUMA_API void TabControlComponent_ClearOnTabClosedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::TabControlComponent>(s, entity)) { c->onTabClosedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::TabControlComponent>(s, entity))
+    {
+        c->onTabClosedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void TabControlComponent_AddOnTabClosedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void TabControlComponent_AddOnTabClosedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                       Guid_CAPI targetGuid,
                                                        const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::TabControlComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onTabClosedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onTabClosedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -744,18 +848,26 @@ LUMA_API bool ListBoxComponent_GetOnSelectionChangedTarget(LumaSceneHandle scene
 LUMA_API void ListBoxComponent_ClearOnSelectionChangedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::ListBoxComponent>(s, entity)) { c->onSelectionChangedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::ListBoxComponent>(s, entity))
+    {
+        c->onSelectionChangedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void ListBoxComponent_AddOnSelectionChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void ListBoxComponent_AddOnSelectionChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                           Guid_CAPI targetGuid,
                                                            const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::ListBoxComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onSelectionChangedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onSelectionChangedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
 
@@ -781,20 +893,29 @@ LUMA_API bool ListBoxComponent_GetOnItemActivatedTarget(LumaSceneHandle scene, L
 LUMA_API void ListBoxComponent_ClearOnItemActivatedTargets(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* s = AsScene(scene);
-    if (auto* c = TryGetComponent<ECS::ListBoxComponent>(s, entity)) { c->onItemActivatedTargets.clear(); PublishComponentUpdated(s, entity);}    
+    if (auto* c = TryGetComponent<ECS::ListBoxComponent>(s, entity))
+    {
+        c->onItemActivatedTargets.clear();
+        PublishComponentUpdated(s, entity);
+    }
 }
 
-LUMA_API void ListBoxComponent_AddOnItemActivatedTarget(LumaSceneHandle scene, LumaEntityHandle entity, Guid_CAPI targetGuid,
+LUMA_API void ListBoxComponent_AddOnItemActivatedTarget(LumaSceneHandle scene, LumaEntityHandle entity,
+                                                        Guid_CAPI targetGuid,
                                                         const char* componentName, const char* methodName)
 {
     auto* s = AsScene(scene);
     if (auto* c = TryGetComponent<ECS::ListBoxComponent>(s, entity))
     {
-        ECS::SerializableEventTarget t{}; t.targetEntityGuid = FromGuidCAPI(targetGuid);
-        if (componentName) t.targetComponentName = componentName; if (methodName) t.targetMethodName = methodName;
-        c->onItemActivatedTargets.push_back(std::move(t)); PublishComponentUpdated(s, entity);
+        ECS::SerializableEventTarget t{};
+        t.targetEntityGuid = FromGuidCAPI(targetGuid);
+        if (componentName) t.targetComponentName = componentName;
+        if (methodName) t.targetMethodName = methodName;
+        c->onItemActivatedTargets.push_back(std::move(t));
+        PublishComponentUpdated(s, entity);
     }
 }
+
 LUMA_API bool InputTextComponent_GetOnTextChangedTarget(LumaSceneHandle scene, LumaEntityHandle entity, int index,
                                                         SerializableEventTarget_CAPI* outTarget)
 {
@@ -1047,9 +1168,6 @@ LUMA_API bool SceneManager_LoadScene(const char* sceneGuidStr)
 }
 
 
-
-
-
 namespace
 {
     std::unique_ptr<GraphicsBackend> g_backend;
@@ -1086,8 +1204,13 @@ LUMA_API bool Engine_InitWithANativeWindow(void* aNativeWindow, int width, int h
         g_backend = GraphicsBackend::Create(opts);
         if (!g_backend) return false;
         g_renderSystem = RenderSystem::Create(*g_backend);
-        if (!g_renderSystem) { g_backend.reset(); return false; }
-        g_fbWidth = width; g_fbHeight = height;
+        if (!g_renderSystem)
+        {
+            g_backend.reset();
+            return false;
+        }
+        g_fbWidth = width;
+        g_fbHeight = height;
         Camera::GetInstance().GetProperties().viewport = {0, 0, static_cast<float>(width), static_cast<float>(height)};
         return true;
     }
@@ -1105,7 +1228,7 @@ LUMA_API void Engine_Shutdown()
     g_backend.reset();
 }
 
-LUMA_API void Engine_Frame(float )
+LUMA_API void Engine_Frame(float)
 {
     if (!g_renderSystem) return;
 
@@ -1734,9 +1857,10 @@ LUMA_API void Entity_SetComponentProperty(LumaSceneHandle scene, LumaEntityHandl
 
     const auto& props = compReg->properties;
     auto propIt = std::find_if(props.begin(), props.end(),
-                             [&](const PropertyRegistration& prop) {
-                                 return prop.name == propertyName;
-                             });
+                               [&](const PropertyRegistration& prop)
+                               {
+                                   return prop.name == propertyName;
+                               });
 
     if (propIt != props.end() && propIt->set_from_raw_ptr)
     {
@@ -1760,15 +1884,17 @@ LUMA_API void Entity_GetComponentProperty(LumaSceneHandle scene, LumaEntityHandl
 
     const auto& props = compReg->properties;
     auto propIt = std::find_if(props.begin(), props.end(),
-                             [&](const PropertyRegistration& prop) {
-                                 return prop.name == propertyName;
-                             });
+                               [&](const PropertyRegistration& prop)
+                               {
+                                   return prop.name == propertyName;
+                               });
 
     if (propIt != props.end() && propIt->get_to_raw_ptr)
     {
         propIt->get_to_raw_ptr(runtimeScene->GetRegistry(), (entt::entity)entity, valueData);
     }
 }
+
 LUMA_API const char* TextComponent_GetText(LumaSceneHandle scene, LumaEntityHandle entity)
 {
     auto* runtimeScene = AsScene(scene);
@@ -1906,4 +2032,86 @@ LUMA_API void EdgeCollider_SetVertices(LumaSceneHandle scene, LumaEntityHandle e
         comp.vertices.emplace_back(vertices[i].x, vertices[i].y);
     }
     comp.isDirty = true;
+}
+
+LUMA_API bool AssetManager_StartPreload()
+{
+    return AssetManager::GetInstance().StartPreload();
+}
+
+LUMA_API void AssetManager_StopPreload()
+{
+    AssetManager::GetInstance().StopPreload();
+}
+
+
+LUMA_API bool AssetManager_IsPreloadComplete()
+{
+    return AssetManager::GetInstance().IsPreloadComplete();
+}
+
+LUMA_API bool AssetManager_IsPreloadRunning()
+{
+    return AssetManager::GetInstance().IsPreloadRunning();
+}
+
+LUMA_API void AssetManager_GetPreloadProgress(int* outTotalCount, int* outLoadedCount)
+{
+    auto res = AssetManager::GetInstance().GetPreloadProgress();
+    if (outLoadedCount)
+    {
+        *outLoadedCount = res.second;
+    }
+    if (outTotalCount)
+    {
+        *outTotalCount = res.first;
+    }
+}
+
+LUMA_API Guid_CAPI LoadAsset(const char* assetPath)
+{
+    if (!assetPath) return Guid_CAPI{0};
+
+    auto guid = AssetManager::GetInstance().LoadAsset(assetPath);
+    if (guid.Valid())
+    {
+        return ToGuidCAPI(guid);
+    }
+    return Guid_CAPI{0};
+}
+
+LUMA_API const char* PathUtils_GetExecutableDir()
+{
+    static std::string path = PathUtils::GetExecutableDir().string();
+    return path.c_str();
+}
+
+LUMA_API const char* PathUtils_GetPersistentDataDir()
+{
+    static std::string path = PathUtils::GetPersistentDataDir().string();
+    return path.c_str();
+}
+
+LUMA_API const char* PathUtils_GetCacheDir()
+{
+    static std::string path = PathUtils::GetCacheDir().string();
+    return path.c_str();
+}
+
+LUMA_API const char* PathUtils_GetContentDir()
+{
+    static std::string path = PathUtils::GetContentDir().string();
+    return path.c_str();
+}
+
+LUMA_API const char* PathUtils_GetAndroidInternalDataDir()
+{
+    static std::string path = PathUtils::GetAndroidInternalDataDir().string();
+    return path.c_str();
+}
+
+LUMA_API const char* PathUtils_GetAndroidExternalDataDir()
+{
+    static std::string path = PathUtils::GetAndroidExternalDataDir().string();
+    return path.c_str();
 }

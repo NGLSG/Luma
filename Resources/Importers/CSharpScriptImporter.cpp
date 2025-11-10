@@ -31,9 +31,8 @@ const std::vector<std::string>& CSharpScriptImporter::GetSupportedExtensions() c
 void CSharpScriptImporter::ExtractScriptInfo(const std::filesystem::path& assetPath, YAML::Node& settingsNode)
 {
     std::filesystem::path executablePath = Directory::GetCurrentExecutablePath();
-    std::filesystem::path executableDir = executablePath.parent_path();
 
-    std::filesystem::path parserPath = executableDir / "Tools" / LUMA_PLATFORM_NAME / LUMA_PARSER_EXECUTABLE;
+    std::filesystem::path parserPath = executablePath / "Tools" / LUMA_PLATFORM_NAME / LUMA_PARSER_EXECUTABLE;
 
     if (!std::filesystem::exists(parserPath))
     {

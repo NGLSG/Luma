@@ -4,9 +4,8 @@
 #include <functional>
 #include <SDL3/SDL.h>
 #include "../Renderer/GraphicsBackend.h"
-
 #include "../Data/EngineContext.h"
-
+#include <unordered_map>
 
 /**
  * @brief 表示一个应用程序窗口。
@@ -26,6 +25,16 @@ public:
         Error    ///< 错误级别。
     };
 
+    /**
+     * @brief 触摸点信息结构。
+     */
+    struct TouchPoint
+    {
+        SDL_FingerID fingerId;  ///< 触摸点ID。
+        float x;                ///< 触摸点X坐标（归一化）。
+        float y;                ///< 触摸点Y坐标（归一化）。
+        float pressure;         ///< 触摸压力。
+    };
 
     /// 通用事件回调函数类型。
     using EventCallback = std::function<void(const SDL_Event&)>;
@@ -45,6 +54,12 @@ public:
     using TextInputCallback = std::function<void(const char* text)>;
     /// 文件拖放回调函数类型。
     using FileDropCallback = std::function<void(const std::vector<std::string>& files)>;
+    /// 触摸点按下回调函数类型。
+    using TouchDownCallback = std::function<void(SDL_FingerID fingerId, float x, float y, float pressure)>;
+    /// 触摸点移动回调函数类型。
+    using TouchMoveCallback = std::function<void(SDL_FingerID fingerId, float x, float y, float dx, float dy, float pressure)>;
+    /// 触摸点抬起回调函数类型。
+    using TouchUpCallback = std::function<void(SDL_FingerID fingerId, float x, float y)>;
 
 public:
     /**
@@ -66,7 +81,6 @@ public:
      */
     InputState GetInputState() const;
 
-
     /**
      * @brief 禁用拷贝构造函数。
      */
@@ -77,12 +91,10 @@ public:
      */
     PlatformWindow& operator=(const PlatformWindow&) = delete;
 
-
     /**
      * @brief 轮询并处理所有待处理的窗口事件。
      */
     void PollEvents();
-
 
     /**
      * @brief 检查窗口是否应该关闭。
@@ -95,7 +107,6 @@ public:
      * @param title 新的窗口标题。
      */
     void SetTitle(const std::string& title);
-
 
     /**
      * @brief 获取底层的SDL_Window指针。
@@ -135,7 +146,6 @@ public:
      */
     float GetHeight() const;
 
-
     /**
      * @brief 启动文本输入模式。
      */
@@ -146,7 +156,6 @@ public:
      */
     void StopTextInput();
 
-
     /**
      * @brief 设置文本输入区域和光标位置。
      * @param rect 文本输入区域的矩形。
@@ -154,13 +163,11 @@ public:
      */
     void SetTextInputArea(const SDL_Rect& rect, int cursor);
 
-
     /**
      * @brief 检查文本输入是否处于活动状态。
      * @return 如果文本输入处于活动状态，则返回true；否则返回false。
      */
     bool IsTextInputActive() const;
-
 
     /**
      * @brief 显示一个消息框。
@@ -185,8 +192,17 @@ public:
     static std::unique_ptr<PlatformWindow> Create(const std::string& title, int width, int height);
 
 #if defined(SDL_PLATFORM_ANDROID)
-    // Android: allow injecting an existing ANativeWindow* from Java/Kotlin layer
+    /**
+     * @brief Android平台允许从Java/Kotlin层注入现有的ANativeWindow指针。
+     * @param nativeWindow Android原生窗口指针。
+     */
     static void SetAndroidNativeWindow(void* nativeWindow);
+
+    /**
+     * @brief 获取所有活动的触摸点。
+     * @return 触摸点ID到触摸点信息的映射。
+     */
+    const std::unordered_map<SDL_FingerID, TouchPoint>& GetActiveTouches() const { return activeTouches; }
 #endif
 
     /**
@@ -227,16 +243,28 @@ public:
     LumaEvent<SDL_Keycode, SDL_Scancode, bool> OnKeyRelease;
     /// 当文本输入发生时触发。
     LumaEvent<const char*> OnTextInput;
+    /// 当触摸点按下时触发。
+    LumaEvent<SDL_FingerID, float, float, float> OnTouchDown;
+    /// 当触摸点移动时触发。
+    LumaEvent<SDL_FingerID, float, float, float, float, float> OnTouchMove;
+    /// 当触摸点抬起时触发。
+    LumaEvent<SDL_FingerID, float, float> OnTouchUp;
 
 private:
     /// 处理单个SDL事件。
     void handleEvent(const SDL_Event& event);
+
+    /// 处理触摸事件。
+    void handleTouchEvent(const SDL_Event& event);
 
 private:
     SDL_Window* sdlWindow = nullptr; ///< 底层的SDL窗口指针。
     bool shouldCloseFlag = false;    ///< 标记窗口是否应该关闭。
     InputState inputState;           ///< 窗口的输入状态。
 
+#if defined(SDL_PLATFORM_ANDROID)
+    std::unordered_map<SDL_FingerID, TouchPoint> activeTouches; ///< 活动的触摸点映射。
+#endif
 
     EventCallback onAnyEvent;             ///< 任何事件的回调。
     ResizeCallback onResize;              ///< 窗口大小改变的回调。
@@ -249,4 +277,7 @@ private:
     KeyCallback onKeyRelease;             ///< 键盘按键释放的回调。
     TextInputCallback onTextInput;        ///< 文本输入的回调。
     FileDropCallback onFileDrop;          ///< 文件拖放的回调。
+    TouchDownCallback onTouchDown;        ///< 触摸点按下的回调。
+    TouchMoveCallback onTouchMove;        ///< 触摸点移动的回调。
+    TouchUpCallback onTouchUp;            ///< 触摸点抬起的回调。
 };

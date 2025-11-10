@@ -67,7 +67,7 @@ private:
     void drawFpsDisplay();
     void updateFps();
     void rebuildScripts();
-    bool runScriptCompilationLogic(std::string& statusMessage);
+    bool runScriptCompilationLogic(std::string& statusMessage, const std::filesystem::path& outPath = "");
     void drawPreferencesPopup();
     void drawScriptCompilationPopup();
 

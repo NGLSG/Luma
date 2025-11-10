@@ -11,8 +11,6 @@
 #include <unordered_map>
 #include <memory>
 
-#pragma once
-
 #include "IAssetManager.h"
 #include "../Utils/LazySingleton.h"
 #include <memory>
@@ -107,6 +105,42 @@ public:
      */
     void Shutdown();
 
+    /**
+      * @brief 手动启动后台预加载
+      * @return 如果成功启动返回 true,如果已在运行或已完成返回 false
+      */
+    bool StartPreload();
+
+    /**
+     * @brief 停止后台预加载
+     */
+    void StopPreload();
+
+    /**
+     * @brief 获取预加载进度
+     * @return pair<总数, 已处理数>
+     */
+    std::pair<int, int> GetPreloadProgress() const;
+
+    /**
+     * @brief 检查预加载是否完成
+     * @return 如果预加载完成返回 true,否则返回 false
+     */
+    bool IsPreloadComplete() const;
+
+    /**
+     * @brief 检查预加载是否正在运行
+     * @return 如果预加载正在运行返回 true,否则返回 false
+     */
+    bool IsPreloadRunning() const;
+
+    /**
+     * @brief 根据资产路径加载资产并返回其GUID
+     * @param assetPath 资产的文件系统路径
+     * @return 资产的GUID
+     */
+    Guid LoadAsset(const std::filesystem::path& assetPath);
+
 private:
     /**
      * @brief 私有默认构造函数。
@@ -116,5 +150,6 @@ private:
     AssetManager() = default;
 
     std::unique_ptr<IAssetManager> m_implementation; ///< 资产管理器接口的实现。
+    ApplicationMode m_appMode; ///< 应用程序的运行模式。
 };
 #endif
