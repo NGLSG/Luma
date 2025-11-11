@@ -206,6 +206,7 @@ struct Renderable
 {
     entt::entity entityId;
     int zIndex = 0;
+    uint64_t sortKey = 0;
     ECS::TransformComponent transform;
 
     std::variant<

@@ -1,7 +1,6 @@
 #include "RenderSystem.h"
 #include "GraphicsBackend.h"
 #include <stdexcept>
-#include <unordered_map>
 #include <cmath>
 #include <numbers>
 #include <algorithm>
@@ -71,6 +70,13 @@ public:
     std::vector<ShaderBatch> shaderBatches;
     std::vector<RawDrawBatch> rawDrawBatches;
     std::vector<CursorPrimitive> cursorPrimitives;
+    enum class BatchType { Sprite, Text, Instance, Rect, Circle, Line, Shader, RawDraw };
+    struct QueuedBatch
+    {
+        BatchType type;
+        size_t index;
+    };
+    std::vector<QueuedBatch> orderedBatches;
 
     std::vector<SkPoint> positions;
     std::vector<SkPoint> texCoords;
@@ -110,6 +116,7 @@ public:
         shaderBatches.reserve(32);
         rawDrawBatches.reserve(16);
         cursorPrimitives.reserve(16);
+        orderedBatches.reserve(128);
     }
 
 
@@ -124,18 +131,19 @@ public:
         shaderBatches.clear();
         cursorPrimitives.clear();
         rawDrawBatches.clear();
+        orderedBatches.clear();
     }
 
 
-    void DrawAllSpriteBatches(SkCanvas* canvas);
-    void DrawAllTextBatches(SkCanvas* canvas);
-    void DrawAllInstanceBatches(SkCanvas* canvas);
-    void DrawAllRectBatches(SkCanvas* canvas);
-    void DrawAllCircleBatches(SkCanvas* canvas);
-    void DrawAllLineBatches(SkCanvas* canvas);
-    void DrawAllShaderBatches(SkCanvas* canvas);
+    void DrawSpriteBatch(const SpriteBatch& batch, SkCanvas* canvas);
+    void DrawTextBatch(const TextBatch& batch, SkCanvas* canvas);
+    void DrawInstanceBatch(const InstanceBatch& batch, SkCanvas* canvas);
+    void DrawRectBatch(const RectBatch& batch, SkCanvas* canvas);
+    void DrawCircleBatch(const CircleBatch& batch, SkCanvas* canvas);
+    void DrawLineBatch(const LineBatch& batch, SkCanvas* canvas);
+    void DrawShaderBatch(const ShaderBatch& batch, SkCanvas* canvas);
     void DrawAllCursorBatches(SkCanvas* canvas);
-    void DrawAllRawDrawBatches(SkCanvas* canvas);
+    void DrawRawDrawBatch(const RawDrawBatch& batch, SkCanvas* canvas);
 
 private:
     enum class TextAlignment
@@ -204,23 +212,51 @@ RenderSystem::RenderSystem(GraphicsBackend& backend, size_t maxPrimitivesPerBatc
 
 RenderSystem::~RenderSystem() = default;
 
-void RenderSystem::Submit(const SpriteBatch& batch) { if (batch.count > 0) pImpl->spriteBatches.push_back(batch); }
+void RenderSystem::Submit(const SpriteBatch& batch)
+{
+    if (batch.count <= 0) return;
+    pImpl->spriteBatches.push_back(batch);
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Sprite, pImpl->spriteBatches.size() - 1});
+}
 
 void RenderSystem::Submit(const TextBatch& batch)
 {
-    if (batch.count > 0) pImpl->textBatches.push_back(batch);
+    if (batch.count <= 0) return;
+    pImpl->textBatches.push_back(batch);
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Text, pImpl->textBatches.size() - 1});
 }
 
-void RenderSystem::Submit(const InstanceBatch& batch) { if (batch.count > 0) pImpl->instanceBatches.push_back(batch); }
-void RenderSystem::Submit(const RectBatch& batch) { if (batch.count > 0) pImpl->rectBatches.push_back(batch); }
-void RenderSystem::Submit(const CircleBatch& batch) { if (batch.count > 0) pImpl->circleBatches.push_back(batch); }
-void RenderSystem::Submit(const LineBatch& batch) { if (batch.pointCount >= 2) pImpl->lineBatches.push_back(batch); }
+void RenderSystem::Submit(const InstanceBatch& batch)
+{
+    if (batch.count <= 0) return;
+    pImpl->instanceBatches.push_back(batch);
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Instance, pImpl->instanceBatches.size() - 1});
+}
+void RenderSystem::Submit(const RectBatch& batch)
+{
+    if (batch.count <= 0) return;
+    pImpl->rectBatches.push_back(batch);
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Rect, pImpl->rectBatches.size() - 1});
+}
+void RenderSystem::Submit(const CircleBatch& batch)
+{
+    if (batch.count <= 0) return;
+    pImpl->circleBatches.push_back(batch);
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Circle, pImpl->circleBatches.size() - 1});
+}
+void RenderSystem::Submit(const LineBatch& batch)
+{
+    if (batch.pointCount < 2) return;
+    pImpl->lineBatches.push_back(batch);
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Line, pImpl->lineBatches.size() - 1});
+}
 
 void RenderSystem::Submit(const ShaderBatch& batch)
 {
     if (batch.material && batch.material->effect)
     {
         pImpl->shaderBatches.push_back(batch);
+        pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Shader, pImpl->shaderBatches.size() - 1});
     }
 }
 
@@ -229,6 +265,7 @@ void RenderSystem::Submit(const RawDrawBatch& batch)
     if (batch.drawFunc)
     {
         pImpl->rawDrawBatches.push_back(batch);
+        pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::RawDraw, pImpl->rawDrawBatches.size() - 1});
     }
 }
 
@@ -292,15 +329,37 @@ void RenderSystem::Flush()
     canvas->clear(Camera::GetInstance().GetProperties().clearColor);
     Camera::GetInstance().ApplyTo(canvas);
 
-    pImpl->DrawAllSpriteBatches(canvas);
-    pImpl->DrawAllTextBatches(canvas);
-    pImpl->DrawAllInstanceBatches(canvas);
-    pImpl->DrawAllRectBatches(canvas);
-    pImpl->DrawAllCircleBatches(canvas);
-    pImpl->DrawAllLineBatches(canvas);
-    pImpl->DrawAllShaderBatches(canvas);
+    for (const auto& entry : pImpl->orderedBatches)
+    {
+        switch (entry.type)
+        {
+        case RenderSystem::RenderSystemImpl::BatchType::Sprite:
+            pImpl->DrawSpriteBatch(pImpl->spriteBatches[entry.index], canvas);
+            break;
+        case RenderSystem::RenderSystemImpl::BatchType::Text:
+            pImpl->DrawTextBatch(pImpl->textBatches[entry.index], canvas);
+            break;
+        case RenderSystem::RenderSystemImpl::BatchType::Instance:
+            pImpl->DrawInstanceBatch(pImpl->instanceBatches[entry.index], canvas);
+            break;
+        case RenderSystem::RenderSystemImpl::BatchType::Rect:
+            pImpl->DrawRectBatch(pImpl->rectBatches[entry.index], canvas);
+            break;
+        case RenderSystem::RenderSystemImpl::BatchType::Circle:
+            pImpl->DrawCircleBatch(pImpl->circleBatches[entry.index], canvas);
+            break;
+        case RenderSystem::RenderSystemImpl::BatchType::Line:
+            pImpl->DrawLineBatch(pImpl->lineBatches[entry.index], canvas);
+            break;
+        case RenderSystem::RenderSystemImpl::BatchType::Shader:
+            pImpl->DrawShaderBatch(pImpl->shaderBatches[entry.index], canvas);
+            break;
+        case RenderSystem::RenderSystemImpl::BatchType::RawDraw:
+            pImpl->DrawRawDrawBatch(pImpl->rawDrawBatches[entry.index], canvas);
+            break;
+        }
+    }
     pImpl->DrawAllCursorBatches(canvas);
-    pImpl->DrawAllRawDrawBatches(canvas);
     canvas->restore();
     if (hasClip)
     {
@@ -323,9 +382,9 @@ void RenderSystem::ClearClipRect()
 }
 
 
-void RenderSystem::RenderSystemImpl::DrawAllSpriteBatches(SkCanvas* canvas)
+void RenderSystem::RenderSystemImpl::DrawSpriteBatch(const SpriteBatch& singleBatch, SkCanvas* canvas)
 {
-    if (spriteBatches.empty())
+    if (singleBatch.count == 0)
     {
         return;
     }
@@ -352,13 +411,15 @@ void RenderSystem::RenderSystemImpl::DrawAllSpriteBatches(SkCanvas* canvas)
     alignas(32) float final_x[simd_chunk_size], final_y[simd_chunk_size];
 
 
-    for (const auto& batch : spriteBatches)
-    {
+        const SpriteBatch& batch = singleBatch;
         const auto* material = batch.material;
         const auto* image = batch.image.get();
         const SkColor skColor = batch.color.toSkColor();
 
-        if (!image) continue;
+        if (!image)
+        {
+            return;
+        }
 
         const SkTileMode tileX = GetSkTileMode(batch.wrapMode);
         const SkTileMode tileY = GetSkTileMode(batch.wrapMode);
@@ -381,7 +442,10 @@ void RenderSystem::RenderSystemImpl::DrawAllSpriteBatches(SkCanvas* canvas)
             shader = batch.image->makeShader(tileX, tileY, sampling);
         }
 
-        if (!shader) continue;
+        if (!shader)
+        {
+            return;
+        }
 
         paint.setShader(std::move(shader));
 
@@ -543,12 +607,11 @@ void RenderSystem::RenderSystemImpl::DrawAllSpriteBatches(SkCanvas* canvas)
         }
 
         flushDrawCall();
-    }
 }
 
-void RenderSystem::RenderSystemImpl::DrawAllTextBatches(SkCanvas* canvas)
+void RenderSystem::RenderSystemImpl::DrawTextBatch(const TextBatch& singleBatch, SkCanvas* canvas)
 {
-    if (textBatches.empty())
+    if (!singleBatch.typeface || singleBatch.count == 0)
     {
         return;
     }
@@ -561,178 +624,104 @@ void RenderSystem::RenderSystemImpl::DrawAllTextBatches(SkCanvas* canvas)
     font.setHinting(SkFontHinting::kSlight);
 
 
-    for (const auto& batch : textBatches)
+    const TextBatch& batch = singleBatch;
+
+
+    font.setTypeface(batch.typeface);
+    font.setSize(batch.fontSize);
+    paint.setColor4f(batch.color);
+
+    const float lineHeight = font.getSpacing();
+    SkFontMetrics metrics;
+    font.getMetrics(&metrics);
+
+
+    for (size_t i = 0; i < batch.count; ++i)
     {
-        if (!batch.typeface || batch.count == 0)
+        const auto& transform = batch.transforms[i];
+        const std::string& textBlock = batch.texts[i];
+
+        auto lines = splitStringByNewline(textBlock);
+        if (lines.empty())
         {
             continue;
         }
 
 
-        font.setTypeface(batch.typeface);
-        font.setSize(batch.fontSize);
-        paint.setColor4f(batch.color);
+        SkMatrix textMatrix;
+        textMatrix.setAll(
+            transform.cosR * transform.scaleX, -transform.sinR * transform.scaleX, transform.position.fX,
+            transform.sinR * transform.scaleY, transform.cosR * transform.scaleY, transform.position.fY,
+            0, 0, 1
+        );
 
-        const float lineHeight = font.getSpacing();
-        SkFontMetrics metrics;
-        font.getMetrics(&metrics);
 
+        float totalBlockHeight = (lines.size() - 1) * lineHeight - metrics.fAscent + metrics.fDescent;
+        float initialYOffset = 0;
+        const TextAlignment alignment = static_cast<TextAlignment>(batch.alignment);
 
-        for (size_t i = 0; i < batch.count; ++i)
+        switch (alignment)
         {
-            const auto& transform = batch.transforms[i];
-            const std::string& textBlock = batch.texts[i];
-
-            auto lines = splitStringByNewline(textBlock);
-            if (lines.empty())
-            {
-                continue;
-            }
-
-
-            SkMatrix textMatrix;
-            textMatrix.setAll(
-                transform.cosR * transform.scaleX, -transform.sinR * transform.scaleX, transform.position.fX,
-                transform.sinR * transform.scaleY, transform.cosR * transform.scaleY, transform.position.fY,
-                0, 0, 1
-            );
-
-
-            float totalBlockHeight = (lines.size() - 1) * lineHeight - metrics.fAscent + metrics.fDescent;
-            float initialYOffset = 0;
-            const TextAlignment alignment = static_cast<TextAlignment>(batch.alignment);
-
-            switch (alignment)
-            {
-            case TextAlignment::TopLeft:
-            case TextAlignment::TopCenter:
-            case TextAlignment::TopRight:
-                initialYOffset = -metrics.fAscent;
-                break;
-            case TextAlignment::MiddleLeft:
-            case TextAlignment::MiddleCenter:
-            case TextAlignment::MiddleRight:
-                initialYOffset = -totalBlockHeight / 2.0f - metrics.fAscent;
-                break;
-            case TextAlignment::BottomLeft:
-            case TextAlignment::BottomCenter:
-            case TextAlignment::BottomRight:
-                initialYOffset = -totalBlockHeight - metrics.fAscent;
-                break;
-            }
-
-
-            canvas->save();
-            canvas->concat(textMatrix);
-
-            for (size_t j = 0; j < lines.size(); ++j)
-            {
-                const std::string& line = lines[j];
-                if (line.empty()) continue;
-
-                SkPoint alignmentOffset = calculateTextAlignmentOffset(line, font, alignment);
-
-
-                canvas->drawString(line.c_str(),
-                                   alignmentOffset.fX,
-                                   initialYOffset + j * lineHeight,
-                                   font,
-                                   paint);
-            }
-
-            canvas->restore();
+        case TextAlignment::TopLeft:
+        case TextAlignment::TopCenter:
+        case TextAlignment::TopRight:
+            initialYOffset = -metrics.fAscent;
+            break;
+        case TextAlignment::MiddleLeft:
+        case TextAlignment::MiddleCenter:
+        case TextAlignment::MiddleRight:
+            initialYOffset = -totalBlockHeight / 2.0f - metrics.fAscent;
+            break;
+        case TextAlignment::BottomLeft:
+        case TextAlignment::BottomCenter:
+        case TextAlignment::BottomRight:
+            initialYOffset = -totalBlockHeight - metrics.fAscent;
+            break;
         }
+
+
+        canvas->save();
+        canvas->concat(textMatrix);
+
+        for (size_t j = 0; j < lines.size(); ++j)
+        {
+            const std::string& line = lines[j];
+            if (line.empty()) continue;
+
+            SkPoint alignmentOffset = calculateTextAlignmentOffset(line, font, alignment);
+
+
+            canvas->drawString(line.c_str(),
+                               alignmentOffset.fX,
+                               initialYOffset + j * lineHeight,
+                               font,
+                               paint);
+        }
+
+        canvas->restore();
     }
 }
 
 
-struct InstanceGroupKey
+void RenderSystem::RenderSystemImpl::DrawInstanceBatch(const InstanceBatch& batch, SkCanvas* canvas)
 {
-    const SkImage* image;
-    SkColor color;
-
-    bool operator==(const InstanceGroupKey& other) const
-    {
-        return image == other.image && color == other.color;
-    }
-};
-
-
-struct InstanceGroupKeyHash
-{
-    std::size_t operator()(const InstanceGroupKey& key) const
-    {
-        const auto hash1 = std::hash<const SkImage*>{}(key.image);
-        const auto hash2 = std::hash<SkColor>{}(key.color);
-        return hash1 ^ (hash2 << 1);
-    }
-};
-
-
-void RenderSystem::RenderSystemImpl::DrawAllInstanceBatches(SkCanvas* canvas)
-{
-    if (instanceBatches.empty())
+    if (batch.count == 0 || !batch.atlasImage)
     {
         return;
     }
-
-
-    std::unordered_map<InstanceGroupKey, std::vector<const InstanceBatch*>, InstanceGroupKeyHash> groupedBatches;
-    for (const auto& batch : instanceBatches)
-    {
-        groupedBatches[{batch.atlasImage.get(), batch.color.toSkColor()}].push_back(&batch);
-    }
-
 
     rsxforms.clear();
     texRects.clear();
 
     SkPaint paint;
-    SkSamplingOptions sampling(SkFilterMode::kLinear);
+    paint.setColor4f(batch.color);
+    SkSamplingOptions sampling(GetSkFilterMode(batch.filterQuality), GetSkMipmapMode(batch.filterQuality));
 
-    for (const auto& [key, batches] : groupedBatches)
+    auto atlasImage = batch.atlasImage;
+
+    for (size_t i = 0; i < batch.count; ++i)
     {
-        auto atlasImage = sk_ref_sp(key.image);
-        paint.setColor(key.color);
-
-        for (const auto* batch : batches)
-        {
-            for (size_t i = 0; i < batch->count; ++i)
-            {
-                if (rsxforms.size() >= maxPrimitivesPerBatch) [[unlikely]]
-                {
-                    canvas->drawAtlas(atlasImage.get(), rsxforms, texRects, {},
-                                      SkBlendMode::kModulate, sampling,
-                                      nullptr, &paint);
-                    rsxforms.clear();
-                    texRects.clear();
-                }
-
-                const auto& transform = batch->transforms[i];
-                const auto& srcRect = batch->sourceRects[i];
-
-                const float s = transform.sinR;
-                const float c = transform.cosR;
-
-                const float effectiveScale = (transform.scaleX + transform.scaleY) * 0.5f;
-
-                const SkScalar sc = effectiveScale * c;
-                const SkScalar ss = effectiveScale * s;
-
-                const float centerX = srcRect.centerX();
-                const float centerY = srcRect.centerY();
-
-
-                const SkScalar tx = transform.position.fX - (sc * centerX - ss * centerY);
-                const SkScalar ty = transform.position.fY - (ss * centerX + sc * centerY);
-
-                rsxforms.push_back(SkRSXform::Make(sc, ss, tx, ty));
-                texRects.push_back(srcRect);
-            }
-        }
-
-
-        if (!rsxforms.empty())
+        if (rsxforms.size() >= maxPrimitivesPerBatch) [[unlikely]]
         {
             canvas->drawAtlas(atlasImage.get(), rsxforms, texRects, {},
                               SkBlendMode::kModulate, sampling,
@@ -740,13 +729,42 @@ void RenderSystem::RenderSystemImpl::DrawAllInstanceBatches(SkCanvas* canvas)
             rsxforms.clear();
             texRects.clear();
         }
+
+        const auto& transform = batch.transforms[i];
+        const auto& srcRect = batch.sourceRects[i];
+
+        const float s = transform.sinR;
+        const float c = transform.cosR;
+
+        const float effectiveScale = (transform.scaleX + transform.scaleY) * 0.5f;
+
+        const SkScalar sc = effectiveScale * c;
+        const SkScalar ss = effectiveScale * s;
+
+        const float centerX = srcRect.centerX();
+        const float centerY = srcRect.centerY();
+
+        const SkScalar tx = transform.position.fX - (sc * centerX - ss * centerY);
+        const SkScalar ty = transform.position.fY - (ss * centerX + sc * centerY);
+
+        rsxforms.push_back(SkRSXform::Make(sc, ss, tx, ty));
+        texRects.push_back(srcRect);
+    }
+
+    if (!rsxforms.empty())
+    {
+        canvas->drawAtlas(atlasImage.get(), rsxforms, texRects, {},
+                          SkBlendMode::kModulate, sampling,
+                          nullptr, &paint);
+        rsxforms.clear();
+        texRects.clear();
     }
 }
 
 
-void RenderSystem::RenderSystemImpl::DrawAllRectBatches(SkCanvas* canvas)
+void RenderSystem::RenderSystemImpl::DrawRectBatch(const RectBatch& singleBatch, SkCanvas* canvas)
 {
-    if (rectBatches.empty()) return;
+    if (singleBatch.count == 0) return;
 
     SkPaint paint;
     paint.setStyle(SkPaint::kFill_Style);
@@ -756,8 +774,7 @@ void RenderSystem::RenderSystemImpl::DrawAllRectBatches(SkCanvas* canvas)
     colors.clear();
     indices.clear();
 
-    for (const auto& batch : rectBatches)
-    {
+        const RectBatch& batch = singleBatch;
         paint.setColor4f(batch.color, nullptr);
         SkColor skColor = paint.getColor();
 
@@ -802,7 +819,6 @@ void RenderSystem::RenderSystemImpl::DrawAllRectBatches(SkCanvas* canvas)
             indices.push_back(baseVertex + 2);
             indices.push_back(baseVertex + 3);
         }
-    }
 
     if (!positions.empty())
     {
@@ -814,94 +830,75 @@ void RenderSystem::RenderSystemImpl::DrawAllRectBatches(SkCanvas* canvas)
 }
 
 
-void RenderSystem::RenderSystemImpl::DrawAllCircleBatches(SkCanvas* canvas)
+void RenderSystem::RenderSystemImpl::DrawCircleBatch(const CircleBatch& singleBatch, SkCanvas* canvas)
 {
-    if (circleBatches.empty()) return;
+    if (singleBatch.count == 0) return;
     SkPaint paint;
     paint.setStyle(SkPaint::kFill_Style);
     paint.setAntiAlias(true);
-    for (const auto& batch : circleBatches)
+    paint.setColor4f(singleBatch.color, nullptr);
+    for (size_t i = 0; i < singleBatch.count; ++i)
     {
-        paint.setColor4f(batch.color, nullptr);
-        for (size_t i = 0; i < batch.count; ++i)
-        {
-            canvas->drawCircle(batch.centers[i], batch.radius, paint);
-        }
+        canvas->drawCircle(singleBatch.centers[i], singleBatch.radius, paint);
     }
 }
 
 
-void RenderSystem::RenderSystemImpl::DrawAllLineBatches(SkCanvas* canvas)
+void RenderSystem::RenderSystemImpl::DrawLineBatch(const LineBatch& singleBatch, SkCanvas* canvas)
 {
-    if (lineBatches.empty()) return;
+    if (singleBatch.pointCount < 2) return;
     SkPaint paint;
     paint.setStyle(SkPaint::kStroke_Style);
     paint.setAntiAlias(true);
-    for (const auto& batch : lineBatches)
-    {
-        if (batch.pointCount % 2 != 0) continue;
-        paint.setColor4f(batch.color, nullptr);
-        paint.setStrokeWidth(batch.width);
-        canvas->drawPoints(
-            SkCanvas::kLines_PointMode,
-            SkSpan<const SkPoint>(batch.points, batch.pointCount),
-            paint
-        );
-    }
+    if (singleBatch.pointCount % 2 != 0) return;
+    paint.setColor4f(singleBatch.color, nullptr);
+    paint.setStrokeWidth(singleBatch.width);
+    canvas->drawPoints(
+        SkCanvas::kLines_PointMode,
+        SkSpan<const SkPoint>(singleBatch.points, singleBatch.pointCount),
+        paint
+    );
 }
 
 
-void RenderSystem::RenderSystemImpl::DrawAllShaderBatches(SkCanvas* canvas)
+void RenderSystem::RenderSystemImpl::DrawShaderBatch(const ShaderBatch& batch, SkCanvas* canvas)
 {
-    if (shaderBatches.empty())
+    if (!batch.material || !batch.material->effect)
     {
         return;
-    }
-
-    std::unordered_map<const Material*, std::vector<const ShaderBatch*>> groupedBatches;
-    for (const auto& batch : shaderBatches)
-    {
-        groupedBatches[batch.material].push_back(&batch);
     }
 
     SkPaint paint;
 
     paint.setBlendMode(SkBlendMode::kSrc);
-
-    for (const auto& [material, batches] : groupedBatches)
+    SkRuntimeShaderBuilder builder(batch.material->effect);
+    for (const auto& [name, value] : batch.material->uniforms)
     {
-        SkRuntimeShaderBuilder builder(material->effect);
-        for (const auto& [name, value] : material->uniforms)
-        {
-            std::visit(UniformSetter{builder, name}, value);
-        }
-
-        sk_sp<SkShader> shader = builder.makeShader();
-        if (!shader)
-        {
-            continue;
-        }
-        paint.setShader(std::move(shader));
-
-        for (const auto* batch : batches)
-        {
-            const auto& transform = batch->transform;
-            const auto& size = batch->size;
-
-            const SkRect localRect = SkRect::MakeXYWH(-size.width() * 0.5f,
-                                                      -size.height() * 0.5f,
-                                                      size.width(),
-                                                      size.height());
-            canvas->save();
-            canvas->translate(transform.position.fX, transform.position.fY);
-            canvas->rotate(SkRadiansToDegrees(transform.rotation));
-            canvas->scale(transform.scale.x(), transform.scale.y());
-
-            canvas->drawRect(localRect, paint);
-
-            canvas->restore();
-        }
+        std::visit(UniformSetter{builder, name}, value);
     }
+
+    sk_sp<SkShader> shader = builder.makeShader();
+    if (!shader)
+    {
+        return;
+    }
+    paint.setShader(std::move(shader));
+
+    const auto& transform = batch.transform;
+    const auto& size = batch.size;
+
+    const SkRect localRect = SkRect::MakeXYWH(-size.width() * 0.5f,
+                                              -size.height() * 0.5f,
+                                              size.width(),
+                                              size.height());
+    canvas->save();
+    canvas->translate(transform.position.fX, transform.position.fY);
+    canvas->rotate(SkRadiansToDegrees(transform.rotation));
+    canvas->scale(transform.scale.x(), transform.scale.y());
+
+    canvas->drawRect(localRect, paint);
+
+    canvas->restore();
 }
 
 void RenderSystem::RenderSystemImpl::DrawAllCursorBatches(SkCanvas* canvas)
@@ -971,14 +968,8 @@ void RenderSystem::RenderSystemImpl::DrawAllCursorBatches(SkCanvas* canvas)
     flushCursorDrawCall();
 }
 
-void RenderSystem::RenderSystemImpl::DrawAllRawDrawBatches(SkCanvas* canvas)
+void RenderSystem::RenderSystemImpl::DrawRawDrawBatch(const RawDrawBatch& batch, SkCanvas* canvas)
 {
-    if (rawDrawBatches.empty()) return;
-    for (const auto& batch : rawDrawBatches)
-    {
-        if (batch.drawFunc)
-        {
-            batch.drawFunc(canvas);
-        }
-    }
+    if (!batch.drawFunc) return;
+    batch.drawFunc(canvas);
 }

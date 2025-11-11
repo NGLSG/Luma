@@ -15,13 +15,7 @@
 
 namespace
 {
-    /**
-     * @brief 将屏幕坐标转换为世界坐标（居中模式）
-     * @param globalScreenPos 全局屏幕坐标
-     * @param cameraProps 相机属性
-     * @param viewport 视口矩形
-     * @return 世界坐标
-     */
+    
     static ECS::Vector2f screenToWorldCentered(const ECS::Vector2f& globalScreenPos,
                                                const Camera::CamProperties& cameraProps,
                                                const ECS::RectF& viewport)
@@ -29,28 +23,22 @@ namespace
         const float localX = globalScreenPos.x - viewport.x;
         const float localY = globalScreenPos.y - viewport.y;
 
-        // 转换到以视口中心为原点的坐标系
+        
         const float centeredX = localX - (viewport.z / 2.0f);
         const float centeredY = localY - (viewport.w / 2.0f);
 
-        // 逆向缩放（考虑相机缩放）
+        
         const float unzoomedX = centeredX / cameraProps.zoom;
         const float unzoomedY = centeredY / cameraProps.zoom;
 
-        // 转换到世界坐标
+        
         const float worldX = unzoomedX + cameraProps.position.x();
         const float worldY = unzoomedY + cameraProps.position.y();
 
         return {worldX, worldY};
     }
 
-    /**
-     * @brief 检查点是否在精灵内部
-     * @param worldPoint 世界坐标点
-     * @param transform 变换组件
-     * @param sprite 精灵组件
-     * @return 如果点在精灵内部返回true
-     */
+    
     static bool isPointInSprite(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
                                 const ECS::SpriteComponent& sprite)
     {
@@ -65,7 +53,7 @@ namespace
 
         if (halfWidth <= 0 || halfHeight <= 0) return false;
 
-        // 转换到局部坐标
+        
         ECS::Vector2f localPoint = worldPoint - transform.position;
         if (transform.rotation != 0.0f)
         {
@@ -78,18 +66,12 @@ namespace
         localPoint.x /= transform.scale.x;
         localPoint.y /= transform.scale.y;
 
-        // 边界检测
+        
         return (localPoint.x >= -halfWidth && localPoint.x <= halfWidth &&
             localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
     }
 
-    /**
-     * @brief 检查点是否在矩形UI内部
-     * @param worldPoint 世界坐标点
-     * @param transform 变换组件
-     * @param size UI尺寸
-     * @return 如果点在UI内部返回true
-     */
+    
     static bool isPointInRectUI(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
                                 const ECS::Vector2f& size)
     {
@@ -98,7 +80,7 @@ namespace
 
         if (halfWidth <= 0 || halfHeight <= 0) return false;
 
-        // 转换到局部坐标
+        
         ECS::Vector2f localPoint = worldPoint - transform.position;
         if (transform.rotation != 0.0f)
         {
@@ -111,7 +93,7 @@ namespace
         localPoint.x /= transform.scale.x;
         localPoint.y /= transform.scale.y;
 
-        // 边界检测
+        
         return (localPoint.x >= -halfWidth && localPoint.x <= halfWidth &&
             localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
     }
@@ -134,20 +116,20 @@ namespace Systems
     {
         auto& registry = scene->GetRegistry();
 
-        // 清除上一帧的交互事件
+        
         registry.clear<PointerEnterEvent, PointerExitEvent, PointerDownEvent, PointerUpEvent, PointerClickEvent>();
 
-        // 编辑器模式下不处理交互
+        
         if (context.appMode == ApplicationMode::Editor)
         {
             return;
         }
 
 #if defined(SDL_PLATFORM_ANDROID) || defined(SDL_PLATFORM_IOS)
-        // 移动平台使用多点触摸
+        
         handleMultiTouchEvents(scene, context);
 #else
-        // 桌面平台使用鼠标
+        
         ECS::Vector2f worldMousePos;
         bool canInteract = false;
 
@@ -156,18 +138,18 @@ namespace Systems
         auto cameraProps = scene->GetCameraProperties();
         ECS::RectF viewportRect;
 
-        // 确定视口区域
+        
         if (context.appMode == ApplicationMode::PIE)
         {
             viewportRect = context.sceneViewRect;
-            // 检查鼠标是否在视口内
+            
             if (globalMousePos.x >= viewportRect.x && globalMousePos.x <= (viewportRect.x + viewportRect.z) &&
                 globalMousePos.y >= viewportRect.y && globalMousePos.y <= (viewportRect.y + viewportRect.w))
             {
                 canInteract = true;
             }
         }
-        else // Runtime模式
+        else 
         {
             viewportRect = {0.0f, 0.0f, cameraProps.viewport.width(), cameraProps.viewport.height()};
             canInteract = true;
@@ -191,7 +173,7 @@ namespace Systems
     {
         std::vector<std::pair<entt::entity, int>> candidates;
 
-        // 检查所有UI组件（按钮、输入框等）
+        
         auto buttonView = registry.view<ECS::TransformComponent, ECS::ButtonComponent>();
         for (auto entity : buttonView)
         {
@@ -384,11 +366,11 @@ namespace Systems
             }
         }
 
-        // 检查精灵组件
+        
         auto spriteView = registry.view<ECS::TransformComponent, ECS::SpriteComponent>();
         for (auto entity : spriteView)
         {
-            // 跳过已经作为UI组件处理的实体
+            
             if (registry.any_of<ECS::ButtonComponent, ECS::InputTextComponent, ECS::ToggleButtonComponent,
                                 ECS::RadioButtonComponent, ECS::CheckBoxComponent, ECS::SliderComponent,
                                 ECS::ComboBoxComponent,
@@ -413,14 +395,14 @@ namespace Systems
             return entt::null;
         }
 
-        // 按zIndex排序，选择最顶层的实体
+        
         std::ranges::sort(candidates, [](const auto& a, const auto& b)
         {
             if (a.second != b.second)
             {
-                return a.second > b.second; // zIndex高的在前
+                return a.second > b.second; 
             }
-            return a.first > b.first; // 相同zIndex时按实体ID排序
+            return a.first > b.first; 
         });
 
         return candidates[0].first;
@@ -431,12 +413,12 @@ namespace Systems
     {
         if (currentHoveredEntity != previousHoveredEntity)
         {
-            // 触发退出事件
+            
             if (registry.valid(previousHoveredEntity))
             {
                 registry.emplace<PointerExitEvent>(previousHoveredEntity);
             }
-            // 触发进入事件
+            
             if (registry.valid(currentHoveredEntity))
             {
                 registry.emplace<PointerEnterEvent>(currentHoveredEntity);
@@ -448,7 +430,7 @@ namespace Systems
     {
         bool isLeftMouseDownThisFrame = inputState.isLeftMouseDown;
 
-        // 鼠标按下
+        
         if (isLeftMouseDownThisFrame && !m_wasLeftMouseDownLastFrame)
         {
             if (registry.valid(m_hoveredEntity))
@@ -457,7 +439,7 @@ namespace Systems
                 m_pressedEntity = m_hoveredEntity;
             }
         }
-        // 鼠标抬起
+        
         else if (!isLeftMouseDownThisFrame && m_wasLeftMouseDownLastFrame)
         {
             if (registry.valid(m_pressedEntity))
@@ -465,7 +447,7 @@ namespace Systems
                 registry.emplace<PointerUpEvent>(m_pressedEntity);
             }
 
-            // 如果抬起时仍在同一个实体上，触发点击事件
+            
             if (registry.valid(m_hoveredEntity) && m_hoveredEntity == m_pressedEntity)
             {
                 registry.emplace<PointerClickEvent>(m_hoveredEntity);
@@ -483,41 +465,41 @@ namespace Systems
         auto& registry = scene->GetRegistry();
         auto cameraProps = scene->GetCameraProperties();
 
-        // 获取窗口尺寸
+        
         int windowWidth, windowHeight;
         SDL_GetWindowSizeInPixels(context.window->GetSdlWindow(), &windowWidth, &windowHeight);
 
         ECS::RectF viewportRect = {0.0f, 0.0f, (float)windowWidth, (float)windowHeight};
 
-        // 获取当前活动的触摸点
+        
         const auto& activeTouches = context.window->GetActiveTouches();
 
-        // 处理新的触摸点和更新现有触摸点
+        
         for (const auto& [fingerId, touchPoint] : activeTouches)
         {
-            // 将归一化坐标转换为像素坐标
+            
             ECS::Vector2f screenPos = {
                 touchPoint.x * windowWidth,
                 touchPoint.y * windowHeight
             };
 
-            // 转换为世界坐标
+            
             ECS::Vector2f worldPos = screenToWorldCentered(screenPos, cameraProps, viewportRect);
 
-            // 执行拾取
+            
             entt::entity pickedEntity = performGeometricPicking(registry, worldPos);
 
-            // 查找或创建触摸点信息
+            
             auto it = m_touchPoints.find(fingerId);
             if (it == m_touchPoints.end())
             {
-                // 新触摸点
+                
                 TouchPointInfo info;
                 info.position = worldPos;
                 info.hoveredEntity = pickedEntity;
                 info.pressedEntity = entt::null;
 
-                // 触发进入事件
+                
                 if (registry.valid(pickedEntity))
                 {
                     registry.emplace<PointerEnterEvent>(pickedEntity);
@@ -529,22 +511,22 @@ namespace Systems
             }
             else
             {
-                // 已存在的触摸点
+                
                 TouchPointInfo& info = it->second;
                 entt::entity previousHoveredEntity = info.hoveredEntity;
 
-                // 更新位置
+                
                 info.position = worldPos;
 
-                // 检查悬停实体是否改变
+                
                 if (pickedEntity != previousHoveredEntity)
                 {
-                    // 触发退出事件
+                    
                     if (registry.valid(previousHoveredEntity))
                     {
                         registry.emplace<PointerExitEvent>(previousHoveredEntity);
 
-                        // 如果这是被按下的实体，也触发抬起事件
+                        
                         if (previousHoveredEntity == info.pressedEntity)
                         {
                             registry.emplace<PointerUpEvent>(previousHoveredEntity);
@@ -552,7 +534,7 @@ namespace Systems
                         }
                     }
 
-                    // 触发进入事件
+                    
                     if (registry.valid(pickedEntity))
                     {
                         registry.emplace<PointerEnterEvent>(pickedEntity);
@@ -563,26 +545,26 @@ namespace Systems
             }
         }
 
-        // 处理已抬起的触摸点
+        
         std::vector<SDL_FingerID> fingersToRemove;
         for (const auto& [fingerId, info] : m_touchPoints)
         {
-            // 如果触摸点不在活动列表中，说明已抬起
+            
             if (activeTouches.find(fingerId) == activeTouches.end())
             {
-                // 触发抬起事件
+                
                 if (registry.valid(info.pressedEntity))
                 {
                     registry.emplace<PointerUpEvent>(info.pressedEntity);
 
-                    // 如果抬起时仍在同一实体上，触发点击事件
+                    
                     if (info.hoveredEntity == info.pressedEntity)
                     {
                         registry.emplace<PointerClickEvent>(info.pressedEntity);
                     }
                 }
 
-                // 触发退出事件
+                
                 if (registry.valid(info.hoveredEntity))
                 {
                     registry.emplace<PointerExitEvent>(info.hoveredEntity);
@@ -592,7 +574,7 @@ namespace Systems
             }
         }
 
-        // 移除已抬起的触摸点
+        
         for (SDL_FingerID fingerId : fingersToRemove)
         {
             m_touchPoints.erase(fingerId);

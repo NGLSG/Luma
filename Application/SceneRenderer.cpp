@@ -7,6 +7,8 @@
 #include "../Components/RelationshipComponent.h"
 #include <algorithm>
 #include <cmath>
+#include <functional>
+#include <unordered_map>
 
 #include "Profiler.h"
 #include "RenderableManager.h"
@@ -69,6 +71,43 @@ namespace
 
         return SkSize::Make(maxWidth, totalHeight);
     }
+
+    void BuildHierarchyDrawOrder(const sk_sp<RuntimeScene>& scene,
+                                 std::unordered_map<entt::entity, uint64_t>& outOrder)
+    {
+        if (!scene)
+        {
+            return;
+        }
+
+        RuntimeScene* scenePtr = scene.get();
+        uint64_t orderCounter = 0;
+
+        std::function<void(RuntimeGameObject&)> traverse = [&](RuntimeGameObject& go)
+        {
+            if (!go.IsValid()) return;
+            outOrder[go.GetEntityHandle()] = orderCounter++;
+
+            if (go.HasComponent<ECS::ChildrenComponent>())
+            {
+                const auto& children = go.GetComponent<ECS::ChildrenComponent>().children;
+                for (auto it = children.rbegin(); it != children.rend(); ++it)
+                {
+                    RuntimeGameObject child(*it, scenePtr);
+                    traverse(child);
+                }
+            }
+        };
+
+        auto& roots = scene->GetRootGameObjects();
+        for (auto it = roots.rbegin(); it != roots.rend(); ++it)
+        {
+            if (it->IsValid())
+            {
+                traverse(*it);
+            }
+        }
+    }
 }
 
 void SceneRenderer::Extract(entt::registry& registry, std::vector<RenderPacket>& outQueue)
@@ -91,6 +130,19 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
 {
     PROFILE_SCOPE("SceneRenderer::ExtractToRenderableManager - Total");
 
+    sk_sp<RuntimeScene> currentScene = SceneManager::GetInstance().GetCurrentScene();
+    std::unordered_map<entt::entity, uint64_t> hierarchyOrder;
+    BuildHierarchyDrawOrder(currentScene, hierarchyOrder);
+    uint64_t fallbackOrder = hierarchyOrder.size();
+    auto getSortKey = [&](entt::entity entity) -> uint64_t
+    {
+        if (auto it = hierarchyOrder.find(entity); it != hierarchyOrder.end())
+        {
+            return it->second;
+        }
+        return fallbackOrder++;
+    };
+
     std::vector<Renderable> renderables;
 
     PROFILE_SCOPE("SceneRenderer::ExtractToRenderableManager - Sprite Processing");
@@ -98,7 +150,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         auto view = registry.view<const ECS::TransformComponent, const ECS::SpriteComponent>();
         for (auto entity : view)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive())
                 continue;
 
             const auto& transform = view.get<const ECS::TransformComponent>(entity);
@@ -125,6 +177,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = sprite.zIndex,
+                .sortKey = getSortKey(entity),
                 .transform = adjustedTransform,
                 .data = SpriteRenderData{
                     .image = sprite.image->getImage().get(),
@@ -145,7 +198,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                                   ECS::TilemapRendererComponent>();
         for (auto entity : view)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive())
                 continue;
 
             const auto& tilemapTransform = view.get<const ECS::TransformComponent>(entity);
@@ -197,6 +250,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                         renderables.emplace_back(Renderable{
                             .entityId = entity,
                             .zIndex = renderer.zIndex,
+                            .sortKey = getSortKey(entity),
                             .transform = tileTransform,
                             .data = SpriteRenderData{
                                 .image = hydratedTile.image->getImage().get(),
@@ -218,7 +272,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
     {
         auto processTextView = [&](auto& view, auto getTextComponent, auto entity)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive())
                 return;
 
             const auto& transform = view.template get<const ECS::TransformComponent>(entity);
@@ -234,6 +288,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = textData.zIndex,
+                .sortKey = getSortKey(entity),
                 .transform = adjustedTransform,
                 .data = TextRenderData{
                     .typeface = textData.typeface.get(),
@@ -260,7 +315,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         auto buttonView = registry.view<const ECS::TransformComponent, const ECS::ButtonComponent>();
         for (auto entity : buttonView)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive())
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive())
                 continue;
 
             const auto& transform = buttonView.get<const ECS::TransformComponent>(entity);
@@ -275,6 +330,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = button.zIndex,
+                .sortKey = getSortKey(entity),
                 .transform = transform,
                 .data = RawButtonRenderData{
                     .rect = button.rect,
@@ -292,7 +348,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         auto inputTextView = registry.view<const ECS::TransformComponent, const ECS::InputTextComponent>();
         for (auto entity : inputTextView)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive()) continue;
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
 
             const auto& transform = inputTextView.get<const ECS::TransformComponent>(entity);
             const auto& inputText = inputTextView.get<const ECS::InputTextComponent>(entity);
@@ -309,6 +365,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = inputText.zIndex,
+                .sortKey = getSortKey(entity),
                 .transform = transform,
                 .data = RawInputTextRenderData{
                     .rect = inputText.rect,
@@ -333,7 +390,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         auto toggleView = registry.view<const ECS::TransformComponent, const ECS::ToggleButtonComponent>();
         for (auto entity : toggleView)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive()) continue;
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
 
             const auto& transform = toggleView.get<const ECS::TransformComponent>(entity);
             const auto& toggle = toggleView.get<const ECS::ToggleButtonComponent>(entity);
@@ -346,6 +403,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = toggle.zIndex,
+                .sortKey = getSortKey(entity),
                 .transform = transform,
                 .data = RawToggleButtonRenderData{
                     .rect = toggle.rect,
@@ -367,7 +425,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         auto radioView = registry.view<const ECS::TransformComponent, const ECS::RadioButtonComponent>();
         for (auto entity : radioView)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive()) continue;
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
 
             const auto& transform = radioView.get<const ECS::TransformComponent>(entity);
             const auto& radio = radioView.get<const ECS::RadioButtonComponent>(entity);
@@ -385,6 +443,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = radio.zIndex,
+                .sortKey = getSortKey(entity),
                 .transform = transform,
                 .data = RawRadioButtonRenderData{
                     .rect = radio.rect,
@@ -406,7 +465,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         auto checkBoxView = registry.view<const ECS::TransformComponent, const ECS::CheckBoxComponent>();
         for (auto entity : checkBoxView)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive()) continue;
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
 
             const auto& transform = checkBoxView.get<const ECS::TransformComponent>(entity);
             const auto& checkBox = checkBoxView.get<const ECS::CheckBoxComponent>(entity);
@@ -425,6 +484,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = checkBox.zIndex,
+                .sortKey = getSortKey(entity),
                 .transform = transform,
                 .data = RawCheckBoxRenderData{
                     .rect = checkBox.rect,
@@ -448,7 +508,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         auto sliderView = registry.view<const ECS::TransformComponent, const ECS::SliderComponent>();
         for (auto entity : sliderView)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive()) continue;
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
 
             const auto& transform = sliderView.get<const ECS::TransformComponent>(entity);
             const auto& slider = sliderView.get<const ECS::SliderComponent>(entity);
@@ -467,6 +527,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = slider.zIndex,
+                .sortKey = getSortKey(entity),
                 .transform = transform,
                 .data = RawSliderRenderData{
                     .rect = slider.rect,
@@ -488,7 +549,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         auto comboView = registry.view<const ECS::TransformComponent, const ECS::ComboBoxComponent>();
         for (auto entity : comboView)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive()) continue;
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
 
             const auto& transform = comboView.get<const ECS::TransformComponent>(entity);
             const auto& combo = comboView.get<const ECS::ComboBoxComponent>(entity);
@@ -505,6 +566,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = combo.zIndex,
+                .sortKey = getSortKey(entity),
                 .transform = transform,
                 .data = RawComboBoxRenderData{
                     .rect = combo.rect,
@@ -529,7 +591,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         auto expanderView = registry.view<const ECS::TransformComponent, const ECS::ExpanderComponent>();
         for (auto entity : expanderView)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive()) continue;
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
 
             const auto& transform = expanderView.get<const ECS::TransformComponent>(entity);
             const auto& expander = expanderView.get<const ECS::ExpanderComponent>(entity);
@@ -543,6 +605,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = expander.zIndex,
+                .sortKey = getSortKey(entity),
                 .transform = transform,
                 .data = RawExpanderRenderData{
                     .rect = expander.rect,
@@ -561,7 +624,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         auto progressView = registry.view<const ECS::TransformComponent, const ECS::ProgressBarComponent>();
         for (auto entity : progressView)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive()) continue;
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
 
             const auto& transform = progressView.get<const ECS::TransformComponent>(entity);
             const auto& progress = progressView.get<const ECS::ProgressBarComponent>(entity);
@@ -577,6 +640,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = progress.zIndex,
+                .sortKey = getSortKey(entity),
                 .transform = transform,
                 .data = RawProgressBarRenderData{
                     .rect = progress.rect,
@@ -598,7 +662,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         auto tabView = registry.view<const ECS::TransformComponent, const ECS::TabControlComponent>();
         for (auto entity : tabView)
         {
-            if (!SceneManager::GetInstance().GetCurrentScene()->FindGameObjectByEntity(entity).IsActive()) continue;
+            if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
 
             const auto& transform = tabView.get<const ECS::TransformComponent>(entity);
             const auto& tabControl = tabView.get<const ECS::TabControlComponent>(entity);
@@ -616,6 +680,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = tabControl.zIndex,
+                .sortKey = getSortKey(entity),
                 .transform = transform,
                 .data = RawTabControlRenderData{
                     .rect = tabControl.rect,
@@ -635,7 +700,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             });
         }
 
-        if (auto currentScene = SceneManager::GetInstance().GetCurrentScene())
+        if (currentScene)
         {
             auto listBoxView = registry.view<const ECS::TransformComponent, const ECS::ListBoxComponent>();
             for (auto entity : listBoxView)
@@ -679,6 +744,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 renderables.emplace_back(Renderable{
                     .entityId = entity,
                     .zIndex = listBox.zIndex,
+                    .sortKey = getSortKey(entity),
                     .transform = transform,
                     .data = RawListBoxRenderData{
                         .rect = listBox.rect,

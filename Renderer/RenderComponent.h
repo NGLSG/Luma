@@ -317,6 +317,7 @@ struct RawDrawBatch
 struct RenderPacket
 {
     int zIndex = 0; ///< 渲染顺序的Z-index值。
+    uint64_t sortKey = 0; ///< 同层级下的稳定排序键。
 
     std::variant<
         SpriteBatch,

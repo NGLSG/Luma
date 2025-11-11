@@ -387,6 +387,7 @@ public:
         std::vector<RenderableTransform> transforms; ///< 变换组件列表。
         SkRect sourceRect; ///< 源矩形。
         int zIndex; ///< Z轴深度索引。
+        uint64_t sortKey = 0; ///< 渲染顺序的层级键。
         int filterQuality; ///< 过滤质量。
         int wrapMode; ///< 环绕模式。
         float ppuScaleFactor; ///< 每像素单位缩放因子。

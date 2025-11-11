@@ -50,7 +50,7 @@ bool RuntimeGameObject::operator==(const RuntimeGameObject& other) const
     return m_entityHandle == other.m_entityHandle && m_scene == other.m_scene;
 }
 
-bool RuntimeGameObject::IsValid()
+bool RuntimeGameObject::IsValid() const
 {
     return m_scene != nullptr && m_scene->GetRegistry().valid(m_entityHandle);
 }

@@ -312,13 +312,13 @@ namespace
                 {
                     if (!canvas) return;
 
-                    // 应用transform
+                    
                     canvas->save();
                     canvas->translate(trans.position.x, trans.position.y);
                     canvas->rotate(SkRadiansToDegrees(trans.rotation));
                     canvas->scale(trans.scale.x, trans.scale.y);
 
-                    // 在局部空间中绘制
+                    
                     ECS::RectF localRect = data.rect;
                     localRect.x = -data.rect.Width() * 0.5f;
                     localRect.y = -data.rect.Height() * 0.5f;
@@ -363,6 +363,7 @@ namespace
 
             result->rawDrawPackets.emplace_back(RenderPacket{
                 .zIndex = batch.zIndex,
+                .sortKey = currIt->sortKey,
                 .batchData = std::move(batch)
             });
         }
@@ -469,6 +470,7 @@ namespace
 
             result->rawDrawPackets.emplace_back(RenderPacket{
                 .zIndex = batch.zIndex,
+                .sortKey = currIt->sortKey,
                 .batchData = std::move(batch)
             });
         }
@@ -550,6 +552,7 @@ namespace
 
             result->rawDrawPackets.emplace_back(RenderPacket{
                 .zIndex = batch.zIndex,
+                .sortKey = currIt->sortKey,
                 .batchData = std::move(batch)
             });
         }
@@ -659,6 +662,7 @@ namespace
 
             result->rawDrawPackets.emplace_back(RenderPacket{
                 .zIndex = batch.zIndex,
+                .sortKey = currIt->sortKey,
                 .batchData = std::move(batch)
             });
         }
@@ -784,6 +788,7 @@ namespace
 
             result->rawDrawPackets.emplace_back(RenderPacket{
                 .zIndex = batch.zIndex,
+                .sortKey = currIt->sortKey,
                 .batchData = std::move(batch)
             });
         }
@@ -941,6 +946,7 @@ namespace
 
             result->rawDrawPackets.emplace_back(RenderPacket{
                 .zIndex = batch.zIndex,
+                .sortKey = currIt->sortKey,
                 .batchData = std::move(batch)
             });
         }
@@ -1051,12 +1057,12 @@ namespace
                         canvas->drawPath(triangle, paint);
                     }
 
-                    // 下拉列表绘制（需要在世界空间绘制，不受transform影响）
+                    
                     canvas->restore();
 
                     if (combo.isDropdownOpen && !combo.items.empty())
                     {
-                        // 计算世界坐标
+                        
                         ECS::RectF worldRect = combo.rect;
                         worldRect.x = trans.position.x - combo.rect.Width() * 0.5f;
                         worldRect.y = trans.position.y - combo.rect.Height() * 0.5f;
@@ -1119,6 +1125,7 @@ namespace
 
             result->rawDrawPackets.emplace_back(RenderPacket{
                 .zIndex = batch.zIndex,
+                .sortKey = currIt->sortKey,
                 .batchData = std::move(batch)
             });
         }
@@ -1237,6 +1244,7 @@ namespace
 
             result->rawDrawPackets.emplace_back(RenderPacket{
                 .zIndex = batch.zIndex,
+                .sortKey = currIt->sortKey,
                 .batchData = std::move(batch)
             });
         }
@@ -1356,6 +1364,7 @@ namespace
 
             result->rawDrawPackets.emplace_back(RenderPacket{
                 .zIndex = batch.zIndex,
+                .sortKey = currIt->sortKey,
                 .batchData = std::move(batch)
             });
         }
@@ -1474,6 +1483,7 @@ namespace
 
             result->rawDrawPackets.emplace_back(RenderPacket{
                 .zIndex = batch.zIndex,
+                .sortKey = currIt->sortKey,
                 .batchData = std::move(batch)
             });
         }
@@ -1540,7 +1550,7 @@ namespace
                     int rows = 1;
                     int itemsPerPage = 0;
 
-                    // 根据布局计算行列
+                    
                     switch (listBox.layout)
                     {
                     case ECS::ListBoxLayout::Horizontal:
@@ -1830,7 +1840,7 @@ namespace
                         canvas->restore();
                     }
 
-                    // 绘制垂直滚动条
+                    
                     if (showVertical && availableHeight > 0.0f)
                     {
                         SkRect trackRect = SkRect::MakeXYWH(contentRight + trackSpacing,
@@ -1875,7 +1885,7 @@ namespace
                                           thumbPaint);
                     }
 
-                    // 绘制水平滚动条
+                    
                     if (showHorizontal && availableWidth > 0.0f)
                     {
                         SkRect trackRect = SkRect::MakeXYWH(contentLeft,
@@ -1930,6 +1940,7 @@ namespace
 
             result->rawDrawPackets.emplace_back(RenderPacket{
                 .zIndex = batch.zIndex,
+                .sortKey = currIt->sortKey,
                 .batchData = std::move(batch)
             });
         }
@@ -1943,6 +1954,7 @@ namespace
 
             auto keyIt = result->textGroupIndices.find(key);
             size_t groupIndex;
+            bool createdNewGroup = false;
 
             if (keyIt == result->textGroupIndices.end())
             {
@@ -1956,8 +1968,10 @@ namespace
                 group.color = textData.color;
                 group.alignment = static_cast<TextAlignment>(textData.alignment);
                 group.zIndex = currIt->zIndex;
+                group.sortKey = currIt->sortKey;
                 group.transforms.reserve(16);
                 group.texts.reserve(16);
+                createdNewGroup = true;
             }
             else
             {
@@ -1965,6 +1979,10 @@ namespace
             }
 
             auto& group = result->textBatchGroups[groupIndex];
+            if (!createdNewGroup)
+            {
+                group.sortKey = std::min(group.sortKey, currIt->sortKey);
+            }
             group.transforms.emplace_back(
                 transform.position, transform.scale.x, transform.scale.y,
                 sinf(transform.rotation), cosf(transform.rotation));
@@ -1981,6 +1999,7 @@ namespace
 
             auto keyIt = result->spriteGroupIndices.find(key);
             size_t groupIndex;
+            bool createdNewGroup = false;
 
             if (keyIt == result->spriteGroupIndices.end())
             {
@@ -1994,17 +2013,25 @@ namespace
                 group.sourceRect = spriteData.sourceRect;
                 group.color = spriteData.color;
                 group.zIndex = currIt->zIndex;
+                group.sortKey = currIt->sortKey;
                 group.filterQuality = spriteData.filterQuality;
                 group.wrapMode = spriteData.wrapMode;
                 group.ppuScaleFactor = spriteData.ppuScaleFactor;
                 group.transforms.reserve(32);
+                createdNewGroup = true;
             }
             else
             {
                 groupIndex = keyIt->second;
             }
 
-            result->spriteBatchGroups[groupIndex].transforms.emplace_back(
+            auto& spriteGroup = result->spriteBatchGroups[groupIndex];
+            if (!createdNewGroup)
+            {
+                spriteGroup.sortKey = std::min(spriteGroup.sortKey, currIt->sortKey);
+            }
+
+            spriteGroup.transforms.emplace_back(
                 transform.position, transform.scale.x, transform.scale.y,
                 sinf(transform.rotation), cosf(transform.rotation));
         }
@@ -2240,6 +2267,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
             else
             {
                 auto& masterGroup = spriteBatchGroups[it->second];
+                masterGroup.sortKey = std::min(masterGroup.sortKey, threadGroup.sortKey);
                 masterGroup.transforms.insert(masterGroup.transforms.end(),
                                               threadGroup.transforms.begin(),
                                               threadGroup.transforms.end());
@@ -2265,6 +2293,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
             else
             {
                 auto& masterGroup = textBatchGroups[it->second];
+                masterGroup.sortKey = std::min(masterGroup.sortKey, threadGroup.sortKey);
                 masterGroup.transforms.insert(masterGroup.transforms.end(),
                                               threadGroup.transforms.begin(),
                                               threadGroup.transforms.end());
@@ -2300,6 +2329,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
         outPackets.emplace_back(RenderPacket{
             .zIndex = group.zIndex,
+            .sortKey = group.sortKey,
             .batchData = SpriteBatch{
                 .material = group.material,
                 .image = sk_ref_sp(group.image),
@@ -2330,6 +2360,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
         outPackets.emplace_back(RenderPacket{
             .zIndex = group.zIndex,
+            .sortKey = group.sortKey,
             .batchData = TextBatch{
                 .typeface = sk_ref_sp(group.typeface),
                 .fontSize = group.fontSize,
@@ -2353,6 +2384,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
     std::ranges::sort(outPackets, [](const RenderPacket& a, const RenderPacket& b)
     {
         if (a.zIndex != b.zIndex) return a.zIndex < b.zIndex;
+        if (a.sortKey != b.sortKey) return a.sortKey < b.sortKey;
         int ta = packet_type_index(a);
         int tb = packet_type_index(b);
         if (ta != tb) return ta < tb;

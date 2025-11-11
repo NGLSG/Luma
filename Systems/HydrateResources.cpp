@@ -75,7 +75,7 @@ namespace Systems
                 }
             }));
 
-        // 监听资产更新事件，当资产重新导入时刷新场景中的资源
+        
         m_listeners.push_back(EventBus::GetInstance().Subscribe<AssetUpdatedEvent>(
             [this](const AssetUpdatedEvent& event)
             {
@@ -84,10 +84,10 @@ namespace Systems
                 
                 auto& registry = currentScene->GetRegistry();
                 
-                // 根据资产类型刷新对应的组件
+                
                 if (event.assetType == AssetType::Texture)
                 {
-                    // 刷新所有使用该纹理的精灵组件
+                    
                     auto spriteView = registry.view<ECS::SpriteComponent>();
                     for (auto entity : spriteView)
                     {
@@ -98,7 +98,7 @@ namespace Systems
                         }
                     }
                     
-                    // 刷新所有使用该纹理的UI组件
+                    
                     auto buttonView = registry.view<ECS::ButtonComponent>();
                     for (auto entity : buttonView)
                     {
@@ -175,7 +175,7 @@ namespace Systems
                 }
                 else if (event.assetType == AssetType::Material)
                 {
-                    // 刷新所有使用该材质的精灵组件
+                    
                     auto spriteView = registry.view<ECS::SpriteComponent>();
                     for (auto entity : spriteView)
                     {
@@ -188,7 +188,7 @@ namespace Systems
                 }
                 else if (event.assetType == AssetType::Font)
                 {
-                    // 刷新所有使用该字体的文本组件
+                    
                     auto textView = registry.view<ECS::TextComponent>();
                     for (auto entity : textView)
                     {
@@ -214,7 +214,7 @@ namespace Systems
                 LogInfo("资产已更新，场景中的相关组件已刷新: {}", event.guid.ToString());
             }));
 
-        // 对已存在的所有实体执行初始水合
+        
         for (auto entity : registry.storage<entt::entity>())
         {
             processEntity(entity);

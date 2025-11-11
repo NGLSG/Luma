@@ -131,7 +131,7 @@ public:
      * @brief 检查当前游戏对象是否有效。
      * @return 如果实体句柄有效且关联的场景存在，则返回true。
      */
-    bool IsValid();
+    bool IsValid() const;
 
     /**
      * @brief 将当前游戏对象序列化为预制体数据节点。
