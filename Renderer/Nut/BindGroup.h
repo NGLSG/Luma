@@ -5,6 +5,8 @@
 #include "Buffer.h"
 #include "dawn/webgpu_cpp.h"
 
+namespace Nut {
+
 class ComputePipeline;
 class Sampler;
 class TextureA;
@@ -30,5 +32,6 @@ public:
     void Build(const std::shared_ptr<NutContext>& ctx);
 };
 
+} // namespace Nut
 
 #endif //NOAI_BINDGROUP_H

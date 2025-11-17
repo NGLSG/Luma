@@ -6,6 +6,7 @@
 #include "NutContext.h"
 #include "Shader.h"
 
+namespace Nut {
 
 VertexAttribute& VertexAttribute::SetLocation(size_t loc)
 {
@@ -83,63 +84,63 @@ FragmentState::FragmentState(const std::vector<ColorTargetState>& layouts, Shade
     state.targets = targetsStorage.data();
 }
 
-class Sampler& Sampler::SetWrapModeU(WrapMode mode)
+Sampler& Sampler::SetWrapModeU(WrapMode mode)
 {
     m_descriptor.addressModeU = mode;
     m_isBuild = false;
     return *this;
 }
 
-class Sampler& Sampler::SetWrapModeW(WrapMode mode)
+Sampler& Sampler::SetWrapModeW(WrapMode mode)
 {
     m_descriptor.addressModeW = mode;
     m_isBuild = false;
     return *this;
 }
 
-class Sampler& Sampler::SetWrapModeV(WrapMode mode)
+Sampler& Sampler::SetWrapModeV(WrapMode mode)
 {
     m_descriptor.addressModeV = mode;
     m_isBuild = false;
     return *this;
 }
 
-class Sampler& Sampler::SetMagFilter(wgpu::FilterMode mag)
+Sampler& Sampler::SetMagFilter(wgpu::FilterMode mag)
 {
     m_descriptor.magFilter = mag;
     m_isBuild = false;
     return *this;
 }
 
-class Sampler& Sampler::SetMinFilter(wgpu::FilterMode mag)
+Sampler& Sampler::SetMinFilter(wgpu::FilterMode mag)
 {
     m_descriptor.magFilter = mag;
     m_isBuild = false;
     return *this;
 }
 
-class Sampler& Sampler::SetMipmapFilter(MipmapFilterMode mode)
+Sampler& Sampler::SetMipmapFilter(MipmapFilterMode mode)
 {
     m_descriptor.mipmapFilter = mode;
     m_isBuild = false;
     return *this;
 }
 
-class Sampler& Sampler::SetMaxAnisotropy(size_t size)
+Sampler& Sampler::SetMaxAnisotropy(size_t size)
 {
     m_descriptor.maxAnisotropy = size;
     m_isBuild = false;
     return *this;
 }
 
-class Sampler& Sampler::SetLodMinClamp(size_t clamp)
+Sampler& Sampler::SetLodMinClamp(size_t clamp)
 {
     m_descriptor.lodMinClamp = clamp;
     m_isBuild = false;
     return *this;
 }
 
-class Sampler& Sampler::SetLodMaxClamp(size_t lod)
+Sampler& Sampler::SetLodMaxClamp(size_t lod)
 {
     m_descriptor.lodMaxClamp = lod;
     m_isBuild = false;
@@ -157,11 +158,13 @@ void Sampler::Build(const std::shared_ptr<NutContext>& ctx)
     m_sampler = ctx->CreateSampler(&m_descriptor);
 }
 
-const wgpu::Sampler& Sampler::Get()
+wgpu::Sampler Sampler::Get() const
 {
-    if (m_isBuild)return m_sampler;
-    std::cerr << "Please call the Build function first to build, and then call this function" << std::endl;
-    return nullptr;
+    if (!m_isBuild)
+    {
+        std::cerr << "Please call the Build function first to build, and then call this function" << std::endl;
+    }
+    return m_sampler;
 }
 
 Pipeline& Pipeline::SetBinding(const std::string& name, Sampler& sampler)
@@ -339,3 +342,5 @@ ComputePipeline::ComputePipeline(const ComputePipelineDescriptor& desc)
     }
     m_shaderModule = desc.shaderModule;
 }
+
+} // namespace Nut

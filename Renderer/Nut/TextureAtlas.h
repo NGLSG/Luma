@@ -8,6 +8,8 @@
 #include "stb_image.h"
 #include "stb_image_write.h"
 
+namespace Nut {
+
 struct AtlasMapping
 {
     float uvOffset[2];
@@ -28,5 +30,6 @@ public:
     AtlasMapping GetAtlasMapping(const std::string& file);
 };
 
+} // namespace Nut
 
 #endif //NOAI_TEXTUREATLAS_H

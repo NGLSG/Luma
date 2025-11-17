@@ -9,6 +9,8 @@
 #include "Buffer.h"
 #include "NutContext.h"
 
+using namespace Nut;
+
 struct Vertex
 {
     float position[2];

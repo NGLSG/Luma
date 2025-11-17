@@ -8,6 +8,8 @@
 #include "Shader.h"
 #include "dawn/webgpu_cpp.h"
 
+namespace Nut {
+
 class NutContext;
 
 using VertexFormat = wgpu::VertexFormat;
@@ -194,7 +196,7 @@ public:
 
     void Build(const std::shared_ptr<NutContext>& ctx);
 
-    const wgpu::Sampler& Get();
+    wgpu::Sampler Get() const;
 };
 
 class Pipeline
@@ -244,5 +246,7 @@ public:
     ComputePipeline(const ComputePipelineDescriptor& desc);
     wgpu::ComputePipeline& Get() { return pipeline; }
 };
+
+} // namespace Nut
 
 #endif //NOAI_PIPELINE_H

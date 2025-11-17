@@ -8,6 +8,7 @@
 #include "stb_image_write.h"
 #include "dawn/dawn_proc.h"
 
+namespace Nut {
 
 NutContext::NutContext() : m_size(0)
 {
@@ -550,3 +551,5 @@ TextureA NutContext::CreateTexture(const TextureDescriptor& descriptor)
 
     return {texture, this};
 }
+
+} // namespace Nut

@@ -2,6 +2,8 @@
 
 #include "NutContext.h"
 
+namespace Nut {
+
 QuerySetBuilder& QuerySetBuilder::SetLabel(const std::string_view& label)
 {
     descriptor.label = label;
@@ -507,3 +509,5 @@ ComputePass ComputePassBuilder::Build()
 {
     return {m_commandEncoder, m_descriptor};
 }
+
+} // namespace Nut

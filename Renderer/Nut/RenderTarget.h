@@ -2,6 +2,7 @@
 #define LUMAENGINE_RENDERTARGET_H
 #include "dawn/webgpu_cpp.h"
 
+namespace Nut {
 
 /**
  * @brief 渲染目标类，封装了一个WGPU纹理及其尺寸信息。
@@ -65,5 +66,7 @@ private:
     uint16_t m_width; ///< 渲染目标的宽度。
     uint16_t m_height; ///< 渲染目标的高度。
 };
+
+} // namespace Nut
 
 #endif //LUMAENGINE_RENDERTARGET_H

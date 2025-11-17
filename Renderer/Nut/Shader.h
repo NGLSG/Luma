@@ -7,6 +7,8 @@
 
 #include "dawn/webgpu_cpp.h"
 
+namespace Nut {
+
 class NutContext;
 
 enum class BindingType:uint32_t
@@ -53,4 +55,7 @@ public:
 
     static ShaderModule& GetFromString(const std::string& code, const std::shared_ptr<NutContext>&ctx);
 };
+
+} // namespace Nut
+
 #endif //NOAI_SHADER_H

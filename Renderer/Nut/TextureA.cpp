@@ -7,6 +7,7 @@
 #include "stb_image.h"
 #include "stb_image_write.h"
 
+namespace Nut {
 
 TextureA TextureBuilder::Build(std::shared_ptr<NutContext> context)
 {
@@ -138,8 +139,42 @@ TextureA TextureBuilder::Build(std::shared_ptr<NutContext> context)
     // 5. 生成Mipmaps(如果需要)
     if (m_generateMipmaps && descriptor.mipLevelCount > 1)
     {
-        // TODO: 实现Mipmap生成逻辑
-        std::cout << "Mipmap生成功能待实现" << std::endl;
+        // 使用GPU生成Mipmap（框架代码）
+        // 注意：完整实现需要配合blit shader进行下采样
+        // 当前代码仅创建mipmap级别的纹理视图框架
+        wgpu::CommandEncoder encoder = context->GetWGPUDevice().CreateCommandEncoder();
+        
+        for (uint32_t mipLevel = 1; mipLevel < descriptor.mipLevelCount; ++mipLevel)
+        {
+            // 为每个mip级别创建目标纹理视图
+            wgpu::TextureViewDescriptor dstViewDesc;
+            dstViewDesc.baseMipLevel = mipLevel;
+            dstViewDesc.mipLevelCount = 1;
+            dstViewDesc.baseArrayLayer = 0;
+            dstViewDesc.arrayLayerCount = 1;
+            dstViewDesc.dimension = wgpu::TextureViewDimension::e2D;
+            dstViewDesc.format = descriptor.format;
+            wgpu::TextureView dstView = texture.CreateView(&dstViewDesc);
+            
+            // 创建渲染pass来清空mip级别（占位实现）
+            wgpu::RenderPassColorAttachment colorAttachment;
+            colorAttachment.view = dstView;
+            colorAttachment.loadOp = wgpu::LoadOp::Clear;
+            colorAttachment.storeOp = wgpu::StoreOp::Store;
+            colorAttachment.clearValue = {0.0f, 0.0f, 0.0f, 0.0f};
+            
+            wgpu::RenderPassDescriptor renderPassDesc;
+            renderPassDesc.colorAttachmentCount = 1;
+            renderPassDesc.colorAttachments = &colorAttachment;
+            
+            wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&renderPassDesc);
+            pass.End();
+        }
+        
+        wgpu::CommandBuffer commands = encoder.Finish();
+        context->GetWGPUDevice().GetQueue().Submit(1, &commands);
+        
+        std::cout << "Mipmap框架生成完成，共 " << descriptor.mipLevelCount << " 级（需配合shader实现完整功能）" << std::endl;
     }
 
     // 6. 清理临时数据
@@ -179,23 +214,19 @@ wgpu::TextureView TextureA::GetTextureView() const
 size_t TextureA::GetWidth() const
 {
     if (!m_texture)
-        return -1;
+        return 0;
     return m_texture.GetWidth();
 }
 
 size_t TextureA::GetHeight() const
 {
     if (!m_texture)
-        return -1;
+        return 0;
     return m_texture.GetHeight();
 }
 
-const wgpu::TextureView& TextureA::GetView()
+wgpu::TextureView TextureA::GetView() const
 {
-    if (!m_textureView)
-    {
-        return nullptr;
-    }
     return m_textureView;
 }
 
@@ -327,3 +358,5 @@ void TextureA::WriteToFile(const std::string& fileName) const
     // 7. 清理资源
     readbackBuffer.Unmap();
 }
+
+} // namespace Nut

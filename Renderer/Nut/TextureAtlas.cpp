@@ -4,6 +4,8 @@
 
 #include "TextureAtlas.h"
 
+namespace Nut {
+
 void TextureAtlas::Create(const std::vector<std::string>& imageFiles)
 {
     struct ImageData
@@ -77,5 +79,7 @@ AtlasMapping TextureAtlas::GetAtlasMapping(const std::string& file)
     {
         return AtlasMapping();
     }
-    return it->second;
+    return atlas[file];
 }
+
+} // namespace Nut

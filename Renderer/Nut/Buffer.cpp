@@ -5,6 +5,8 @@
 
 #include "NutContext.h"
 
+namespace Nut {
+
 bool Buffer::ReadBuffer(void* dest, const std::function<void(bool success)>& onCompleted, uint32_t size,
                         uint32_t offset) const
 {
@@ -73,6 +75,7 @@ bool Buffer::ReadBuffer(void* dest, const std::function<void(bool success)>& onC
 }
 
 Buffer::Buffer(std::nullopt_t) noexcept
+    : m_layout{}, m_context(nullptr), m_size(0), m_offset(0)
 {
 }
 
@@ -107,7 +110,8 @@ Buffer::operator bool() const
     return m_buffer != nullptr;
 }
 
-Buffer::Buffer(BufferLayout layout, const std::shared_ptr<NutContext>& ctx) : m_context(ctx), m_layout(layout)
+Buffer::Buffer(BufferLayout layout, const std::shared_ptr<NutContext>& ctx) 
+    : m_context(ctx), m_layout(layout), m_size(0), m_offset(0)
 {
     wgpu::BufferDescriptor bufferDesc;
     bufferDesc.size = layout.size;
@@ -258,3 +262,5 @@ Buffer BufferBuilder::Build(const std::shared_ptr<NutContext>& ctx) const
     bff.WriteBuffer(m_data);
     return bff;
 }
+
+} // namespace Nut

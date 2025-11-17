@@ -5,6 +5,8 @@
 
 #include "dawn/webgpu_cpp.h"
 
+namespace Nut {
+
 namespace BufferUtils
 {
     template <typename T>
@@ -144,4 +146,7 @@ BufferBuilder& BufferBuilder::SetData(const std::vector<T>& data)
     m_data = const_cast<void*>(static_cast<const void*>(data.data()));
     return *this;
 }
+
+} // namespace Nut
+
 #endif //NOAI_BUFFER_H

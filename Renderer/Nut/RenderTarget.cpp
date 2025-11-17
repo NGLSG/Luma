@@ -1,5 +1,7 @@
 #include "RenderTarget.h"
 
+namespace Nut {
+
 wgpu::Texture RenderTarget::GetTexture() const
 {
     return m_texture;
@@ -24,3 +26,5 @@ RenderTarget::RenderTarget(wgpu::Texture texture, uint16_t width, uint16_t heigh
     m_height(height)
 {
 }
+
+} // namespace Nut

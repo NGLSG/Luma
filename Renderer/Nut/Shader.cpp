@@ -4,6 +4,8 @@
 
 #include "NutContext.h"
 
+namespace Nut {
+
 ShaderModule::ShaderModule(const std::string& shaderCode, const std::shared_ptr<NutContext>& ctx)
 {
     wgpu::ShaderModuleWGSLDescriptor wgslModuleDesc;
@@ -131,3 +133,5 @@ ShaderModule& ShaderManager::GetFromString(const std::string& code, const std::s
     shaderModules[code] = std::make_shared<ShaderModule>(code, ctx);
     return *shaderModules[code].get();
 }
+
+} // namespace Nut

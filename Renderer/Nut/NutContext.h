@@ -4,6 +4,9 @@
 #include "RenderTarget.h"
 #include "TextureA.h"
 #include "dawn/native/DawnNative.h"
+
+namespace Nut {
+
 /**
  * @brief 定义图形后端类型。
  */
@@ -165,5 +168,6 @@ public:
     TextureA CreateTexture(const TextureDescriptor& descriptor);
 };
 
+} // namespace Nut
 
 #endif //NOAI_GRAPHICSCONTEXT_H

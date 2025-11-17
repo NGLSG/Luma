@@ -1,11 +1,10 @@
-
-
 #ifndef LUMAENGINE_TEXTUREA_H
 #define LUMAENGINE_TEXTUREA_H
 #include <string>
 
 #include "dawn/webgpu_cpp.h"
 
+namespace Nut {
 
 class NutContext;
 
@@ -27,7 +26,7 @@ public:
 
     size_t GetHeight() const;
 
-    const wgpu::TextureView& GetView();
+    wgpu::TextureView GetView() const;
 
     operator bool() const;
 
@@ -295,6 +294,6 @@ struct Size
     uint32_t height;
 };
 
-
+} // namespace Nut
 
 #endif //LUMAENGINE_TEXTUREA_H

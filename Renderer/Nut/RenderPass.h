@@ -5,6 +5,8 @@
 #include "dawn/webgpu_cpp.h"
 #include "Pipeline.h"
 
+namespace Nut {
+
 // 前置声明
 class Buffer;
 class RenderPipeline;
@@ -226,5 +228,7 @@ public:
     ComputePassBuilder& SetLabel(const std::string& label);
     ComputePass Build();
 };
+
+} // namespace Nut
 
 #endif //NOAI_RENDERPASS_H

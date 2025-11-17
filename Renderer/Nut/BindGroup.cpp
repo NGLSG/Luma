@@ -6,6 +6,8 @@
 #include "NutContext.h"
 #include "Pipeline.h"
 
+namespace Nut {
+
 BindGroup BindGroup::Create(uint32_t groupIndex, RenderPipeline* Pipeline)
 {
     BindGroup group;
@@ -97,3 +99,5 @@ void BindGroup::Build(const std::shared_ptr<NutContext>& ctx)
     m_bindGroup = ctx->GetWGPUDevice().CreateBindGroup(&descriptor);
     m_isBuild = true;
 }
+
+} // namespace Nut
