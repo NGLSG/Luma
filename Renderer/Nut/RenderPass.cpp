@@ -78,7 +78,7 @@ wgpu::CommandBuffer RenderPass::End()
     return m_commandEncoder.Finish();
 }
 
-// 新增函数实现 - 遮挡查询
+
 void RenderPass::BeginOcclusionQuery(uint32_t queryIndex) const
 {
     m_passEncoder.BeginOcclusionQuery(queryIndex);
@@ -89,7 +89,7 @@ void RenderPass::EndOcclusionQuery() const
     m_passEncoder.EndOcclusionQuery();
 }
 
-// 新增函数实现 - 绘制命令
+
 void RenderPass::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) const
 {
     m_passEncoder.Draw(vertexCount, instanceCount, firstVertex, firstInstance);
@@ -105,7 +105,7 @@ void RenderPass::DrawIndirect(Buffer& indirectBuffer, uint64_t indirectOffset) c
     m_passEncoder.DrawIndirect(indirectBuffer.GetBuffer(), indirectOffset);
 }
 
-// 新增函数实现 - 多重绘制命令
+
 void RenderPass::MultiDrawIndexedIndirect(Buffer& indirectBuffer, uint64_t indirectOffset, uint32_t maxDrawCount,
                                           Buffer& drawCountBuffer, uint64_t drawCountBufferOffset) const
 {
@@ -136,7 +136,7 @@ void RenderPass::MultiDrawIndirect(Buffer& indirectBuffer, uint64_t indirectOffs
     }
 }
 
-// 新增函数实现 - 调试标记
+
 void RenderPass::InsertDebugMarker(const char* markerLabel) const
 {
     m_passEncoder.InsertDebugMarker(markerLabel);
@@ -152,49 +152,49 @@ void RenderPass::PushDebugGroup(const char* groupLabel) const
     m_passEncoder.PushDebugGroup(groupLabel);
 }
 
-// 新增函数实现 - 像素本地存储屏障
+
 void RenderPass::PixelLocalStorageBarrier() const
 {
     m_passEncoder.PixelLocalStorageBarrier();
 }
 
-// 新增函数实现 - 设置混合常量
+
 void RenderPass::SetBlendConstant(const wgpu::Color* color) const
 {
     m_passEncoder.SetBlendConstant(color);
 }
 
-// 新增函数实现 - 设置立即数据
+
 void RenderPass::SetImmediateData(uint32_t offset, const void* data, size_t size) const
 {
     m_passEncoder.SetImmediateData(offset, data, size);
 }
 
-// 新增函数实现 - 设置标签
+
 void RenderPass::SetLabel(const char* label) const
 {
     m_passEncoder.SetLabel(label);
 }
 
-// 新增函数实现 - 设置裁剪矩形
+
 void RenderPass::SetScissorRect(uint32_t x, uint32_t y, uint32_t width, uint32_t height) const
 {
     m_passEncoder.SetScissorRect(x, y, width, height);
 }
 
-// 新增函数实现 - 设置模板参考值
+
 void RenderPass::SetStencilReference(uint32_t reference) const
 {
     m_passEncoder.SetStencilReference(reference);
 }
 
-// 新增函数实现 - 设置视口
+
 void RenderPass::SetViewport(float x, float y, float width, float height, float minDepth, float maxDepth) const
 {
     m_passEncoder.SetViewport(x, y, width, height, minDepth, maxDepth);
 }
 
-// 新增函数实现 - 写入时间戳
+
 void RenderPass::WriteTimestamp(const QuerySet& querySet, uint32_t queryIndex) const
 {
     m_passEncoder.WriteTimestamp(querySet.Get(), queryIndex);
@@ -510,4 +510,4 @@ ComputePass ComputePassBuilder::Build()
     return {m_commandEncoder, m_descriptor};
 }
 
-} // namespace Nut
+} 

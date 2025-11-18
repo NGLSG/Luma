@@ -85,13 +85,13 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
 
     try
     {
-        // 创建 NutContext 描述符
+        
         Nut::NutContextDescriptor nutDesc;
         nutDesc.width = opts.width;
         nutDesc.height = opts.height;
         nutDesc.enableVSync = opts.enableVSync;
         
-        // 复制窗口句柄
+        
 #if defined(_WIN32)
         nutDesc.windowHandle.hWnd = opts.windowHandle.hWnd;
         nutDesc.windowHandle.hInst = opts.windowHandle.hInst;
@@ -104,7 +104,7 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
         nutDesc.windowHandle.aNativeWindow = opts.windowHandle.aNativeWindow;
 #endif
         
-        // 转换 BackendType
+        
         for (const auto& type : opts.backendTypePriority)
         {
             switch (type)
@@ -130,7 +130,7 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
             }
         }
         
-        // 转换 QualityLevel
+        
         switch (opts.qualityLevel)
         {
         case QualityLevel::Low:
@@ -145,7 +145,7 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
             break;
         }
 
-        // 创建 NutContext
+        
         nutContext = Nut::NutContext::Create(nutDesc);
         if (!nutContext)
         {
@@ -153,7 +153,7 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
             throw std::runtime_error("创建 NutContext 失败");
         }
 
-        // 创建 Skia Graphite 上下文
+        
         skgpu::graphite::DawnBackendContext backendContext;
         backendContext.fInstance = nutContext->GetWGPUInstance();
         backendContext.fDevice = nutContext->GetWGPUDevice();
@@ -176,7 +176,7 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
         this->currentWidth = options.width;
         this->currentHeight = options.height;
         
-        // 创建 MSAA 纹理
+        
         if (m_msaaSampleCount > 1)
         {
             Nut::TextureDescriptor msaaDesc;
@@ -533,7 +533,7 @@ void GraphicsBackend::Resize(uint16_t width, uint16_t height)
     {
         nutContext->Resize(width, height);
         
-        // 更新 MSAA 纹理
+        
         if (m_msaaSampleCount > 1)
         {
             if (m_msaaTexture)
@@ -726,7 +726,7 @@ skgpu::graphite::Recorder* GraphicsBackend::GetRecorder() const
 
 wgpu::TextureFormat GraphicsBackend::GetSurfaceFormat() const
 {
-    // 默认使用 BGRA8Unorm 格式，这是 NutContext 中的默认格式
+    
     return wgpu::TextureFormat::BGRA8Unorm;
 }
 

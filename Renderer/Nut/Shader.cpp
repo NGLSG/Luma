@@ -13,9 +13,9 @@ ShaderModule::ShaderModule(const std::string& shaderCode, const std::shared_ptr<
     wgpu::ShaderModuleDescriptor shaderModuleDesc;
     shaderModuleDesc.nextInChain = &wgslModuleDesc;
 
-    shaderModule = ctx->GetWGPUDevice().CreateShaderModule(&shaderModuleDesc); // 编译着色器
+    shaderModule = ctx->GetWGPUDevice().CreateShaderModule(&shaderModuleDesc); 
 
-    // 改进的正则表达式，能够匹配 var<storage, read_write> 的形式
+    
     std::regex re(R"(@group\((\d+)\)\s*@binding\((\d+)\)\s*var(?:<([^>]+)>)?\s+(\w+)\s*:\s*([\w_<>,\s]+))");
     std::smatch match;
     std::string::const_iterator searchStart(shaderCode.cbegin());
@@ -26,14 +26,14 @@ ShaderModule::ShaderModule(const std::string& shaderCode, const std::shared_ptr<
         bindingInfo.groupIndex = std::stoul(match[1]);
         bindingInfo.location = std::stoul(match[2]);
 
-        // 解析 var<...> 中的内容
-        std::string varModifierFull = match[3]; // 完整的修饰符，如 "uniform" 或 "storage, read_write"
+        
+        std::string varModifierFull = match[3]; 
         std::string name = match[4];
         std::string typeStr = match[5];
 
         bindingInfo.name = name;
 
-        // 判断绑定类型
+        
         if (typeStr.find("sampler") != std::string::npos)
         {
             bindingInfo.type = BindingType::Sampler;
@@ -134,4 +134,4 @@ ShaderModule& ShaderManager::GetFromString(const std::string& code, const std::s
     return *shaderModules[code].get();
 }
 
-} // namespace Nut
+} 

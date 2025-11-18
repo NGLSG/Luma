@@ -84,3 +84,14 @@ Camera::CamProperties Camera::GetProperties() const
     std::shared_lock<std::shared_mutex> lock(m_mutex);
     return m_properties;
 }
+
+SkM44 Camera::GetViewProjectionMatrix()
+{
+    std::shared_lock<std::shared_mutex> lock(m_mutex);
+    const auto props = m_properties;
+    SkM44 viewProjMatrix;
+    viewProjMatrix.preTranslate(props.viewport.width() * 0.5f, props.viewport.height() * 0.5f);
+    viewProjMatrix.preScale(props.zoom, props.zoom);
+    viewProjMatrix.preTranslate(-props.position.x(), -props.position.y());
+    return viewProjMatrix;
+}

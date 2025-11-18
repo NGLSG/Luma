@@ -28,7 +28,7 @@ VertexAttribute& VertexAttribute::SetOffset(size_t offset)
 
 VertexState::VertexState(const std::vector<VertexBufferLayout>& layouts, ShaderModule module, const std::string& entry)
 {
-    entryPointStorage = entry; // ensure lifetime
+    entryPointStorage = entry; 
     state.entryPoint = entryPointStorage.c_str();
     state.module = module.Get();
     for (auto& item : layouts)
@@ -67,7 +67,7 @@ ColorTargetState& ColorTargetState::SetColorWriteMask(wgpu::ColorWriteMask color
     return *this;
 }
 
-// In FragmentState class definition
+
 const wgpu::FragmentState* FragmentState::Get() const
 {
     return &state;
@@ -76,10 +76,10 @@ const wgpu::FragmentState* FragmentState::Get() const
 FragmentState::FragmentState(const std::vector<ColorTargetState>& layouts, ShaderModule module,
                              const std::string& entry)
 {
-    entryPointStorage = entry; // ensure lifetime
+    entryPointStorage = entry; 
     state.entryPoint = entryPointStorage.c_str();
     state.module = module.Get();
-    targetsStorage = layouts; // own the targets to keep pointers valid
+    targetsStorage = layouts; 
     state.targetCount = targetsStorage.size();
     state.targets = targetsStorage.data();
 }
@@ -343,9 +343,9 @@ ComputePipeline::ComputePipeline(const ComputePipelineDescriptor& desc)
     m_shaderModule = desc.shaderModule;
 }
 
-// ========== 高级Pipeline封装实现 ==========
 
-// DepthStencilState实现
+
+
 DepthStencilState::DepthStencilState()
 {
     m_state.format = wgpu::TextureFormat::Depth24PlusStencil8;
@@ -425,7 +425,7 @@ DepthStencilState DepthStencilState::NoDepth()
     return state;
 }
 
-// RasterizationState实现
+
 RasterizationState::RasterizationState()
 {
     m_primitive.topology = wgpu::PrimitiveTopology::TriangleList;
@@ -482,7 +482,7 @@ RasterizationState RasterizationState::NoCull()
     return state;
 }
 
-// MultisampleState实现
+
 MultisampleState::MultisampleState()
 {
     m_state.count = 1;
@@ -527,10 +527,10 @@ MultisampleState MultisampleState::MSAA8x()
     return state;
 }
 
-// BlendState实现
+
 BlendState::BlendState()
 {
-    // 默认不透明
+    
     m_state.color.operation = wgpu::BlendOperation::Add;
     m_state.color.srcFactor = wgpu::BlendFactor::One;
     m_state.color.dstFactor = wgpu::BlendFactor::Zero;
@@ -587,7 +587,7 @@ BlendState BlendState::Multiply()
     return state;
 }
 
-// RenderPipelineBuilder实现
+
 RenderPipelineBuilder::RenderPipelineBuilder(const std::shared_ptr<NutContext>& context)
     : m_context(context)
 {
@@ -679,11 +679,11 @@ std::unique_ptr<RenderPipeline> RenderPipelineBuilder::Build()
         return nullptr;
     }
     
-    // 创建顶点和片段状态
+    
     VertexState vertex(m_vertexLayouts, m_shaderModule, m_vertexEntry);
     FragmentState fragment(m_colorTargets, m_shaderModule, m_fragmentEntry);
     
-    // 创建描述符
+    
     wgpu::RenderPipelineDescriptor descriptor{};
     descriptor.label = m_label.c_str();
     descriptor.vertex = vertex.Get();
@@ -696,17 +696,17 @@ std::unique_ptr<RenderPipeline> RenderPipelineBuilder::Build()
         descriptor.depthStencil = m_depthStencil->Get();
     }
     
-    // 创建pipeline
+    
     wgpu::RenderPipeline wgpuPipeline = m_context->GetWGPUDevice().CreateRenderPipeline(&descriptor);
     
-    // 创建包装对象
+    
     RenderPipelineDescriptor pipelineDesc{vertex, fragment, m_shaderModule, m_context};
     auto pipeline = std::make_unique<RenderPipeline>(pipelineDesc);
     
     return pipeline;
 }
 
-// PipelineCache实现
+
 std::unordered_map<std::string, std::shared_ptr<RenderPipeline>> PipelineCache::s_renderPipelines;
 std::unordered_map<std::string, std::shared_ptr<ComputePipeline>> PipelineCache::s_computePipelines;
 
@@ -766,7 +766,7 @@ void PipelineCache::ClearComputePipelines()
     s_computePipelines.clear();
 }
 
-// PipelinePresets实现
+
 std::unique_ptr<RenderPipeline> PipelinePresets::CreateBasic3D(
     const std::shared_ptr<NutContext>& context,
     const ShaderModule& shader,
@@ -830,4 +830,4 @@ std::unique_ptr<RenderPipeline> PipelinePresets::CreatePostProcess(
         .Build();
 }
 
-} // namespace Nut
+} 

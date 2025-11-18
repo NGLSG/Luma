@@ -1,6 +1,7 @@
 #include "HydrateResources.h"
 
 #include "ColliderComponent.h"
+#include "GraphicsBackend.h"
 #include "SceneManager.h"
 #include "TextComponent.h"
 #include "TilemapComponent.h"
@@ -244,6 +245,7 @@ namespace Systems
         TextureLoader textureLoader(*m_context->graphicsBackend);
         MaterialLoader materialLoader;
 
+        
         if (sprite.textureHandle.Valid() && (!sprite.image || sprite.lastSpriteHandle != sprite.textureHandle))
         {
             sprite.image = textureLoader.LoadAsset(sprite.textureHandle.assetGuid);
@@ -264,18 +266,46 @@ namespace Systems
             sprite.image.reset();
         }
 
-        if (sprite.materialHandle.Valid() && (!sprite.material || sprite.lastMaterialHandle != sprite.materialHandle))
+        
+        if (sprite.materialHandle.Valid() && (!sprite.wgslMaterial || sprite.lastMaterialHandle != sprite.materialHandle))
         {
-            sprite.material = materialLoader.LoadAsset(sprite.materialHandle.assetGuid);
-            if (!sprite.material)
+            
+            auto nutContext = m_context->graphicsBackend->GetNutContext();
+            if (nutContext)
             {
-                LogError("Failed to load material with GUID: {}", sprite.materialHandle.assetGuid.ToString());
+                sprite.wgslMaterial = materialLoader.LoadWGSLMaterial(sprite.materialHandle.assetGuid, nutContext);
+                if (!sprite.wgslMaterial)
+                {
+                    LogError("Failed to load WGSL material with GUID: {}", sprite.materialHandle.assetGuid.ToString());
+                    
+                    
+                    sprite.material = materialLoader.LoadAsset(sprite.materialHandle.assetGuid);
+                    if (!sprite.material)
+                    {
+                        LogError("Failed to load fallback SkSL material with GUID: {}", sprite.materialHandle.assetGuid.ToString());
+                    }
+                }
+                else
+                {
+                    
+                    sprite.material.reset();
+                }
+            }
+            else
+            {
+                LogWarn("NutContext not available, loading SkSL material as fallback");
+                sprite.material = materialLoader.LoadAsset(sprite.materialHandle.assetGuid);
+                if (!sprite.material)
+                {
+                    LogError("Failed to load material with GUID: {}", sprite.materialHandle.assetGuid.ToString());
+                }
             }
             sprite.lastMaterialHandle = sprite.materialHandle;
         }
         else if (!sprite.materialHandle.Valid())
         {
             sprite.material.reset();
+            sprite.wgslMaterial.reset();
         }
     }
 

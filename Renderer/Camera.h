@@ -82,6 +82,7 @@ public:
      * @return 当前摄像机的CamProperties结构体。
      */
     CamProperties GetProperties() const;
+    SkM44 GetViewProjectionMatrix();
 };
 
 #endif

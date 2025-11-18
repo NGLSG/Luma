@@ -99,6 +99,11 @@ private:
      */
     void openTextureSlicer();
 
+    /**
+     * @brief 打开Shader编辑器（仅用于材质资产）。
+     */
+    void openShaderEditor();
+
 private:
     ///< 当前在面板中编辑的资产路径列表。
     std::vector<std::filesystem::path> m_currentEditingPaths;

@@ -1,7 +1,3 @@
-//
-// Created by 92703 on 2025/10/14.
-//
-
 #include "TextureAtlas.h"
 
 namespace Nut {
@@ -82,4 +78,4 @@ AtlasMapping TextureAtlas::GetAtlasMapping(const std::string& file)
     return atlas[file];
 }
 
-} // namespace Nut
+} 

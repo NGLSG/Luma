@@ -51,7 +51,7 @@ bool Buffer::ReadBuffer(void* dest, const std::function<void(bool success)>& onC
                 }
                 else
                 {
-                    success = false; // 获取映射地址失败
+                    success = false; 
                 }
             }
 
@@ -263,4 +263,4 @@ Buffer BufferBuilder::Build(const std::shared_ptr<NutContext>& ctx) const
     return bff;
 }
 
-} // namespace Nut
+} 

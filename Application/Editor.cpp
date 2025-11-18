@@ -58,6 +58,7 @@
 #include "Editor/TilesetPanel.h"
 #include "Editor/RuleTilePanel.h"
 #include "Editor/TextureSlicerPanel.h"
+#include "Editor/ShaderEditorPanel.h"
 #include "Managers/RuntimeAnimationClipManager.h"
 #include "Managers/RuntimeFontManager.h"
 #include "RuntimeAsset/RuntimeAnimationClip.h"
@@ -273,6 +274,7 @@ void Editor::initializePanels()
     m_panels.push_back(std::make_unique<AIPanel>());
     m_panels.push_back(std::make_unique<BlueprintPanel>());
     m_panels.push_back(std::make_unique<TextureSlicerPanel>());
+    m_panels.push_back(std::make_unique<ShaderEditorPanel>());
 
     for (auto& panel : m_panels)
     {

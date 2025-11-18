@@ -100,4 +100,4 @@ void BindGroup::Build(const std::shared_ptr<NutContext>& ctx)
     m_isBuild = true;
 }
 
-} // namespace Nut
+} 

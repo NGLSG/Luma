@@ -4,6 +4,7 @@
 #include "IRuntimeAsset.h"
 #include "TextureImporterSettings.h"
 #include "include/core/SkImage.h"
+#include "Nut/TextureA.h"
 
 /**
  * @brief 运行时纹理类，继承自运行时资产接口。
@@ -15,6 +16,7 @@ class RuntimeTexture : public IRuntimeAsset
 private:
     sk_sp<SkImage> m_image; ///< Skia图像对象。
     TextureImporterSettings m_importSettings; ///< 纹理导入设置。
+    std::shared_ptr<Nut::TextureA> m_nutTexture; ///< Nut图形纹理对象。
 
 public:
     /**

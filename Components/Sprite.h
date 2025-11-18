@@ -9,6 +9,7 @@
 #include "../Renderer/RenderComponent.h"
 #include "ComponentRegistry.h"
 #include "RuntimeAsset/RuntimeTexture.h"
+#include "RuntimeAsset/RuntimeWGSLMaterial.h"
 
 namespace ECS
 {
@@ -42,7 +43,8 @@ namespace ECS
 
 
         sk_sp<RuntimeTexture> image = nullptr; ///< 运行时纹理对象。
-        sk_sp<Material> material = nullptr; ///< 运行时材质对象。
+        sk_sp<Material> material = nullptr; ///< 运行时材质对象（SkSL - 已弃用）。
+        sk_sp<RuntimeWGSLMaterial> wgslMaterial = nullptr; ///< 运行时WGSL材质对象（推荐）。
         AssetHandle lastSpriteHandle = AssetHandle(AssetType::Texture); ///< 上次使用的精灵纹理句柄，用于检测变化。
         AssetHandle lastMaterialHandle = AssetHandle(AssetType::Material); ///< 上次使用的材质句柄，用于检测变化。
     };

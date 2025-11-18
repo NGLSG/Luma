@@ -27,4 +27,4 @@ RenderTarget::RenderTarget(wgpu::Texture texture, uint16_t width, uint16_t heigh
 {
 }
 
-} // namespace Nut
+} 

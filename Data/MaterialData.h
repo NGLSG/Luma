@@ -9,9 +9,19 @@
 #include <include/core/SkColor.h>
 
 #include "IData.h"
+#include "SceneData.h"  // 需要SkPoint的YAML转换器定义
 
 namespace Data
 {
+    /**
+     * @brief 着色器类型枚举
+     */
+    enum class ShaderType
+    {
+        SkSL,       ///< Skia SkSL着色器（已弃用，仅用于向后兼容）
+        WGSL        ///< WebGPU WGSL着色器（推荐）
+    };
+
     /**
      * @brief 统一变量类型枚举。
      * 定义了材质中可能使用的各种统一变量的数据类型。
@@ -19,10 +29,14 @@ namespace Data
     enum class UniformType
     {
         Float,      ///< 浮点数类型。
-        Color4f,    ///< 4分量颜色类型。
+        Color4f,    ///< 4分量颜色类型（vec4）。
         Int,        ///< 整型类型。
-        Point,      ///< 点坐标类型。
-        Shader      ///< 着色器类型。
+        Point,      ///< 点坐标类型（vec2）。
+        Shader,     ///< 着色器类型（已弃用）。
+        Vec2,       ///< 2D向量。
+        Vec3,       ///< 3D向量。
+        Vec4,       ///< 4D向量。
+        Mat4        ///< 4x4矩阵。
     };
 
     /**
@@ -46,6 +60,7 @@ namespace Data
         friend class IData<MaterialDefinition>;
         std::string shaderName;                 ///< 着色器名称。
         std::string shaderCode;                 ///< 着色器代码。
+        ShaderType shaderType = ShaderType::WGSL; ///< 着色器类型（WGSL或SkSL）。
         std::vector<MaterialUniform> uniforms;  ///< 材质中包含的统一变量列表。
 
     private:
@@ -56,42 +71,10 @@ namespace Data
 namespace YAML
 {
     /**
-     * @brief SkPoint类型的YAML转换器特化。
-     * 允许SkPoint对象在YAML节点和C++对象之间进行编码和解码。
-     */
-    template <>
-    struct convert<SkPoint>
-    {
-        /**
-         * @brief 将SkPoint对象编码为YAML节点。
-         * @param rhs 要编码的SkPoint对象。
-         * @return 编码后的YAML节点。
-         */
-        static Node encode(const SkPoint& rhs)
-        {
-            Node node;
-            node.push_back(rhs.x());
-            node.push_back(rhs.y());
-            return node;
-        }
-
-        /**
-         * @brief 将YAML节点解码为SkPoint对象。
-         * @param node 要解码的YAML节点。
-         * @param rhs 解码后的SkPoint对象。
-         * @return 如果解码成功则返回true，否则返回false。
-         */
-        static bool decode(const Node& node, SkPoint& rhs)
-        {
-            if (!node.IsSequence() || node.size() != 2) return false;
-            rhs.set(node[0].as<float>(), node[1].as<float>());
-            return true;
-        }
-    };
-
-    /**
      * @brief Data::MaterialUniform类型的YAML转换器特化。
      * 允许Data::MaterialUniform对象在YAML节点和C++对象之间进行编码和解码。
+     * 
+     * 注意：SkPoint的YAML转换器已在SceneData.h中定义
      */
     template <>
     struct convert<Data::MaterialUniform>
@@ -116,6 +99,17 @@ namespace YAML
             case Data::UniformType::Point: typeStr = "point";
                 break;
             case Data::UniformType::Shader: typeStr = "shader";
+                break;
+            case Data::UniformType::Vec2: typeStr = "vec2";
+                break;
+            case Data::UniformType::Vec3: typeStr = "vec3";
+                break;
+            case Data::UniformType::Vec4: typeStr = "vec4";
+                break;
+            case Data::UniformType::Mat4: typeStr = "mat4";
+                break;
+            default:
+                typeStr = "float";
                 break;
             }
             node["type"] = typeStr;
@@ -144,6 +138,10 @@ namespace YAML
             else if (typeStr == "int") rhs.type = Data::UniformType::Int;
             else if (typeStr == "point") rhs.type = Data::UniformType::Point;
             else if (typeStr == "shader") rhs.type = Data::UniformType::Shader;
+            else if (typeStr == "vec2") rhs.type = Data::UniformType::Vec2;
+            else if (typeStr == "vec3") rhs.type = Data::UniformType::Vec3;
+            else if (typeStr == "vec4") rhs.type = Data::UniformType::Vec4;
+            else if (typeStr == "mat4") rhs.type = Data::UniformType::Mat4;
             else return false;
 
             if (node["value"])

@@ -50,7 +50,7 @@ static void onDeviceLog(const wgpu::Device&, wgpu::ErrorType type, wgpu::StringV
 
 bool NutContext::createDevice()
 {
-    /// 获取Adaptar
+    
     wgpu::RequestAdapterOptions adapterOptions;
     static const std::vector<const char*> kToggles = {
         "allow_unsafe_apis",
@@ -63,7 +63,7 @@ bool NutContext::createDevice()
         "dump_shaders",
 
     };
-    wgpu::DawnTogglesDescriptor togglesDesc; //设置Device特性
+    wgpu::DawnTogglesDescriptor togglesDesc; 
     togglesDesc.enabledToggleCount = kToggles.size();
     togglesDesc.enabledToggles = kToggles.data();
 
@@ -112,9 +112,9 @@ bool NutContext::createDevice()
         adapterOptions.featureLevel = wgpu::FeatureLevel::Core;
         auto adapters = m_instance->EnumerateAdapters(&adapterOptions);
         wgpu::Adapter adapter = adapters[0].Get();
-        /// 获取Adaptar
+        
 
-        /// 创建Device
+        
         std::vector<wgpu::FeatureName> features;
         constexpr wgpu::FeatureName allPossibleFeatures[] = {
             wgpu::FeatureName::DepthClipControl,
@@ -214,7 +214,7 @@ bool NutContext::createDevice()
             wgpu::CallbackMode::AllowSpontaneous,
             [this](const wgpu::Device&, wgpu::DeviceLostReason reason, wgpu::StringView msg)
             {
-                //Destroy普遍是程序退出
+                
                 if (reason == wgpu::DeviceLostReason::Destroyed)
                 {
                     return;
@@ -230,7 +230,7 @@ bool NutContext::createDevice()
             switch (t)
             {
             case wgpu::LoggingType::Info:
-                //std::cout << "[WGPU Info] " << msg.data << std::endl;
+                
                 break;
             case wgpu::LoggingType::Warning:
                 std::cout << "[WGPU Warning] " << msg.data << std::endl;
@@ -249,7 +249,7 @@ bool NutContext::createDevice()
         }
     }
     return false;
-    /// 创建Device
+    
 }
 
 bool NutContext::createSurface()
@@ -327,7 +327,7 @@ GraphicsContextCreateStatus NutContext::Initialize(const NutContextDescriptor& d
     {
         return GraphicsContextCreateStatus::ERROR_ALREADY_CREATED;
     }
-    dawnProcSetProcs(&dawn::native::GetProcs()); //初始化Dawn函数指针
+    dawnProcSetProcs(&dawn::native::GetProcs()); 
     m_descriptor = desc;
     if (!createInstance())
     {
@@ -552,4 +552,4 @@ TextureA NutContext::CreateTexture(const TextureDescriptor& descriptor)
     return {texture, shared_from_this()};
 }
 
-} // namespace Nut
+} 

@@ -11,6 +11,7 @@
 
 #include "Editor.h"
 #include "TextureSlicerPanel.h"
+#include "ShaderEditorPanel.h"
 
 void AssetInspectorPanel::Initialize(EditorContext* context)
 {
@@ -288,6 +289,17 @@ void AssetInspectorPanel::drawInspectorUI()
         }
     }
 
+    
+    if (m_editingAssetType == AssetType::Material && m_currentEditingPaths.size() == 1)
+    {
+        PROFILE_SCOPE("AssetInspectorPanel::ShaderEditorButton");
+        ImGui::Separator();
+        if (ImGui::Button("打开Shader编辑器", ImVec2(-1, 30)))
+        {
+            openShaderEditor();
+        }
+    }
+
     {
         PROFILE_SCOPE("AssetInspectorPanel::DrawActionButtons");
         
@@ -407,5 +419,34 @@ void AssetInspectorPanel::openTextureSlicer()
     else
     {
         LogError("无法找到纹理切片编辑器面板");
+    }
+}
+
+void AssetInspectorPanel::openShaderEditor()
+{
+    PROFILE_FUNCTION();
+
+    if (m_currentEditingPaths.empty())
+        return;
+
+    const AssetMetadata* metadata = AssetManager::GetInstance().GetMetadata(m_currentEditingPaths[0]);
+    if (!metadata || metadata->type != AssetType::Material)
+        return;
+
+    if (!m_context->editor)
+    {
+        LogError("EditorContext 中的 editor 指针为空！");
+        return;
+    }
+
+    auto* shaderEditorPanel = dynamic_cast<ShaderEditorPanel*>(m_context->editor->GetPanelByName("着色器编辑器"));
+    if (shaderEditorPanel)
+    {
+        AssetHandle materialHandle(metadata->guid, AssetType::Material);
+        shaderEditorPanel->OpenMaterial(materialHandle);
+    }
+    else
+    {
+        LogError("无法找到Shader编辑器面板");
     }
 }
