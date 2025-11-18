@@ -27,407 +27,30 @@ GraphicsBackend::~GraphicsBackend()
     shutdown();
 }
 
-wgpu::Device GraphicsBackend::CreateDevice(const GraphicsBackendOptions& opts,
-                                           const std::unique_ptr<dawn::native::Instance>& instance)
+
+Nut::TextureA GraphicsBackend::LoadTextureFromFile(const std::string& filename)
 {
-    if (!instance)
+    if (!nutContext)
     {
-        LogError("CreateDevice 失败: Instance 为空指针");
+        LogError("LoadTextureFromFile 失败: nutContext为空");
         return nullptr;
     }
-
-    wgpu::RequestAdapterOptions adapterOptions;
-
-    static const std::vector<const char*> kToggles = {
-        "allow_unsafe_apis",
-        "use_user_defined_labels_in_backend",
-        "disable_robustness",
-        "use_tint_ir",
-        "dawn.validation",
-    };
-    wgpu::DawnTogglesDescriptor togglesDesc;
-    togglesDesc.enabledToggleCount = kToggles.size();
-    togglesDesc.enabledToggles = kToggles.data();
-    adapterOptions.nextInChain = &togglesDesc;
-    adapterOptions.featureLevel = wgpu::FeatureLevel::Core;
-
-    switch (opts.qualityLevel)
-    {
-    case QualityLevel::Low:
-        adapterOptions.powerPreference = wgpu::PowerPreference::LowPower;
-        break;
-    case QualityLevel::Medium:
-    case QualityLevel::High:
-    case QualityLevel::Ultra:
-        adapterOptions.powerPreference = wgpu::PowerPreference::HighPerformance;
-        break;
-    }
-
-    for (const auto& type : options.backendTypePriority)
-    {
-        const char* backendName = "未知";
-        switch (type)
-        {
-        case BackendType::D3D12:
-            adapterOptions.backendType = wgpu::BackendType::D3D12;
-            backendName = "D3D12";
-            break;
-        case BackendType::D3D11:
-            adapterOptions.backendType = wgpu::BackendType::D3D11;
-            backendName = "D3D11";
-            break;
-        case BackendType::Vulkan:
-            adapterOptions.backendType = wgpu::BackendType::Vulkan;
-            backendName = "Vulkan";
-            break;
-        case BackendType::Metal:
-            adapterOptions.backendType = wgpu::BackendType::Metal;
-            backendName = "Metal";
-            break;
-        case BackendType::OpenGL:
-            adapterOptions.backendType = wgpu::BackendType::OpenGL;
-            backendName = "OpenGL";
-            break;
-        case BackendType::OpenGLES:
-            adapterOptions.backendType = wgpu::BackendType::OpenGLES;
-            backendName = "OpenGLES";
-            break;
-        default:
-            LogWarn("跳过不支持的后端类型");
-            continue;
-        }
-
-        std::vector<dawn::native::Adapter> adapters = instance->EnumerateAdapters(&adapterOptions);
-        if (adapters.empty())
-        {
-            LogWarn("未找到 {} 后端适配器", backendName);
-            continue;
-        }
-
-        wgpu::Adapter adapter = adapters[0].Get();
-
-        std::vector<wgpu::FeatureName> features;
-        if (adapter.HasFeature(wgpu::FeatureName::MSAARenderToSingleSampled))
-        {
-            features.push_back(wgpu::FeatureName::MSAARenderToSingleSampled);
-        }
-        if (adapter.HasFeature(wgpu::FeatureName::TransientAttachments))
-        {
-            features.push_back(wgpu::FeatureName::TransientAttachments);
-        }
-        if (adapter.HasFeature(wgpu::FeatureName::Unorm16TextureFormats))
-        {
-            features.push_back(wgpu::FeatureName::Unorm16TextureFormats);
-        }
-        if (adapter.HasFeature(wgpu::FeatureName::DualSourceBlending))
-        {
-            features.push_back(wgpu::FeatureName::DualSourceBlending);
-        }
-        if (adapter.HasFeature(wgpu::FeatureName::FramebufferFetch))
-        {
-            features.push_back(wgpu::FeatureName::FramebufferFetch);
-        }
-        if (adapter.HasFeature(wgpu::FeatureName::BufferMapExtendedUsages))
-        {
-            features.push_back(wgpu::FeatureName::BufferMapExtendedUsages);
-        }
-        if (adapter.HasFeature(wgpu::FeatureName::TextureCompressionETC2))
-        {
-            features.push_back(wgpu::FeatureName::TextureCompressionETC2);
-        }
-        if (adapter.HasFeature(wgpu::FeatureName::TextureCompressionBC))
-        {
-            features.push_back(wgpu::FeatureName::TextureCompressionBC);
-        }
-        if (adapter.HasFeature(wgpu::FeatureName::R8UnormStorage))
-        {
-            features.push_back(wgpu::FeatureName::R8UnormStorage);
-        }
-        if (adapter.HasFeature(wgpu::FeatureName::DawnLoadResolveTexture))
-        {
-            features.push_back(wgpu::FeatureName::DawnLoadResolveTexture);
-        }
-        if (adapter.HasFeature(wgpu::FeatureName::DawnPartialLoadResolveTexture))
-        {
-            features.push_back(wgpu::FeatureName::DawnPartialLoadResolveTexture);
-        }
-
-        wgpu::DeviceDescriptor deviceDescriptor;
-        deviceDescriptor.requiredFeatures = features.data();
-        deviceDescriptor.requiredFeatureCount = features.size();
-        deviceDescriptor.nextInChain = &togglesDesc;
-        deviceDescriptor.SetDeviceLostCallback(
-            wgpu::CallbackMode::AllowSpontaneous,
-            [this](const wgpu::Device&, wgpu::DeviceLostReason reason, wgpu::StringView msg)
-            {
-                LogError("Dawn 设备丢失 - 原因代码: {}, 消息: {}", static_cast<int>(reason), msg.data ? msg.data : "无消息");
-                this->isDeviceLost = true;
-            });
-
-        wgpu::Device createdDevice = adapter.CreateDevice(&deviceDescriptor);
-        if (createdDevice)
-        {
-            LogInfo("成功创建设备: {}", backendName);
-            return createdDevice;
-        }
-        else
-        {
-            LogError("创建 {} 设备失败", backendName);
-        }
-    }
-
-    LogError("所有后端类型都无法创建设备");
-    return nullptr;
+    
+    return nutContext->LoadTextureFromFile(filename);
 }
 
-wgpu::Texture GraphicsBackend::LoadTextureFromFile(const std::string& filename)
+Nut::TextureA GraphicsBackend::LoadTextureFromData(const unsigned char* data, size_t size)
 {
-    if (filename.empty())
+    if (!nutContext)
     {
-        LogError("LoadTextureFromFile 失败: 文件名为空");
+        LogError("LoadTextureFromData 失败: nutContext为空");
         return nullptr;
     }
-
-    int width, height, channels;
-    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-
-    if (!data)
-    {
-        LogError("从文件加载纹理失败: {} - stbi 错误: {}", filename, stbi_failure_reason());
-        return nullptr;
-    }
-
-    if (width <= 0 || height <= 0)
-    {
-        LogError("从文件加载纹理失败: {} - 无效的图像尺寸 ({}x{})", filename, width, height);
-        stbi_image_free(data);
-        return nullptr;
-    }
-
-    channels = 4;
-
-    wgpu::TextureDescriptor textureDesc;
-    textureDesc.size = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1};
-    textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
-    textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
-    textureDesc.mipLevelCount = 1;
-    textureDesc.sampleCount = 1;
-    textureDesc.dimension = wgpu::TextureDimension::e2D;
-
-    wgpu::Texture texture = device.CreateTexture(&textureDesc);
-    if (!texture)
-    {
-        LogError("为文件创建 WGPU 纹理失败: {}", filename);
-        stbi_image_free(data);
-        return nullptr;
-    }
-
-    wgpu::TexelCopyTextureInfo destination;
-    destination.texture = texture;
-    destination.mipLevel = 0;
-    destination.origin = {0, 0, 0};
-    destination.aspect = wgpu::TextureAspect::All;
-
-    wgpu::TexelCopyBufferLayout dataLayout;
-    dataLayout.offset = 0;
-    dataLayout.bytesPerRow = static_cast<uint32_t>(width * channels);
-    dataLayout.rowsPerImage = static_cast<uint32_t>(height);
-
-    wgpu::Extent3D writeSize = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1};
-
-    device.GetQueue().WriteTexture(&destination, data,
-                                   static_cast<size_t>(width * height * channels),
-                                   &dataLayout, &writeSize);
-
-    stbi_image_free(data);
-    return texture;
+    
+    return nutContext->LoadTextureFromMemory(data, size);
 }
 
-wgpu::Texture GraphicsBackend::LoadTextureFromData(const unsigned char* data, size_t size)
-{
-    if (!data || size == 0)
-    {
-        LogError("LoadTextureFromData 失败: 数据指针为空或大小为 0");
-        return nullptr;
-    }
 
-    int width, height, channels;
-    unsigned char* imgData = stbi_load_from_memory(data, static_cast<int>(size), &width, &height, &channels,
-                                                   STBI_rgb_alpha);
-
-    if (!imgData)
-    {
-        LogError("从内存加载纹理失败 - stbi 错误: {}", stbi_failure_reason());
-        return nullptr;
-    }
-
-    if (width <= 0 || height <= 0)
-    {
-        LogError("从内存加载纹理失败 - 无效的图像尺寸 ({}x{})", width, height);
-        stbi_image_free(imgData);
-        return nullptr;
-    }
-
-    channels = 4;
-
-    wgpu::TextureDescriptor textureDesc;
-    textureDesc.size = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1};
-    textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
-    textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
-    textureDesc.mipLevelCount = 1;
-    textureDesc.sampleCount = 1;
-    textureDesc.dimension = wgpu::TextureDimension::e2D;
-
-    wgpu::Texture texture = device.CreateTexture(&textureDesc);
-    if (!texture)
-    {
-        LogError("从内存数据创建 WGPU 纹理失败");
-        stbi_image_free(imgData);
-        return nullptr;
-    }
-
-    wgpu::TexelCopyTextureInfo destination;
-    destination.texture = texture;
-    destination.mipLevel = 0;
-    destination.origin = {0, 0, 0};
-    destination.aspect = wgpu::TextureAspect::All;
-
-    wgpu::TexelCopyBufferLayout dataLayout;
-    dataLayout.offset = 0;
-    dataLayout.bytesPerRow = static_cast<uint32_t>(width * channels);
-    dataLayout.rowsPerImage = static_cast<uint32_t>(height);
-
-    wgpu::Extent3D writeSize = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1};
-
-    device.GetQueue().WriteTexture(&destination, imgData,
-                                   static_cast<size_t>(width * height * channels),
-                                   &dataLayout, &writeSize);
-
-    stbi_image_free(imgData);
-    return texture;
-}
-
-wgpu::Surface GraphicsBackend::CreateSurface(const GraphicsBackendOptions& options,
-                                             const std::unique_ptr<dawn::native::Instance>& dawnInstance)
-{
-    if (!dawnInstance)
-    {
-        LogError("CreateSurface 失败: Dawn instance 为空");
-        return nullptr;
-    }
-
-    if (!options.windowHandle.IsValid())
-    {
-        LogError("CreateSurface 失败: 窗口句柄无效");
-        return nullptr;
-    }
-
-    wgpu::SurfaceDescriptor surfaceDesc;
-
-#if defined(_WIN32)
-    wgpu::SurfaceDescriptorFromWindowsHWND surfaceChainedDesc;
-    surfaceChainedDesc.hwnd = options.windowHandle.hWnd;
-    surfaceChainedDesc.hinstance = options.windowHandle.hInst;
-    surfaceDesc.nextInChain = &surfaceChainedDesc;
-#elif defined(__APPLE__)
-    wgpu::SurfaceDescriptorFromMetalLayer surfaceChainedDesc;
-    surfaceChainedDesc.layer = options.windowHandle.metalLayer;
-    surfaceDesc.nextInChain = &surfaceChainedDesc;
-#elif defined(__linux__) && !defined(__ANDROID__)
-    wgpu::SurfaceDescriptorFromXlibWindow surfaceChainedDesc;
-    surfaceChainedDesc.display = options.windowHandle.x11Display;
-    surfaceChainedDesc.window = options.windowHandle.x11Window;
-    surfaceDesc.nextInChain = &surfaceChainedDesc;
-#elif defined(__ANDROID__)
-    wgpu::SurfaceDescriptorFromAndroidNativeWindow surfaceChainedDesc;
-    surfaceChainedDesc.window = options.windowHandle.aNativeWindow;
-    surfaceDesc.nextInChain = &surfaceChainedDesc;
-#else
-#error "Unsupported platform for surface creation"
-    LogError("不支持的平台: 无法创建表面");
-    throw std::runtime_error("不支持的平台: 无法创建表面");
-    return nullptr;
-#endif
-
-    wgpu::Surface surface = wgpu::Instance(dawnInstance->Get()).CreateSurface(&surfaceDesc);
-    if (!surface)
-    {
-        LogError("创建 WGPU 表面失败");
-        return nullptr;
-    }
-
-    LogInfo("成功创建 WGPU 表面");
-    return surface;
-}
-
-void GraphicsBackend::configureSurface(uint16_t width, uint16_t height)
-{
-    if (!surface)
-    {
-        LogWarn("configureSurface: 表面为空,跳过配置");
-        return;
-    }
-
-    if (width == 0 || height == 0)
-    {
-        LogError("configureSurface 失败: 无效的尺寸 ({}x{})", width, height);
-        return;
-    }
-
-    wgpu::SurfaceConfiguration config;
-    config.device = device;
-    config.format = surfaceFormat;
-    config.usage = wgpu::TextureUsage::RenderAttachment;
-    config.width = width;
-    config.height = height;
-    if (enableVSync)
-        config.presentMode = wgpu::PresentMode::Fifo;
-    else
-    {
-#ifdef __ANDROID__
-        config.presentMode = wgpu::PresentMode::Fifo;
-#else
-        config.presentMode = wgpu::PresentMode::Mailbox;
-#endif
-    }
-
-    surface.Configure(&config);
-
-    this->currentWidth = width;
-    this->currentHeight = height;
-
-    if (m_msaaSampleCount > 1)
-    {
-        if (m_msaaTexture)
-        {
-            m_msaaTexture.Destroy();
-        }
-        wgpu::TextureDescriptor msaaDesc;
-        msaaDesc.usage = wgpu::TextureUsage::RenderAttachment;
-        msaaDesc.size = {(uint32_t)width, (uint32_t)height, 1};
-        msaaDesc.format = surfaceFormat;
-        msaaDesc.sampleCount = m_msaaSampleCount;
-        m_msaaTexture = device.CreateTexture(&msaaDesc);
-
-        if (!m_msaaTexture)
-        {
-            LogError("创建 MSAA 纹理失败 (样本数: {})", m_msaaSampleCount);
-        }
-        else
-        {
-            LogInfo("创建 MSAA 纹理 (样本数: {})", m_msaaSampleCount);
-        }
-    }
-    else
-    {
-        if (m_msaaTexture)
-        {
-            m_msaaTexture.Destroy();
-            m_msaaTexture = nullptr;
-            LogInfo("已销毁 MSAA 纹理");
-        }
-    }
-}
 
 void GraphicsBackend::updateQualitySettings()
 {
@@ -462,30 +85,79 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
 
     try
     {
-        dawnProcSetProcs(&dawn::native::GetProcs());
-        std::vector<wgpu::InstanceFeatureName> instanceFeatures = {wgpu::InstanceFeatureName::TimedWaitAny};
-        wgpu::InstanceDescriptor instanceDesc;
-        instanceDesc.requiredFeatureCount = instanceFeatures.size();
-        instanceDesc.requiredFeatures = instanceFeatures.data();
-        dawnInstance = std::make_unique<dawn::native::Instance>(&instanceDesc);
-
-        if (!dawnInstance)
+        // 创建 NutContext 描述符
+        Nut::NutContextDescriptor nutDesc;
+        nutDesc.width = opts.width;
+        nutDesc.height = opts.height;
+        nutDesc.enableVSync = opts.enableVSync;
+        
+        // 复制窗口句柄
+#if defined(_WIN32)
+        nutDesc.windowHandle.hWnd = opts.windowHandle.hWnd;
+        nutDesc.windowHandle.hInst = opts.windowHandle.hInst;
+#elif defined(__APPLE__)
+        nutDesc.windowHandle.metalLayer = opts.windowHandle.metalLayer;
+#elif defined(__linux__) && !defined(__ANDROID__)
+        nutDesc.windowHandle.x11Display = opts.windowHandle.x11Display;
+        nutDesc.windowHandle.x11Window = opts.windowHandle.x11Window;
+#elif defined(__ANDROID__)
+        nutDesc.windowHandle.aNativeWindow = opts.windowHandle.aNativeWindow;
+#endif
+        
+        // 转换 BackendType
+        for (const auto& type : opts.backendTypePriority)
         {
-            LogError("创建 Dawn instance 失败");
-            throw std::runtime_error("创建 Dawn instance 失败");
+            switch (type)
+            {
+            case BackendType::D3D12:
+                nutDesc.backendTypePriority.push_back(Nut::BackendType::D3D12);
+                break;
+            case BackendType::D3D11:
+                nutDesc.backendTypePriority.push_back(Nut::BackendType::D3D11);
+                break;
+            case BackendType::Vulkan:
+                nutDesc.backendTypePriority.push_back(Nut::BackendType::Vulkan);
+                break;
+            case BackendType::Metal:
+                nutDesc.backendTypePriority.push_back(Nut::BackendType::Metal);
+                break;
+            case BackendType::OpenGL:
+                nutDesc.backendTypePriority.push_back(Nut::BackendType::OpenGL);
+                break;
+            case BackendType::OpenGLES:
+                nutDesc.backendTypePriority.push_back(Nut::BackendType::OpenGLES);
+                break;
+            }
+        }
+        
+        // 转换 QualityLevel
+        switch (opts.qualityLevel)
+        {
+        case QualityLevel::Low:
+            nutDesc.qualityLevel = Nut::QualityLevel::Low;
+            break;
+        case QualityLevel::Medium:
+            nutDesc.qualityLevel = Nut::QualityLevel::Medium;
+            break;
+        case QualityLevel::High:
+        case QualityLevel::Ultra:
+            nutDesc.qualityLevel = Nut::QualityLevel::High;
+            break;
         }
 
-        device = CreateDevice(options, dawnInstance);
-        if (!device)
+        // 创建 NutContext
+        nutContext = Nut::NutContext::Create(nutDesc);
+        if (!nutContext)
         {
-            LogError("创建 Dawn 设备失败");
-            throw std::runtime_error("创建 Dawn 设备失败");
+            LogError("创建 NutContext 失败");
+            throw std::runtime_error("创建 NutContext 失败");
         }
 
+        // 创建 Skia Graphite 上下文
         skgpu::graphite::DawnBackendContext backendContext;
-        backendContext.fInstance = wgpu::Instance(dawnInstance->Get());
-        backendContext.fDevice = device;
-        backendContext.fQueue = device.GetQueue();
+        backendContext.fInstance = nutContext->GetWGPUInstance();
+        backendContext.fDevice = nutContext->GetWGPUDevice();
+        backendContext.fQueue = nutContext->GetWGPUDevice().GetQueue();
 
         graphiteContext = skgpu::graphite::ContextFactory::MakeDawn(backendContext, {});
         if (!graphiteContext)
@@ -503,16 +175,27 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
 
         this->currentWidth = options.width;
         this->currentHeight = options.height;
-
-        if (options.windowHandle.IsValid())
+        
+        // 创建 MSAA 纹理
+        if (m_msaaSampleCount > 1)
         {
-            surface = CreateSurface(options, dawnInstance);
-            if (!surface)
+            Nut::TextureDescriptor msaaDesc;
+            msaaDesc.SetSize(currentWidth, currentHeight)
+                   .SetFormat(GetSurfaceFormat())
+                   .SetSampleCount(m_msaaSampleCount)
+                   .SetUsage(wgpu::TextureUsage::RenderAttachment)
+                   .SetLabel("MSAA Texture");
+            
+            m_msaaTexture = nutContext->CreateTexture(msaaDesc);
+
+            if (!m_msaaTexture)
             {
-                LogError("创建 WGPU 表面失败");
-                throw std::runtime_error("创建 WGPU 表面失败");
+                LogError("创建 MSAA 纹理失败 (样本数: {})", m_msaaSampleCount);
             }
-            configureSurface(options.width, options.height);
+            else
+            {
+                LogInfo("创建 MSAA 纹理 (样本数: {})", m_msaaSampleCount);
+            }
         }
     }
     catch (const std::exception& e)
@@ -524,25 +207,32 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
 
 void GraphicsBackend::ResolveMSAA()
 {
-    if (m_msaaSampleCount <= 1 || !surface || !m_msaaTexture || !m_currentSurfaceTexture.texture)
+    if (m_msaaSampleCount <= 1 || !nutContext || !m_msaaTexture)
     {
         return;
     }
 
     try
     {
-        wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
+        wgpu::CommandEncoder encoder = nutContext->GetWGPUDevice().CreateCommandEncoder();
         if (!encoder)
         {
             LogError("ResolveMSAA: 创建命令编码器失败");
             return;
         }
 
+        auto currentTexture = nutContext->GetCurrentTexture();
+        if (!currentTexture.GetTexture())
+        {
+            LogError("ResolveMSAA: 获取当前纹理失败");
+            return;
+        }
+
         wgpu::RenderPassColorAttachment colorAttachment;
-        colorAttachment.view = m_msaaTexture.CreateView();
+        colorAttachment.view = m_msaaTexture.GetTexture().CreateView();
         colorAttachment.loadOp = wgpu::LoadOp::Load;
         colorAttachment.storeOp = wgpu::StoreOp::Store;
-        colorAttachment.resolveTarget = m_currentSurfaceTexture.texture.CreateView();
+        colorAttachment.resolveTarget = currentTexture.GetTexture().CreateView();
 
         wgpu::RenderPassDescriptor passDesc;
         passDesc.colorAttachmentCount = 1;
@@ -563,7 +253,7 @@ void GraphicsBackend::ResolveMSAA()
             return;
         }
 
-        device.GetQueue().Submit(1, &commands);
+        nutContext->GetWGPUDevice().GetQueue().Submit(1, &commands);
     }
     catch (const std::exception& e)
     {
@@ -602,14 +292,13 @@ std::shared_ptr<RenderTarget> GraphicsBackend::CreateOrGetRenderTarget(const std
         }
     }
 
-    wgpu::TextureDescriptor textureDesc;
-    textureDesc.size = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1};
-    textureDesc.format = GetSurfaceFormat();
-    textureDesc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
-    textureDesc.mipLevelCount = 1;
-    textureDesc.sampleCount = 1;
+    Nut::TextureDescriptor textureDesc;
+    textureDesc.SetSize(width, height)
+               .SetFormat(GetSurfaceFormat())
+               .SetUsage(wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding)
+               .SetLabel(name);
 
-    wgpu::Texture texture = device.CreateTexture(&textureDesc);
+    Nut::TextureA texture = nutContext->CreateTexture(textureDesc);
     if (!texture)
     {
         LogError("创建渲染目标纹理失败: {}", name);
@@ -647,7 +336,7 @@ sk_sp<SkImage> GraphicsBackend::CreateImageFromCompressedData(const unsigned cha
     textureDesc.format = format;
     textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
 
-    wgpu::Texture texture = device.CreateTexture(&textureDesc);
+    wgpu::Texture texture = nutContext->GetWGPUDevice().CreateTexture(&textureDesc);
     if (!texture)
     {
         LogError("为压缩数据创建 WGPU 纹理失败");
@@ -660,7 +349,7 @@ sk_sp<SkImage> GraphicsBackend::CreateImageFromCompressedData(const unsigned cha
     dataLayout.bytesPerRow = (width / 4) * 16;
     dataLayout.rowsPerImage = height / 4;
     wgpu::Extent3D writeSize = {(uint32_t)width, (uint32_t)height, 1};
-    device.GetQueue().WriteTexture(&destination, data, size, &dataLayout, &writeSize);
+    nutContext->GetWGPUDevice().GetQueue().WriteTexture(&destination, data, size, &dataLayout, &writeSize);
 
     auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(texture.Get());
     if (!backendTex.isValid())
@@ -699,10 +388,9 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
             return nullptr;
         }
 
-
         auto m_surface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(),
                                                         backendTex,
-                                                        kRGBA_8888_SkColorType,
+                                                        kBGRA_8888_SkColorType,
                                                         SkColorSpace::MakeSRGB(),
                                                         nullptr);
         if (!m_surface)
@@ -712,11 +400,11 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
         return m_surface;
     }
 
-    if (surface)
+    if (nutContext)
     {
         if (m_msaaSampleCount > 1 && m_msaaTexture)
         {
-            auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(m_msaaTexture.Get());
+            auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(m_msaaTexture.GetTexture().Get());
             if (!backendTex.isValid())
             {
                 LogError("GetSurface: MSAA 纹理的后端纹理无效");
@@ -724,7 +412,7 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
             }
 
             auto skSurface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(), backendTex,
-                                                            kRGBA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
+                                                            kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
             if (!skSurface)
             {
                 LogError("GetSurface: 包装 MSAA 纹理失败");
@@ -733,15 +421,13 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
         }
         else
         {
-            if (!m_currentSurfaceTexture.texture)
+            auto currentTexture = nutContext->GetCurrentTexture();
+            if (!currentTexture.GetTexture())
             {
-                if (!BeginFrame())
-                {
-                    LogError("GetSurface: BeginFrame 失败");
-                    return nullptr;
-                }
+                LogError("GetSurface: 获取当前纹理失败");
+                return nullptr;
             }
-            auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(m_currentSurfaceTexture.texture.Get());
+            auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(currentTexture.GetTexture().Get());
             if (!backendTex.isValid())
             {
                 LogError("GetSurface: 当前表面纹理的后端纹理无效");
@@ -749,7 +435,7 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
             }
 
             auto skSurface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(), backendTex,
-                                                            kRGBA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
+                                                            kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
             if (!skSurface)
             {
                 LogError("GetSurface: 包装表面纹理失败");
@@ -764,7 +450,7 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
         {
             SkImageInfo imageInfo = SkImageInfo::Make(
                 currentWidth, currentHeight,
-                kRGBA_8888_SkColorType,
+                kBGRA_8888_SkColorType,
                 kPremul_SkAlphaType,
                 SkColorSpace::MakeSRGB()
             );
@@ -843,16 +529,36 @@ void GraphicsBackend::Resize(uint16_t width, uint16_t height)
         return;
     }
 
-    if (surface)
+    if (nutContext)
     {
-        configureSurface(width, height);
+        nutContext->Resize(width, height);
+        
+        // 更新 MSAA 纹理
+        if (m_msaaSampleCount > 1)
+        {
+            if (m_msaaTexture)
+            {
+                m_msaaTexture.GetTexture().Destroy();
+            }
+            Nut::TextureDescriptor msaaDesc;
+            msaaDesc.SetSize(width, height)
+                   .SetFormat(GetSurfaceFormat())
+                   .SetSampleCount(m_msaaSampleCount)
+                   .SetUsage(wgpu::TextureUsage::RenderAttachment)
+                   .SetLabel("MSAA Texture");
+            
+            m_msaaTexture = nutContext->CreateTexture(msaaDesc);
+
+            if (!m_msaaTexture)
+            {
+                LogError("创建 MSAA 纹理失败 (样本数: {})", m_msaaSampleCount);
+            }
+        }
     }
-    else
-    {
-        this->currentWidth = width;
-        this->currentHeight = height;
-        this->offscreenSurface.reset();
-    }
+    
+    this->currentWidth = width;
+    this->currentHeight = height;
+    this->offscreenSurface.reset();
 }
 
 bool GraphicsBackend::Recreate()
@@ -898,7 +604,11 @@ void GraphicsBackend::SetEnableVSync(bool enable)
     }
 
     enableVSync = enable;
-    configureSurface(currentWidth, currentHeight);
+    if (nutContext)
+    {
+        nutContext->SetVSync(enable);
+        nutContext->Resize(currentWidth, currentHeight);
+    }
 }
 
 void GraphicsBackend::SetQualityLevel(QualityLevel level)
@@ -929,40 +639,29 @@ bool GraphicsBackend::BeginFrame()
         }
     }
 
-    if (!surface)
+    if (!nutContext)
     {
-        LogWarn("BeginFrame: 表面为空");
+        LogWarn("BeginFrame: nutContext为空");
         return false;
     }
 
-    if (m_currentSurfaceTexture.texture)
-    {
-        m_currentSurfaceTexture.texture.Destroy();
-    }
-    m_currentSurfaceTexture = {};
-
-    surface.GetCurrentTexture(&m_currentSurfaceTexture);
-    if (m_currentSurfaceTexture.status != wgpu::SurfaceGetCurrentTextureStatus::SuccessOptimal)
-    {
-        LogWarn("BeginFrame: 获取表面纹理失败,状态码: {}", static_cast<int>(m_currentSurfaceTexture.status));
-        m_currentSurfaceTexture = {};
-        if (m_currentSurfaceTexture.status == wgpu::SurfaceGetCurrentTextureStatus::Lost)
-        {
-            configureSurface(this->currentWidth, this->currentHeight);
-        }
-        return false;
-    }
     return true;
 }
 
 wgpu::TextureView GraphicsBackend::GetCurrentFrameView() const
 {
-    if (!m_currentSurfaceTexture.texture)
+    if (!nutContext)
+    {
+        LogWarn("GetCurrentFrameView: nutContext为空");
+        return nullptr;
+    }
+    auto currentTexture = nutContext->GetCurrentTexture();
+    if (!currentTexture.GetTexture())
     {
         LogWarn("GetCurrentFrameView: 当前表面纹理为空");
         return nullptr;
     }
-    return m_currentSurfaceTexture.texture.CreateView();
+    return currentTexture.GetTexture().CreateView();
 }
 
 void GraphicsBackend::Submit()
@@ -1001,9 +700,9 @@ void GraphicsBackend::Submit()
 
 void GraphicsBackend::PresentFrame()
 {
-    if (surface)
+    if (nutContext)
     {
-        (void)surface.Present();
+        nutContext->Present();
     }
     else if (offscreenSurface)
     {
@@ -1013,14 +712,6 @@ void GraphicsBackend::PresentFrame()
             LogWarn("PresentFrame: 创建离屏图像快照失败");
         }
     }
-
-    if (m_currentSurfaceTexture.texture)
-    {
-        m_currentSurfaceTexture.texture.Destroy();
-    }
-    m_currentSurfaceTexture = {};
-
-    device.Tick();
 }
 
 skgpu::graphite::Context* GraphicsBackend::GetGraphiteContext() const
@@ -1031,6 +722,12 @@ skgpu::graphite::Context* GraphicsBackend::GetGraphiteContext() const
 skgpu::graphite::Recorder* GraphicsBackend::GetRecorder() const
 {
     return graphiteRecorder.get();
+}
+
+wgpu::TextureFormat GraphicsBackend::GetSurfaceFormat() const
+{
+    // 默认使用 BGRA8Unorm 格式，这是 NutContext 中的默认格式
+    return wgpu::TextureFormat::BGRA8Unorm;
 }
 
 sk_sp<SkImage> GraphicsBackend::DetachLastOffscreenImage()
@@ -1083,29 +780,11 @@ void GraphicsBackend::shutdown()
 
     if (m_msaaTexture)
     {
-        m_msaaTexture.Destroy();
+        m_msaaTexture.GetTexture().Destroy();
         m_msaaTexture = nullptr;
     }
 
-    if (m_currentSurfaceTexture.texture)
-    {
-        m_currentSurfaceTexture.texture.Destroy();
-    }
-    m_currentSurfaceTexture = {};
-
-    if (surface)
-    {
-        surface.Unconfigure();
-        surface = nullptr;
-    }
-
-    if (device)
-    {
-        device.Tick();
-        device = nullptr;
-    }
-
-    dawnInstance.reset();
+    nutContext.reset();
 
     isDeviceLost = false;
 }

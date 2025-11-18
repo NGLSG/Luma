@@ -12,6 +12,7 @@
 #include "include/gpu/graphite/dawn/DawnBackendContext.h"
 #include "include/gpu/graphite/dawn/DawnGraphiteTypes.h"
 #include "include/gpu/graphite/dawn/DawnUtils.h"
+#include "Nut/TextureA.h"
 
 /**
  * @brief 渲染目标类，封装了一个WGPU纹理及其尺寸信息。
@@ -42,6 +43,12 @@ public:
      */
     wgpu::Texture GetTexture() const;
     /**
+     * @brief 获取内部封装的TextureA对象。
+     *
+     * @return TextureA对象引用。
+     */
+    const Nut::TextureA& GetTextureA() const;
+    /**
      * @brief 获取渲染目标的宽度。
      *
      * @return 渲染目标的宽度。
@@ -61,9 +68,17 @@ public:
      * @param height 渲染目标的高度。
      */
     RenderTarget(wgpu::Texture texture, uint16_t width, uint16_t height);
+    /**
+     * @brief 构造函数，使用给定的TextureA、宽度和高度初始化渲染目标。
+     *
+     * @param texture TextureA对象。
+     * @param width 渲染目标的宽度。
+     * @param height 渲染目标的高度。
+     */
+    RenderTarget(Nut::TextureA texture, uint16_t width, uint16_t height);
 
 private:
-    wgpu::Texture m_texture; ///< 内部封装的WGPU纹理对象。
+    Nut::TextureA m_texture; ///< 内部封装的TextureA对象。
     uint16_t m_width;       ///< 渲染目标的宽度。
     uint16_t m_height;      ///< 渲染目标的高度。
 };

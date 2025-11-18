@@ -313,14 +313,14 @@ void NutContext::configureSurface(uint32_t width, uint32_t height)
     m_surface.Configure(&surfaceConfig);
 }
 
-std::shared_ptr<NutContext> NutContext::Create(const GraphicsContextDescriptor& descriptor)
+std::shared_ptr<NutContext> NutContext::Create(const NutContextDescriptor& descriptor)
 {
     std::shared_ptr<NutContext> result = std::make_shared<NutContext>();
     result->Initialize(descriptor);
     return result;
 }
 
-GraphicsContextCreateStatus NutContext::Initialize(const GraphicsContextDescriptor& desc)
+GraphicsContextCreateStatus NutContext::Initialize(const NutContextDescriptor& desc)
 {
     static bool Initialized = false;
     if (Initialized)
@@ -507,11 +507,11 @@ TextureA NutContext::GetCurrentTexture()
         {
             return nullptr;
         }
-        return {m_currentSurfaceTexture.texture, this};
+        return {m_currentSurfaceTexture.texture, shared_from_this()};
     }
     else
     {
-        return {m_currentRenderTarget->GetTexture(), this};
+        return {m_currentRenderTarget->GetTexture(), shared_from_this()};
     }
 }
 
@@ -549,7 +549,7 @@ TextureA NutContext::CreateTexture(const TextureDescriptor& descriptor)
         return nullptr;
     }
 
-    return {texture, this};
+    return {texture, shared_from_this()};
 }
 
 } // namespace Nut

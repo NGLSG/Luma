@@ -96,7 +96,7 @@ TextureA TextureBuilder::Build(std::shared_ptr<NutContext> context)
         return nullptr;
     }
 
-    // 4. 上传像素数据
+    // 4. 上传像素数据（支持2D和3D纹理）
     if (finalPixels)
     {
         wgpu::TexelCopyTextureInfo destination;
@@ -124,9 +124,11 @@ TextureA TextureBuilder::Build(std::shared_ptr<NutContext> context)
         dataLayout.bytesPerRow = bytesPerRow;
         dataLayout.rowsPerImage = rowsPerImage;
 
-        wgpu::Extent3D writeSize = {finalWidth, finalHeight, 1};
+        // 对于3D纹理或纹理数组，使用实际深度
+        uint32_t uploadDepth = (m_hasPixelData && m_depth > 1) ? m_depth : 1;
+        wgpu::Extent3D writeSize = {finalWidth, finalHeight, uploadDepth};
 
-        size_t dataSize = finalWidth * finalHeight * finalChannels;
+        size_t dataSize = finalWidth * finalHeight * uploadDepth * finalChannels;
         context->GetWGPUDevice().GetQueue().WriteTexture(
             &destination,
             finalPixels,
@@ -134,6 +136,53 @@ TextureA TextureBuilder::Build(std::shared_ptr<NutContext> context)
             &dataLayout,
             &writeSize
         );
+    }
+    
+    // 4b. 处理纹理数组（从多个文件加载）
+    if (m_loadFromFileArray && !m_filePathArray.empty())
+    {
+        uint32_t layerIndex = 0;
+        for (const auto& filePath : m_filePathArray)
+        {
+            int width, height, channels;
+            unsigned char* pixels = stbi_load(filePath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+            
+            if (!pixels)
+            {
+                std::cerr << "加载纹理数组层失败: " << filePath << std::endl;
+                continue;
+            }
+            
+            // 上传到特定数组层
+            wgpu::TexelCopyTextureInfo destination;
+            destination.texture = texture;
+            destination.mipLevel = 0;
+            destination.aspect = wgpu::TextureAspect::All;
+            destination.origin = {0, 0, layerIndex};
+            
+            wgpu::TexelCopyBufferLayout dataLayout;
+            dataLayout.offset = 0;
+            dataLayout.bytesPerRow = width * 4;
+            dataLayout.rowsPerImage = height;
+            
+            wgpu::Extent3D writeSize = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1};
+            
+            size_t dataSize = width * height * 4;
+            context->GetWGPUDevice().GetQueue().WriteTexture(
+                &destination,
+                pixels,
+                dataSize,
+                &dataLayout,
+                &writeSize
+            );
+            
+            stbi_image_free(pixels);
+            layerIndex++;
+            
+            std::cout << "纹理数组层 " << layerIndex << " 加载成功: " << filePath << std::endl;
+        }
+        
+        std::cout << "纹理数组加载完成，共 " << layerIndex << " 层" << std::endl;
     }
 
     // 5. 生成Mipmaps(如果需要)
@@ -183,7 +232,7 @@ TextureA TextureBuilder::Build(std::shared_ptr<NutContext> context)
         stbi_image_free(loadedPixels);
     }
 
-    return {texture, context.get()};
+    return {texture, context};
 }
 
 TextureA::TextureA(std::nullptr_t) noexcept
@@ -192,7 +241,7 @@ TextureA::TextureA(std::nullptr_t) noexcept
     m_textureView = nullptr;
 }
 
-TextureA::TextureA(const wgpu::Texture& texture, NutContext* context) : m_Context(context)
+TextureA::TextureA(const wgpu::Texture& texture, const std::shared_ptr<NutContext>& context) : m_Context(context)
 {
     m_texture = texture;
     if (texture)
@@ -223,6 +272,105 @@ size_t TextureA::GetHeight() const
     if (!m_texture)
         return 0;
     return m_texture.GetHeight();
+}
+
+size_t TextureA::GetDepth() const
+{
+    if (!m_texture)
+        return 0;
+    return m_texture.GetDepthOrArrayLayers();
+}
+
+wgpu::TextureDimension TextureA::GetDimension() const
+{
+    if (!m_texture)
+        return wgpu::TextureDimension::e2D;
+    return m_texture.GetDimension();
+}
+
+wgpu::TextureFormat TextureA::GetFormat() const
+{
+    if (!m_texture)
+        return wgpu::TextureFormat::Undefined;
+    return m_texture.GetFormat();
+}
+
+uint32_t TextureA::GetMipLevelCount() const
+{
+    if (!m_texture)
+        return 0;
+    return m_texture.GetMipLevelCount();
+}
+
+uint32_t TextureA::GetSampleCount() const
+{
+    if (!m_texture)
+        return 0;
+    return m_texture.GetSampleCount();
+}
+
+wgpu::TextureView TextureA::CreateView(
+    uint32_t baseMipLevel,
+    uint32_t mipLevelCount,
+    uint32_t baseArrayLayer,
+    uint32_t arrayLayerCount,
+    wgpu::TextureViewDimension dimension,
+    wgpu::TextureAspect aspect) const
+{
+    if (!m_texture)
+    {
+        std::cerr << "TextureA::CreateView: Invalid texture" << std::endl;
+        return nullptr;
+    }
+    
+    wgpu::TextureViewDescriptor viewDesc;
+    viewDesc.baseMipLevel = baseMipLevel;
+    viewDesc.mipLevelCount = (mipLevelCount == 0) ? (GetMipLevelCount() - baseMipLevel) : mipLevelCount;
+    viewDesc.baseArrayLayer = baseArrayLayer;
+    viewDesc.arrayLayerCount = (arrayLayerCount == 0) ? (GetDepth() - baseArrayLayer) : arrayLayerCount;
+    viewDesc.aspect = aspect;
+    
+    // 自动推断维度
+    if (dimension == wgpu::TextureViewDimension::Undefined)
+    {
+        auto texDim = GetDimension();
+        if (texDim == wgpu::TextureDimension::e1D)
+        {
+            viewDesc.dimension = wgpu::TextureViewDimension::e1D;
+        }
+        else if (texDim == wgpu::TextureDimension::e2D)
+        {
+            if (GetDepth() == 6)
+            {
+                viewDesc.dimension = wgpu::TextureViewDimension::Cube;
+            }
+            else if (GetDepth() > 1)
+            {
+                viewDesc.dimension = wgpu::TextureViewDimension::e2DArray;
+            }
+            else
+            {
+                viewDesc.dimension = wgpu::TextureViewDimension::e2D;
+            }
+        }
+        else if (texDim == wgpu::TextureDimension::e3D)
+        {
+            viewDesc.dimension = wgpu::TextureViewDimension::e3D;
+        }
+    }
+    else
+    {
+        viewDesc.dimension = dimension;
+    }
+    
+    viewDesc.format = GetFormat();
+    
+    return m_texture.CreateView(&viewDesc);
+}
+
+bool TextureA::IsCube() const
+{
+    return GetDimension() == wgpu::TextureDimension::e2D && GetDepth() == 6;
 }
 
 wgpu::TextureView TextureA::GetView() const

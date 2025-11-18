@@ -1,3 +1,4 @@
+/*
 #include <format>
 #include <future>
 #include <iostream>
@@ -230,7 +231,7 @@ int WINAPI TESTFUNCTION_WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdS
     if (hwnd == nullptr)
         return 0;
 
-    GraphicsContextDescriptor graphicsDesc;
+    NutContextDescriptor graphicsDesc;
     graphicsDesc.width = 800;
     graphicsDesc.height = 600;
     graphicsDesc.windowHandle.hWnd = hwnd;
@@ -466,3 +467,4 @@ int WINAPI TESTFUNCTION_WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdS
 
     return 0;
 }
+*/

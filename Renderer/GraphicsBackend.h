@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include "dawn/dawn_proc.h"
 #include "RenderTarget.h"
+#include "Nut/NutContext.h"
 
 #include <imgui.h>
 
@@ -99,18 +100,13 @@ struct GraphicsBackendOptions
 class LUMA_API GraphicsBackend
 {
 private:
-    std::unique_ptr<dawn::native::Instance> dawnInstance; ///< Dawn 原生实例。
-    wgpu::Device device; ///< WebGPU 设备。
+    std::shared_ptr<Nut::NutContext> nutContext; ///< Nut图形上下文，管理wgpu资源。
     std::unique_ptr<skgpu::graphite::Context> graphiteContext; ///< Skia Graphite 上下文。
     std::unique_ptr<skgpu::graphite::Recorder> graphiteRecorder; ///< Skia Graphite 记录器。
     GraphicsBackendOptions options; ///< 图形后端选项。
-    wgpu::Texture m_msaaTexture; ///< 多重采样抗锯齿纹理。
+    Nut::TextureA m_msaaTexture; ///< 多重采样抗锯齿纹理。
     int m_msaaSampleCount = 1; ///< 多重采样抗锯齿样本计数。
     bool isDeviceLost = false; ///< 设备是否丢失的标志。
-
-    wgpu::Surface surface; ///< WebGPU 表面。
-    wgpu::TextureFormat surfaceFormat = wgpu::TextureFormat::RGBA8Unorm; ///< 表面纹理格式。
-    wgpu::SurfaceTexture m_currentSurfaceTexture; ///< 当前表面纹理。
 
 
     sk_sp<SkSurface> offscreenSurface; ///< 离屏渲染表面。
@@ -125,19 +121,7 @@ private:
     GraphicsBackend(); ///< 私有构造函数，通过 Create 静态方法创建实例。
     bool enableVSync = true; ///< 是否启用垂直同步。
 
-
-    wgpu::Device CreateDevice(const GraphicsBackendOptions& options,
-                              const std::unique_ptr<dawn::native::Instance>& instance);
-
-
-    static wgpu::Surface CreateSurface(const GraphicsBackendOptions& options,
-                                       const std::unique_ptr<dawn::native::Instance>& dawnInstance);
-
-
     void updateQualitySettings();
-
-
-    void configureSurface(uint16_t width, uint16_t height);
 
 
     void initialize(const GraphicsBackendOptions& options);
@@ -278,13 +262,19 @@ public:
      * @brief 获取 WebGPU 设备。
      * @return WebGPU 设备对象。
      */
-    wgpu::Device GetDevice() const { return device; }
+    wgpu::Device GetDevice() const { return nutContext ? nutContext->GetWGPUDevice() : wgpu::Device(); }
 
     /**
      * @brief 获取表面纹理格式。
      * @return 表面纹理格式。
      */
-    wgpu::TextureFormat GetSurfaceFormat() const { return surfaceFormat; }
+    wgpu::TextureFormat GetSurfaceFormat() const;
+
+    /**
+     * @brief 获取 NutContext。
+     * @return NutContext 智能指针。
+     */
+    std::shared_ptr<Nut::NutContext> GetNutContext() const { return nutContext; }
 
     /**
      * @brief 关闭图形后端并释放资源。
@@ -301,11 +291,11 @@ public:
     /**
      * @brief 从文件加载纹理。
      * @param filename 纹理文件路径。
-     * @return 加载的 WebGPU 纹理。
+     * @return 加载的纹理。
      */
-    wgpu::Texture LoadTextureFromFile(const std::string& filename);
+    Nut::TextureA LoadTextureFromFile(const std::string& filename);
 
-    wgpu::Texture LoadTextureFromData(const unsigned char* data, size_t size);
+    Nut::TextureA LoadTextureFromData(const unsigned char* data, size_t size);
 };
 
 #endif

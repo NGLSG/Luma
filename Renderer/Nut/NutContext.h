@@ -72,7 +72,7 @@ struct NativeWindowHandle
     }
 };
 
-struct GraphicsContextDescriptor
+struct NutContextDescriptor
 {
     std::vector<BackendType> backendTypePriority = {
         BackendType::D3D12, BackendType::Vulkan, BackendType::Metal
@@ -104,7 +104,7 @@ private:
     std::unique_ptr<dawn::native::Instance> m_instance;
     wgpu::Device m_device;
     wgpu::Surface m_surface;
-    GraphicsContextDescriptor m_descriptor;
+    NutContextDescriptor m_descriptor;
     std::unordered_map<std::string, std::shared_ptr<RenderTarget>> m_renderTargets;
     wgpu::TextureFormat m_graphicsFormat = wgpu::TextureFormat::BGRA8Unorm;
     Size m_size = {0, 0};
@@ -130,8 +130,8 @@ private:
     void configureSurface(uint32_t width, uint32_t height);
 
 public:
-    static std::shared_ptr<NutContext> Create(const GraphicsContextDescriptor& descriptor);
-    GraphicsContextCreateStatus Initialize(const GraphicsContextDescriptor& desc);
+    static std::shared_ptr<NutContext> Create(const NutContextDescriptor& descriptor);
+    GraphicsContextCreateStatus Initialize(const NutContextDescriptor& desc);
 
     std::shared_ptr<RenderTarget> CreateOrGetRenderTarget(const std::string& name, uint16_t width, uint16_t height);
 
