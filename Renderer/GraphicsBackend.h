@@ -3,12 +3,23 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
-#include "dawn/dawn_proc.h"
 #include "RenderTarget.h"
 #include "Nut/NutContext.h"
 
 #include <imgui.h>
-
+#include "dawn/native/DawnNative.h"
+#include "include/core/SkColorSpace.h"
+#include "include/core/SkSurface.h"
+#include "include/core/SkImage.h"
+#include "include/gpu/graphite/Context.h"
+#include "include/gpu/graphite/Recorder.h"
+#include "include/gpu/graphite/Surface.h"
+#include "include/gpu/graphite/ContextOptions.h"
+#include "include/gpu/graphite/BackendTexture.h"
+#include "include/gpu/graphite/dawn/DawnBackendContext.h"
+#include "include/gpu/graphite/dawn/DawnGraphiteTypes.h"
+#include "include/gpu/graphite/dawn/DawnUtils.h"
+#include "Nut/TextureA.h"
 /**
  * @brief 定义图形后端类型。
  */
@@ -112,7 +123,6 @@ private:
     sk_sp<SkSurface> offscreenSurface; ///< 离屏渲染表面。
     sk_sp<SkImage> lastOffscreenImage; ///< 上一个离屏渲染图像。
 
-    std::unordered_map<std::string, std::shared_ptr<RenderTarget>> m_renderTargets; ///< 渲染目标映射表。
     std::shared_ptr<RenderTarget> m_activeRenderTarget = nullptr; ///< 当前激活的渲染目标。
 
     uint16_t currentWidth = 0; ///< 当前宽度。

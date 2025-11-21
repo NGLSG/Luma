@@ -166,6 +166,16 @@ public:
     TextureA LoadTextureFromFile(const std::string& file);
     TextureA LoadTextureFromMemory(const void* data, size_t size);
     TextureA CreateTexture(const TextureDescriptor& descriptor);
+
+    TextureA CreateTextureFromCompressedData(const unsigned char* data, size_t size, uint32_t width, uint32_t height,
+                                             wgpu::TextureFormat format,
+                                             uint32_t bytesPerRow = 0,
+                                             uint32_t rowsPerImage = 0);
+
+    bool ResolveTexture(const TextureA& source, const TextureA& resolveTarget);
+
+    // 始终从交换链获取当前帧纹理（忽略自定义渲染目标）。
+    TextureA AcquireSwapChainTexture();
 };
 
 } // namespace Nut

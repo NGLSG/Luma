@@ -454,6 +454,23 @@ RenderPassBuilder NutContext::BeginRenderFrame()
 
 void NutContext::Present()
 {
+    if (m_currentRenderTarget)
+    {
+        // 渲染到自定义 RenderTarget 时不需要呈现交换链。
+        m_device.Tick();
+        for (auto& enc : m_commandEncoders)
+        {
+            enc = nullptr;
+        }
+        m_commandEncoders.clear();
+        return;
+    }
+
+    if (!m_currentSurfaceTexture.texture)
+    {
+        m_surface.GetCurrentTexture(&m_currentSurfaceTexture);
+    }
+
     if (wgpu::Status::Success != m_surface.Present())
     {
         std::cerr << "Failed to present the surface." << std::endl;
@@ -550,6 +567,91 @@ TextureA NutContext::CreateTexture(const TextureDescriptor& descriptor)
     }
 
     return {texture, shared_from_this()};
+}
+
+TextureA NutContext::CreateTextureFromCompressedData(const unsigned char* data, size_t size, uint32_t width,
+                                                     uint32_t height, wgpu::TextureFormat format,
+                                                     uint32_t bytesPerRow, uint32_t rowsPerImage)
+{
+    if (!data || size == 0 || width == 0 || height == 0)
+    {
+        std::cerr << "CreateTextureFromCompressedData: invalid input data/size." << std::endl;
+        return nullptr;
+    }
+
+    wgpu::TextureDescriptor textureDesc{};
+    textureDesc.dimension = wgpu::TextureDimension::e2D;
+    textureDesc.size = {width, height, 1};
+    textureDesc.format = format;
+    textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+
+    wgpu::Texture texture = m_device.CreateTexture(&textureDesc);
+    if (!texture)
+    {
+        std::cerr << "CreateTextureFromCompressedData: failed to create texture." << std::endl;
+        return nullptr;
+    }
+
+    wgpu::TexelCopyTextureInfo destination{};
+    destination.texture = texture;
+
+    wgpu::TexelCopyBufferLayout dataLayout{};
+    dataLayout.bytesPerRow = bytesPerRow != 0 ? bytesPerRow : (width / 4) * 16;
+    dataLayout.rowsPerImage = rowsPerImage != 0 ? rowsPerImage : height / 4;
+    wgpu::Extent3D writeSize = {width, height, 1};
+    m_device.GetQueue().WriteTexture(&destination, data, size, &dataLayout, &writeSize);
+
+    return {texture, shared_from_this()};
+}
+
+bool NutContext::ResolveTexture(const TextureA& source, const TextureA& resolveTarget)
+{
+    if (!source || !resolveTarget)
+    {
+        std::cerr << "ResolveTexture: source or destination texture is invalid." << std::endl;
+        return false;
+    }
+
+    wgpu::CommandEncoder encoder = m_device.CreateCommandEncoder();
+    if (!encoder)
+    {
+        std::cerr << "ResolveTexture: failed to create command encoder." << std::endl;
+        return false;
+    }
+
+    wgpu::RenderPassColorAttachment colorAttachment{};
+    colorAttachment.view = source.GetTexture().CreateView();
+    colorAttachment.resolveTarget = resolveTarget.GetTexture().CreateView();
+    colorAttachment.loadOp = wgpu::LoadOp::Load;
+    colorAttachment.storeOp = wgpu::StoreOp::Store;
+
+    wgpu::RenderPassDescriptor passDesc{};
+    passDesc.colorAttachmentCount = 1;
+    passDesc.colorAttachments = &colorAttachment;
+
+    wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&passDesc);
+    if (!pass)
+    {
+        std::cerr << "ResolveTexture: failed to begin render pass." << std::endl;
+        return false;
+    }
+    pass.End();
+
+    wgpu::CommandBuffer commands = encoder.Finish();
+    if (!commands)
+    {
+        std::cerr << "ResolveTexture: failed to finish command buffer." << std::endl;
+        return false;
+    }
+
+    m_device.GetQueue().Submit(1, &commands);
+    return true;
+}
+
+TextureA NutContext::AcquireSwapChainTexture()
+{
+    m_currentRenderTarget = nullptr;
+    return GetCurrentTexture();
 }
 
 } 

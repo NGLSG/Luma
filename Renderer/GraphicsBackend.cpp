@@ -3,13 +3,10 @@
 #include "include/core/SkData.h"
 #include "include/gpu/graphite/Image.h"
 
-#include <future>
-
 #include "include/core/SkCanvas.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkSurface.h"
 #include "../Utils/PCH.h"
-#include "../Utils/stb_image.h"
 #if defined(_WIN32)
 #include <windows.h>
 #elif defined(__linux__) && !defined(__ANDROID__)
@@ -19,6 +16,7 @@
 #elif defined(__APPLE__)
 #include "TargetConditionals.h"
 #endif
+
 
 GraphicsBackend::GraphicsBackend() = default;
 
@@ -207,57 +205,21 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
 
 void GraphicsBackend::ResolveMSAA()
 {
-    if (m_msaaSampleCount <= 1 || !nutContext || !m_msaaTexture)
+    if (m_msaaSampleCount <= 1 || !nutContext || !m_msaaTexture || m_activeRenderTarget)
     {
         return;
     }
 
-    try
+    auto currentTexture = nutContext->GetCurrentTexture();
+    if (!currentTexture.GetTexture())
     {
-        wgpu::CommandEncoder encoder = nutContext->GetWGPUDevice().CreateCommandEncoder();
-        if (!encoder)
-        {
-            LogError("ResolveMSAA: 创建命令编码器失败");
-            return;
-        }
-
-        auto currentTexture = nutContext->GetCurrentTexture();
-        if (!currentTexture.GetTexture())
-        {
-            LogError("ResolveMSAA: 获取当前纹理失败");
-            return;
-        }
-
-        wgpu::RenderPassColorAttachment colorAttachment;
-        colorAttachment.view = m_msaaTexture.GetTexture().CreateView();
-        colorAttachment.loadOp = wgpu::LoadOp::Load;
-        colorAttachment.storeOp = wgpu::StoreOp::Store;
-        colorAttachment.resolveTarget = currentTexture.GetTexture().CreateView();
-
-        wgpu::RenderPassDescriptor passDesc;
-        passDesc.colorAttachmentCount = 1;
-        passDesc.colorAttachments = &colorAttachment;
-
-        wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&passDesc);
-        if (!pass)
-        {
-            LogError("ResolveMSAA: 开始渲染通道失败");
-            return;
-        }
-        pass.End();
-
-        wgpu::CommandBuffer commands = encoder.Finish();
-        if (!commands)
-        {
-            LogError("ResolveMSAA: 完成命令缓冲区失败");
-            return;
-        }
-
-        nutContext->GetWGPUDevice().GetQueue().Submit(1, &commands);
+        LogError("ResolveMSAA: 获取当前纹理失败");
+        return;
     }
-    catch (const std::exception& e)
+
+    if (!nutContext->ResolveTexture(m_msaaTexture, currentTexture))
     {
-        LogError("ResolveMSAA 过程中发生异常: {}", e.what());
+        LogError("ResolveMSAA: 调用 NutContext 解析 MSAA 失败");
     }
 }
 
@@ -276,43 +238,29 @@ std::shared_ptr<RenderTarget> GraphicsBackend::CreateOrGetRenderTarget(const std
         return nullptr;
     }
 
-    auto it = m_renderTargets.find(name);
-    if (it != m_renderTargets.end())
+    if (!nutContext)
     {
-        auto& target = it->second;
-
-        if (target->GetWidth() != width || target->GetHeight() != height)
-        {
-            target->GetTexture().Destroy();
-            m_renderTargets.erase(it);
-        }
-        else
-        {
-            return target;
-        }
-    }
-
-    Nut::TextureDescriptor textureDesc;
-    textureDesc.SetSize(width, height)
-               .SetFormat(GetSurfaceFormat())
-               .SetUsage(wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding)
-               .SetLabel(name);
-
-    Nut::TextureA texture = nutContext->CreateTexture(textureDesc);
-    if (!texture)
-    {
-        LogError("创建渲染目标纹理失败: {}", name);
+        LogError("CreateOrGetRenderTarget 失败: nutContext为空");
         return nullptr;
     }
 
-    auto newTarget = std::make_shared<RenderTarget>(texture, width, height);
-    m_renderTargets[name] = newTarget;
-    return newTarget;
+    auto target = nutContext->CreateOrGetRenderTarget(name, width, height);
+    if (!target)
+    {
+        LogError("CreateOrGetRenderTarget 失败: NutContext 创建渲染目标 {} 失败", name);
+        return nullptr;
+    }
+
+    return target;
 }
 
 void GraphicsBackend::SetActiveRenderTarget(std::shared_ptr<RenderTarget> target)
 {
     m_activeRenderTarget = std::move(target);
+    if (nutContext)
+    {
+        nutContext->SetActiveRenderTarget(m_activeRenderTarget);
+    }
 }
 
 sk_sp<SkImage> GraphicsBackend::CreateImageFromCompressedData(const unsigned char* data, size_t size,
@@ -330,28 +278,20 @@ sk_sp<SkImage> GraphicsBackend::CreateImageFromCompressedData(const unsigned cha
         return nullptr;
     }
 
-    wgpu::TextureDescriptor textureDesc;
-    textureDesc.dimension = wgpu::TextureDimension::e2D;
-    textureDesc.size = {(uint32_t)width, (uint32_t)height, 1};
-    textureDesc.format = format;
-    textureDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
-
-    wgpu::Texture texture = nutContext->GetWGPUDevice().CreateTexture(&textureDesc);
-    if (!texture)
+    if (!nutContext)
     {
-        LogError("为压缩数据创建 WGPU 纹理失败");
+        LogError("CreateImageFromCompressedData 失败: nutContext为空");
         return nullptr;
     }
 
-    wgpu::TexelCopyTextureInfo destination;
-    destination.texture = texture;
-    wgpu::TexelCopyBufferLayout dataLayout;
-    dataLayout.bytesPerRow = (width / 4) * 16;
-    dataLayout.rowsPerImage = height / 4;
-    wgpu::Extent3D writeSize = {(uint32_t)width, (uint32_t)height, 1};
-    nutContext->GetWGPUDevice().GetQueue().WriteTexture(&destination, data, size, &dataLayout, &writeSize);
+    auto texture = nutContext->CreateTextureFromCompressedData(data, size, width, height, format);
+    if (!texture)
+    {
+        LogError("CreateImageFromCompressedData 失败: NutContext 创建纹理失败");
+        return nullptr;
+    }
 
-    auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(texture.Get());
+    auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(texture.GetTexture().Get());
     if (!backendTex.isValid())
     {
         LogError("从 WGPU 纹理创建有效的 BackendTexture 失败");
@@ -532,6 +472,8 @@ void GraphicsBackend::Resize(uint16_t width, uint16_t height)
     if (nutContext)
     {
         nutContext->Resize(width, height);
+        nutContext->SetActiveRenderTarget(nullptr);
+        m_activeRenderTarget = nullptr;
         
         
         if (m_msaaSampleCount > 1)
@@ -629,6 +571,10 @@ void GraphicsBackend::SetQualityLevel(QualityLevel level)
 bool GraphicsBackend::BeginFrame()
 {
     m_activeRenderTarget = nullptr;
+    if (nutContext)
+    {
+        nutContext->SetActiveRenderTarget(nullptr);
+    }
 
     if (isDeviceLost)
     {
@@ -655,6 +601,9 @@ wgpu::TextureView GraphicsBackend::GetCurrentFrameView() const
         LogWarn("GetCurrentFrameView: nutContext为空");
         return nullptr;
     }
+    // ImGui 等 UI 始终应渲染到交换链纹理，因此强制回到默认表面。
+    nutContext->SetActiveRenderTarget(nullptr);
+
     auto currentTexture = nutContext->GetCurrentTexture();
     if (!currentTexture.GetTexture())
     {
@@ -702,6 +651,9 @@ void GraphicsBackend::PresentFrame()
 {
     if (nutContext)
     {
+        m_activeRenderTarget = nullptr;
+        // 确保最终呈现的目标是交换链而非自定义 RenderTarget。
+        nutContext->SetActiveRenderTarget(nullptr);
         nutContext->Present();
     }
     else if (offscreenSurface)
@@ -769,7 +721,6 @@ sk_sp<SkImage> GraphicsBackend::GPUToCPUImage(sk_sp<SkImage> src) const
 
 void GraphicsBackend::shutdown()
 {
-    m_renderTargets.clear();
     m_activeRenderTarget = nullptr;
 
     offscreenSurface.reset();
