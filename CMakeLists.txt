@@ -19,22 +19,22 @@ project(LumaEngine CXX)
 # =============================================================================
 option(ENABLE_LIGHTWEIGHT_BUILD "启用轻量化构建（剥离符号并优化体积）" OFF)
 
-if(ENABLE_LIGHTWEIGHT_BUILD)
+if (ENABLE_LIGHTWEIGHT_BUILD)
     message(STATUS "========================================")
     message(STATUS "轻量化构建模式: 已启用")
     message(STATUS "========================================")
 
     # 体积优化编译选项
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(-Oz -ffunction-sections -fdata-sections)
         add_link_options(-Wl,--gc-sections -Wl,--as-needed)
         message(STATUS "Release 模式：使用 -Oz 优化体积")
-    else()
+    else ()
         add_compile_options(-Os -ffunction-sections -fdata-sections)
         add_link_options(-Wl,--gc-sections)
         message(STATUS "Debug 模式：使用 -Os 优化体积")
-    endif()
-endif()
+    endif ()
+endif ()
 
 # CLion NDK --target 修复 (必须在 project() 之后)
 if (ANDROID)
@@ -301,6 +301,15 @@ add_library(LumaEngine SHARED
         EngineEntry.h
 )
 
+add_library(LumaEngine_static SHARED
+        ${LUMA_ENGINE_SOURCES}
+        Luma_CAPI.cpp
+        Luma_CAPI.h
+        GameEntry.cpp
+        EditorEntry.cpp
+        EngineEntry.h
+)
+
 # 设置包含目录
 target_include_directories(LumaEngine PUBLIC
         ${ENGINE_ROOT_DIR}
@@ -352,24 +361,26 @@ target_precompile_headers(LumaEngine PUBLIC "Utils/PCH.h")
 # =============================================================================
 # 轻量化构建：智能符号剥离（保留 JNI 符号）
 # =============================================================================
-if(ENABLE_LIGHTWEIGHT_BUILD)
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+if (ENABLE_LIGHTWEIGHT_BUILD)
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
         # Release 模式使用 --strip-unneeded 保留 JNI 符号
         add_custom_command(TARGET LumaEngine POST_BUILD
                 COMMAND ${CMAKE_STRIP} --strip-unneeded $<TARGET_FILE:LumaEngine>
                 COMMENT "正在剥离 LumaEngine 的未使用符号（保留动态符号）..."
         )
         message(STATUS "已启用 Release 模式符号剥离 (--strip-unneeded)")
-    else()
+    else ()
         # Debug 模式仅剥离调试符号
         add_custom_command(TARGET LumaEngine POST_BUILD
                 COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:LumaEngine>
                 COMMENT "正在剥离 LumaEngine 的调试符号（Debug 模式）..."
         )
         message(STATUS "已启用 Debug 模式符号剥离 (--strip-debug)")
-    endif()
-endif()
+    endif ()
+endif ()
 
+add_executable(test testMain.cpp)
+target_link_libraries(test PRIVATE LumaEngine)
 # =============================================================================
 # 桌面平台可执行文件 (Editor 和 Game)
 # =============================================================================
@@ -436,7 +447,7 @@ function(CopyEngineAssets TARGET_NAME OUTPUT_DIR)
             COMMENT "正在为 ${TARGET_NAME} 复制 LumaEngine 动态库..."
     )
 
-    set(RESOURCE_FOLDERS Icons Fonts Tools template)
+    set(RESOURCE_FOLDERS Icons Fonts Tools template Shaders)
     foreach (FOLDER ${RESOURCE_FOLDERS})
         if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${FOLDER}")
             add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
@@ -532,7 +543,7 @@ add_custom_command(TARGET publish POST_BUILD
         COMMENT "正在复制编译产物到 Build/${LUMA_PLATFORM_NAME}..."
 )
 
-set(FOLDERS_TO_COPY Tools template Fonts Icons)
+set(FOLDERS_TO_COPY Tools template Fonts Icons Shaders)
 foreach (FOLDER ${FOLDERS_TO_COPY})
     if (EXISTS "${CMAKE_SOURCE_DIR}/${FOLDER}")
         add_custom_command(TARGET publish POST_BUILD
@@ -636,22 +647,22 @@ message(STATUS "========================================")
 message(STATUS "Luma Engine 配置完成")
 if (ANDROID)
     message(STATUS "Android STL: c++_shared (全局启用)")
-endif()
+endif ()
 if (ENABLE_AVX512)
     message(STATUS "AVX512 指令集: 已显式启用")
 else ()
     message(STATUS "AVX512 指令集: 未启用 (使用 -DENABLE_AVX512=ON 启用)")
 endif ()
-if(ENABLE_LIGHTWEIGHT_BUILD)
+if (ENABLE_LIGHTWEIGHT_BUILD)
     message(STATUS "轻量化构建: 已启用")
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
         message(STATUS "  - 优化级别: -Oz (最小体积)")
         message(STATUS "  - 符号剥离: --strip-unneeded (保留 JNI)")
-    else()
+    else ()
         message(STATUS "  - 优化级别: -Os (体积优化)")
         message(STATUS "  - 符号剥离: --strip-debug")
-    endif()
-else()
+    endif ()
+else ()
     message(STATUS "轻量化构建: 未启用 (使用 -DENABLE_LIGHTWEIGHT_BUILD=ON 启用)")
-endif()
+endif ()
 message(STATUS "========================================")

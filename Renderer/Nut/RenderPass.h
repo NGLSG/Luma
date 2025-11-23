@@ -14,7 +14,7 @@ namespace Nut
     using QueryType = wgpu::QueryType;
     using QuerySet = wgpu::QuerySet;
 
-    class QuerySetBuilder
+    class LUMA_API QuerySetBuilder
     {
         wgpu::QuerySetDescriptor descriptor{};
 
@@ -32,7 +32,7 @@ namespace Nut
     };
 
 
-    class RenderPass
+    class LUMA_API RenderPass
     {
     private:
         wgpu::RenderPassEncoder m_passEncoder;
@@ -92,13 +92,13 @@ namespace Nut
     using Color = wgpu::Color;
     using ColorAttachment = wgpu::RenderPassColorAttachment;
 
-    class ColorAttachmentBuilder
+    class LUMA_API ColorAttachmentBuilder
     {
         ColorAttachment attachment;
 
     public:
-        ColorAttachmentBuilder& SetTexture(const TextureA& texture);
-        ColorAttachmentBuilder& SetResolveTexture(const TextureA& texture);
+        ColorAttachmentBuilder& SetTexture(const TextureAPtr& texture);
+        ColorAttachmentBuilder& SetResolveTexture(const TextureAPtr& texture);
         ColorAttachmentBuilder& SetDepthSlice(uint32_t slice);
         ColorAttachmentBuilder& SetLoadOnOpen(LoadOnOpen loadOnOpen);
         ColorAttachmentBuilder& SetStoreOnOpen(StoreOnOpen storeOnOpen);
@@ -110,12 +110,12 @@ namespace Nut
 
     using DepthStencilAttachment = wgpu::RenderPassDepthStencilAttachment;
 
-    class DepthStencilAttachmentBuilder
+    class LUMA_API DepthStencilAttachmentBuilder
     {
         DepthStencilAttachment attachment;
 
     public:
-        DepthStencilAttachmentBuilder& SetTexture(const TextureA& texture);
+        DepthStencilAttachmentBuilder& SetTexture(const TextureAPtr& texture);
         DepthStencilAttachmentBuilder& SetDepthLoadOnOpen(LoadOnOpen loadOnOpen);
         DepthStencilAttachmentBuilder& SetDepthStoreOnOpen(StoreOnOpen storeOnOpen);
         DepthStencilAttachmentBuilder& SetDepth(float depth);
@@ -128,7 +128,7 @@ namespace Nut
         [[nodiscard]] DepthStencilAttachment Build() const;
     };
 
-    class RenderPassBuilder
+    class LUMA_API RenderPassBuilder
     {
     private:
         wgpu::RenderPassDescriptor m_descriptor{};
@@ -176,7 +176,7 @@ namespace Nut
         RenderPassBuilder& Reset();
     };
 
-    class ComputePass
+    class LUMA_API ComputePass
     {
         wgpu::ComputePassEncoder m_passEncoder;
         wgpu::CommandEncoder m_commandEncoder;
@@ -200,7 +200,7 @@ namespace Nut
         operator bool() const { return m_passEncoder != nullptr; }
     };
 
-    class ComputePassBuilder
+    class LUMA_API ComputePassBuilder
     {
         wgpu::ComputePassDescriptor m_descriptor{};
         wgpu::PassTimestampWrites m_timestampWrites{};

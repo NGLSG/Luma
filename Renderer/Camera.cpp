@@ -1,4 +1,6 @@
 #include "Camera.h"
+
+#include "Cursor.h"
 #include "include/core/SkCanvas.h"
 #include "fstream"
 
@@ -94,4 +96,15 @@ SkM44 Camera::GetViewProjectionMatrix()
     viewProjMatrix.preScale(props.zoom, props.zoom);
     viewProjMatrix.preTranslate(-props.position.x(), -props.position.y());
     return viewProjMatrix;
+}
+
+void Camera::FillEngineData(EngineData& data) const
+{
+    data.CameraPosition = {m_properties.position.x(), m_properties.position.y()};
+    data.CameraScaleX = m_properties.zoom;
+    data.CameraScaleY = m_properties.zoom;
+    data.CameraSinR = sin(m_properties.rotation);
+    data.CameraCosR = cos(m_properties.rotation);
+    data.ViewportSize = {m_properties.viewport.width(), m_properties.viewport.height()};
+    data.MousePosition = {(float)LumaCursor::GetInstance().GetPosition().x, (float)LumaCursor::GetInstance().GetPosition().y};
 }

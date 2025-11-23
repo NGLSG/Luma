@@ -1,10 +1,125 @@
 #include "Shader.h"
 
 #include <regex>
+#include <unordered_set>
+#include <filesystem>
 
 #include "NutContext.h"
 
 namespace Nut {
+
+namespace {
+
+std::string LoadFileToString(const std::filesystem::path& path)
+{
+    std::ifstream fs(path, std::ios::binary);
+    if (!fs.is_open())
+    {
+        std::cerr << "Failed to open shader file: " << path << std::endl;
+        return {};
+    }
+    std::ostringstream buffer;
+    buffer << fs.rdbuf();
+    return buffer.str();
+}
+
+std::string PreprocessWGSL(const std::filesystem::path& path,
+                           const std::filesystem::path& systemIncludeDir,
+                           std::unordered_set<std::string>& includeStack)
+{
+    if (includeStack.contains(path.string()))
+    {
+        std::cerr << "Circular include detected for WGSL: " << path << std::endl;
+        return {};
+    }
+    includeStack.insert(path.string());
+
+    std::string source = LoadFileToString(path);
+    if (source.empty())
+    {
+        return {};
+    }
+
+    std::stringstream output;
+    std::string line;
+    std::istringstream input(source);
+    std::regex includeRegex(R"(^\s*#include\s*[<\"]([^>\"]+)[>\"]\s*)");
+
+    while (std::getline(input, line))
+    {
+        std::smatch match;
+        if (std::regex_match(line, match, includeRegex))
+        {
+            std::string includePath = match[1];
+            std::filesystem::path resolved;
+            if (line.find('<') != std::string::npos)
+            {
+                resolved = systemIncludeDir / includePath;
+            }
+            else
+            {
+                resolved = path.parent_path() / includePath;
+            }
+
+            std::string included = PreprocessWGSL(resolved, systemIncludeDir, includeStack);
+            if (!included.empty())
+            {
+                output << included << "\n";
+            }
+            continue;
+        }
+
+        output << line << "\n";
+    }
+
+    includeStack.erase(path.string());
+    return output.str();
+}
+
+std::string PreprocessWGSLFromString(const std::string& code, const std::filesystem::path& systemIncludeDir)
+{
+    std::stringstream output;
+    std::string line;
+    std::istringstream input(code);
+    std::regex includeRegex(R"(^\s*#include\s*[<\"]([^>\"]+)[>\"]\s*)");
+    std::unordered_set<std::string> includeStack;
+
+    while (std::getline(input, line))
+    {
+        std::smatch match;
+        if (std::regex_match(line, match, includeRegex))
+        {
+            std::string includePath = match[1];
+            std::filesystem::path resolved;
+            
+            
+            if (line.find('<') != std::string::npos)
+            {
+                resolved = systemIncludeDir / includePath;
+            }
+            else
+            {
+                
+                std::cerr << "Warning: Relative include \"" << includePath 
+                          << "\" not supported in string source, skipping." << std::endl;
+                continue;
+            }
+
+            std::string included = PreprocessWGSL(resolved, systemIncludeDir, includeStack);
+            if (!included.empty())
+            {
+                output << included << "\n";
+            }
+            continue;
+        }
+
+        output << line << "\n";
+    }
+
+    return output.str();
+}
+
+} 
 
 ShaderModule::ShaderModule(const std::string& shaderCode, const std::shared_ptr<NutContext>& ctx)
 {
@@ -113,25 +228,42 @@ void ShaderModule::ForeachBinding(const std::function<void(const ShaderBindingIn
 
 ShaderModule& ShaderManager::GetFromFile(const std::string& file, const std::shared_ptr<NutContext>& ctx)
 {
-    std::fstream fs(file);
-    if (!fs.is_open())
+    if (systemIncludeDir.empty())
     {
-        std::cerr << "Failed to open file " << file << std::endl;
+        systemIncludeDir = std::filesystem::current_path() / "Shaders";
     }
-    std::ostringstream buffer;
-    buffer << fs.rdbuf();
-    std::string code = buffer.str();
+
+    std::unordered_set<std::string> includeStack;
+    std::string code = PreprocessWGSL(file, systemIncludeDir, includeStack);
+    if (code.empty())
+    {
+        static ShaderModule emptyFallback{};
+        return emptyFallback;
+    }
     return GetFromString(code, ctx);
 }
 
 ShaderModule& ShaderManager::GetFromString(const std::string& code, const std::shared_ptr<NutContext>& ctx)
 {
-    if (shaderModules.contains(code) && shaderModules[code].get() != nullptr)
+    
+    if (systemIncludeDir.empty())
     {
-        return *shaderModules[code].get();
+        systemIncludeDir = std::filesystem::current_path() / "Shaders";
     }
-    shaderModules[code] = std::make_shared<ShaderModule>(code, ctx);
-    return *shaderModules[code].get();
+    
+    std::string processedCode = PreprocessWGSLFromString(code, systemIncludeDir);
+    
+    if (shaderModules.contains(processedCode) && shaderModules[processedCode].get() != nullptr)
+    {
+        return *shaderModules[processedCode].get();
+    }
+    shaderModules[processedCode] = std::make_shared<ShaderModule>(processedCode, ctx);
+    return *shaderModules[processedCode].get();
+}
+
+void ShaderManager::SetSystemIncludeDir(const std::filesystem::path& dir)
+{
+    systemIncludeDir = dir;
 }
 
 } 

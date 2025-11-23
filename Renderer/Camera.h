@@ -7,6 +7,7 @@
 #include <include/core/SkRect.h>
 #include <include/core/SkColor.h>
 #include "include/core/SkM44.h"
+#include "Nut/ShaderStruct.h"
 
 class SkCanvas;
 
@@ -16,7 +17,7 @@ class SkCanvas;
  * 这是一个单例类，通过LazySingleton模式确保全局只有一个摄像机实例。
  * 它负责将世界坐标转换为屏幕坐标，反之亦然，并应用视图变换到SkCanvas。
  */
-class Camera : public LazySingleton<Camera>
+class LUMA_API Camera : public LazySingleton<Camera>
 {
 public:
     friend class LazySingleton<Camera>;
@@ -30,8 +31,8 @@ public:
     {
         SkPoint position{0.0f, 0.0f}; ///< 摄像机在世界坐标系中的位置。
         SkRect viewport{0, 0, 1, 1}; ///< 摄像机的视口矩形，通常表示屏幕或渲染区域。
-        float rotation = 0.0f;       ///< 摄像机的旋转角度（以弧度为单位）。
-        float zoom = 1.0f;           ///< 摄像机的缩放级别。
+        float rotation = 0.0f; ///< 摄像机的旋转角度（以弧度为单位）。
+        float zoom = 1.0f; ///< 摄像机的缩放级别。
         SkColor4f clearColor = SkColor4f{0.15f, 0.16f, 0.18f, 1.0f}; ///< 渲染前用于清除背景的颜色。
     } m_properties; ///< 当前摄像机的属性实例。
     mutable std::shared_mutex m_mutex; ///< 保护摄像机属性的读写锁。
@@ -83,6 +84,8 @@ public:
      */
     CamProperties GetProperties() const;
     SkM44 GetViewProjectionMatrix();
+
+    void FillEngineData(EngineData& data) const;
 };
 
 #endif

@@ -4,58 +4,61 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <filesystem>
 
 #include "dawn/webgpu_cpp.h"
 
-namespace Nut {
-
-class NutContext;
-
-enum class BindingType:uint32_t
+namespace Nut
 {
-    UniformBuffer = 0,
-    StorageBuffer = 1,
-    Texture = 2,
-    Sampler = 3,
-};
+    class NutContext;
 
-struct ShaderBindingInfo
-{
-    size_t groupIndex;
-    size_t location;
-    BindingType type;
-    std::string name;
-};
+    enum class BindingType:uint32_t
+    {
+        UniformBuffer = 0,
+        StorageBuffer = 1,
+        Texture = 2,
+        Sampler = 3,
+    };
 
-class ShaderModule
-{
-    wgpu::ShaderModule shaderModule;
-    std::unordered_map<std::string, ShaderBindingInfo> bindings;
+    struct ShaderBindingInfo
+    {
+        size_t groupIndex;
+        size_t location;
+        BindingType type;
+        std::string name;
+    };
 
-public:
-    ShaderModule(const std::string& shaderCode, const std::shared_ptr<NutContext>&ctx);
+    class LUMA_API ShaderModule
+    {
+        wgpu::ShaderModule shaderModule;
+        std::unordered_map<std::string, ShaderBindingInfo> bindings;
 
-    ShaderModule();
+    public:
+        ShaderModule(const std::string& shaderCode, const std::shared_ptr<NutContext>& ctx);
 
-    wgpu::ShaderModule& Get();
-    operator bool() const;
+        ShaderModule();
 
-    ShaderBindingInfo GetBindingInfo(const std::string& name);
-    bool GetBindingInfo(const std::string& name, ShaderBindingInfo& info);
+        wgpu::ShaderModule& Get();
+        operator bool() const;
 
-    void ForeachBinding(const std::function<void(const ShaderBindingInfo&)>& callback) const;
-};
+        ShaderBindingInfo GetBindingInfo(const std::string& name);
+        bool GetBindingInfo(const std::string& name, ShaderBindingInfo& info);
 
-class ShaderManager
-{
-    inline static std::unordered_map<std::string, std::shared_ptr<ShaderModule>> shaderModules;
+        void ForeachBinding(const std::function<void(const ShaderBindingInfo&)>& callback) const;
+    };
 
-public:
-    static ShaderModule& GetFromFile(const std::string& file, const std::shared_ptr<NutContext>& ctx);
+    class ShaderManager
+    {
+        inline static std::unordered_map<std::string, std::shared_ptr<ShaderModule>> shaderModules;
+        inline static std::filesystem::path systemIncludeDir;
 
-    static ShaderModule& GetFromString(const std::string& code, const std::shared_ptr<NutContext>&ctx);
-};
+    public:
+        static ShaderModule& GetFromFile(const std::string& file, const std::shared_ptr<NutContext>& ctx);
 
+        static ShaderModule& GetFromString(const std::string& code, const std::shared_ptr<NutContext>& ctx);
+
+        static void SetSystemIncludeDir(const std::filesystem::path& dir);
+    };
 } // namespace Nut
 
 #endif //NOAI_SHADER_H

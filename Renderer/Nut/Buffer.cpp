@@ -235,7 +235,7 @@ BufferUsage BufferBuilder::GetCommonStorageUsage()
 
 BufferUsage BufferBuilder::GetCommonInstanceUsage()
 {
-    return GetCommonVertexUsage();
+    return GetCommonStorageUsage();
 }
 
 BufferBuilder& BufferBuilder::SetUsage(BufferUsage usage)

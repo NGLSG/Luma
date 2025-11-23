@@ -58,8 +58,6 @@ void GameViewPanel::Draw()
 
                 m_context->graphicsBackend->SetActiveRenderTarget(m_gameViewTarget);
 
-
-
                 for (const auto& packet : m_context->renderQueue)
                 {
                     m_context->engineContext->renderSystem->Submit(packet);

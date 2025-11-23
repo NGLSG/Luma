@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include "RenderTarget.h"
 #include "Nut/NutContext.h"
+#include "Nut/TextureA.h"
 
 #include <imgui.h>
 #include "dawn/native/DawnNative.h"
@@ -20,19 +21,11 @@
 #include "include/gpu/graphite/dawn/DawnGraphiteTypes.h"
 #include "include/gpu/graphite/dawn/DawnUtils.h"
 #include "Nut/TextureA.h"
+class RuntimeWGSLMaterial;
 /**
  * @brief 定义图形后端类型。
  */
-enum class BackendType
-{
-    D3D12, ///< Direct3D 12 后端。
-    D3D11, ///< Direct3D 11 后端。
-    Vulkan, ///< Vulkan 后端。
-    Metal, ///< Metal 后端。
-    OpenGL, ///< OpenGL 后端。
-    OpenGLES, ///< OpenGL ES 后端。
-};
-
+using BackendType=Nut::BackendType;
 /**
  * @brief 定义渲染质量等级。
  */
@@ -49,43 +42,7 @@ enum class QualityLevel
  *
  * 根据不同的操作系统，包含不同的原生窗口句柄类型。
  */
-struct NativeWindowHandle
-{
-#if defined(_WIN32)
-    void* hWnd = nullptr; ///< Windows 窗口句柄。
-    void* hInst = nullptr; ///< Windows 实例句柄。
-#elif defined(__APPLE__)
-    void* metalLayer = nullptr; ///< Metal 层对象。
-#elif defined(__linux__) && !defined(__ANDROID__)
-    void* x11Display = nullptr; ///< X11 显示器句柄。
-    unsigned long x11Window = 0; ///< X11 窗口ID。
-#elif defined(__ANDROID__)
-    void* aNativeWindow = nullptr; ///< Android 原生窗口指针。
-#else
-
-    void* placeholder = nullptr; ///< 占位符，用于未知平台。
-#endif
-
-    /**
-     * @brief 检查原生窗口句柄是否有效。
-     * @return 如果句柄有效则返回 true，否则返回 false。
-     */
-    bool IsValid() const
-    {
-#if defined(_WIN32)
-        return hWnd != nullptr && hInst != nullptr;
-#elif defined(__APPLE__)
-        return metalLayer != nullptr;
-#elif defined(__linux__) && !defined(__ANDROID__)
-        return x11Display != nullptr && x11Window != 0;
-#elif defined(__ANDROID__)
-        return aNativeWindow != nullptr;
-#else
-        return placeholder != nullptr;
-#endif
-    }
-};
-
+using NativeWindowHandle = Nut::NativeWindowHandle;
 /**
  * @brief 图形后端初始化选项。
  *
@@ -115,10 +72,10 @@ private:
     std::unique_ptr<skgpu::graphite::Context> graphiteContext; ///< Skia Graphite 上下文。
     std::unique_ptr<skgpu::graphite::Recorder> graphiteRecorder; ///< Skia Graphite 记录器。
     GraphicsBackendOptions options; ///< 图形后端选项。
-    Nut::TextureA m_msaaTexture; ///< 多重采样抗锯齿纹理。
+    Nut::TextureAPtr m_msaaTexture; ///< 多重采样抗锯齿纹理。
     int m_msaaSampleCount = 1; ///< 多重采样抗锯齿样本计数。
     bool isDeviceLost = false; ///< 设备是否丢失的标志。
-
+    sk_sp<SkSurface> m_currentSwapChainSurface;
 
     sk_sp<SkSurface> offscreenSurface; ///< 离屏渲染表面。
     sk_sp<SkImage> lastOffscreenImage; ///< 上一个离屏渲染图像。
@@ -135,16 +92,14 @@ private:
 
 
     void initialize(const GraphicsBackendOptions& options);
-
-public:
-    GraphicsBackend(const GraphicsBackend&) = delete; ///< 禁用拷贝构造函数。
-    GraphicsBackend& operator=(const GraphicsBackend&) = delete; ///< 禁用赋值操作符。
-    ~GraphicsBackend();
-
     /**
      * @brief 解析多重采样抗锯齿纹理。
      */
     void ResolveMSAA();
+public:
+    GraphicsBackend(const GraphicsBackend&) = delete; ///< 禁用拷贝构造函数。
+    GraphicsBackend& operator=(const GraphicsBackend&) = delete; ///< 禁用赋值操作符。
+    ~GraphicsBackend();
 
     /**
      * @brief 创建或获取一个渲染目标。
@@ -303,9 +258,15 @@ public:
      * @param filename 纹理文件路径。
      * @return 加载的纹理。
      */
-    Nut::TextureA LoadTextureFromFile(const std::string& filename);
+    Nut::TextureAPtr LoadTextureFromFile(const std::string& filename);
 
-    Nut::TextureA LoadTextureFromData(const unsigned char* data, size_t size);
+    Nut::TextureAPtr LoadTextureFromData(const unsigned char* data, size_t size);
+
+    Nut::TextureAPtr GetMSAATexture() const { return m_msaaTexture; }
+
+    uint32_t GetSampleCount() const { return m_msaaSampleCount; }
+
+    RuntimeWGSLMaterial* CreateOrGetDefaultMaterial();
 };
 
 #endif

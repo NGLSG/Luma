@@ -162,7 +162,7 @@ void AssetBrowserPanel::drawToolbar()
             if (parentNode)
             {
                 m_context->currentAssetDirectory = parentNode;
-                m_pathToExpand = parentPath; 
+                m_pathToExpand = parentPath;
             }
         }
         ImGui::SameLine();
@@ -187,7 +187,6 @@ void AssetBrowserPanel::drawDirectoryTree()
 {
     if (m_context->assetTreeRoot)
     {
-        
         if (!m_pathToExpand.empty())
         {
             ensurePathLoaded(m_pathToExpand);
@@ -569,7 +568,8 @@ void AssetBrowserPanel::drawAssetContentView()
 
                 drawAssetItemContextMenu(item.path);
                 ImGui::SameLine();
-                wgpu::Texture iconTexture = item.isDirectory ? m_icons.directory : getIconForAssetType(item.type);
+                auto iconTexturePtr = item.isDirectory ? m_icons.directory : getIconForAssetType(item.type);
+                wgpu::Texture iconTexture = iconTexturePtr ? iconTexturePtr->GetTexture() : wgpu::Texture();
                 ImTextureID iconId = iconTexture
                                          ? m_context->imguiRenderer->GetOrCreateTextureIdFor(iconTexture)
                                          : (ImTextureID)-1;
@@ -622,7 +622,8 @@ void AssetBrowserPanel::drawAssetContentView()
                 ImVec4 color = isSelected ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : ImVec4(0, 0, 0, 0);
                 ImGui::PushStyleColor(ImGuiCol_Button, color);
 
-                wgpu::Texture iconTexture = item.isDirectory ? m_icons.directory : getIconForAssetType(item.type);
+                auto iconTexturePtr = item.isDirectory ? m_icons.directory : getIconForAssetType(item.type);
+                wgpu::Texture iconTexture = iconTexturePtr ? iconTexturePtr->GetTexture() : wgpu::Texture();
                 ImTextureID iconId = iconTexture
                                          ? m_context->imguiRenderer->GetOrCreateTextureIdFor(iconTexture)
                                          : (ImTextureID)-1;
@@ -977,7 +978,7 @@ void AssetBrowserPanel::drawDirectoryNode(DirectoryNode& node)
         flags |= ImGuiTreeNodeFlags_Selected;
     }
 
-    
+
     if (node.scanned && node.subdirectories.empty())
     {
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
@@ -997,7 +998,8 @@ void AssetBrowserPanel::drawDirectoryNode(DirectoryNode& node)
 
     ImGui::PushID(node.path.generic_string().c_str());
 
-    wgpu::Texture iconTexture = m_icons.directory;
+    auto iconTexturePtr = m_icons.directory;
+    wgpu::Texture iconTexture = iconTexturePtr ? iconTexturePtr->GetTexture() : wgpu::Texture();
     if (iconTexture)
     {
         ImTextureID iconId = m_context->imguiRenderer->GetOrCreateTextureIdFor(iconTexture);
@@ -1057,7 +1059,6 @@ void AssetBrowserPanel::drawDirectoryNode(DirectoryNode& node)
 
         for (const auto* subNode : sortedSubdirs)
         {
-            
             drawDirectoryNode(*const_cast<DirectoryNode*>(subNode));
         }
         ImGui::TreePop();
@@ -1137,7 +1138,7 @@ void AssetBrowserPanel::buildAssetTree()
     m_context->assetTreeRoot->path = "";
     m_context->assetTreeRoot->name = "Assets";
     m_context->assetTreeRoot->scanned = false;
-    
+
     scanDirectoryNode(m_context->assetTreeRoot.get());
 }
 
@@ -1146,7 +1147,7 @@ void AssetBrowserPanel::scanDirectoryNode(DirectoryNode* parentNode)
     if (!parentNode) return;
     if (parentNode->scanned)
     {
-        return; 
+        return;
     }
     parentNode->subdirectories.clear();
     parentNode->assets.clear();
@@ -1188,7 +1189,7 @@ void AssetBrowserPanel::scanDirectoryNode(DirectoryNode* parentNode)
             auto newNode = std::make_unique<DirectoryNode>();
             newNode->path = parentNode->path / dirName;
             newNode->name = dirName;
-            newNode->scanned = false; 
+            newNode->scanned = false;
 
             parentNode->subdirectories[dirName] = std::move(newNode);
         }
@@ -1199,11 +1200,12 @@ void AssetBrowserPanel::scanDirectoryNode(DirectoryNode* parentNode)
                 ec.clear();
                 continue;
             }
-            
-            std::filesystem::path relPath = std::filesystem::relative(entry.path(), AssetManager::GetInstance().GetAssetsRootPath());
+
+            std::filesystem::path relPath = std::filesystem::relative(entry.path(),
+                                                                      AssetManager::GetInstance().GetAssetsRootPath());
             if (relPath.extension() == ".meta")
             {
-                continue; 
+                continue;
             }
             if (const AssetMetadata* meta = AssetManager::GetInstance().GetMetadata(relPath))
             {
@@ -1237,7 +1239,6 @@ DirectoryNode* AssetBrowserPanel::findNodeByPath(const std::filesystem::path& pa
         auto it = currentNode->subdirectories.find(partStr);
         if (it == currentNode->subdirectories.end())
         {
-            
             return nullptr;
         }
         currentNode = it->second.get();
@@ -1260,7 +1261,6 @@ void AssetBrowserPanel::ensurePathLoaded(const std::filesystem::path& path)
         auto it = current->subdirectories.find(partStr);
         if (it == current->subdirectories.end())
         {
-            
             return;
         }
         current = it->second.get();
@@ -1310,39 +1310,55 @@ void AssetBrowserPanel::createNewAsset(AssetType type)
     case AssetType::Material:
         baseName = "新建材质";
         extension = ".mat";
-        defaultContent = R"(shaderCode: |
-  // Default WGSL Shader
-  struct VertexInput {
-      @location(0) position: vec2f,
-      @location(1) texCoord: vec2f,
-      @location(2) color: vec4f,
-  };
+        defaultContent = R"(
+/// @file Common2D.wgsl
+/// @brief 2D渲染通用着色器模板
+/// @author Luma Engine
+/// @version 1.0
+/// @date 2025
 
-  struct VertexOutput {
-      @builtin(position) position: vec4f,
-      @location(0) texCoord: vec2f,
-      @location(1) color: vec4f,
-  };
+#include <Common.wgsl>
 
-  @group(0) @binding(0) var textureSampler: sampler;
-  @group(0) @binding(1) var spriteTexture: texture_2d<f32>;
+/// @brief 顶点着色器主函数
+/// @details 处理顶点变换、UV变换和颜色传递，支持实例化渲染
+/// @param input 顶点输入数据
+/// @param instanceIdx 实例索引，用于访问实例数据数组
+/// @return 处理后的顶点输出数据
+@vertex
+fn vs_main(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> VertexOutput {
+    // 从实例数据数组中获取当前实例的数据
+    let instance = instanceDatas[instanceIdx];
 
-  @vertex
-  fn vs_main(input: VertexInput) -> VertexOutput {
-      var output: VertexOutput;
-      output.position = vec4f(input.position, 0.0, 1.0);
-      output.texCoord = input.texCoord;
-      output.color = input.color;
-      return output;
-  }
+    // 将局部坐标按实例尺寸进行缩放
+    let localPos = input.position * instance.size;
 
-  @fragment
-  fn fs_main(input: VertexOutput) -> @location(0) vec4f {
-      let texColor = textureSample(spriteTexture, textureSampler, input.texCoord);
-      return texColor * input.color;
-  }
+    // 将局部坐标变换到裁剪空间
+    let clipPosition = TransformVertex(localPos, instance, engineData);
 
-uniforms: {}
+    // 对UV坐标进行变换，应用实例的UV矩形
+    let transformedUV = TransformUV(input.uv, instance.uvRect);
+
+    // 构建顶点输出结构
+    var out: VertexOutput;
+    out.clipPosition = clipPosition;    ///< 裁剪空间位置
+    out.uv = transformedUV;             ///< 变换后的UV坐标
+    out.color = instance.color;         ///< 实例颜色（包含透明度）
+
+    return out;
+}
+
+/// @brief 片段着色器主函数
+/// @details 采样纹理并与顶点颜色混合，输出最终像素颜色
+/// @param in 顶点着色器传递过来的插值数据
+/// @return 输出到颜色附件的RGBA颜色值
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    // 从主纹理采样颜色，使用主采样器
+    let texColor = textureSample(mainTexture, mainSampler, in.uv);
+
+    // 将纹理颜色与顶点颜色相乘（支持透明度混合）
+    return texColor * in.color;
+}
 )";
         break;
     case AssetType::PhysicsMaterial:
@@ -1655,16 +1671,17 @@ void AssetBrowserPanel::processFileDrop()
 
 void AssetBrowserPanel::loadEditorIcons()
 {
-    m_icons.directory = m_context->graphicsBackend->LoadTextureFromFile("Icons/directory.png");
-    m_icons.image = m_context->graphicsBackend->LoadTextureFromFile("Icons/image.png");
-    m_icons.script = m_context->graphicsBackend->LoadTextureFromFile("Icons/script.png");
-    m_icons.scene = m_context->graphicsBackend->LoadTextureFromFile("Icons/scene.png");
-    m_icons.audio = m_context->graphicsBackend->LoadTextureFromFile("Icons/audio.png");
-    m_icons.file = m_context->graphicsBackend->LoadTextureFromFile("Icons/file.png");
-    m_icons.prefab = m_context->graphicsBackend->LoadTextureFromFile("Icons/prefab.png");
+    auto backend = m_context->graphicsBackend;
+    m_icons.directory = backend->LoadTextureFromFile("Icons/directory.png");
+    m_icons.image = backend->LoadTextureFromFile("Icons/image.png");
+    m_icons.script = backend->LoadTextureFromFile("Icons/script.png");
+    m_icons.scene = backend->LoadTextureFromFile("Icons/scene.png");
+    m_icons.audio = backend->LoadTextureFromFile("Icons/audio.png");
+    m_icons.file = backend->LoadTextureFromFile("Icons/file.png");
+    m_icons.prefab = backend->LoadTextureFromFile("Icons/prefab.png");
 }
 
-wgpu::Texture AssetBrowserPanel::getIconForAssetType(AssetType type)
+Nut::TextureAPtr AssetBrowserPanel::getIconForAssetType(AssetType type)
 {
     switch (type)
     {

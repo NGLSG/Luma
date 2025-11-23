@@ -21,6 +21,7 @@
 #include <SIMDWrapper.h>
 
 #include "Profiler.h"
+#include "RuntimeAsset/RuntimeWGSLMaterial.h"
 
 static SkFilterMode GetSkFilterMode(int quality)
 {
@@ -70,12 +71,16 @@ public:
     std::vector<ShaderBatch> shaderBatches;
     std::vector<RawDrawBatch> rawDrawBatches;
     std::vector<CursorPrimitive> cursorPrimitives;
-    enum class BatchType { Sprite, Text, Instance, Rect, Circle, Line, Shader, RawDraw };
+    std::vector<WGPUSpriteBatch> wgpuSpriteBatches;
+
+    enum class BatchType { Sprite, Text, Instance, Rect, Circle, Line, Shader, RawDraw, WGPUSprite };
+
     struct QueuedBatch
     {
         BatchType type;
         size_t index;
     };
+
     std::vector<QueuedBatch> orderedBatches;
 
     std::vector<SkPoint> positions;
@@ -108,6 +113,7 @@ public:
         texRects.reserve(maxPrimitives);
 
         spriteBatches.reserve(32);
+        wgpuSpriteBatches.reserve(32);
         textBatches.reserve(32);
         instanceBatches.reserve(32);
         rectBatches.reserve(32);
@@ -123,6 +129,7 @@ public:
     void ClearBatches()
     {
         spriteBatches.clear();
+        wgpuSpriteBatches.clear();
         textBatches.clear();
         instanceBatches.clear();
         rectBatches.clear();
@@ -144,6 +151,7 @@ public:
     void DrawShaderBatch(const ShaderBatch& batch, SkCanvas* canvas);
     void DrawAllCursorBatches(SkCanvas* canvas);
     void DrawRawDrawBatch(const RawDrawBatch& batch, SkCanvas* canvas);
+    void DrawWGPUSpriteBatch(const WGPUSpriteBatch& batch, std::shared_ptr<Nut::NutContext> nutContext);
 
 private:
     enum class TextAlignment
@@ -232,18 +240,21 @@ void RenderSystem::Submit(const InstanceBatch& batch)
     pImpl->instanceBatches.push_back(batch);
     pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Instance, pImpl->instanceBatches.size() - 1});
 }
+
 void RenderSystem::Submit(const RectBatch& batch)
 {
     if (batch.count <= 0) return;
     pImpl->rectBatches.push_back(batch);
     pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Rect, pImpl->rectBatches.size() - 1});
 }
+
 void RenderSystem::Submit(const CircleBatch& batch)
 {
     if (batch.count <= 0) return;
     pImpl->circleBatches.push_back(batch);
     pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Circle, pImpl->circleBatches.size() - 1});
 }
+
 void RenderSystem::Submit(const LineBatch& batch)
 {
     if (batch.pointCount < 2) return;
@@ -267,6 +278,13 @@ void RenderSystem::Submit(const RawDrawBatch& batch)
         pImpl->rawDrawBatches.push_back(batch);
         pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::RawDraw, pImpl->rawDrawBatches.size() - 1});
     }
+}
+
+void RenderSystem::Submit(const WGPUSpriteBatch& batch)
+{
+    if (batch.count <= 0) return;
+    pImpl->wgpuSpriteBatches.push_back(batch);
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::WGPUSprite, pImpl->wgpuSpriteBatches.size() - 1});
 }
 
 void RenderSystem::DrawCursor(const SkPoint& position, float height, const SkColor4f& color)
@@ -309,66 +327,112 @@ void RenderSystem::Clear(const SkColor& color)
 void RenderSystem::Flush()
 {
     PROFILE_FUNCTION();
+
     auto surface = pImpl->backend.GetSurface();
     if (!surface) return;
-
     SkCanvas* canvas = surface->getCanvas();
     if (!canvas) return;
 
-
     bool hasClip = pImpl->clipRect.has_value();
-    if (hasClip)
-    {
-        const SkRect& viewport = *pImpl->clipRect;
-        canvas->save();
-        canvas->clipRect(viewport);
-        canvas->translate(viewport.fLeft, viewport.fTop);
-    }
-    canvas->save();
 
+    
+    auto SetupCanvasState = [&](SkCanvas* cvs)
+    {
+        if (hasClip)
+        {
+            const SkRect& viewport = *pImpl->clipRect;
+            cvs->save();
+            cvs->clipRect(viewport);
+            cvs->translate(viewport.fLeft, viewport.fTop);
+        }
+        cvs->save();
+        
+    };
+
+    
+    
     canvas->clear(Camera::GetInstance().GetProperties().clearColor);
+
+    SetupCanvasState(canvas);
     Camera::GetInstance().ApplyTo(canvas);
 
     for (const auto& entry : pImpl->orderedBatches)
     {
-        switch (entry.type)
+        if (entry.type == RenderSystemImpl::BatchType::WGPUSprite)
         {
-        case RenderSystem::RenderSystemImpl::BatchType::Sprite:
-            pImpl->DrawSpriteBatch(pImpl->spriteBatches[entry.index], canvas);
-            break;
-        case RenderSystem::RenderSystemImpl::BatchType::Text:
-            pImpl->DrawTextBatch(pImpl->textBatches[entry.index], canvas);
-            break;
-        case RenderSystem::RenderSystemImpl::BatchType::Instance:
-            pImpl->DrawInstanceBatch(pImpl->instanceBatches[entry.index], canvas);
-            break;
-        case RenderSystem::RenderSystemImpl::BatchType::Rect:
-            pImpl->DrawRectBatch(pImpl->rectBatches[entry.index], canvas);
-            break;
-        case RenderSystem::RenderSystemImpl::BatchType::Circle:
-            pImpl->DrawCircleBatch(pImpl->circleBatches[entry.index], canvas);
-            break;
-        case RenderSystem::RenderSystemImpl::BatchType::Line:
-            pImpl->DrawLineBatch(pImpl->lineBatches[entry.index], canvas);
-            break;
-        case RenderSystem::RenderSystemImpl::BatchType::Shader:
-            pImpl->DrawShaderBatch(pImpl->shaderBatches[entry.index], canvas);
-            break;
-        case RenderSystem::RenderSystemImpl::BatchType::RawDraw:
-            pImpl->DrawRawDrawBatch(pImpl->rawDrawBatches[entry.index], canvas);
-            break;
+            canvas->restore();
+            if (hasClip) canvas->restore();
+
+            pImpl->backend.Submit();
+
+            surface.reset();
+            canvas = nullptr;
+
+            
+            pImpl->DrawWGPUSpriteBatch(pImpl->wgpuSpriteBatches[entry.index], pImpl->backend.GetNutContext());
+
+            
+            surface = pImpl->backend.GetSurface();
+            if (!surface)
+            {
+                LogError("Flush: 重建 Surface 失败");
+                break;
+            }
+            canvas = surface->getCanvas();
+
+            
+            SetupCanvasState(canvas);
+            Camera::GetInstance().ApplyTo(canvas);
+        }
+        else
+        {
+            
+            switch (entry.type)
+            {
+            case RenderSystemImpl::BatchType::Sprite:
+                pImpl->DrawSpriteBatch(pImpl->spriteBatches[entry.index], canvas);
+                break;
+            case RenderSystemImpl::BatchType::Text:
+                pImpl->DrawTextBatch(pImpl->textBatches[entry.index], canvas);
+                break;
+            case RenderSystemImpl::BatchType::Instance:
+                pImpl->DrawInstanceBatch(pImpl->instanceBatches[entry.index], canvas);
+                break;
+            case RenderSystemImpl::BatchType::Rect:
+                pImpl->DrawRectBatch(pImpl->rectBatches[entry.index], canvas);
+                break;
+            case RenderSystemImpl::BatchType::Circle:
+                pImpl->DrawCircleBatch(pImpl->circleBatches[entry.index], canvas);
+                break;
+            case RenderSystemImpl::BatchType::Line:
+                pImpl->DrawLineBatch(pImpl->lineBatches[entry.index], canvas);
+                break;
+            case RenderSystemImpl::BatchType::Shader:
+                pImpl->DrawShaderBatch(pImpl->shaderBatches[entry.index], canvas);
+                break;
+            case RenderSystemImpl::BatchType::RawDraw:
+                pImpl->DrawRawDrawBatch(pImpl->rawDrawBatches[entry.index], canvas);
+                break;
+            default: break;
+            }
         }
     }
+
+    
     pImpl->DrawAllCursorBatches(canvas);
-    canvas->restore();
-    if (hasClip)
+
+    
+    if (canvas)
     {
         canvas->restore();
+        if (hasClip)
+        {
+            canvas->restore();
+        }
     }
 
     pImpl->ClearBatches();
 }
-
 
 void RenderSystem::SetClipRect(const SkRect& rect)
 {
@@ -411,202 +475,202 @@ void RenderSystem::RenderSystemImpl::DrawSpriteBatch(const SpriteBatch& singleBa
     alignas(32) float final_x[simd_chunk_size], final_y[simd_chunk_size];
 
 
-        const SpriteBatch& batch = singleBatch;
-        const auto* material = batch.material;
-        const auto* image = batch.image.get();
-        const SkColor skColor = batch.color.toSkColor();
+    const SpriteBatch& batch = singleBatch;
+    const auto* material = batch.material;
+    const auto* image = batch.image.get();
+    const SkColor skColor = batch.color.toSkColor();
 
-        if (!image)
+    if (!image)
+    {
+        return;
+    }
+
+    const SkTileMode tileX = GetSkTileMode(batch.wrapMode);
+    const SkTileMode tileY = GetSkTileMode(batch.wrapMode);
+    const SkSamplingOptions sampling(GetSkFilterMode(batch.filterQuality), GetSkMipmapMode(batch.filterQuality));
+
+    sk_sp<SkShader> shader = nullptr;
+    if (material && material->effect)
+    {
+        SkRuntimeShaderBuilder builder(material->effect);
+        for (const auto& [name, value] : material->uniforms)
         {
-            return;
+            std::visit(UniformSetter{builder, name}, value);
+        }
+        sk_sp<SkShader> imageShader = batch.image->makeShader(tileX, tileY, sampling);
+        builder.child("_MainTex") = std::move(imageShader);
+        shader = builder.makeShader();
+    }
+    else
+    {
+        shader = batch.image->makeShader(tileX, tileY, sampling);
+    }
+
+    if (!shader)
+    {
+        return;
+    }
+
+    paint.setShader(std::move(shader));
+
+
+    size_t currentVertexCount = 0;
+    size_t currentIndexCount = 0;
+
+    auto flushDrawCall = [&]()
+    {
+        if (currentVertexCount == 0) return;
+        sk_sp<SkVertices> vertices = SkVertices::MakeCopy(
+            SkVertices::kTriangles_VertexMode, currentVertexCount,
+            positions.data(), texCoords.data(), colors.data(),
+            currentIndexCount, indices.data());
+        canvas->drawVertices(vertices, SkBlendMode::kModulate, paint);
+        currentVertexCount = 0;
+        currentIndexCount = 0;
+    };
+
+
+    const float worldHalfWidth = batch.sourceRect.width() * 0.5f * batch.ppuScaleFactor;
+    const float worldHalfHeight = batch.sourceRect.height() * 0.5f * batch.ppuScaleFactor;
+
+    const SkPoint srcCorners[] = {
+        {batch.sourceRect.fLeft, batch.sourceRect.fTop},
+        {batch.sourceRect.fRight, batch.sourceRect.fTop},
+        {batch.sourceRect.fRight, batch.sourceRect.fBottom},
+        {batch.sourceRect.fLeft, batch.sourceRect.fBottom}
+    };
+
+    size_t i = 0;
+    const size_t count = batch.count;
+
+
+    const size_t simdCount = count - (count % simd_chunk_size);
+    for (; i < simdCount; i += simd_chunk_size)
+    {
+        if (currentVertexCount + (simd_chunk_size * 4) > maxVerticesPerDraw) [[unlikely]]
+        {
+            flushDrawCall();
         }
 
-        const SkTileMode tileX = GetSkTileMode(batch.wrapMode);
-        const SkTileMode tileY = GetSkTileMode(batch.wrapMode);
-        const SkSamplingOptions sampling(GetSkFilterMode(batch.filterQuality), GetSkMipmapMode(batch.filterQuality));
-
-        sk_sp<SkShader> shader = nullptr;
-        if (material && material->effect)
+        const RenderableTransform* t = batch.transforms + i;
+        for (size_t k = 0; k < simd_chunk_size; ++k)
         {
-            SkRuntimeShaderBuilder builder(material->effect);
-            for (const auto& [name, value] : material->uniforms)
-            {
-                std::visit(UniformSetter{builder, name}, value);
-            }
-            sk_sp<SkShader> imageShader = batch.image->makeShader(tileX, tileY, sampling);
-            builder.child("_MainTex") = std::move(imageShader);
-            shader = builder.makeShader();
-        }
-        else
-        {
-            shader = batch.image->makeShader(tileX, tileY, sampling);
+            pos_x_soa[k] = t[k].position.fX;
+            pos_y_soa[k] = t[k].position.fY;
+            scale_x_soa[k] = t[k].scaleX;
+            scale_y_soa[k] = t[k].scaleY;
+            sin_r_soa[k] = t[k].sinR;
+            cos_r_soa[k] = t[k].cosR;
         }
 
-        if (!shader)
+
+        for (size_t k = 0; k < simd_chunk_size; ++k)
         {
-            return;
+            scaled_half_w[k] = worldHalfWidth * scale_x_soa[k];
+            scaled_half_h[k] = worldHalfHeight * scale_y_soa[k];
         }
 
-        paint.setShader(std::move(shader));
-
-
-        size_t currentVertexCount = 0;
-        size_t currentIndexCount = 0;
-
-        auto flushDrawCall = [&]()
-        {
-            if (currentVertexCount == 0) return;
-            sk_sp<SkVertices> vertices = SkVertices::MakeCopy(
-                SkVertices::kTriangles_VertexMode, currentVertexCount,
-                positions.data(), texCoords.data(), colors.data(),
-                currentIndexCount, indices.data());
-            canvas->drawVertices(vertices, SkBlendMode::kModulate, paint);
-            currentVertexCount = 0;
-            currentIndexCount = 0;
+        const SkPoint localCornerFactors[] = {
+            {-1.0f, -1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f}, {-1.0f, 1.0f}
         };
 
+        for (int j = 0; j < 4; ++j)
+        {
+            for (size_t k = 0; k < simd_chunk_size; ++k)
+            {
+                scaled_local_x[k] = scaled_half_w[k] * localCornerFactors[j].fX;
+                scaled_local_y[k] = scaled_half_h[k] * localCornerFactors[j].fY;
+            }
 
-        const float worldHalfWidth = batch.sourceRect.width() * 0.5f * batch.ppuScaleFactor;
-        const float worldHalfHeight = batch.sourceRect.height() * 0.5f * batch.ppuScaleFactor;
+            simd.VectorRotatePoints(
+                scaled_local_x, scaled_local_y,
+                sin_r_soa, cos_r_soa,
+                final_x, final_y,
+                simd_chunk_size
+            );
 
-        const SkPoint srcCorners[] = {
-            {batch.sourceRect.fLeft, batch.sourceRect.fTop},
-            {batch.sourceRect.fRight, batch.sourceRect.fTop},
-            {batch.sourceRect.fRight, batch.sourceRect.fBottom},
-            {batch.sourceRect.fLeft, batch.sourceRect.fBottom}
+            simd.VectorAdd(
+                final_x, pos_x_soa,
+                final_x,
+                simd_chunk_size
+            );
+            simd.VectorAdd(
+                final_y, pos_y_soa,
+                final_y,
+                simd_chunk_size
+            );
+
+            for (size_t k = 0; k < simd_chunk_size; ++k)
+            {
+                positions[currentVertexCount + k * 4 + j] = {final_x[k], final_y[k]};
+            }
+        }
+
+        for (size_t k = 0; k < simd_chunk_size; ++k)
+        {
+            const uint16_t baseVertex = static_cast<uint16_t>(currentVertexCount + k * 4);
+            texCoords[baseVertex + 0] = srcCorners[0];
+            texCoords[baseVertex + 1] = srcCorners[1];
+            texCoords[baseVertex + 2] = srcCorners[2];
+            texCoords[baseVertex + 3] = srcCorners[3];
+
+            for (int c = 0; c < 4; ++c) colors[baseVertex + c] = skColor;
+
+            const size_t indexStart = currentIndexCount + k * 6;
+            indices[indexStart + 0] = baseVertex + 0;
+            indices[indexStart + 1] = baseVertex + 1;
+            indices[indexStart + 2] = baseVertex + 2;
+            indices[indexStart + 3] = baseVertex + 0;
+            indices[indexStart + 4] = baseVertex + 2;
+            indices[indexStart + 5] = baseVertex + 3;
+        }
+        currentVertexCount += (simd_chunk_size * 4);
+        currentIndexCount += (simd_chunk_size * 6);
+    }
+
+
+    for (; i < count; ++i)
+    {
+        if (currentVertexCount + 4 > maxVerticesPerDraw) [[unlikely]]
+        {
+            flushDrawCall();
+        }
+
+        const auto& transform = batch.transforms[i];
+        const float s = transform.sinR;
+        const float c = transform.cosR;
+
+
+        const float scaledHalfWidth = worldHalfWidth * transform.scaleX;
+        const float scaledHalfHeight = worldHalfHeight * transform.scaleY;
+
+        const SkPoint localCorners[4] = {
+            {-scaledHalfWidth, -scaledHalfHeight}, {scaledHalfWidth, -scaledHalfHeight},
+            {scaledHalfWidth, scaledHalfHeight}, {-scaledHalfWidth, scaledHalfHeight}
         };
 
-        size_t i = 0;
-        const size_t count = batch.count;
-
-
-        const size_t simdCount = count - (count % simd_chunk_size);
-        for (; i < simdCount; i += simd_chunk_size)
+        const uint16_t baseVertex = static_cast<uint16_t>(currentVertexCount);
+        for (int j = 0; j < 4; ++j)
         {
-            if (currentVertexCount + (simd_chunk_size * 4) > maxVerticesPerDraw) [[unlikely]]
-            {
-                flushDrawCall();
-            }
-
-            const RenderableTransform* t = batch.transforms + i;
-            for (size_t k = 0; k < simd_chunk_size; ++k)
-            {
-                pos_x_soa[k] = t[k].position.fX;
-                pos_y_soa[k] = t[k].position.fY;
-                scale_x_soa[k] = t[k].scaleX;
-                scale_y_soa[k] = t[k].scaleY;
-                sin_r_soa[k] = t[k].sinR;
-                cos_r_soa[k] = t[k].cosR;
-            }
-
-
-            for (size_t k = 0; k < simd_chunk_size; ++k)
-            {
-                scaled_half_w[k] = worldHalfWidth * scale_x_soa[k];
-                scaled_half_h[k] = worldHalfHeight * scale_y_soa[k];
-            }
-
-            const SkPoint localCornerFactors[] = {
-                {-1.0f, -1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f}, {-1.0f, 1.0f}
-            };
-
-            for (int j = 0; j < 4; ++j)
-            {
-                for (size_t k = 0; k < simd_chunk_size; ++k)
-                {
-                    scaled_local_x[k] = scaled_half_w[k] * localCornerFactors[j].fX;
-                    scaled_local_y[k] = scaled_half_h[k] * localCornerFactors[j].fY;
-                }
-
-                simd.VectorRotatePoints(
-                    scaled_local_x, scaled_local_y,
-                    sin_r_soa, cos_r_soa,
-                    final_x, final_y,
-                    simd_chunk_size
-                );
-
-                simd.VectorAdd(
-                    final_x, pos_x_soa,
-                    final_x,
-                    simd_chunk_size
-                );
-                simd.VectorAdd(
-                    final_y, pos_y_soa,
-                    final_y,
-                    simd_chunk_size
-                );
-
-                for (size_t k = 0; k < simd_chunk_size; ++k)
-                {
-                    positions[currentVertexCount + k * 4 + j] = {final_x[k], final_y[k]};
-                }
-            }
-
-            for (size_t k = 0; k < simd_chunk_size; ++k)
-            {
-                const uint16_t baseVertex = static_cast<uint16_t>(currentVertexCount + k * 4);
-                texCoords[baseVertex + 0] = srcCorners[0];
-                texCoords[baseVertex + 1] = srcCorners[1];
-                texCoords[baseVertex + 2] = srcCorners[2];
-                texCoords[baseVertex + 3] = srcCorners[3];
-
-                for (int c = 0; c < 4; ++c) colors[baseVertex + c] = skColor;
-
-                const size_t indexStart = currentIndexCount + k * 6;
-                indices[indexStart + 0] = baseVertex + 0;
-                indices[indexStart + 1] = baseVertex + 1;
-                indices[indexStart + 2] = baseVertex + 2;
-                indices[indexStart + 3] = baseVertex + 0;
-                indices[indexStart + 4] = baseVertex + 2;
-                indices[indexStart + 5] = baseVertex + 3;
-            }
-            currentVertexCount += (simd_chunk_size * 4);
-            currentIndexCount += (simd_chunk_size * 6);
+            const float rX = localCorners[j].fX * c - localCorners[j].fY * s;
+            const float rY = localCorners[j].fX * s + localCorners[j].fY * c;
+            positions[currentVertexCount + j] = {transform.position.fX + rX, transform.position.fY + rY};
+            texCoords[currentVertexCount + j] = srcCorners[j];
+            colors[currentVertexCount + j] = skColor;
         }
 
+        indices[currentIndexCount + 0] = baseVertex + 0;
+        indices[currentIndexCount + 1] = baseVertex + 1;
+        indices[currentIndexCount + 2] = baseVertex + 2;
+        indices[currentIndexCount + 3] = baseVertex + 0;
+        indices[currentIndexCount + 4] = baseVertex + 2;
+        indices[currentIndexCount + 5] = baseVertex + 3;
 
-        for (; i < count; ++i)
-        {
-            if (currentVertexCount + 4 > maxVerticesPerDraw) [[unlikely]]
-            {
-                flushDrawCall();
-            }
+        currentVertexCount += 4;
+        currentIndexCount += 6;
+    }
 
-            const auto& transform = batch.transforms[i];
-            const float s = transform.sinR;
-            const float c = transform.cosR;
-
-
-            const float scaledHalfWidth = worldHalfWidth * transform.scaleX;
-            const float scaledHalfHeight = worldHalfHeight * transform.scaleY;
-
-            const SkPoint localCorners[4] = {
-                {-scaledHalfWidth, -scaledHalfHeight}, {scaledHalfWidth, -scaledHalfHeight},
-                {scaledHalfWidth, scaledHalfHeight}, {-scaledHalfWidth, scaledHalfHeight}
-            };
-
-            const uint16_t baseVertex = static_cast<uint16_t>(currentVertexCount);
-            for (int j = 0; j < 4; ++j)
-            {
-                const float rX = localCorners[j].fX * c - localCorners[j].fY * s;
-                const float rY = localCorners[j].fX * s + localCorners[j].fY * c;
-                positions[currentVertexCount + j] = {transform.position.fX + rX, transform.position.fY + rY};
-                texCoords[currentVertexCount + j] = srcCorners[j];
-                colors[currentVertexCount + j] = skColor;
-            }
-
-            indices[currentIndexCount + 0] = baseVertex + 0;
-            indices[currentIndexCount + 1] = baseVertex + 1;
-            indices[currentIndexCount + 2] = baseVertex + 2;
-            indices[currentIndexCount + 3] = baseVertex + 0;
-            indices[currentIndexCount + 4] = baseVertex + 2;
-            indices[currentIndexCount + 5] = baseVertex + 3;
-
-            currentVertexCount += 4;
-            currentIndexCount += 6;
-        }
-
-        flushDrawCall();
+    flushDrawCall();
 }
 
 void RenderSystem::RenderSystemImpl::DrawTextBatch(const TextBatch& singleBatch, SkCanvas* canvas)
@@ -774,51 +838,51 @@ void RenderSystem::RenderSystemImpl::DrawRectBatch(const RectBatch& singleBatch,
     colors.clear();
     indices.clear();
 
-        const RectBatch& batch = singleBatch;
-        paint.setColor4f(batch.color, nullptr);
-        SkColor skColor = paint.getColor();
+    const RectBatch& batch = singleBatch;
+    paint.setColor4f(batch.color, nullptr);
+    SkColor skColor = paint.getColor();
 
-        const float halfWidth = batch.size.width() / 2.0f;
-        const float halfHeight = batch.size.height() / 2.0f;
+    const float halfWidth = batch.size.width() / 2.0f;
+    const float halfHeight = batch.size.height() / 2.0f;
 
-        for (size_t i = 0; i < batch.count; ++i)
+    for (size_t i = 0; i < batch.count; ++i)
+    {
+        if (positions.size() + 4 > maxVerticesPerDraw) [[unlikely]]
         {
-            if (positions.size() + 4 > maxVerticesPerDraw) [[unlikely]]
-            {
-                canvas->drawVertices(SkVertices::MakeCopy(SkVertices::kTriangles_VertexMode, positions.size(),
-                                                          positions.data(), nullptr, colors.data(), indices.size(),
-                                                          indices.data()),
-                                     SkBlendMode::kSrcOver, paint);
-                positions.clear();
-                colors.clear();
-                indices.clear();
-            }
-
-            const auto& transform = batch.transforms[i];
-            const float s = transform.sinR;
-            const float c = transform.cosR;
-            const float scaledHalfWidth = halfWidth * transform.scaleX;
-            const float scaledHalfHeight = halfHeight * transform.scaleY;
-
-            const SkPoint localCorners[4] = {
-                {-scaledHalfWidth, -scaledHalfHeight}, {scaledHalfWidth, -scaledHalfHeight},
-                {scaledHalfWidth, scaledHalfHeight}, {-scaledHalfWidth, scaledHalfHeight}
-            };
-            uint16_t baseVertex = static_cast<uint16_t>(positions.size());
-            for (int j = 0; j < 4; ++j)
-            {
-                float rX = localCorners[j].fX * c - localCorners[j].fY * s;
-                float rY = localCorners[j].fX * s + localCorners[j].fY * c;
-                positions.emplace_back(transform.position.fX + rX, transform.position.fY + rY);
-                colors.push_back(skColor);
-            }
-            indices.push_back(baseVertex + 0);
-            indices.push_back(baseVertex + 1);
-            indices.push_back(baseVertex + 2);
-            indices.push_back(baseVertex + 0);
-            indices.push_back(baseVertex + 2);
-            indices.push_back(baseVertex + 3);
+            canvas->drawVertices(SkVertices::MakeCopy(SkVertices::kTriangles_VertexMode, positions.size(),
+                                                      positions.data(), nullptr, colors.data(), indices.size(),
+                                                      indices.data()),
+                                 SkBlendMode::kSrcOver, paint);
+            positions.clear();
+            colors.clear();
+            indices.clear();
         }
+
+        const auto& transform = batch.transforms[i];
+        const float s = transform.sinR;
+        const float c = transform.cosR;
+        const float scaledHalfWidth = halfWidth * transform.scaleX;
+        const float scaledHalfHeight = halfHeight * transform.scaleY;
+
+        const SkPoint localCorners[4] = {
+            {-scaledHalfWidth, -scaledHalfHeight}, {scaledHalfWidth, -scaledHalfHeight},
+            {scaledHalfWidth, scaledHalfHeight}, {-scaledHalfWidth, scaledHalfHeight}
+        };
+        uint16_t baseVertex = static_cast<uint16_t>(positions.size());
+        for (int j = 0; j < 4; ++j)
+        {
+            float rX = localCorners[j].fX * c - localCorners[j].fY * s;
+            float rY = localCorners[j].fX * s + localCorners[j].fY * c;
+            positions.emplace_back(transform.position.fX + rX, transform.position.fY + rY);
+            colors.push_back(skColor);
+        }
+        indices.push_back(baseVertex + 0);
+        indices.push_back(baseVertex + 1);
+        indices.push_back(baseVertex + 2);
+        indices.push_back(baseVertex + 0);
+        indices.push_back(baseVertex + 2);
+        indices.push_back(baseVertex + 3);
+    }
 
     if (!positions.empty())
     {
@@ -972,4 +1036,170 @@ void RenderSystem::RenderSystemImpl::DrawRawDrawBatch(const RawDrawBatch& batch,
 {
     if (!batch.drawFunc) return;
     batch.drawFunc(canvas);
+}
+void RenderSystem::RenderSystemImpl::DrawWGPUSpriteBatch(const WGPUSpriteBatch& batch,
+                                                         std::shared_ptr<Nut::NutContext> nutContext)
+{
+    if (batch.count == 0) return;
+
+    auto materialToUse = batch.material ? batch.material : backend.CreateOrGetDefaultMaterial();
+    if (!materialToUse)
+    {
+        LogError("RenderSystem::RenderSystemImpl::DrawWGPUSpriteBatch: No valid material to use for WGPU sprite batch.");
+        return;
+    }
+
+    auto swapChainTexture = nutContext->GetCurrentTexture();
+    if (!swapChainTexture) return;
+
+    static Nut::Buffer localQuadVBO(std::nullopt);
+    static Nut::Buffer localQuadIBO(std::nullopt);
+    static std::once_flag geoInit;
+
+    std::call_once(geoInit, [nutContext]()
+    {
+        
+        
+        
+        std::vector<Vertex> vertices = {
+            
+            {-0.5f, -0.5f, 0.0f, 0.0f}, 
+            {-0.5f, 0.5f, 0.0f, 1.0f},  
+            {0.5f, 0.5f, 1.0f, 1.0f},   
+            {0.5f, -0.5f, 1.0f, 0.0f}   
+        };
+        std::vector<uint16_t> indices = {0, 1, 2, 0, 2, 3};
+
+        localQuadVBO = Nut::BufferBuilder()
+                       .SetUsage(Nut::BufferUsage::Vertex | Nut::BufferUsage::CopyDst)
+                       .SetData(vertices)
+                       .Build(nutContext);
+
+        localQuadIBO = Nut::BufferBuilder()
+                       .SetUsage(Nut::BufferUsage::Index | Nut::BufferUsage::CopyDst)
+                       .SetData(indices)
+                       .Build(nutContext);
+    });
+
+    float texWidth = 1.0f;
+    float texHeight = 1.0f;
+    if (batch.image)
+    {
+        texWidth = static_cast<float>(batch.image->GetWidth());
+        texHeight = static_cast<float>(batch.image->GetHeight());
+    }
+
+    std::vector<InstanceData> instanceDatas(batch.count);
+    for (size_t i = 0; i < batch.count; ++i)
+    {
+        const auto& t = batch.transforms[i];
+        const auto& c = batch.color;
+
+        float srcX = batch.sourceRect.fLeft;
+        float srcY = batch.sourceRect.fTop;
+        float srcW = batch.sourceRect.width();
+        float srcH = batch.sourceRect.height();
+
+        if (srcW <= 0.0001f) srcW = texWidth;
+        if (srcH <= 0.0001f) srcH = texHeight;
+
+        float uvX = srcX / texWidth;
+        float uvY = srcY / texHeight;
+        float uvW = srcW / texWidth;
+        float uvH = srcH / texHeight;
+
+        float worldW = srcW * batch.ppuScaleFactor;
+        float worldH = srcH * batch.ppuScaleFactor;
+
+        instanceDatas[i].position = {t.position.fX, t.position.fY, 0.0f, 1.0f};
+        instanceDatas[i].scaleX = t.scaleX;
+        instanceDatas[i].scaleY = t.scaleY;
+        instanceDatas[i].sinR = t.sinR;
+        instanceDatas[i].cosR = t.cosR;
+        instanceDatas[i].color = {c.r, c.g, c.b, c.a};
+        instanceDatas[i].uvRect = {uvX, uvY, uvW, uvH};
+        instanceDatas[i].size = {worldW, worldH};
+        instanceDatas[i].padding = {0.0f, 0.0f};
+    }
+
+    EngineData engineData{};
+    Camera::GetInstance().FillEngineData(engineData);
+
+    
+    
+    
+    
+    engineData.CameraScaleY *= -1.0f;
+
+    if (engineData.ViewportSize.x <= 1 || engineData.ViewportSize.y <= 1)
+    {
+        engineData.ViewportSize = {
+            static_cast<float>(nutContext->GetCurrentSwapChainSize().width),
+            static_cast<float>(nutContext->GetCurrentSwapChainSize().height)
+        };
+    }
+
+    uint32_t sampleCount = backend.GetSampleCount();
+    auto msaaTexture = backend.GetMSAATexture();
+    bool useMSAA = false;
+
+    
+    
+    if (sampleCount > 1 && msaaTexture && swapChainTexture)
+    {
+        if (msaaTexture->GetWidth() == swapChainTexture->GetWidth() &&
+            msaaTexture->GetHeight() == swapChainTexture->GetHeight())
+        {
+            useMSAA = true;
+        }
+    }
+
+    uint32_t targetSampleCount = useMSAA ? sampleCount : 1;
+    auto pipeline = materialToUse->GetPipeline(targetSampleCount);
+
+    if (!pipeline)
+    {
+        LogError("RenderSystem: Failed to get pipeline for sample count {}", targetSampleCount);
+        return;
+    }
+
+    Nut::Sampler sampler;
+    Nut::FilterMode filter = (batch.filterQuality == 0) ? Nut::FilterMode::Nearest : Nut::FilterMode::Linear;
+    sampler.SetMagFilter(filter).SetMinFilter(filter).Build(nutContext);
+
+    pipeline->SetReservedBuffers(engineData, instanceDatas, nutContext);
+    if (!pipeline->SwapTexture(batch.image, &sampler, nutContext))
+    {
+        LogError("RenderSystem: Failed to swap texture in material.");
+        return;
+    }
+
+    Nut::ColorAttachmentBuilder attachmentBuilder;
+
+    if (useMSAA)
+    {
+        attachmentBuilder.SetTexture(msaaTexture)
+                         .SetLoadOnOpen(Nut::LoadOnOpen::Load)
+                         .SetStoreOnOpen(Nut::StoreOnOpen::Store);
+    }
+    else
+    {
+        attachmentBuilder.SetTexture(swapChainTexture)
+                         .SetLoadOnOpen(Nut::LoadOnOpen::Load)
+                         .SetStoreOnOpen(Nut::StoreOnOpen::Store);
+    }
+
+    auto renderPass = nutContext->BeginRenderFrame()
+                                .AddColorAttachment(attachmentBuilder.Build())
+                                .Build();
+
+    renderPass.SetPipeline(*pipeline);
+    materialToUse->Bind(renderPass);
+
+    renderPass.SetVertexBuffer(0, localQuadVBO);
+    renderPass.SetIndexBuffer(localQuadIBO, wgpu::IndexFormat::Uint16);
+
+    renderPass.DrawIndexed(6, static_cast<uint32_t>(batch.count), 0, 0, 0);
+
+    nutContext->Submit({nutContext->EndRenderFrame(renderPass)});
 }

@@ -200,25 +200,25 @@ void RenderPass::WriteTimestamp(const QuerySet& querySet, uint32_t queryIndex) c
     m_passEncoder.WriteTimestamp(querySet.Get(), queryIndex);
 }
 
-ColorAttachmentBuilder& ColorAttachmentBuilder::SetTexture(const TextureA& texture)
+ColorAttachmentBuilder& ColorAttachmentBuilder::SetTexture(const TextureAPtr& texture)
 {
     if (!texture)
     {
         std::cerr << "Failed to set color attachment to texture" << std::endl;
         return *this;
     }
-    attachment.view = texture.GetTextureView();
+    attachment.view = texture->GetTextureView();
     return *this;
 }
 
-ColorAttachmentBuilder& ColorAttachmentBuilder::SetResolveTexture(const TextureA& texture)
+ColorAttachmentBuilder& ColorAttachmentBuilder::SetResolveTexture(const TextureAPtr& texture)
 {
     if (!texture)
     {
         std::cerr << "Failed to set color attachment to texture" << std::endl;
         return *this;
     }
-    attachment.view = texture.GetTextureView();
+    attachment.view = texture->GetTextureView();
     return *this;
 }
 
@@ -253,14 +253,14 @@ ColorAttachment ColorAttachmentBuilder::Build()
     return attachment;
 }
 
-DepthStencilAttachmentBuilder& DepthStencilAttachmentBuilder::SetTexture(const TextureA& texture)
+DepthStencilAttachmentBuilder& DepthStencilAttachmentBuilder::SetTexture(const TextureAPtr& texture)
 {
     if (!texture)
     {
         std::cerr << "Failed to set depth stencil attachment to texture" << std::endl;
         return *this;
     }
-    attachment.view = texture.GetTextureView();
+    attachment.view = texture->GetTextureView();
     return *this;
 }
 

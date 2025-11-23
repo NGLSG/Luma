@@ -13,6 +13,15 @@
 #include "include/core/SkCanvas.h"
 #include "include/core/SkM44.h"
 #include "include/core/SkTypeface.h"
+#include "Nut/Buffer.h"
+#include <memory>
+
+class RuntimeWGSLMaterial;
+
+namespace Nut
+{
+    class TextureA;
+}
 
 /**
  * @brief 概念：判断类型是否为统一变量类型。
@@ -223,6 +232,20 @@ struct SpriteBatch
     size_t count;
 };
 
+// WGSL 渲染批次（使用 RuntimeWGSLMaterial + TextureA）
+struct WGPUSpriteBatch
+{
+    RuntimeWGSLMaterial* material = nullptr;
+    std::shared_ptr<Nut::TextureA> image;
+    SkRect sourceRect;
+    ECS::Color color = ECS::Colors::White;
+    const RenderableTransform* transforms = nullptr;
+    int filterQuality = 0;
+    int wrapMode = 0;
+    float ppuScaleFactor = 1.0f;
+    size_t count = 0;
+};
+
 /**
  * @brief 实例批次结构体。
  */
@@ -327,6 +350,7 @@ struct RenderPacket
         InstanceBatch,
         ShaderBatch,
         TextBatch,
-        RawDrawBatch
+        RawDrawBatch,
+        WGPUSpriteBatch
     > batchData; ///< 包含具体批次数据的变体。
 };

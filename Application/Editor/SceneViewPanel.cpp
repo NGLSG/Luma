@@ -433,7 +433,6 @@ void SceneViewPanel::Draw()
             const Camera::CamProperties prevCamProps = cam.m_properties;
             cam.SetProperties(m_editorCameraProperties);
 
-
             m_context->graphicsBackend->SetActiveRenderTarget(m_sceneViewTarget);
             for (const auto& packet : m_context->renderQueue)
             {

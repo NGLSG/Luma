@@ -7,6 +7,8 @@
 #include "include/core/SkImage.h"
 #include "include/core/SkSurface.h"
 #include "../Utils/PCH.h"
+#include "Resources/RuntimeAsset/RuntimeWGSLMaterial.h"
+
 #if defined(_WIN32)
 #include <windows.h>
 #elif defined(__linux__) && !defined(__ANDROID__)
@@ -26,28 +28,27 @@ GraphicsBackend::~GraphicsBackend()
 }
 
 
-Nut::TextureA GraphicsBackend::LoadTextureFromFile(const std::string& filename)
+Nut::TextureAPtr GraphicsBackend::LoadTextureFromFile(const std::string& filename)
 {
     if (!nutContext)
     {
         LogError("LoadTextureFromFile 失败: nutContext为空");
         return nullptr;
     }
-    
+
     return nutContext->LoadTextureFromFile(filename);
 }
 
-Nut::TextureA GraphicsBackend::LoadTextureFromData(const unsigned char* data, size_t size)
+Nut::TextureAPtr GraphicsBackend::LoadTextureFromData(const unsigned char* data, size_t size)
 {
     if (!nutContext)
     {
         LogError("LoadTextureFromData 失败: nutContext为空");
         return nullptr;
     }
-    
-    return nutContext->LoadTextureFromMemory(data, size);
-}
 
+    return nutContext->CreateTextureFromMemory(data, size);
+}
 
 
 void GraphicsBackend::updateQualitySettings()
@@ -83,13 +84,12 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
 
     try
     {
-        
         Nut::NutContextDescriptor nutDesc;
         nutDesc.width = opts.width;
         nutDesc.height = opts.height;
         nutDesc.enableVSync = opts.enableVSync;
-        
-        
+
+
 #if defined(_WIN32)
         nutDesc.windowHandle.hWnd = opts.windowHandle.hWnd;
         nutDesc.windowHandle.hInst = opts.windowHandle.hInst;
@@ -101,8 +101,8 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
 #elif defined(__ANDROID__)
         nutDesc.windowHandle.aNativeWindow = opts.windowHandle.aNativeWindow;
 #endif
-        
-        
+
+
         for (const auto& type : opts.backendTypePriority)
         {
             switch (type)
@@ -127,8 +127,8 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
                 break;
             }
         }
-        
-        
+
+
         switch (opts.qualityLevel)
         {
         case QualityLevel::Low:
@@ -143,7 +143,7 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
             break;
         }
 
-        
+
         nutContext = Nut::NutContext::Create(nutDesc);
         if (!nutContext)
         {
@@ -151,7 +151,7 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
             throw std::runtime_error("创建 NutContext 失败");
         }
 
-        
+
         skgpu::graphite::DawnBackendContext backendContext;
         backendContext.fInstance = nutContext->GetWGPUInstance();
         backendContext.fDevice = nutContext->GetWGPUDevice();
@@ -173,17 +173,17 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
 
         this->currentWidth = options.width;
         this->currentHeight = options.height;
-        
-        
+
+
         if (m_msaaSampleCount > 1)
         {
             Nut::TextureDescriptor msaaDesc;
             msaaDesc.SetSize(currentWidth, currentHeight)
-                   .SetFormat(GetSurfaceFormat())
-                   .SetSampleCount(m_msaaSampleCount)
-                   .SetUsage(wgpu::TextureUsage::RenderAttachment)
-                   .SetLabel("MSAA Texture");
-            
+                    .SetFormat(GetSurfaceFormat())
+                    .SetSampleCount(m_msaaSampleCount)
+                    .SetUsage(wgpu::TextureUsage::RenderAttachment)
+                    .SetLabel("MSAA Texture");
+
             m_msaaTexture = nutContext->CreateTexture(msaaDesc);
 
             if (!m_msaaTexture)
@@ -205,15 +205,19 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
 
 void GraphicsBackend::ResolveMSAA()
 {
-    if (m_msaaSampleCount <= 1 || !nutContext || !m_msaaTexture || m_activeRenderTarget)
+    if (m_msaaSampleCount <= 1 || !nutContext || !m_msaaTexture)
+    {
+        return;
+    }
+
+    if (m_activeRenderTarget)
     {
         return;
     }
 
     auto currentTexture = nutContext->GetCurrentTexture();
-    if (!currentTexture.GetTexture())
+    if (!currentTexture || !currentTexture->GetTexture())
     {
-        LogError("ResolveMSAA: 获取当前纹理失败");
         return;
     }
 
@@ -291,7 +295,7 @@ sk_sp<SkImage> GraphicsBackend::CreateImageFromCompressedData(const unsigned cha
         return nullptr;
     }
 
-    auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(texture.GetTexture().Get());
+    auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(texture->GetTexture().Get());
     if (!backendTex.isValid())
     {
         LogError("从 WGPU 纹理创建有效的 BackendTexture 失败");
@@ -328,60 +332,54 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
             return nullptr;
         }
 
-        auto m_surface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(),
-                                                        backendTex,
-                                                        kBGRA_8888_SkColorType,
-                                                        SkColorSpace::MakeSRGB(),
-                                                        nullptr);
-        if (!m_surface)
+        auto surface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(),
+                                                      backendTex,
+                                                      kBGRA_8888_SkColorType,
+                                                      SkColorSpace::MakeSRGB(),
+                                                      nullptr);
+        if (!surface)
         {
             LogError("GetSurface: 包装活动渲染目标失败");
         }
-        return m_surface;
+        return surface;
     }
+
 
     if (nutContext)
     {
         if (m_msaaSampleCount > 1 && m_msaaTexture)
         {
-            auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(m_msaaTexture.GetTexture().Get());
-            if (!backendTex.isValid())
-            {
-                LogError("GetSurface: MSAA 纹理的后端纹理无效");
-                return nullptr;
-            }
+            auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(m_msaaTexture->GetTexture().Get());
+            if (!backendTex.isValid()) return nullptr;
 
-            auto skSurface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(), backendTex,
-                                                            kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
-            if (!skSurface)
-            {
-                LogError("GetSurface: 包装 MSAA 纹理失败");
-            }
-            return skSurface;
+            return SkSurfaces::WrapBackendTexture(graphiteRecorder.get(), backendTex,
+                                                  kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
         }
-        else
+
+
+        auto currentTexture = nutContext->GetCurrentTexture();
+        if (!currentTexture || !currentTexture->GetTexture())
         {
-            auto currentTexture = nutContext->GetCurrentTexture();
-            if (!currentTexture.GetTexture())
-            {
-                LogError("GetSurface: 获取当前纹理失败");
-                return nullptr;
-            }
-            auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(currentTexture.GetTexture().Get());
-            if (!backendTex.isValid())
-            {
-                LogError("GetSurface: 当前表面纹理的后端纹理无效");
-                return nullptr;
-            }
-
-            auto skSurface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(), backendTex,
-                                                            kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
-            if (!skSurface)
-            {
-                LogError("GetSurface: 包装表面纹理失败");
-            }
-            return skSurface;
+            LogError("GetSurface: 获取当前纹理失败");
+            return nullptr;
         }
+
+
+        auto backendTex = skgpu::graphite::BackendTextures::MakeDawn(currentTexture->GetTexture().Get());
+        if (!backendTex.isValid())
+        {
+            LogError("GetSurface: 当前表面纹理的后端纹理无效");
+            return nullptr;
+        }
+
+
+        auto skSurface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(), backendTex,
+                                                        kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
+
+
+        m_currentSwapChainSurface = skSurface;
+
+        return skSurface;
     }
     else
     {
@@ -474,21 +472,21 @@ void GraphicsBackend::Resize(uint16_t width, uint16_t height)
         nutContext->Resize(width, height);
         nutContext->SetActiveRenderTarget(nullptr);
         m_activeRenderTarget = nullptr;
-        
-        
+
+
         if (m_msaaSampleCount > 1)
         {
             if (m_msaaTexture)
             {
-                m_msaaTexture.GetTexture().Destroy();
+                m_msaaTexture->GetTexture().Destroy();
             }
             Nut::TextureDescriptor msaaDesc;
             msaaDesc.SetSize(width, height)
-                   .SetFormat(GetSurfaceFormat())
-                   .SetSampleCount(m_msaaSampleCount)
-                   .SetUsage(wgpu::TextureUsage::RenderAttachment)
-                   .SetLabel("MSAA Texture");
-            
+                    .SetFormat(GetSurfaceFormat())
+                    .SetSampleCount(m_msaaSampleCount)
+                    .SetUsage(wgpu::TextureUsage::RenderAttachment)
+                    .SetLabel("MSAA Texture");
+
             m_msaaTexture = nutContext->CreateTexture(msaaDesc);
 
             if (!m_msaaTexture)
@@ -497,7 +495,7 @@ void GraphicsBackend::Resize(uint16_t width, uint16_t height)
             }
         }
     }
-    
+
     this->currentWidth = width;
     this->currentHeight = height;
     this->offscreenSurface.reset();
@@ -601,16 +599,16 @@ wgpu::TextureView GraphicsBackend::GetCurrentFrameView() const
         LogWarn("GetCurrentFrameView: nutContext为空");
         return nullptr;
     }
-    // ImGui 等 UI 始终应渲染到交换链纹理，因此强制回到默认表面。
+
     nutContext->SetActiveRenderTarget(nullptr);
 
     auto currentTexture = nutContext->GetCurrentTexture();
-    if (!currentTexture.GetTexture())
+    if (!currentTexture || !currentTexture->GetTexture())
     {
         LogWarn("GetCurrentFrameView: 当前表面纹理为空");
         return nullptr;
     }
-    return currentTexture.GetTexture().CreateView();
+    return currentTexture->GetTexture().CreateView();
 }
 
 void GraphicsBackend::Submit()
@@ -649,21 +647,27 @@ void GraphicsBackend::Submit()
 
 void GraphicsBackend::PresentFrame()
 {
+    if (m_msaaSampleCount > 1)
+    {
+        ResolveMSAA();
+    }
+
+    Submit();
+
+    m_currentSwapChainSurface.reset();
+
     if (nutContext)
     {
-        m_activeRenderTarget = nullptr;
-        // 确保最终呈现的目标是交换链而非自定义 RenderTarget。
         nutContext->SetActiveRenderTarget(nullptr);
+
         nutContext->Present();
     }
     else if (offscreenSurface)
     {
         lastOffscreenImage = offscreenSurface->makeImageSnapshot();
-        if (!lastOffscreenImage)
-        {
-            LogWarn("PresentFrame: 创建离屏图像快照失败");
-        }
     }
+
+    m_activeRenderTarget = nullptr;
 }
 
 skgpu::graphite::Context* GraphicsBackend::GetGraphiteContext() const
@@ -678,7 +682,6 @@ skgpu::graphite::Recorder* GraphicsBackend::GetRecorder() const
 
 wgpu::TextureFormat GraphicsBackend::GetSurfaceFormat() const
 {
-    
     return wgpu::TextureFormat::BGRA8Unorm;
 }
 
@@ -719,6 +722,94 @@ sk_sp<SkImage> GraphicsBackend::GPUToCPUImage(sk_sp<SkImage> src) const
     return result;
 }
 
+RuntimeWGSLMaterial* GraphicsBackend::CreateOrGetDefaultMaterial()
+{
+    static std::unique_ptr<RuntimeWGSLMaterial> defaultMaterial = nullptr;
+
+    static uint32_t cachedSampleCount = 0;
+    static std::weak_ptr<Nut::NutContext> cachedContext;
+
+    uint32_t currentSampleCount = GetSampleCount();
+
+    bool needsRebuild = !defaultMaterial;
+    if (defaultMaterial)
+    {
+        if (cachedSampleCount != currentSampleCount) needsRebuild = true;
+        if (cachedContext.lock() != nutContext) needsRebuild = true;
+    }
+
+    if (needsRebuild)
+    {
+        defaultMaterial = std::make_unique<RuntimeWGSLMaterial>();
+
+        const std::string defaultShader = R"(
+/// @file Common2D.wgsl
+/// @brief 2D渲染通用着色器模板
+/// @author Luma Engine
+/// @version 1.0
+/// @date 2025
+
+#include <Common.wgsl>
+
+/// @brief 顶点着色器主函数
+/// @details 处理顶点变换、UV变换和颜色传递，支持实例化渲染
+/// @param input 顶点输入数据
+/// @param instanceIdx 实例索引，用于访问实例数据数组
+/// @return 处理后的顶点输出数据
+@vertex
+fn vs_main(input: VertexInput, @builtin(instance_index) instanceIdx: u32) -> VertexOutput {
+    // 从实例数据数组中获取当前实例的数据
+    let instance = instanceDatas[instanceIdx];
+
+    // 将局部坐标按实例尺寸进行缩放
+    let localPos = input.position * instance.size;
+
+    // 将局部坐标变换到裁剪空间
+    let clipPosition = TransformVertex(localPos, instance, engineData);
+
+    // 对UV坐标进行变换，应用实例的UV矩形
+    let transformedUV = TransformUV(input.uv, instance.uvRect);
+
+    // 构建顶点输出结构
+    var out: VertexOutput;
+    out.clipPosition = clipPosition;    ///< 裁剪空间位置
+    out.uv = transformedUV;             ///< 变换后的UV坐标
+    out.color = instance.color;         ///< 实例颜色（包含透明度）
+
+    return out;
+}
+
+/// @brief 片段着色器主函数
+/// @details 采样纹理并与顶点颜色混合，输出最终像素颜色
+/// @param in 顶点着色器传递过来的插值数据
+/// @return 输出到颜色附件的RGBA颜色值
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    // 从主纹理采样颜色，使用主采样器
+    let texColor = textureSample(mainTexture, mainSampler, in.uv);
+
+    // 将纹理颜色与顶点颜色相乘（支持透明度混合）
+    return texColor * in.color;
+}
+)";
+
+
+        if (defaultMaterial->Initialize(nutContext, defaultShader, GetSurfaceFormat(), currentSampleCount))
+        {
+            cachedSampleCount = currentSampleCount;
+            cachedContext = nutContext;
+            LogInfo("Default WGSL Material initialized successfully.");
+        }
+        else
+        {
+            LogError("Failed to initialize default material.");
+            defaultMaterial.reset();
+            return nullptr;
+        }
+    }
+    return defaultMaterial.get();
+}
+
 void GraphicsBackend::shutdown()
 {
     m_activeRenderTarget = nullptr;
@@ -731,7 +822,7 @@ void GraphicsBackend::shutdown()
 
     if (m_msaaTexture)
     {
-        m_msaaTexture.GetTexture().Destroy();
+        m_msaaTexture->GetTexture().Destroy();
         m_msaaTexture = nullptr;
     }
 

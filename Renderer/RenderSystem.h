@@ -97,6 +97,12 @@ public:
      */
     void Submit(const RawDrawBatch& batch);
 
+    /**
+     * @brief 提交一个WGPU精灵批次进行渲染。
+     * @param batch 要提交的WGPU精灵批次。
+     */
+    void Submit(const WGPUSpriteBatch& batch);
+
 
     /**
      * @brief 提交一个渲染包进行渲染。

@@ -121,6 +121,22 @@ namespace
                 seed = hash_combine_u64(seed, float_bits(batch.size.fWidth));
                 seed = hash_combine_u64(seed, float_bits(batch.size.fHeight));
             }
+            else if constexpr (std::is_same_v<T, WGPUSpriteBatch>)
+            {
+                seed = hash_combine_u64(seed, reinterpret_cast<uint64_t>(batch.image.get()));
+                seed = hash_combine_u64(seed, reinterpret_cast<uint64_t>(batch.material));
+                seed = hash_combine_u64(seed, float_bits(batch.sourceRect.fLeft));
+                seed = hash_combine_u64(seed, float_bits(batch.sourceRect.fTop));
+                seed = hash_combine_u64(seed, float_bits(batch.sourceRect.fRight));
+                seed = hash_combine_u64(seed, float_bits(batch.sourceRect.fBottom));
+                seed = hash_combine_u64(seed, float_bits(batch.ppuScaleFactor));
+                seed = hash_combine_u64(seed, float_bits(batch.color.r));
+                seed = hash_combine_u64(seed, float_bits(batch.color.g));
+                seed = hash_combine_u64(seed, float_bits(batch.color.b));
+                seed = hash_combine_u64(seed, float_bits(batch.color.a));
+                seed = hash_combine_u64(seed, static_cast<uint64_t>(batch.filterQuality));
+                seed = hash_combine_u64(seed, static_cast<uint64_t>(batch.wrapMode));
+            }
             else if constexpr (std::is_same_v<T, RawDrawBatch>)
             {
                 seed = hash_combine_u64(seed, 0xDEADBEEFULL);
@@ -137,6 +153,24 @@ namespace
         std::vector<SceneRenderer::BatchGroup> spriteBatchGroups;
         std::vector<SceneRenderer::BatchGroup> textBatchGroups;
         std::vector<RenderPacket> rawDrawPackets;
+
+        
+        struct WGPUBatchGroup
+        {
+            RuntimeWGSLMaterial* material;
+            std::shared_ptr<Nut::TextureA> image;
+            SkRect sourceRect;
+            ECS::Color color;
+            int zIndex = 0;
+            uint64_t sortKey = 0;
+            int filterQuality = 0;
+            int wrapMode = 0;
+            float ppuScaleFactor = 1.0f;
+            std::vector<RenderableTransform> transforms;
+        };
+
+        std::vector<WGPUBatchGroup> wgpuBatchGroups;
+        std::unordered_map<uint64_t, size_t> wgpuGroupIndices; 
     };
 
     class InterpolationAndBatchJob : public IJob
@@ -312,13 +346,13 @@ namespace
                 {
                     if (!canvas) return;
 
-                    
+
                     canvas->save();
                     canvas->translate(trans.position.x, trans.position.y);
                     canvas->rotate(SkRadiansToDegrees(trans.rotation));
                     canvas->scale(trans.scale.x, trans.scale.y);
 
-                    
+
                     ECS::RectF localRect = data.rect;
                     localRect.x = -data.rect.Width() * 0.5f;
                     localRect.y = -data.rect.Height() * 0.5f;
@@ -1057,12 +1091,11 @@ namespace
                         canvas->drawPath(triangle, paint);
                     }
 
-                    
+
                     canvas->restore();
 
                     if (combo.isDropdownOpen && !combo.items.empty())
                     {
-                        
                         ECS::RectF worldRect = combo.rect;
                         worldRect.x = trans.position.x - combo.rect.Width() * 0.5f;
                         worldRect.y = trans.position.y - combo.rect.Height() * 0.5f;
@@ -1550,7 +1583,7 @@ namespace
                     int rows = 1;
                     int itemsPerPage = 0;
 
-                    
+
                     switch (listBox.layout)
                     {
                     case ECS::ListBoxLayout::Horizontal:
@@ -1840,7 +1873,7 @@ namespace
                         canvas->restore();
                     }
 
-                    
+
                     if (showVertical && availableHeight > 0.0f)
                     {
                         SkRect trackRect = SkRect::MakeXYWH(contentRight + trackSpacing,
@@ -1885,7 +1918,7 @@ namespace
                                           thumbPaint);
                     }
 
-                    
+
                     if (showHorizontal && availableWidth > 0.0f)
                     {
                         SkRect trackRect = SkRect::MakeXYWH(contentLeft,
@@ -1992,48 +2025,111 @@ namespace
         void processSpriteData(const Renderable* currIt, const ECS::TransformComponent& transform,
                                const SpriteRenderData& spriteData)
         {
-            FastSpriteBatchKey key(spriteData.image, spriteData.material, spriteData.color,
-                                   static_cast<ECS::FilterQuality>(spriteData.filterQuality),
-                                   static_cast<ECS::WrapMode>(spriteData.wrapMode),
-                                   spriteData.sourceRect, spriteData.ppuScaleFactor, currIt->zIndex);
-
-            auto keyIt = result->spriteGroupIndices.find(key);
-            size_t groupIndex;
-            bool createdNewGroup = false;
-
-            if (keyIt == result->spriteGroupIndices.end())
+            
+            if (spriteData.isUISprite)
             {
-                groupIndex = result->spriteBatchGroups.size();
-                result->spriteGroupIndices[key] = groupIndex;
+                
+                FastSpriteBatchKey key(spriteData.image, spriteData.material, spriteData.color,
+                                       static_cast<ECS::FilterQuality>(spriteData.filterQuality),
+                                       static_cast<ECS::WrapMode>(spriteData.wrapMode),
+                                       spriteData.sourceRect, spriteData.ppuScaleFactor, currIt->zIndex);
 
-                result->spriteBatchGroups.emplace_back();
-                auto& group = result->spriteBatchGroups.back();
-                group.image = const_cast<SkImage*>(spriteData.image);
-                group.material = spriteData.material;
-                group.sourceRect = spriteData.sourceRect;
-                group.color = spriteData.color;
-                group.zIndex = currIt->zIndex;
-                group.sortKey = currIt->sortKey;
-                group.filterQuality = spriteData.filterQuality;
-                group.wrapMode = spriteData.wrapMode;
-                group.ppuScaleFactor = spriteData.ppuScaleFactor;
-                group.transforms.reserve(32);
-                createdNewGroup = true;
+                auto keyIt = result->spriteGroupIndices.find(key);
+                size_t groupIndex;
+                bool createdNewGroup = false;
+
+                if (keyIt == result->spriteGroupIndices.end())
+                {
+                    groupIndex = result->spriteBatchGroups.size();
+                    result->spriteGroupIndices[key] = groupIndex;
+
+                    result->spriteBatchGroups.emplace_back();
+                    auto& group = result->spriteBatchGroups.back();
+                    group.image = const_cast<SkImage*>(spriteData.image);
+                    group.material = spriteData.material;
+                    group.sourceRect = spriteData.sourceRect;
+                    group.color = spriteData.color;
+                    group.zIndex = currIt->zIndex;
+                    group.sortKey = currIt->sortKey;
+                    group.filterQuality = spriteData.filterQuality;
+                    group.wrapMode = spriteData.wrapMode;
+                    group.ppuScaleFactor = spriteData.ppuScaleFactor;
+                    group.transforms.reserve(32);
+                    createdNewGroup = true;
+                }
+                else
+                {
+                    groupIndex = keyIt->second;
+                }
+
+                auto& spriteGroup = result->spriteBatchGroups[groupIndex];
+                if (!createdNewGroup)
+                {
+                    spriteGroup.sortKey = std::min(spriteGroup.sortKey, currIt->sortKey);
+                }
+
+                spriteGroup.transforms.emplace_back(
+                    transform.position, transform.scale.x, transform.scale.y,
+                    sinf(transform.rotation), cosf(transform.rotation));
             }
             else
             {
-                groupIndex = keyIt->second;
-            }
+                
+                
+                uint64_t batchKey = 0xcbf29ce484222325ULL; 
+                batchKey = hash_combine_u64(batchKey, reinterpret_cast<uint64_t>(spriteData.wgpuTexture.get()));
+                batchKey = hash_combine_u64(batchKey, reinterpret_cast<uint64_t>(spriteData.wgpuMaterial));
+                batchKey = hash_combine_u64(batchKey, float_bits(spriteData.color.r));
+                batchKey = hash_combine_u64(batchKey, float_bits(spriteData.color.g));
+                batchKey = hash_combine_u64(batchKey, float_bits(spriteData.color.b));
+                batchKey = hash_combine_u64(batchKey, float_bits(spriteData.color.a));
+                batchKey = hash_combine_u64(batchKey, float_bits(spriteData.sourceRect.fLeft));
+                batchKey = hash_combine_u64(batchKey, float_bits(spriteData.sourceRect.fTop));
+                batchKey = hash_combine_u64(batchKey, float_bits(spriteData.sourceRect.fRight));
+                batchKey = hash_combine_u64(batchKey, float_bits(spriteData.sourceRect.fBottom));
+                batchKey = hash_combine_u64(batchKey, float_bits(spriteData.ppuScaleFactor));
+                batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(spriteData.filterQuality));
+                batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(spriteData.wrapMode));
+                batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(currIt->zIndex));
 
-            auto& spriteGroup = result->spriteBatchGroups[groupIndex];
-            if (!createdNewGroup)
-            {
-                spriteGroup.sortKey = std::min(spriteGroup.sortKey, currIt->sortKey);
-            }
+                auto keyIt = result->wgpuGroupIndices.find(batchKey);
+                size_t groupIndex;
+                bool createdNewGroup = false;
 
-            spriteGroup.transforms.emplace_back(
-                transform.position, transform.scale.x, transform.scale.y,
-                sinf(transform.rotation), cosf(transform.rotation));
+                if (keyIt == result->wgpuGroupIndices.end())
+                {
+                    groupIndex = result->wgpuBatchGroups.size();
+                    result->wgpuGroupIndices[batchKey] = groupIndex;
+
+                    result->wgpuBatchGroups.emplace_back();
+                    auto& group = result->wgpuBatchGroups.back();
+                    group.image = spriteData.wgpuTexture;
+                    group.material = spriteData.wgpuMaterial;
+                    group.sourceRect = spriteData.sourceRect;
+                    group.color = spriteData.color;
+                    group.zIndex = currIt->zIndex;
+                    group.sortKey = currIt->sortKey;
+                    group.filterQuality = spriteData.filterQuality;
+                    group.wrapMode = spriteData.wrapMode;
+                    group.ppuScaleFactor = spriteData.ppuScaleFactor;
+                    group.transforms.reserve(32);
+                    createdNewGroup = true;
+                }
+                else
+                {
+                    groupIndex = keyIt->second;
+                }
+
+                auto& wgpuGroup = result->wgpuBatchGroups[groupIndex];
+                if (!createdNewGroup)
+                {
+                    wgpuGroup.sortKey = std::min(wgpuGroup.sortKey, currIt->sortKey);
+                }
+
+                wgpuGroup.transforms.emplace_back(
+                    transform.position, transform.scale.x, transform.scale.y,
+                    sinf(transform.rotation), cosf(transform.rotation));
+            }
         }
     };
 }
@@ -2239,10 +2335,12 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
 
     size_t totalSpriteGroups = 0;
     size_t totalTextGroups = 0;
+    size_t totalWGPUGroups = 0;
     for (const auto& result : threadResults)
     {
         totalSpriteGroups += result.spriteBatchGroups.size();
         totalTextGroups += result.textBatchGroups.size();
+        totalWGPUGroups += result.wgpuBatchGroups.size();
     }
 
     spriteBatchGroups.reserve(totalSpriteGroups);
@@ -2304,13 +2402,58 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         }
     }
 
-    outPackets.reserve(spriteBatchGroups.size() + textBatchGroups.size());
+    
+    std::vector<ThreadLocalBatchResult::WGPUBatchGroup> wgpuBatchGroups;
+    std::unordered_map<uint64_t, size_t> wgpuGroupIndices;
+    wgpuBatchGroups.reserve(totalWGPUGroups);
+
+    for (const auto& result : threadResults)
+    {
+        for (const auto& threadGroup : result.wgpuBatchGroups)
+        {
+            
+            uint64_t batchKey = 0xcbf29ce484222325ULL;
+            batchKey = hash_combine_u64(batchKey, reinterpret_cast<uint64_t>(threadGroup.image.get()));
+            batchKey = hash_combine_u64(batchKey, reinterpret_cast<uint64_t>(threadGroup.material));
+            batchKey = hash_combine_u64(batchKey, float_bits(threadGroup.color.r));
+            batchKey = hash_combine_u64(batchKey, float_bits(threadGroup.color.g));
+            batchKey = hash_combine_u64(batchKey, float_bits(threadGroup.color.b));
+            batchKey = hash_combine_u64(batchKey, float_bits(threadGroup.color.a));
+            batchKey = hash_combine_u64(batchKey, float_bits(threadGroup.sourceRect.fLeft));
+            batchKey = hash_combine_u64(batchKey, float_bits(threadGroup.sourceRect.fTop));
+            batchKey = hash_combine_u64(batchKey, float_bits(threadGroup.sourceRect.fRight));
+            batchKey = hash_combine_u64(batchKey, float_bits(threadGroup.sourceRect.fBottom));
+            batchKey = hash_combine_u64(batchKey, float_bits(threadGroup.ppuScaleFactor));
+            batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(threadGroup.filterQuality));
+            batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(threadGroup.wrapMode));
+            batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(threadGroup.zIndex));
+
+            auto it = wgpuGroupIndices.find(batchKey);
+            if (it == wgpuGroupIndices.end())
+            {
+                size_t newIndex = wgpuBatchGroups.size();
+                wgpuGroupIndices[batchKey] = newIndex;
+                wgpuBatchGroups.push_back(threadGroup);
+            }
+            else
+            {
+                auto& masterGroup = wgpuBatchGroups[it->second];
+                masterGroup.sortKey = std::min(masterGroup.sortKey, threadGroup.sortKey);
+                masterGroup.transforms.insert(masterGroup.transforms.end(),
+                                              threadGroup.transforms.begin(),
+                                              threadGroup.transforms.end());
+            }
+        }
+    }
+
+    outPackets.reserve(spriteBatchGroups.size() + textBatchGroups.size() + wgpuBatchGroups.size());
 
 
     {
         size_t totalTransformsNeeded = 0;
         for (const auto& group : spriteBatchGroups) totalTransformsNeeded += group.transforms.size();
         for (const auto& group : textBatchGroups) totalTransformsNeeded += group.transforms.size();
+        for (const auto& group : wgpuBatchGroups) totalTransformsNeeded += group.transforms.size();
         transformArenas[buildIndex]->Reserve(totalTransformsNeeded);
 
         size_t totalTextsNeeded = 0;
@@ -2368,6 +2511,32 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
                 .texts = textBuffer,
                 .alignment = static_cast<int>(group.alignment),
                 .transforms = transformBuffer,
+                .count = count
+            }
+        });
+    }
+
+    
+    for (const auto& group : wgpuBatchGroups)
+    {
+        const size_t count = group.transforms.size();
+        if (count == 0) continue;
+
+        RenderableTransform* transformBuffer = transformArenas[buildIndex]->Allocate(count);
+        std::memcpy(transformBuffer, group.transforms.data(), count * sizeof(RenderableTransform));
+
+        outPackets.emplace_back(RenderPacket{
+            .zIndex = group.zIndex,
+            .sortKey = group.sortKey,
+            .batchData = WGPUSpriteBatch{
+                .material = group.material,
+                .image = group.image,
+                .sourceRect = group.sourceRect,
+                .color = group.color,
+                .transforms = transformBuffer,
+                .filterQuality = group.filterQuality,
+                .wrapMode = group.wrapMode,
+                .ppuScaleFactor = group.ppuScaleFactor,
                 .count = count
             }
         });

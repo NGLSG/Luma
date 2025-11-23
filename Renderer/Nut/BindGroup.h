@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "Buffer.h"
+#include "TextureA.h"
 #include "dawn/webgpu_cpp.h"
 
 namespace Nut {
@@ -26,10 +27,14 @@ public:
     BindGroup& SetSampler(uint32_t bindingIndex, Sampler& sampler);
     BindGroup& SetTextureView(uint32_t bindingIndex, const wgpu::TextureView& view);
     BindGroup& SetBuffer(uint32_t bindingIndex, Buffer& buffer, uint32_t size = 0, uint32_t offset = 0);
-    BindGroup& SetTexture(uint32_t bindingIndex, TextureA& texture);
+    BindGroup& SetTexture(uint32_t bindingIndex, const TextureAPtr& texture);
     wgpu::BindGroup const& Get();
 
     void Build(const std::shared_ptr<NutContext>& ctx);
+
+    void OverrideBindGroup(const wgpu::BindGroup& cached);
+    const wgpu::BindGroup& RawBindGroup() const { return m_bindGroup; }
+    const std::vector<wgpu::BindGroupEntry>& GetEntries() const { return m_BindGroupEntries; }
 };
 
 } // namespace Nut

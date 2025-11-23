@@ -24,6 +24,19 @@ BindGroup BindGroup::Create(uint32_t groupIndex, ComputePipeline* Pipeline)
 
 BindGroup& BindGroup::SetSampler(uint32_t bindingIndex, const wgpu::Sampler& sampler)
 {
+    
+    for (auto& entry : m_BindGroupEntries)
+    {
+        if (entry.binding == bindingIndex)
+        {
+            
+            entry.sampler = sampler;
+            m_isBuild = false;
+            return *this;
+        }
+    }
+    
+    
     wgpu::BindGroupEntry entry;
     entry.binding = bindingIndex;
     entry.sampler = sampler;
@@ -34,6 +47,19 @@ BindGroup& BindGroup::SetSampler(uint32_t bindingIndex, const wgpu::Sampler& sam
 
 BindGroup& BindGroup::SetSampler(uint32_t bindingIndex, Sampler& sampler)
 {
+    
+    for (auto& entry : m_BindGroupEntries)
+    {
+        if (entry.binding == bindingIndex)
+        {
+            
+            entry.sampler = sampler.Get();
+            m_isBuild = false;
+            return *this;
+        }
+    }
+    
+    
     wgpu::BindGroupEntry entry;
     entry.binding = bindingIndex;
     entry.sampler = sampler.Get();
@@ -44,6 +70,19 @@ BindGroup& BindGroup::SetSampler(uint32_t bindingIndex, Sampler& sampler)
 
 BindGroup& BindGroup::SetTextureView(uint32_t bindingIndex, const wgpu::TextureView& view)
 {
+    
+    for (auto& entry : m_BindGroupEntries)
+    {
+        if (entry.binding == bindingIndex)
+        {
+            
+            entry.textureView = view;
+            m_isBuild = false;
+            return *this;
+        }
+    }
+    
+    
     wgpu::BindGroupEntry entry;
     entry.binding = bindingIndex;
     entry.textureView = view;
@@ -54,6 +93,21 @@ BindGroup& BindGroup::SetTextureView(uint32_t bindingIndex, const wgpu::TextureV
 
 BindGroup& BindGroup::SetBuffer(uint32_t bindingIndex, Buffer& buffer, uint32_t size, uint32_t offset)
 {
+    
+    for (auto& entry : m_BindGroupEntries)
+    {
+        if (entry.binding == bindingIndex)
+        {
+            
+            entry.offset = offset;
+            entry.size = (size != 0) ? size : buffer.GetSize();
+            entry.buffer = buffer.GetBuffer();
+            m_isBuild = false;
+            return *this;
+        }
+    }
+    
+    
     wgpu::BindGroupEntry entry;
     entry.binding = bindingIndex;
     entry.offset = offset;
@@ -67,14 +121,14 @@ BindGroup& BindGroup::SetBuffer(uint32_t bindingIndex, Buffer& buffer, uint32_t 
     return *this;
 }
 
-BindGroup& BindGroup::SetTexture(uint32_t bindingIndex, TextureA& texture)
+BindGroup& BindGroup::SetTexture(uint32_t bindingIndex, const TextureAPtr& texture)
 {
     if (!texture)
     {
         std::cerr << "BindGroup::SetTexture: texture is null" << std::endl;
         return *this;
     }
-    SetTextureView(bindingIndex, texture.GetView());
+    SetTextureView(bindingIndex, texture->GetView());
     return *this;
 }
 
@@ -97,6 +151,12 @@ void BindGroup::Build(const std::shared_ptr<NutContext>& ctx)
     descriptor.entryCount = m_BindGroupEntries.size();
     descriptor.layout = m_bindGroupLayout;
     m_bindGroup = ctx->GetWGPUDevice().CreateBindGroup(&descriptor);
+    m_isBuild = true;
+}
+
+void BindGroup::OverrideBindGroup(const wgpu::BindGroup& cached)
+{
+    m_bindGroup = cached;
     m_isBuild = true;
 }
 

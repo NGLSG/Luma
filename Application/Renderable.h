@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 #include <vector>
+#include <memory>
 
 #include <include/core/SkImage.h>
 #include <include/core/SkTypeface.h>
@@ -16,6 +17,10 @@
 #include "../Renderer/RenderComponent.h"
 #include "../Components/UIComponents.h" // 包含 Button 和 InputText 的定义
 
+// 前向声明
+namespace Nut { class TextureA; }
+class RuntimeWGSLMaterial;
+
 /**
  * @brief 存储精灵渲染所需的所有原始数据。
  */
@@ -23,11 +28,14 @@ struct SpriteRenderData
 {
     SkImage* image = nullptr;
     Material* material = nullptr;
+    std::shared_ptr<Nut::TextureA> wgpuTexture = nullptr;
+    RuntimeWGSLMaterial* wgpuMaterial = nullptr;
     SkRect sourceRect;
     ECS::Color color;
     int filterQuality;
     int wrapMode;
     float ppuScaleFactor;
+    bool isUISprite = false; // 标记是否为UI精灵（UI使用Skia，非UI使用WGPU）
 };
 
 /**

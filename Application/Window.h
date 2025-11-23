@@ -12,7 +12,7 @@
  *
  * 该类封装了SDL窗口的创建、管理和事件处理。
  */
-class PlatformWindow
+class LUMA_API PlatformWindow
 {
 public:
     /**
@@ -20,9 +20,9 @@ public:
      */
     enum NoticeLevel
     {
-        Info,    ///< 信息级别。
+        Info, ///< 信息级别。
         Warning, ///< 警告级别。
-        Error    ///< 错误级别。
+        Error ///< 错误级别。
     };
 
     /**
@@ -30,10 +30,10 @@ public:
      */
     struct TouchPoint
     {
-        SDL_FingerID fingerId;  ///< 触摸点ID。
-        float x;                ///< 触摸点X坐标（归一化）。
-        float y;                ///< 触摸点Y坐标（归一化）。
-        float pressure;         ///< 触摸压力。
+        SDL_FingerID fingerId; ///< 触摸点ID。
+        float x; ///< 触摸点X坐标（归一化）。
+        float y; ///< 触摸点Y坐标（归一化）。
+        float pressure; ///< 触摸压力。
     };
 
     /// 通用事件回调函数类型。
@@ -57,7 +57,8 @@ public:
     /// 触摸点按下回调函数类型。
     using TouchDownCallback = std::function<void(SDL_FingerID fingerId, float x, float y, float pressure)>;
     /// 触摸点移动回调函数类型。
-    using TouchMoveCallback = std::function<void(SDL_FingerID fingerId, float x, float y, float dx, float dy, float pressure)>;
+    using TouchMoveCallback = std::function<void(SDL_FingerID fingerId, float x, float y, float dx, float dy,
+                                                 float pressure)>;
     /// 触摸点抬起回调函数类型。
     using TouchUpCallback = std::function<void(SDL_FingerID fingerId, float x, float y)>;
 
@@ -259,25 +260,25 @@ private:
 
 private:
     SDL_Window* sdlWindow = nullptr; ///< 底层的SDL窗口指针。
-    bool shouldCloseFlag = false;    ///< 标记窗口是否应该关闭。
-    InputState inputState;           ///< 窗口的输入状态。
+    bool shouldCloseFlag = false; ///< 标记窗口是否应该关闭。
+    InputState inputState; ///< 窗口的输入状态。
 
 #if defined(SDL_PLATFORM_ANDROID)
     std::unordered_map<SDL_FingerID, TouchPoint> activeTouches; ///< 活动的触摸点映射。
 #endif
 
-    EventCallback onAnyEvent;             ///< 任何事件的回调。
-    ResizeCallback onResize;              ///< 窗口大小改变的回调。
-    CloseCallback onCloseRequest;         ///< 窗口关闭请求的回调。
-    MouseMoveCallback onMouseMove;        ///< 鼠标移动的回调。
-    MouseButtonCallback onMouseButtonDown;///< 鼠标按键按下的回调。
-    MouseButtonCallback onMouseButtonUp;  ///< 鼠标按键释放的回调。
-    MouseWheelCallback onMouseWheel;      ///< 鼠标滚轮滚动的回调。
-    KeyCallback onKeyPress;               ///< 键盘按键按下的回调。
-    KeyCallback onKeyRelease;             ///< 键盘按键释放的回调。
-    TextInputCallback onTextInput;        ///< 文本输入的回调。
-    FileDropCallback onFileDrop;          ///< 文件拖放的回调。
-    TouchDownCallback onTouchDown;        ///< 触摸点按下的回调。
-    TouchMoveCallback onTouchMove;        ///< 触摸点移动的回调。
-    TouchUpCallback onTouchUp;            ///< 触摸点抬起的回调。
+    EventCallback onAnyEvent; ///< 任何事件的回调。
+    ResizeCallback onResize; ///< 窗口大小改变的回调。
+    CloseCallback onCloseRequest; ///< 窗口关闭请求的回调。
+    MouseMoveCallback onMouseMove; ///< 鼠标移动的回调。
+    MouseButtonCallback onMouseButtonDown; ///< 鼠标按键按下的回调。
+    MouseButtonCallback onMouseButtonUp; ///< 鼠标按键释放的回调。
+    MouseWheelCallback onMouseWheel; ///< 鼠标滚轮滚动的回调。
+    KeyCallback onKeyPress; ///< 键盘按键按下的回调。
+    KeyCallback onKeyRelease; ///< 键盘按键释放的回调。
+    TextInputCallback onTextInput; ///< 文本输入的回调。
+    FileDropCallback onFileDrop; ///< 文件拖放的回调。
+    TouchDownCallback onTouchDown; ///< 触摸点按下的回调。
+    TouchMoveCallback onTouchMove; ///< 触摸点移动的回调。
+    TouchUpCallback onTouchUp; ///< 触摸点抬起的回调。
 };

@@ -1,9 +1,9 @@
 #include "Shader.h"
 
-Shader::Shader() = default;
+SKSLShader::SKSLShader() = default;
 
 
-Shader Shader::FromCode(const std::string& vertexSksl, const std::string& fragmentSksl)
+SKSLShader SKSLShader::FromCode(const std::string& vertexSksl, const std::string& fragmentSksl)
 {
     const std::string combinedSksl = vertexSksl + "\n" + fragmentSksl;
 
@@ -18,10 +18,10 @@ Shader Shader::FromCode(const std::string& vertexSksl, const std::string& fragme
         std::cerr << "Shader pipeline compilation failed (using MakeForShader):\n" << error.c_str() << std::endl;
         return {};
     }
-    return Shader(std::move(effect));
+    return SKSLShader(std::move(effect));
 }
 
-Shader Shader::FromFile(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath)
+SKSLShader SKSLShader::FromFile(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath)
 {
     if (!std::filesystem::exists(vertexPath))
     {
@@ -46,7 +46,7 @@ Shader Shader::FromFile(const std::filesystem::path& vertexPath, const std::file
 }
 
 
-Shader Shader::FromFragmentCode(const std::string& fragmentSksl)
+SKSLShader SKSLShader::FromFragmentCode(const std::string& fragmentSksl)
 {
     auto [effect, error] = SkRuntimeEffect::MakeForShader(SkString(fragmentSksl.c_str()));
     if (!effect)
@@ -54,10 +54,10 @@ Shader Shader::FromFragmentCode(const std::string& fragmentSksl)
         std::cerr << "Fragment shader compilation failed:\n" << error.c_str() << std::endl;
         return {};
     }
-    return Shader(std::move(effect));
+    return SKSLShader(std::move(effect));
 }
 
-Shader Shader::FromFragmentFile(const std::filesystem::path& fragmentPath)
+SKSLShader SKSLShader::FromFragmentFile(const std::filesystem::path& fragmentPath)
 {
     if (!std::filesystem::exists(fragmentPath))
     {
@@ -78,32 +78,32 @@ Shader Shader::FromFragmentFile(const std::filesystem::path& fragmentPath)
 }
 
 
-Shader Shader::FromCode(const std::string& skslCode)
+SKSLShader SKSLShader::FromCode(const std::string& skslCode)
 {
     return FromFragmentCode(skslCode);
 }
 
-Shader Shader::FromFile(const std::filesystem::path& filePath)
+SKSLShader SKSLShader::FromFile(const std::filesystem::path& filePath)
 {
     return FromFragmentFile(filePath);
 }
 
 
-bool Shader::IsValid() const
+bool SKSLShader::IsValid() const
 {
     return effect != nullptr;
 }
 
-Shader::operator sk_sp<SkRuntimeEffect>() const
+SKSLShader::operator sk_sp<SkRuntimeEffect>() const
 {
     return effect;
 }
 
-Shader::Shader(sk_sp<SkRuntimeEffect> runtimeEffect) : effect(std::move(runtimeEffect))
+SKSLShader::SKSLShader(sk_sp<SkRuntimeEffect> runtimeEffect) : effect(std::move(runtimeEffect))
 {
 }
 
-std::string Shader::PreprocessSksl(const std::filesystem::path& filePath,
+std::string SKSLShader::PreprocessSksl(const std::filesystem::path& filePath,
                                    std::unordered_set<std::filesystem::path, PathHash>& visited)
 {
     const auto canonicalPath = std::filesystem::canonical(filePath);

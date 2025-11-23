@@ -2,6 +2,7 @@
 #define ASSETBROWSERPANEL_H
 
 #include "IEditorPanel.h"
+#include "Renderer/Nut/TextureA.h"
 
 /**
  * @brief 表示资产浏览器中的一个目录节点。
@@ -140,7 +141,7 @@ private:
     /// 加载编辑器图标。
     void loadEditorIcons();
     /// 获取指定资产类型的图标。
-    wgpu::Texture getIconForAssetType(AssetType type);
+    Nut::TextureAPtr getIconForAssetType(AssetType type);
 
 
     /**
@@ -148,13 +149,13 @@ private:
      */
     struct IconSet
     {
-        wgpu::Texture directory, ///< 目录图标。
-                      image,     ///< 图像图标。
-                      script,    ///< 脚本图标。
-                      scene,     ///< 场景图标。
-                      audio,     ///< 音频图标。
-                      prefab,    ///< 预制体图标。
-                      file;      ///< 通用文件图标。
+        Nut::TextureAPtr directory; ///< 目录图标。
+        Nut::TextureAPtr image;     ///< 图像图标。
+        Nut::TextureAPtr script;    ///< 脚本图标。
+        Nut::TextureAPtr scene;     ///< 场景图标。
+        Nut::TextureAPtr audio;     ///< 音频图标。
+        Nut::TextureAPtr prefab;    ///< 预制体图标。
+        Nut::TextureAPtr file;      ///< 通用文件图标。
     };
 
     IconSet m_icons; ///< 存储所有编辑器图标的集合。

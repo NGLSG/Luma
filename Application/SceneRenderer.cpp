@@ -182,11 +182,14 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 .data = SpriteRenderData{
                     .image = sprite.image->getImage().get(),
                     .material = sprite.material.get(),
+                    .wgpuTexture = sprite.image->getNutTexture(),
+                    .wgpuMaterial = sprite.wgslMaterial.get(),
                     .sourceRect = sprite.sourceRect,
                     .color = sprite.color,
                     .filterQuality = static_cast<int>(sprite.image->getImportSettings().filterQuality),
                     .wrapMode = static_cast<int>(sprite.image->getImportSettings().wrapMode),
-                    .ppuScaleFactor = ppuScaleFactor
+                    .ppuScaleFactor = ppuScaleFactor,
+                    .isUISprite = sprite.image->getNutTexture() ? false : true
                 }
             });
         }
@@ -255,11 +258,14 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                             .data = SpriteRenderData{
                                 .image = hydratedTile.image->getImage().get(),
                                 .material = renderer.material.get(),
+                                .wgpuTexture = hydratedTile.image->getNutTexture(),
+                                .wgpuMaterial = nullptr,
                                 .sourceRect = hydratedTile.sourceRect,
                                 .color = hydratedTile.color,
                                 .filterQuality = static_cast<int>(hydratedTile.filterQuality),
                                 .wrapMode = static_cast<int>(hydratedTile.wrapMode),
-                                .ppuScaleFactor = ppuScaleFactor
+                                .ppuScaleFactor = ppuScaleFactor,
+                                .isUISprite = false 
                             }
                         });
                     }

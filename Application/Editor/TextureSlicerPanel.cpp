@@ -1203,14 +1203,14 @@ void TextureSlicerPanel::loadTexture()
     {
         try
         {
-            if (wgpu::Texture gpuTexture = m_context->graphicsBackend->LoadTextureFromFile(m_texturePath))
+            if (auto gpuTexture = m_context->graphicsBackend->LoadTextureFromFile(m_texturePath))
             {
-                m_gpuTexture = gpuTexture;
+                m_gpuTexture = gpuTexture->GetTexture();
 
 
                 if (m_context->imguiRenderer)
                 {
-                    m_textureID = m_context->imguiRenderer->GetOrCreateTextureIdFor(gpuTexture);
+                    m_textureID = m_context->imguiRenderer->GetOrCreateTextureIdFor(m_gpuTexture);
                     LogInfo("成功创建 GPU 纹理预览");
                 }
                 else

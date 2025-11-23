@@ -1,17 +1,20 @@
 #ifndef LUMAENGINE_TEXTUREA_H
 #define LUMAENGINE_TEXTUREA_H
 #include <string>
+#include <memory>
 
 #include "dawn/webgpu_cpp.h"
 
 namespace Nut
 {
     class NutContext;
+    class TextureA;
+    using TextureAPtr = std::shared_ptr<TextureA>;
 
     /**
      * @brief 纹理类 - 支持1D/2D/3D纹理、纹理数组、Cube纹理等
      */
-    class TextureA
+    class LUMA_API TextureA
     {
         wgpu::Texture m_texture;
         wgpu::TextureView m_textureView;
@@ -28,6 +31,12 @@ namespace Nut
 
         TextureA(const wgpu::Texture& texture,
                  const std::shared_ptr<NutContext>& context);
+
+        static TextureAPtr CreateTextureA(const wgpu::Texture& texture,
+                                          const std::shared_ptr<NutContext>& context)
+        {
+            return std::make_shared<Nut::TextureA>(texture, context);
+        }
 
         // 基础访问
         wgpu::Texture GetTexture() const;
@@ -231,7 +240,7 @@ namespace Nut
     };
 
     // 纹理构建器
-    class TextureBuilder
+    class LUMA_API TextureBuilder
     {
     public:
         TextureBuilder() = default;
@@ -354,7 +363,7 @@ namespace Nut
         }
 
         // 构建纹理
-        class TextureA Build(std::shared_ptr<NutContext> context);
+        TextureAPtr Build(std::shared_ptr<NutContext> context);
 
     private:
         TextureDescriptor m_descriptorBuilder;

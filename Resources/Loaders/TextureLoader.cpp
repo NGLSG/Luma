@@ -27,15 +27,21 @@ sk_sp<RuntimeTexture> TextureLoader::LoadAsset(const AssetMetadata& metadata)
     {
         return nullptr;
     }
+    auto nutCtx = backend.GetNutContext();
     sk_sp<SkData> skData = SkData::MakeWithCopy(binaryData.data(), binaryData.size());
     if (!skData) return nullptr;
 
 
     sk_sp<SkImage> image = backend.CreateSpriteImageFromData(skData);
     if (!image) return nullptr;
+    Nut::TextureAPtr texture;
+    if (nutCtx)
+    {
+        texture = nutCtx->CreateTextureFromMemory(skData->data(), skData->size());
+    }
 
 
-    return sk_make_sp<RuntimeTexture>(metadata.guid, std::move(image), settings);
+    return sk_make_sp<RuntimeTexture>(metadata.guid, std::move(image), settings, std::move(texture));
 }
 
 

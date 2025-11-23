@@ -95,12 +95,10 @@ void Game::Render()
     {
         activeScene->UpdateMainThread(1.f / m_context.currentFps, m_context, false);
     }
-
     if (!m_graphicsBackend->BeginFrame())
     {
         return;
     }
-
 
     if (auto activeScene = SceneManager::GetInstance().GetCurrentScene())
     {
@@ -113,13 +111,11 @@ void Game::Render()
         }
         m_renderSystem->Flush();
     }
-
-
-    m_graphicsBackend->ResolveMSAA();
-
-
-    m_graphicsBackend->Submit();
-
+    else
+    {
+        m_renderSystem->Clear(SkColor4f{0.0f, 0.0f, 0.0f, 1.0f});
+        m_renderSystem->Flush();
+    }
 
     m_graphicsBackend->PresentFrame();
 }

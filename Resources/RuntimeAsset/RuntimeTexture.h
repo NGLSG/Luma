@@ -29,9 +29,11 @@ public:
      * @param sourceGuid 源资产的全局唯一标识符。
      * @param image Skia图像对象。
      * @param importSettings 纹理导入设置。
+     * @param nutTexture Nut图形纹理对象。
      */
-    RuntimeTexture(const Guid& sourceGuid, sk_sp<SkImage> image, TextureImporterSettings importSettings = {})
-        : m_image(std::move(image)), m_importSettings(std::move(importSettings))
+    RuntimeTexture(const Guid& sourceGuid, sk_sp<SkImage> image, TextureImporterSettings importSettings = {},
+                   std::shared_ptr<Nut::TextureA>&& nutTexture = nullptr)
+        : m_image(std::move(image)), m_importSettings(std::move(importSettings)), m_nutTexture(nutTexture)
     {
         m_sourceGuid = sourceGuid;
     }
@@ -52,6 +54,11 @@ public:
     const sk_sp<SkImage>& getImage() const
     {
         return m_image;
+    }
+
+    const std::shared_ptr<Nut::TextureA>& getNutTexture() const
+    {
+        return m_nutTexture;
     }
 };
 #endif

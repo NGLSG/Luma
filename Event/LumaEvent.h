@@ -85,6 +85,27 @@ public:
         return !IsEmpty();
     }
 
+    /**
+     * @brief 重载+=运算符，用于添加监听器。
+     * @param listener 要添加的监听器函数。
+     * @return 一个ListenerHandle，用于标识新添加的监听器。
+     */
+    ListenerHandle operator+=(Listener&& listener);
+
+    /**
+     * @brief 重载+=运算符，用于添加监听器（左值引用版本）。
+     * @param listener 要添加的监听器函数。
+     * @return 一个ListenerHandle，用于标识新添加的监听器。
+     */
+    ListenerHandle operator+=(const Listener& listener);
+
+    /**
+     * @brief 重载-=运算符，用于移除监听器。
+     * @param handle 要移除的监听器的句柄。
+     * @return 对当前事件对象的引用。
+     */
+    LumaEvent& operator-=(ListenerHandle handle);
+
 private:
     std::map<uint64_t, Listener> m_listeners; ///< 存储所有监听器的映射，键为监听器ID，值为监听器函数。
     uint64_t m_nextListenerId = 1; ///< 下一个可用的监听器ID。
@@ -137,4 +158,25 @@ bool LumaEvent<Args...>::IsEmpty() const
 {
     return m_listeners.empty();
 }
+
+template <typename... Args>
+ListenerHandle LumaEvent<Args...>::operator+=(Listener&& listener)
+{
+    return AddListener(std::move(listener));
+}
+
+template <typename... Args>
+ListenerHandle LumaEvent<Args...>::operator+=(const Listener& listener)
+{
+    Listener copy = listener;
+    return AddListener(std::move(copy));
+}
+
+template <typename... Args>
+LumaEvent<Args...>& LumaEvent<Args...>::operator-=(ListenerHandle handle)
+{
+    RemoveListener(handle);
+    return *this;
+}
+
 #endif

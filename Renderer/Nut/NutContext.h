@@ -5,179 +5,178 @@
 #include "TextureA.h"
 #include "dawn/native/DawnNative.h"
 
-namespace Nut {
-
-/**
- * @brief 定义图形后端类型。
- */
-enum class BackendType
+namespace Nut
 {
-    D3D12, ///< Direct3D 12 后端。
-    D3D11, ///< Direct3D 11 后端。
-    Vulkan, ///< Vulkan 后端。
-    Metal, ///< Metal 后端。
-    OpenGL, ///< OpenGL 后端。
-    OpenGLES, ///< OpenGL ES 后端。
-};
-
-/**
- * @brief 定义渲染质量等级。
- */
-enum class QualityLevel
-{
-    Low, ///< 低质量。
-    Medium, ///< 中等质量。
-    High, ///< 高质量。
-};
-
-/**
- * @brief 封装原生窗口句柄信息。
- *
- * 根据不同的操作系统，包含不同的原生窗口句柄类型。
- */
-struct NativeWindowHandle
-{
-#if defined(_WIN32)
-    void* hWnd = nullptr; ///< Windows 窗口句柄。
-    void* hInst = nullptr; ///< Windows 实例句柄。
-#elif defined(__APPLE__)
-    void* metalLayer = nullptr; ///< Metal 层对象。
-#elif defined(__linux__) && !defined(__ANDROID__)
-    void* x11Display = nullptr; ///< X11 显示器句柄。
-    unsigned long x11Window = 0; ///< X11 窗口ID。
-#elif defined(__ANDROID__)
-    void* aNativeWindow = nullptr; ///< Android 原生窗口指针。
-#else
-
-    void* placeholder = nullptr; ///< 占位符，用于未知平台。
-#endif
+    /**
+     * @brief 定义图形后端类型。
+     */
+    enum class BackendType
+    {
+        D3D12, ///< Direct3D 12 后端。
+        D3D11, ///< Direct3D 11 后端。
+        Vulkan, ///< Vulkan 后端。
+        Metal, ///< Metal 后端。
+        OpenGL, ///< OpenGL 后端。
+        OpenGLES, ///< OpenGL ES 后端。
+    };
 
     /**
-     * @brief 检查原生窗口句柄是否有效。
-     * @return 如果句柄有效则返回 true，否则返回 false。
+     * @brief 定义渲染质量等级。
      */
-    bool IsValid() const
+    enum class QualityLevel
+    {
+        Low, ///< 低质量。
+        Medium, ///< 中等质量。
+        High, ///< 高质量。
+    };
+
+    /**
+     * @brief 封装原生窗口句柄信息。
+     *
+     * 根据不同的操作系统，包含不同的原生窗口句柄类型。
+     */
+    struct NativeWindowHandle
     {
 #if defined(_WIN32)
-        return hWnd != nullptr && hInst != nullptr;
+        void* hWnd = nullptr; ///< Windows 窗口句柄。
+        void* hInst = nullptr; ///< Windows 实例句柄。
 #elif defined(__APPLE__)
-        return metalLayer != nullptr;
+        void* metalLayer = nullptr; ///< Metal 层对象。
 #elif defined(__linux__) && !defined(__ANDROID__)
-        return x11Display != nullptr && x11Window != 0;
+        void* x11Display = nullptr; ///< X11 显示器句柄。
+        unsigned long x11Window = 0; ///< X11 窗口ID。
 #elif defined(__ANDROID__)
-        return aNativeWindow != nullptr;
+        void* aNativeWindow = nullptr; ///< Android 原生窗口指针。
 #else
-        return placeholder != nullptr;
+
+        void* placeholder = nullptr; ///< 占位符，用于未知平台。
 #endif
-    }
-};
 
-struct NutContextDescriptor
-{
-    std::vector<BackendType> backendTypePriority = {
-        BackendType::D3D12, BackendType::Vulkan, BackendType::Metal
-    }; ///< 后端类型优先级列表。
-    NativeWindowHandle windowHandle; ///< 原生窗口句柄。
-    uint16_t width = 1; ///< 初始宽度。
-    uint16_t height = 1; ///< 初始高度。
-    bool enableVSync = true; ///< 是否启用垂直同步。
-    QualityLevel qualityLevel = QualityLevel::High; ///< 初始质量等级。
-};
+        /**
+         * @brief 检查原生窗口句柄是否有效。
+         * @return 如果句柄有效则返回 true，否则返回 false。
+         */
+        bool IsValid() const
+        {
+#if defined(_WIN32)
+            return hWnd != nullptr && hInst != nullptr;
+#elif defined(__APPLE__)
+            return metalLayer != nullptr;
+#elif defined(__linux__) && !defined(__ANDROID__)
+            return x11Display != nullptr && x11Window != 0;
+#elif defined(__ANDROID__)
+            return aNativeWindow != nullptr;
+#else
+            return placeholder != nullptr;
+#endif
+        }
+    };
 
-enum GraphicsContextCreateStatus: uint32_t
-{
-    SUCCESS = 0,
-    ERROR_DEVICE_CREATION = 1,
-    ERROR_NONE_AVAILABLE_ADAPTER = 2,
-    ERROR_SURFACE_CREATION = 3,
-    ERROR_INSTANCE_CREATION = 4,
-    ERROR_ALREADY_CREATED = 5,
-};
+    struct NutContextDescriptor
+    {
+        std::vector<BackendType> backendTypePriority = {
+            BackendType::D3D12, BackendType::Vulkan, BackendType::Metal
+        }; ///< 后端类型优先级列表。
+        NativeWindowHandle windowHandle; ///< 原生窗口句柄。
+        uint16_t width = 1; ///< 初始宽度。
+        uint16_t height = 1; ///< 初始高度。
+        bool enableVSync = true; ///< 是否启用垂直同步。
+        QualityLevel qualityLevel = QualityLevel::High; ///< 初始质量等级。
+    };
 
-class RenderPassBuilder;
-class ComputePassBuilder;
+    enum GraphicsContextCreateStatus: uint32_t
+    {
+        SUCCESS = 0,
+        ERROR_DEVICE_CREATION = 1,
+        ERROR_NONE_AVAILABLE_ADAPTER = 2,
+        ERROR_SURFACE_CREATION = 3,
+        ERROR_INSTANCE_CREATION = 4,
+        ERROR_ALREADY_CREATED = 5,
+    };
 
-class NutContext : public std::enable_shared_from_this<NutContext>
-{
-private:
-    wgpu::SurfaceTexture m_currentSurfaceTexture;
-    std::unique_ptr<dawn::native::Instance> m_instance;
-    wgpu::Device m_device;
-    wgpu::Surface m_surface;
-    NutContextDescriptor m_descriptor;
-    std::unordered_map<std::string, std::shared_ptr<RenderTarget>> m_renderTargets;
-    wgpu::TextureFormat m_graphicsFormat = wgpu::TextureFormat::BGRA8Unorm;
-    Size m_size = {0, 0};
-    std::shared_ptr<RenderTarget> m_currentRenderTarget;
-    bool m_isDeviceLost = false;
-    std::vector<wgpu::CommandEncoder> m_commandEncoders;
-    std::mutex m_mutex;
+    class RenderPassBuilder;
+    class ComputePassBuilder;
 
-    std::vector<wgpu::CommandEncoder> m_computeCommandEncoders;
-    std::mutex m_cmutex;
+    class LUMA_API NutContext : public std::enable_shared_from_this<NutContext>
+    {
+    private:
+        wgpu::SurfaceTexture m_currentSurfaceTexture;
+        std::unique_ptr<dawn::native::Instance> m_instance;
+        wgpu::Device m_device;
+        wgpu::Surface m_surface;
+        NutContextDescriptor m_descriptor;
+        std::unordered_map<std::string, std::shared_ptr<RenderTarget>> m_renderTargets;
+        wgpu::TextureFormat m_graphicsFormat = wgpu::TextureFormat::BGRA8Unorm;
+        Size m_size = {0, 0};
+        std::shared_ptr<RenderTarget> m_currentRenderTarget;
+        bool m_isDeviceLost = false;
+        std::vector<wgpu::CommandEncoder> m_commandEncoders;
+        std::mutex m_mutex;
 
-public:
-    NutContext(const NutContext&) = delete;
-    NutContext& operator=(const NutContext&) = delete;
+        std::vector<wgpu::CommandEncoder> m_computeCommandEncoders;
+        std::mutex m_cmutex;
 
-    NutContext();
+    public:
+        NutContext(const NutContext&) = delete;
+        NutContext& operator=(const NutContext&) = delete;
 
-private:
-    bool createInstance();
-    bool createDevice();
-    bool createSurface();
+        NutContext();
 
-    void configureSurface(uint32_t width, uint32_t height);
+    private:
+        bool createInstance();
+        bool createDevice();
+        bool createSurface();
 
-public:
-    static std::shared_ptr<NutContext> Create(const NutContextDescriptor& descriptor);
-    GraphicsContextCreateStatus Initialize(const NutContextDescriptor& desc);
+        void configureSurface(uint32_t width, uint32_t height);
 
-    std::shared_ptr<RenderTarget> CreateOrGetRenderTarget(const std::string& name, uint16_t width, uint16_t height);
+    public:
+        static std::shared_ptr<NutContext> Create(const NutContextDescriptor& descriptor);
+        GraphicsContextCreateStatus Initialize(const NutContextDescriptor& desc);
 
-    void SetActiveRenderTarget(std::shared_ptr<RenderTarget> target);
-    void Resize(uint32_t width, uint32_t height);
-    void SetVSync(bool enable);
+        std::shared_ptr<RenderTarget> CreateOrGetRenderTarget(const std::string& name, uint16_t width, uint16_t height);
 
-    wgpu::Device& GetWGPUDevice();
+        void SetActiveRenderTarget(std::shared_ptr<RenderTarget> target);
+        void Resize(uint32_t width, uint32_t height);
+        void SetVSync(bool enable);
 
-    [[nodiscard]] wgpu::Surface& GetWGPUSurface();
-    wgpu::Instance GetWGPUInstance() const;
+        wgpu::Device& GetWGPUDevice();
 
-    Size GetCurrentSwapChainSize() const;
+        [[nodiscard]] wgpu::Surface& GetWGPUSurface();
+        wgpu::Instance GetWGPUInstance() const;
 
-    RenderPassBuilder BeginRenderFrame();
+        Size GetCurrentSwapChainSize() const;
 
-    wgpu::CommandBuffer EndRenderFrame(RenderPass& renderPass);
+        RenderPassBuilder BeginRenderFrame();
 
-    void Submit(const std::vector<wgpu::CommandBuffer>& cmds);
-    void Present();
+        wgpu::CommandBuffer EndRenderFrame(RenderPass& renderPass);
 
-    ComputePassBuilder BeginComputeFrame();
+        void Submit(const std::vector<wgpu::CommandBuffer>& cmds);
+        void Present();
 
-    wgpu::CommandBuffer EndComputeFrame(ComputePass& computePass);
+        ComputePassBuilder BeginComputeFrame();
 
-    void ClearCommands();
+        wgpu::CommandBuffer EndComputeFrame(ComputePass& computePass);
 
-    TextureA GetCurrentTexture();
+        void ClearCommands();
 
-    wgpu::Sampler CreateSampler(wgpu::SamplerDescriptor const* desc);
+        TextureAPtr GetCurrentTexture();
 
-    TextureA LoadTextureFromFile(const std::string& file);
-    TextureA LoadTextureFromMemory(const void* data, size_t size);
-    TextureA CreateTexture(const TextureDescriptor& descriptor);
+        wgpu::Sampler CreateSampler(wgpu::SamplerDescriptor const* desc);
 
-    TextureA CreateTextureFromCompressedData(const unsigned char* data, size_t size, uint32_t width, uint32_t height,
-                                             wgpu::TextureFormat format,
-                                             uint32_t bytesPerRow = 0,
-                                             uint32_t rowsPerImage = 0);
+        TextureAPtr LoadTextureFromFile(const std::string& file);
+        TextureAPtr CreateTextureFromMemory(const void* data, size_t size);
+        TextureAPtr CreateTexture(const TextureDescriptor& descriptor);
 
-    bool ResolveTexture(const TextureA& source, const TextureA& resolveTarget);
+        TextureAPtr CreateTextureFromCompressedData(const unsigned char* data, size_t size, uint32_t width,
+                                                    uint32_t height,
+                                                    wgpu::TextureFormat format,
+                                                    uint32_t bytesPerRow = 0,
+                                                    uint32_t rowsPerImage = 0);
 
-    // 始终从交换链获取当前帧纹理（忽略自定义渲染目标）。
-    TextureA AcquireSwapChainTexture();
-};
+        bool ResolveTexture(const TextureAPtr& source, const TextureAPtr& resolveTarget);
 
+        TextureAPtr AcquireSwapChainTexture();
+    };
 } // namespace Nut
 
 #endif //NOAI_GRAPHICSCONTEXT_H

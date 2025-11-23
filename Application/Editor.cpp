@@ -430,7 +430,6 @@ void Editor::Render()
         PROFILE_SCOPE("ImGui::NewFrame");
         m_imguiRenderer->NewFrame();
     }
-
     ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()->ID, ImGui::GetMainViewport(),
                                  ImGuiDockNodeFlags_PassthruCentralNode);
 

@@ -35,13 +35,13 @@ struct PathHash
  *
  * 提供从代码字符串或文件路径创建着色器的方法。
  */
-class LUMA_API Shader
+class LUMA_API SKSLShader
 {
 public:
     /**
      * @brief 默认构造函数，创建一个无效的着色器对象。
      */
-    Shader();
+    SKSLShader();
 
     /**
      * @brief 从顶点着色器和片段着色器代码创建着色器。
@@ -49,7 +49,7 @@ public:
      * @param fragmentSksl 片段着色器代码字符串。
      * @return 创建的 Shader 对象。
      */
-    static Shader FromCode(const std::string& vertexSksl, const std::string& fragmentSksl);
+    static SKSLShader FromCode(const std::string& vertexSksl, const std::string& fragmentSksl);
 
     /**
      * @brief 从顶点着色器和片段着色器文件创建着色器。
@@ -57,7 +57,7 @@ public:
      * @param fragmentPath 片段着色器文件路径。
      * @return 创建的 Shader 对象。
      */
-    static Shader FromFile(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath);
+    static SKSLShader FromFile(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath);
 
     /**
      * @brief 从单个 SKSL 代码字符串创建着色器（通常是片段着色器）。
@@ -66,7 +66,7 @@ public:
      * @return 创建的 Shader 对象。
      */
     [[deprecated("Use Shader::FromFragmentCode or the pipeline version Shader::FromCode(vs, fs) instead.")]]
-    static Shader FromCode(const std::string& skslCode);
+    static SKSLShader FromCode(const std::string& skslCode);
 
     /**
      * @brief 从单个 SKSL 文件创建着色器（通常是片段着色器）。
@@ -75,21 +75,21 @@ public:
      * @return 创建的 Shader 对象。
      */
     [[deprecated("Use Shader::FromFragmentFile or the pipeline version Shader::FromFile(vs, fs) instead.")]]
-    static Shader FromFile(const std::filesystem::path& filePath);
+    static SKSLShader FromFile(const std::filesystem::path& filePath);
 
     /**
      * @brief 从片段着色器代码字符串创建着色器。
      * @param fragmentSksl 片段着色器代码字符串。
      * @return 创建的 Shader 对象。
      */
-    static Shader FromFragmentCode(const std::string& fragmentSksl);
+    static SKSLShader FromFragmentCode(const std::string& fragmentSksl);
 
     /**
      * @brief 从片段着色器文件创建着色器。
      * @param fragmentPath 片段着色器文件路径。
      * @return 创建的 Shader 对象。
      */
-    static Shader FromFragmentFile(const std::filesystem::path& fragmentPath);
+    static SKSLShader FromFragmentFile(const std::filesystem::path& fragmentPath);
 
     /**
      * @brief 检查着色器对象是否有效（是否包含一个 SkRuntimeEffect）。
@@ -108,7 +108,7 @@ private:
      * @brief 私有构造函数，用于从 SkRuntimeEffect 智能指针创建 Shader 对象。
      * @param runtimeEffect 要封装的 SkRuntimeEffect 智能指针。
      */
-    explicit Shader(sk_sp<SkRuntimeEffect> runtimeEffect);
+    explicit SKSLShader(sk_sp<SkRuntimeEffect> runtimeEffect);
 
     /**
      * @brief 预处理 SKSL 文件，处理包含指令。
