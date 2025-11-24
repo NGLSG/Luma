@@ -1347,7 +1347,7 @@ void AssetBrowserPanel::createNewAsset(AssetType type)
 /// @version 1.0
 /// @date 2025
 
-#include <Common.wgsl>
+import Std;
 
 /// @brief 顶点着色器主函数
 /// @details 处理顶点变换、UV变换和颜色传递，支持实例化渲染

@@ -2,6 +2,7 @@
 
 #include "ColliderComponent.h"
 #include "GraphicsBackend.h"
+#include "MaterialData.h"
 #include "SceneManager.h"
 #include "TextComponent.h"
 #include "TilemapComponent.h"
@@ -268,8 +269,10 @@ namespace Systems
             materialHandle))
         {
             auto nutContext = m_context->graphicsBackend->GetNutContext();
-            auto shaderLan = AssetManager::GetInstance().GetMetadata(sprite.materialHandle.assetGuid)->importerSettings.
-                                                         as<Data::ShaderData>().language;
+            auto shaderLan = AssetManager::GetInstance().GetMetadata(
+                AssetManager::GetInstance().GetMetadata(sprite.materialHandle.assetGuid)->importerSettings.
+                                            as<Data::MaterialDefinition>().shaderHandle)->importerSettings.as<
+                Data::ShaderData>().language;
             if (nutContext && shaderLan == Data::ShaderLanguage::WGSL)
             {
                 sprite.wgslMaterial = materialLoader.LoadWGSLMaterial(sprite.materialHandle.assetGuid, nutContext);

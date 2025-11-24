@@ -6,7 +6,7 @@
 #include "Utils/Logger.h"
 #include "Profiler.h"
 #include <fstream>
-#include <any> 
+#include <any>
 #include "Resources/RuntimeAsset/RuntimeScene.h"
 
 #include "Editor.h"
@@ -34,17 +34,16 @@ void AssetInspectorPanel::Draw()
 
     {
         PROFILE_SCOPE("AssetInspectorPanel::CheckSelectionChange");
-        
+
         if (m_context->selectedAssets != m_currentEditingPaths)
         {
-            
             resetStateFromSelection();
         }
     }
 
     {
         PROFILE_SCOPE("AssetInspectorPanel::drawInspectorUI");
-        
+
         drawInspectorUI();
     }
 
@@ -56,7 +55,6 @@ void AssetInspectorPanel::Draw()
 
 void AssetInspectorPanel::Shutdown()
 {
-    
     m_currentEditingPaths.clear();
     m_deserializedSettings.reset();
     m_isDeserialized = false;
@@ -68,10 +66,10 @@ void AssetInspectorPanel::resetStateFromSelection()
 {
     PROFILE_FUNCTION();
 
-    
+
     m_currentEditingPaths = m_context->selectedAssets;
 
-    
+
     m_deserializedSettings.reset();
     m_isDeserialized = false;
     m_mixedValueProperties.clear();
@@ -80,7 +78,7 @@ void AssetInspectorPanel::resetStateFromSelection()
 
     if (m_currentEditingPaths.empty()) return;
 
-    
+
     const AssetMetadata* firstMetadata = nullptr;
     {
         PROFILE_SCOPE("AssetInspectorPanel::GetFirstMetadata");
@@ -102,7 +100,6 @@ void AssetInspectorPanel::resetStateFromSelection()
             const AssetMetadata* metadata = AssetManager::GetInstance().GetMetadata(m_currentEditingPaths[i]);
             if (!metadata || metadata->type != m_editingAssetType)
             {
-                
                 m_editingAssetType = AssetType::Unknown;
                 m_deserializedSettings.reset();
                 m_isDeserialized = false;
@@ -111,7 +108,7 @@ void AssetInspectorPanel::resetStateFromSelection()
         }
     }
 
-    
+
     const auto* registration = AssetImporterRegistry::GetInstance().Get(m_editingAssetType);
     if (!registration || !registration->Deserialize)
     {
@@ -124,11 +121,10 @@ void AssetInspectorPanel::resetStateFromSelection()
     try
     {
         PROFILE_SCOPE("AssetInspectorPanel::DeserializeSettings");
-        
+
         YAML::Node sourceSettings = firstMetadata->importerSettings;
 
-        
-        
+
         m_deserializedSettings = registration->Deserialize(sourceSettings);
         m_isDeserialized = true;
     }
@@ -140,14 +136,13 @@ void AssetInspectorPanel::resetStateFromSelection()
     }
 
 
-    
     {
         PROFILE_SCOPE("AssetInspectorPanel::DetectMixedValues");
         if (m_currentEditingPaths.size() > 1)
         {
-            if (!registration) return; 
+            if (!registration) return;
 
-            
+
             for (const auto& [propName, propInfo] : registration->properties)
             {
                 const YAML::Node& firstValueNode = firstMetadata->importerSettings[propName];
@@ -159,7 +154,7 @@ void AssetInspectorPanel::resetStateFromSelection()
                         m_currentEditingPaths[i]);
                     const YAML::Node& otherValueNode = otherMetadata->importerSettings[propName];
 
-                    
+
                     if (!otherValueNode || firstValueNode.Scalar() != otherValueNode.Scalar())
                     {
                         m_mixedValueProperties.insert(propName);
@@ -202,14 +197,14 @@ void AssetInspectorPanel::drawInspectorUI()
 
     const auto* registration = AssetImporterRegistry::GetInstance().Get(m_editingAssetType);
 
-    
+
     if (!registration || !m_isDeserialized || !registration->GetDataPointer)
     {
         ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "无法编辑的资产 (未注册或反序列化失败)");
         return;
     }
 
-    
+
     void* dataPtr = nullptr;
     try
     {
@@ -234,7 +229,6 @@ void AssetInspectorPanel::drawInspectorUI()
         PROFILE_SCOPE("AssetInspectorPanel::DrawProperties");
         for (const auto& [name, prop] : registration->properties)
         {
-            
             if (name == "rawData")
             {
                 continue;
@@ -255,14 +249,13 @@ void AssetInspectorPanel::drawInspectorUI()
                     std::string scopeName = "AssetInspectorPanel::Property::" + name;
                     PROFILE_SCOPE(scopeName.c_str());
 
-                    
-                    
+
                     changed = prop.draw_ui(name, dataPtr);
                 }
 
                 if (changed)
                 {
-                    any_property_changed = true; 
+                    any_property_changed = true;
                     m_dirtyProperties.insert(name);
                     if (isMixed)
                     {
@@ -278,7 +271,7 @@ void AssetInspectorPanel::drawInspectorUI()
         }
     }
 
-    
+
     if (m_editingAssetType == AssetType::Texture && m_currentEditingPaths.size() == 1)
     {
         PROFILE_SCOPE("AssetInspectorPanel::TextureSlicerButton");
@@ -289,7 +282,7 @@ void AssetInspectorPanel::drawInspectorUI()
         }
     }
 
-    
+
     if (m_editingAssetType == AssetType::Material && m_currentEditingPaths.size() == 1)
     {
         PROFILE_SCOPE("AssetInspectorPanel::ShaderEditorButton");
@@ -302,7 +295,7 @@ void AssetInspectorPanel::drawInspectorUI()
 
     {
         PROFILE_SCOPE("AssetInspectorPanel::DrawActionButtons");
-        
+
         if (!m_dirtyProperties.empty())
         {
             if (ImGui::Button("应用"))
@@ -312,7 +305,6 @@ void AssetInspectorPanel::drawInspectorUI()
             ImGui::SameLine();
             if (ImGui::Button("撤销"))
             {
-                
                 resetStateFromSelection();
             }
         }
@@ -325,7 +317,7 @@ void AssetInspectorPanel::applyChanges()
 
     if (m_currentEditingPaths.empty() || m_dirtyProperties.empty()) return;
 
-    
+
     const auto* registration = AssetImporterRegistry::GetInstance().Get(m_editingAssetType);
     if (!registration || !m_isDeserialized || !registration->Serialize)
     {
@@ -337,8 +329,8 @@ void AssetInspectorPanel::applyChanges()
     try
     {
         PROFILE_SCOPE("AssetInspectorPanel::SerializeSettings");
-        
-        
+
+
         newSettingsBase = registration->Serialize(m_deserializedSettings);
     }
     catch (const std::exception& e)
@@ -360,13 +352,10 @@ void AssetInspectorPanel::applyChanges()
             continue;
         }
 
-        
-        
+
         YAML::Node finalSettings = originalMetadata->importerSettings;
         for (const std::string& propName : m_dirtyProperties)
         {
-            
-            
             if (newSettingsBase[propName])
             {
                 finalSettings[propName] = newSettingsBase[propName];
@@ -377,9 +366,8 @@ void AssetInspectorPanel::applyChanges()
         EventBus::GetInstance().Publish(AssetUpdatedEvent{originalMetadata->type, originalMetadata->guid});
     }
 
-    
+
     m_dirtyProperties.clear();
-    
 }
 
 void AssetInspectorPanel::saveMetadataToFile(const AssetMetadata& originalMetadata, const YAML::Node& newSettings)
@@ -388,8 +376,16 @@ void AssetInspectorPanel::saveMetadataToFile(const AssetMetadata& originalMetada
 
     AssetMetadata updatedMeta = originalMetadata;
     updatedMeta.importerSettings = newSettings;
-    
+    std::fstream file(AssetManager::GetInstance().GetAssetsRootPath() / updatedMeta.assetPath, std::ios::out);
+    if (!file.is_open())
+    {
+        LogError("无法保存资产元数据到文件: {}", updatedMeta.assetPath.string());
+        return;
+    }
+    file<< YAML::Dump(newSettings);
+    file.close();
     AssetManager::GetInstance().ReImport(updatedMeta);
+
 }
 
 void AssetInspectorPanel::openTextureSlicer()
@@ -403,14 +399,14 @@ void AssetInspectorPanel::openTextureSlicer()
     if (!metadata || metadata->type != AssetType::Texture)
         return;
 
-    
+
     if (!m_context->editor)
     {
         LogError("EditorContext 中的 editor 指针为空！");
         return;
     }
 
-    
+
     auto* slicerPanel = dynamic_cast<TextureSlicerPanel*>(m_context->editor->GetPanelByName("纹理切片编辑器"));
     if (slicerPanel)
     {
@@ -439,7 +435,7 @@ void AssetInspectorPanel::openShaderEditor()
         return;
     }
 
-    
+
     Data::MaterialDefinition materialData = metadata->importerSettings.as<Data::MaterialDefinition>();
     if (!materialData.shaderHandle.Valid())
     {
@@ -450,7 +446,6 @@ void AssetInspectorPanel::openShaderEditor()
     auto* shaderEditorPanel = dynamic_cast<ShaderEditorPanel*>(m_context->editor->GetPanelByName("着色器编辑器"));
     if (shaderEditorPanel)
     {
-        
         shaderEditorPanel->OpenShader(materialData.shaderHandle);
     }
     else

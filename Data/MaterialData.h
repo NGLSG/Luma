@@ -13,7 +13,6 @@
 
 namespace Data
 {
-
     /**
      * @brief 统一变量类型枚举。
      * 定义了材质中可能使用的各种统一变量的数据类型。
@@ -50,7 +49,7 @@ namespace Data
     {
     public:
         friend class IData<MaterialDefinition>;
-        AssetHandle shaderHandle; ///< 着色器资源的句柄。
+        AssetHandle shaderHandle = AssetHandle(AssetType::Shader); ///< 着色器资源的句柄。
         std::vector<MaterialUniform> uniforms; ///< 材质中包含的统一变量列表。
 
     private:
@@ -158,11 +157,7 @@ namespace YAML
         {
             Node node;
             node["shaderHandle"] = rhs.shaderHandle;
-            Node uniformsNode = node["uniforms"];
-            for (const auto& uniform : rhs.uniforms)
-            {
-                uniformsNode[uniform.name] = uniform;
-            }
+            node["uniforms"] = rhs.uniforms;
             return node;
         }
 
@@ -175,20 +170,13 @@ namespace YAML
         static bool decode(const Node& node, Data::MaterialDefinition& rhs)
         {
             if (!node.IsMap()) return false;
-
             if (node["shaderHandle"])
             {
                 rhs.shaderHandle = node["shaderHandle"].as<AssetHandle>();
             }
-
-            if (node["uniforms"] && node["uniforms"].IsMap())
+            if (node["uniforms"])
             {
-                for (YAML::const_iterator it = node["uniforms"].begin(); it != node["uniforms"].end(); ++it)
-                {
-                    Data::MaterialUniform uniform = it->second.as<Data::MaterialUniform>();
-                    uniform.name = it->first.as<std::string>();
-                    rhs.uniforms.push_back(uniform);
-                }
+                rhs.uniforms = node["uniforms"].as<std::vector<Data::MaterialUniform>>();
             }
             return true;
         }
