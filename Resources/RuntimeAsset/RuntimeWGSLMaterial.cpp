@@ -32,6 +32,46 @@ bool RuntimeWGSLMaterial::Initialize(const std::shared_ptr<Nut::NutContext>& con
     return true;
 }
 
+bool RuntimeWGSLMaterial::Initialize(const std::shared_ptr<Nut::NutContext>& context,
+                                     const sk_sp<RuntimeShader>& runtimeShader, wgpu::TextureFormat colorFormat,
+                                     uint32_t initialSampleCount)
+{
+    if (!context)
+    {
+        LogError("RuntimeWGSLMaterial::Initialize - NutContext is null");
+        return false;
+    }
+    if (!runtimeShader)
+    {
+        LogError("RuntimeWGSLMaterial::Initialize - RuntimeShader is null");
+        return false;
+    }
+    if (runtimeShader->GetLanguage() != Data::ShaderLanguage::WGSL ||
+        runtimeShader->GetShaderType() != Data::ShaderType::VertFrag)
+    {
+        LogError("RuntimeWGSLMaterial::Initialize - RuntimeShader is not a WGSL vertex-fragment shader");
+        return false;
+    }
+
+    m_context = context;
+    m_cachedShaderCode = "";
+    m_cachedColorFormat = colorFormat;
+
+    m_shaderModule = runtimeShader->GetWGPUShader();
+    if (!m_shaderModule.Get())
+    {
+        LogError("RuntimeWGSLMaterial::Initialize - Failed to get shader module from RuntimeShader");
+        return false;
+    }
+
+    if (GetOrBuildPipeline(initialSampleCount) == nullptr)
+    {
+        return false;
+    }
+
+    return true;
+}
+
 Nut::RenderPipeline* RuntimeWGSLMaterial::GetOrBuildPipeline(uint32_t sampleCount)
 {
     auto it = m_pipelineCache.find(sampleCount);

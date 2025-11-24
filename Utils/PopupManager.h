@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <imgui.h>
 
 /**
@@ -46,6 +47,12 @@ public:
     void Open(const std::string& id);
 
     /**
+     * @brief 关闭指定 id 的弹窗。
+     * @param id 弹窗唯一标识
+     */
+    void Close(const std::string& id);
+
+    /**
      * @brief 渲染所有已打开的弹窗。
      */
     void Render();
@@ -65,7 +72,7 @@ private:
     };
 
     std::unordered_map<std::string, PopupData> m_popups; ///< 已注册弹窗映射
-    std::vector<std::string> m_openQueue;                ///< 待打开弹窗队列
+    std::unordered_set<std::string> m_activePopups;      ///< 当前活跃的弹窗 ID 集合
 };
 
 #endif

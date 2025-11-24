@@ -5,6 +5,8 @@
 #include <filesystem>
 
 #include "NutContext.h"
+#include "ShaderModuleRegistry.h"
+#include "ShaderModuleInitializer.h"
 
 namespace Nut {
 
@@ -21,102 +23,6 @@ std::string LoadFileToString(const std::filesystem::path& path)
     std::ostringstream buffer;
     buffer << fs.rdbuf();
     return buffer.str();
-}
-
-std::string PreprocessWGSL(const std::filesystem::path& path,
-                           const std::filesystem::path& systemIncludeDir,
-                           std::unordered_set<std::string>& includeStack)
-{
-    if (includeStack.contains(path.string()))
-    {
-        std::cerr << "Circular include detected for WGSL: " << path << std::endl;
-        return {};
-    }
-    includeStack.insert(path.string());
-
-    std::string source = LoadFileToString(path);
-    if (source.empty())
-    {
-        return {};
-    }
-
-    std::stringstream output;
-    std::string line;
-    std::istringstream input(source);
-    std::regex includeRegex(R"(^\s*#include\s*[<\"]([^>\"]+)[>\"]\s*)");
-
-    while (std::getline(input, line))
-    {
-        std::smatch match;
-        if (std::regex_match(line, match, includeRegex))
-        {
-            std::string includePath = match[1];
-            std::filesystem::path resolved;
-            if (line.find('<') != std::string::npos)
-            {
-                resolved = systemIncludeDir / includePath;
-            }
-            else
-            {
-                resolved = path.parent_path() / includePath;
-            }
-
-            std::string included = PreprocessWGSL(resolved, systemIncludeDir, includeStack);
-            if (!included.empty())
-            {
-                output << included << "\n";
-            }
-            continue;
-        }
-
-        output << line << "\n";
-    }
-
-    includeStack.erase(path.string());
-    return output.str();
-}
-
-std::string PreprocessWGSLFromString(const std::string& code, const std::filesystem::path& systemIncludeDir)
-{
-    std::stringstream output;
-    std::string line;
-    std::istringstream input(code);
-    std::regex includeRegex(R"(^\s*#include\s*[<\"]([^>\"]+)[>\"]\s*)");
-    std::unordered_set<std::string> includeStack;
-
-    while (std::getline(input, line))
-    {
-        std::smatch match;
-        if (std::regex_match(line, match, includeRegex))
-        {
-            std::string includePath = match[1];
-            std::filesystem::path resolved;
-            
-            
-            if (line.find('<') != std::string::npos)
-            {
-                resolved = systemIncludeDir / includePath;
-            }
-            else
-            {
-                
-                std::cerr << "Warning: Relative include \"" << includePath 
-                          << "\" not supported in string source, skipping." << std::endl;
-                continue;
-            }
-
-            std::string included = PreprocessWGSL(resolved, systemIncludeDir, includeStack);
-            if (!included.empty())
-            {
-                output << included << "\n";
-            }
-            continue;
-        }
-
-        output << line << "\n";
-    }
-
-    return output.str();
 }
 
 } 
@@ -228,13 +134,7 @@ void ShaderModule::ForeachBinding(const std::function<void(const ShaderBindingIn
 
 ShaderModule& ShaderManager::GetFromFile(const std::string& file, const std::shared_ptr<NutContext>& ctx)
 {
-    if (systemIncludeDir.empty())
-    {
-        systemIncludeDir = std::filesystem::current_path() / "Shaders";
-    }
-
-    std::unordered_set<std::string> includeStack;
-    std::string code = PreprocessWGSL(file, systemIncludeDir, includeStack);
+    std::string code = LoadFileToString(file);
     if (code.empty())
     {
         static ShaderModule emptyFallback{};
@@ -246,24 +146,51 @@ ShaderModule& ShaderManager::GetFromFile(const std::string& file, const std::sha
 ShaderModule& ShaderManager::GetFromString(const std::string& code, const std::shared_ptr<NutContext>& ctx)
 {
     
-    if (systemIncludeDir.empty())
+    std::string errorMessage;
+    std::string exportedModuleName;
+    std::string expandedCode = ShaderModuleExpander::ExpandModules(code, errorMessage, exportedModuleName);
+    
+    if (expandedCode.empty())
     {
-        systemIncludeDir = std::filesystem::current_path() / "Shaders";
+        std::cerr << "Failed to expand shader modules: " << errorMessage << std::endl;
+        static ShaderModule emptyFallback{};
+        return emptyFallback;
     }
     
-    std::string processedCode = PreprocessWGSLFromString(code, systemIncludeDir);
     
-    if (shaderModules.contains(processedCode) && shaderModules[processedCode].get() != nullptr)
+    if (!exportedModuleName.empty())
     {
-        return *shaderModules[processedCode].get();
+        std::string cleanCode = ShaderModuleInitializer::RemoveExportStatement(code);
+        RegisterShaderModule(exportedModuleName, cleanCode);
+        std::cout << "[ShaderManager] Auto-registered module: " << exportedModuleName << std::endl;
     }
-    shaderModules[processedCode] = std::make_shared<ShaderModule>(processedCode, ctx);
-    return *shaderModules[processedCode].get();
+    
+    
+    if (shaderModules.contains(expandedCode) && shaderModules[expandedCode].get() != nullptr)
+    {
+        return *shaderModules[expandedCode].get();
+    }
+    
+    shaderModules[expandedCode] = std::make_shared<ShaderModule>(expandedCode, ctx);
+    return *shaderModules[expandedCode].get();
 }
 
-void ShaderManager::SetSystemIncludeDir(const std::filesystem::path& dir)
+void ShaderManager::RegisterShaderModule(const std::string& moduleName, const std::string& sourceCode)
 {
-    systemIncludeDir = dir;
+    ShaderModuleRegistry::GetInstance().RegisterModule(moduleName, sourceCode);
+}
+
+bool ShaderManager::RegisterShaderModuleFromFile(const std::string& moduleName, const std::filesystem::path& filePath)
+{
+    std::string code = LoadFileToString(filePath);
+    if (code.empty())
+    {
+        std::cerr << "Failed to load shader module from file: " << filePath << std::endl;
+        return false;
+    }
+    
+    RegisterShaderModule(moduleName, code);
+    return true;
 }
 
 } 

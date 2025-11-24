@@ -2,6 +2,7 @@
 #include "AssetBrowserPanel.h"
 #include "../Resources/RuntimeAsset/RuntimeScene.h"
 #include "AnimationControllerEditorPanel.h"
+#include "ShaderEditorPanel.h"
 #include "BlueprintData.h"
 #include "ButtonSystem.h"
 #include "Editor.h"
@@ -309,6 +310,24 @@ void AssetBrowserPanel::ProcessDoubleClick(const Item& item)
                 LogError("未找到蓝图编辑器面板");
             }
             LogInfo("双击打开蓝图: {}", item.name);
+        }
+        break;
+
+    case AssetType::Shader:
+        {
+            auto shaderEditorPanel = dynamic_cast<ShaderEditorPanel*>(m_context->editor->GetPanelByName("着色器编辑器"));
+            if (shaderEditorPanel)
+            {
+                AssetHandle shaderHandle(item.guid, AssetType::Shader);
+                shaderEditorPanel->OpenShader(shaderHandle);
+                shaderEditorPanel->SetVisible(true);
+                shaderEditorPanel->Focus();
+            }
+            else
+            {
+                LogError("未找到着色器编辑器面板");
+            }
+            LogInfo("双击打开着色器: {}", item.name);
         }
         break;
 
@@ -792,6 +811,7 @@ void AssetBrowserPanel::drawAssetBrowserContextMenu()
         if (ImGui::MenuItem("C# 脚本")) { createNewAsset(AssetType::CSharpScript); }
         if (ImGui::MenuItem("场景")) { createNewAsset(AssetType::Scene); }
         if (ImGui::MenuItem("材质")) { createNewAsset(AssetType::Material); }
+        if (ImGui::MenuItem("着色器")) { createNewAsset(AssetType::Shader); }
         if (ImGui::MenuItem("物理材质")) { createNewAsset(AssetType::PhysicsMaterial); }
         if (ImGui::MenuItem("蓝图")) { createNewAsset(AssetType::Blueprint); }
         ImGui::Separator();
@@ -1308,9 +1328,19 @@ void AssetBrowserPanel::createNewAsset(AssetType type)
         defaultContent = "name: 新建场景\nentities: []";
         break;
     case AssetType::Material:
-        baseName = "新建材质";
-        extension = ".mat";
-        defaultContent = R"(
+        {
+            baseName = "新建材质";
+            extension = ".mat";
+            Data::MaterialDefinition defaultMatDef;
+            defaultContent = YAML::Dump(YAML::convert<Data::MaterialDefinition>::encode(defaultMatDef));
+        }
+        break;
+    case AssetType::Shader:
+        {
+            baseName = "新建着色器";
+            extension = ".shader";
+            Data::ShaderData defaultData;
+            defaultData.source = R"(
 /// @file Common2D.wgsl
 /// @brief 2D渲染通用着色器模板
 /// @author Luma Engine
@@ -1360,6 +1390,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return texColor * in.color;
 }
 )";
+            defaultData.language = Data::ShaderLanguage::WGSL;
+            defaultData.type = Data::ShaderType::VertFrag;
+            defaultContent = YAML::Dump(YAML::convert<Data::ShaderData>::encode(defaultData));
+        }
         break;
     case AssetType::PhysicsMaterial:
         baseName = "新建物理材质";

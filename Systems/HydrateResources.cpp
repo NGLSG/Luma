@@ -27,7 +27,7 @@ namespace Systems
         m_context = &context;
         auto& registry = scene->GetRegistry();
 
-        
+
         auto processEntity = [this, &registry](entt::entity entity)
         {
             if (registry.all_of<ECS::SpriteComponent>(entity)) OnSpriteUpdated(registry, entity);
@@ -76,19 +76,18 @@ namespace Systems
                 }
             }));
 
-        
+
         m_listeners.push_back(EventBus::GetInstance().Subscribe<AssetUpdatedEvent>(
             [this](const AssetUpdatedEvent& event)
             {
                 auto currentScene = SceneManager::GetInstance().GetCurrentScene();
                 if (!currentScene) return;
-                
+
                 auto& registry = currentScene->GetRegistry();
-                
-                
+
+
                 if (event.assetType == AssetType::Texture)
                 {
-                    
                     auto spriteView = registry.view<ECS::SpriteComponent>();
                     for (auto entity : spriteView)
                     {
@@ -98,8 +97,8 @@ namespace Systems
                             OnSpriteUpdated(registry, entity);
                         }
                     }
-                    
-                    
+
+
                     auto buttonView = registry.view<ECS::ButtonComponent>();
                     for (auto entity : buttonView)
                     {
@@ -109,7 +108,7 @@ namespace Systems
                             OnButtonUpdated(registry, entity);
                         }
                     }
-                    
+
                     auto inputTextView = registry.view<ECS::InputTextComponent>();
                     for (auto entity : inputTextView)
                     {
@@ -119,55 +118,55 @@ namespace Systems
                             OnInputTextUpdated(registry, entity);
                         }
                     }
-                    
+
                     auto toggleButtonView = registry.view<ECS::ToggleButtonComponent>();
                     for (auto entity : toggleButtonView)
                     {
                         OnToggleButtonUpdated(registry, entity);
                     }
-                    
+
                     auto radioButtonView = registry.view<ECS::RadioButtonComponent>();
                     for (auto entity : radioButtonView)
                     {
                         OnRadioButtonUpdated(registry, entity);
                     }
-                    
+
                     auto checkBoxView = registry.view<ECS::CheckBoxComponent>();
                     for (auto entity : checkBoxView)
                     {
                         OnCheckBoxUpdated(registry, entity);
                     }
-                    
+
                     auto sliderView = registry.view<ECS::SliderComponent>();
                     for (auto entity : sliderView)
                     {
                         OnSliderUpdated(registry, entity);
                     }
-                    
+
                     auto comboBoxView = registry.view<ECS::ComboBoxComponent>();
                     for (auto entity : comboBoxView)
                     {
                         OnComboBoxUpdated(registry, entity);
                     }
-                    
+
                     auto expanderView = registry.view<ECS::ExpanderComponent>();
                     for (auto entity : expanderView)
                     {
                         OnExpanderUpdated(registry, entity);
                     }
-                    
+
                     auto progressBarView = registry.view<ECS::ProgressBarComponent>();
                     for (auto entity : progressBarView)
                     {
                         OnProgressBarUpdated(registry, entity);
                     }
-                    
+
                     auto tabControlView = registry.view<ECS::TabControlComponent>();
                     for (auto entity : tabControlView)
                     {
                         OnTabControlUpdated(registry, entity);
                     }
-                    
+
                     auto listBoxView = registry.view<ECS::ListBoxComponent>();
                     for (auto entity : listBoxView)
                     {
@@ -176,7 +175,6 @@ namespace Systems
                 }
                 else if (event.assetType == AssetType::Material)
                 {
-                    
                     auto spriteView = registry.view<ECS::SpriteComponent>();
                     for (auto entity : spriteView)
                     {
@@ -189,7 +187,6 @@ namespace Systems
                 }
                 else if (event.assetType == AssetType::Font)
                 {
-                    
                     auto textView = registry.view<ECS::TextComponent>();
                     for (auto entity : textView)
                     {
@@ -199,7 +196,7 @@ namespace Systems
                             OnTextUpdated(registry, entity);
                         }
                     }
-                    
+
                     auto inputTextView = registry.view<ECS::InputTextComponent>();
                     for (auto entity : inputTextView)
                     {
@@ -211,11 +208,11 @@ namespace Systems
                         }
                     }
                 }
-                
+
                 LogInfo("资产已更新，场景中的相关组件已刷新: {}", event.guid.ToString());
             }));
 
-        
+
         for (auto entity : registry.storage<entt::entity>())
         {
             processEntity(entity);
@@ -245,7 +242,7 @@ namespace Systems
         TextureLoader textureLoader(*m_context->graphicsBackend);
         MaterialLoader materialLoader;
 
-        
+
         if (sprite.textureHandle.Valid() && (!sprite.image || sprite.lastSpriteHandle != sprite.textureHandle))
         {
             sprite.image = textureLoader.LoadAsset(sprite.textureHandle.assetGuid);
@@ -266,28 +263,30 @@ namespace Systems
             sprite.image.reset();
         }
 
-        
-        if (sprite.materialHandle.Valid() && (!sprite.wgslMaterial || sprite.lastMaterialHandle != sprite.materialHandle))
+
+        if (sprite.materialHandle.Valid() && (!sprite.wgslMaterial || sprite.lastMaterialHandle != sprite.
+            materialHandle))
         {
-            
             auto nutContext = m_context->graphicsBackend->GetNutContext();
-            if (nutContext)
+            auto shaderLan = AssetManager::GetInstance().GetMetadata(sprite.materialHandle.assetGuid)->importerSettings.
+                                                         as<Data::ShaderData>().language;
+            if (nutContext && shaderLan == Data::ShaderLanguage::WGSL)
             {
                 sprite.wgslMaterial = materialLoader.LoadWGSLMaterial(sprite.materialHandle.assetGuid, nutContext);
                 if (!sprite.wgslMaterial)
                 {
                     LogError("Failed to load WGSL material with GUID: {}", sprite.materialHandle.assetGuid.ToString());
-                    
-                    
+
+
                     sprite.material = materialLoader.LoadAsset(sprite.materialHandle.assetGuid);
                     if (!sprite.material)
                     {
-                        LogError("Failed to load fallback SkSL material with GUID: {}", sprite.materialHandle.assetGuid.ToString());
+                        LogError("Failed to load fallback SkSL material with GUID: {}",
+                                 sprite.materialHandle.assetGuid.ToString());
                     }
                 }
                 else
                 {
-                    
                     sprite.material.reset();
                 }
             }
@@ -346,7 +345,8 @@ namespace Systems
                 target = textureLoader.LoadAsset(handle.assetGuid);
                 if (!target)
                 {
-                    LogError("Failed to load ToggleButton {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                    LogError("Failed to load ToggleButton {} texture with GUID: {}", fieldName,
+                             handle.assetGuid.ToString());
                 }
             }
             else if (!handle.Valid())
@@ -371,7 +371,8 @@ namespace Systems
                     text.typeface = fontLoader.LoadAsset(text.fontHandle.assetGuid);
                     if (!text.typeface)
                     {
-                        LogError("Failed to load RadioButton {} font with GUID: {}", fieldName, text.fontHandle.assetGuid.ToString());
+                        LogError("Failed to load RadioButton {} font with GUID: {}", fieldName,
+                                 text.fontHandle.assetGuid.ToString());
                     }
                     text.lastFontHandle = text.fontHandle;
                 }
@@ -394,7 +395,8 @@ namespace Systems
                 target = textureLoader.LoadAsset(handle.assetGuid);
                 if (!target)
                 {
-                    LogError("Failed to load RadioButton {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                    LogError("Failed to load RadioButton {} texture with GUID: {}", fieldName,
+                             handle.assetGuid.ToString());
                 }
             }
             else if (!handle.Valid())
@@ -420,7 +422,8 @@ namespace Systems
                     text.typeface = fontLoader.LoadAsset(text.fontHandle.assetGuid);
                     if (!text.typeface)
                     {
-                        LogError("Failed to load CheckBox {} font with GUID: {}", fieldName, text.fontHandle.assetGuid.ToString());
+                        LogError("Failed to load CheckBox {} font with GUID: {}", fieldName,
+                                 text.fontHandle.assetGuid.ToString());
                     }
                     text.lastFontHandle = text.fontHandle;
                 }
@@ -443,7 +446,8 @@ namespace Systems
                 target = textureLoader.LoadAsset(handle.assetGuid);
                 if (!target)
                 {
-                    LogError("Failed to load CheckBox {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                    LogError("Failed to load CheckBox {} texture with GUID: {}", fieldName,
+                             handle.assetGuid.ToString());
                 }
             }
             else if (!handle.Valid())
@@ -496,7 +500,8 @@ namespace Systems
                     text.typeface = fontLoader.LoadAsset(text.fontHandle.assetGuid);
                     if (!text.typeface)
                     {
-                        LogError("Failed to load ComboBox {} font with GUID: {}", fieldName, text.fontHandle.assetGuid.ToString());
+                        LogError("Failed to load ComboBox {} font with GUID: {}", fieldName,
+                                 text.fontHandle.assetGuid.ToString());
                     }
                     text.lastFontHandle = text.fontHandle;
                 }
@@ -519,7 +524,8 @@ namespace Systems
                 target = textureLoader.LoadAsset(handle.assetGuid);
                 if (!target)
                 {
-                    LogError("Failed to load ComboBox {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                    LogError("Failed to load ComboBox {} texture with GUID: {}", fieldName,
+                             handle.assetGuid.ToString());
                 }
             }
             else if (!handle.Valid())
@@ -545,7 +551,8 @@ namespace Systems
                     text.typeface = fontLoader.LoadAsset(text.fontHandle.assetGuid);
                     if (!text.typeface)
                     {
-                        LogError("Failed to load Expander {} font with GUID: {}", fieldName, text.fontHandle.assetGuid.ToString());
+                        LogError("Failed to load Expander {} font with GUID: {}", fieldName,
+                                 text.fontHandle.assetGuid.ToString());
                     }
                     text.lastFontHandle = text.fontHandle;
                 }
@@ -568,7 +575,8 @@ namespace Systems
                 target = textureLoader.LoadAsset(handle.assetGuid);
                 if (!target)
                 {
-                    LogError("Failed to load Expander {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                    LogError("Failed to load Expander {} texture with GUID: {}", fieldName,
+                             handle.assetGuid.ToString());
                 }
             }
             else if (!handle.Valid())
@@ -593,7 +601,8 @@ namespace Systems
                 target = textureLoader.LoadAsset(handle.assetGuid);
                 if (!target)
                 {
-                    LogError("Failed to load ProgressBar {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                    LogError("Failed to load ProgressBar {} texture with GUID: {}", fieldName,
+                             handle.assetGuid.ToString());
                 }
             }
             else if (!handle.Valid())
@@ -619,7 +628,8 @@ namespace Systems
                 target = textureLoader.LoadAsset(handle.assetGuid);
                 if (!target)
                 {
-                    LogError("Failed to load TabControl {} texture with GUID: {}", fieldName, handle.assetGuid.ToString());
+                    LogError("Failed to load TabControl {} texture with GUID: {}", fieldName,
+                             handle.assetGuid.ToString());
                 }
             }
             else if (!handle.Valid())
@@ -645,7 +655,8 @@ namespace Systems
                     text.typeface = fontLoader.LoadAsset(text.fontHandle.assetGuid);
                     if (!text.typeface)
                     {
-                        LogError("Failed to load ListBox {} font with GUID: {}", fieldName, text.fontHandle.assetGuid.ToString());
+                        LogError("Failed to load ListBox {} font with GUID: {}", fieldName,
+                                 text.fontHandle.assetGuid.ToString());
                     }
                     text.lastFontHandle = text.fontHandle;
                 }
@@ -687,6 +698,7 @@ namespace Systems
 
         loadTexture(listBox.backgroundImage, listBox.backgroundImageTexture, "backgroundImage");
     }
+
     void HydrateResources::OnScriptUpdated(entt::registry& registry, entt::entity entity)
     {
         auto& scriptsComp = registry.get<ECS::ScriptsComponent>(entity);
@@ -741,7 +753,7 @@ namespace Systems
         auto& inputText = registry.get<ECS::InputTextComponent>(entity);
         FontLoader fontLoader;
 
-        
+
         ECS::TextComponent& text = inputText.text;
         if (text.fontHandle.Valid() && (!text.typeface || text.lastFontHandle != text.fontHandle))
         {
@@ -758,7 +770,7 @@ namespace Systems
             text.lastFontHandle = {};
         }
 
-        
+
         ECS::TextComponent& placeholder = inputText.placeholder;
         if (placeholder.fontHandle.Valid() && (!placeholder.typeface || placeholder.lastFontHandle !=
             placeholder.fontHandle))
@@ -777,7 +789,7 @@ namespace Systems
             placeholder.lastFontHandle = {};
         }
 
-        
+
         if (!m_context || !m_context->graphicsBackend) return;
         if (inputText.backgroundImage.Valid() && (!inputText.backgroundImageTexture || inputText.backgroundImageTexture
             ->GetSourceGuid() != inputText.backgroundImage.assetGuid))
@@ -1018,7 +1030,7 @@ namespace Systems
 
             const float cellWidth = tilemap.cellSize.x;
             const float cellHeight = tilemap.cellSize.y;
-            
+
             const float shiftX = cellWidth * (-0.5f);
             const float shiftY = cellHeight * (-0.5f);
 
@@ -1036,7 +1048,7 @@ namespace Systems
                     maxY = std::max(maxY, coord.y);
                 }
 
-                
+
                 for (int y = minY; y <= maxY + 1; ++y)
                 {
                     bool running = false;
@@ -1054,7 +1066,7 @@ namespace Systems
                         }
                         else if (running)
                         {
-                            int runEndX = x; 
+                            int runEndX = x;
                             if (runEndX > runStartX)
                             {
                                 std::vector<ECS::Vector2f> chain;
@@ -1078,7 +1090,7 @@ namespace Systems
                     }
                 }
 
-                
+
                 for (int x = minX; x <= maxX + 1; ++x)
                 {
                     bool running = false;
@@ -1096,7 +1108,7 @@ namespace Systems
                         }
                         else if (running)
                         {
-                            int runEndY = y; 
+                            int runEndY = y;
                             if (runEndY > runStartY)
                             {
                                 std::vector<ECS::Vector2f> chain;

@@ -7,6 +7,7 @@
 #include <filesystem>
 
 #include "dawn/webgpu_cpp.h"
+#include "ShaderModuleRegistry.h"
 
 namespace Nut
 {
@@ -50,14 +51,35 @@ namespace Nut
     class ShaderManager
     {
         inline static std::unordered_map<std::string, std::shared_ptr<ShaderModule>> shaderModules;
-        inline static std::filesystem::path systemIncludeDir;
 
     public:
+        /**
+         * @brief 从文件加载shader（已弃用，保留兼容性）
+         */
         static ShaderModule& GetFromFile(const std::string& file, const std::shared_ptr<NutContext>& ctx);
 
+        /**
+         * @brief 从字符串创建shader，自动展开模块引用
+         * @param code 原始shader代码（可包含extern语句）
+         * @param ctx Nut上下文
+         * @return Shader模块引用
+         */
         static ShaderModule& GetFromString(const std::string& code, const std::shared_ptr<NutContext>& ctx);
 
-        static void SetSystemIncludeDir(const std::filesystem::path& dir);
+        /**
+         * @brief 注册shader模块到全局注册表
+         * @param moduleName 模块名称（支持点号分隔的层级）
+         * @param sourceCode 模块源代码
+         */
+        static void RegisterShaderModule(const std::string& moduleName, const std::string& sourceCode);
+
+        /**
+         * @brief 从文件加载并注册shader模块
+         * @param moduleName 模块名称
+         * @param filePath 文件路径
+         * @return 成功返回true
+         */
+        static bool RegisterShaderModuleFromFile(const std::string& moduleName, const std::filesystem::path& filePath);
     };
 } // namespace Nut
 

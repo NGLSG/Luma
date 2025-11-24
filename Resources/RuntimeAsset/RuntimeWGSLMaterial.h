@@ -11,6 +11,8 @@
 #include <string>
 #include <array>
 
+#include "RuntimeShader.h"
+
 namespace Nut
 {
     class NutContext;
@@ -69,6 +71,13 @@ public:
     bool Initialize(
         const std::shared_ptr<Nut::NutContext>& context,
         const std::string& shaderCode,
+        wgpu::TextureFormat colorFormat = wgpu::TextureFormat::BGRA8Unorm,
+        uint32_t initialSampleCount = 1
+    );
+
+    bool Initialize(
+        const std::shared_ptr<Nut::NutContext>& context,
+        const sk_sp<RuntimeShader>& runtimeShader,
         wgpu::TextureFormat colorFormat = wgpu::TextureFormat::BGRA8Unorm,
         uint32_t initialSampleCount = 1
     );

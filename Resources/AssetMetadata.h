@@ -31,6 +31,7 @@ enum class AssetType
     Tileset, ///< 瓦片集资产。
     RuleTile, ///< 规则瓦片资产。
     Font, ///< 字体资产。
+    Shader, ///< 着色器资产。
 };
 
 
@@ -44,6 +45,7 @@ inline const char* AssetTypeToString(AssetType type)
     switch (type)
     {
     case AssetType::Texture: return "Texture";
+    case AssetType::Shader: return "Shader";
     case AssetType::Material: return "Material";
     case AssetType::Prefab: return "Prefab";
     case AssetType::Scene: return "Scene";
@@ -72,6 +74,7 @@ inline const char* AssetTypeToString(AssetType type)
 inline AssetType StringToAssetType(const std::string& str)
 {
     if (str == "Texture") return AssetType::Texture;
+    if (str == "Shader") return AssetType::Shader;
     if (str == "Material") return AssetType::Material;
     if (str == "Prefab") return AssetType::Prefab;
     if (str == "Scene") return AssetType::Scene;

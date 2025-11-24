@@ -439,11 +439,19 @@ void AssetInspectorPanel::openShaderEditor()
         return;
     }
 
+    
+    Data::MaterialDefinition materialData = metadata->importerSettings.as<Data::MaterialDefinition>();
+    if (!materialData.shaderHandle.Valid())
+    {
+        LogError("材质没有关联的shader资产");
+        return;
+    }
+
     auto* shaderEditorPanel = dynamic_cast<ShaderEditorPanel*>(m_context->editor->GetPanelByName("着色器编辑器"));
     if (shaderEditorPanel)
     {
-        AssetHandle materialHandle(metadata->guid, AssetType::Material);
-        shaderEditorPanel->OpenMaterial(materialHandle);
+        
+        shaderEditorPanel->OpenShader(materialData.shaderHandle);
     }
     else
     {

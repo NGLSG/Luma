@@ -13,14 +13,6 @@
 
 namespace Data
 {
-    /**
-     * @brief 着色器类型枚举
-     */
-    enum class ShaderType
-    {
-        SkSL,       ///< Skia SkSL着色器（已弃用，仅用于向后兼容）
-        WGSL        ///< WebGPU WGSL着色器（推荐）
-    };
 
     /**
      * @brief 统一变量类型枚举。
@@ -28,15 +20,15 @@ namespace Data
      */
     enum class UniformType
     {
-        Float,      ///< 浮点数类型。
-        Color4f,    ///< 4分量颜色类型（vec4）。
-        Int,        ///< 整型类型。
-        Point,      ///< 点坐标类型（vec2）。
-        Shader,     ///< 着色器类型（已弃用）。
-        Vec2,       ///< 2D向量。
-        Vec3,       ///< 3D向量。
-        Vec4,       ///< 4D向量。
-        Mat4        ///< 4x4矩阵。
+        Float, ///< 浮点数类型。
+        Color4f, ///< 4分量颜色类型（vec4）。
+        Int, ///< 整型类型。
+        Point, ///< 点坐标类型（vec2）。
+        Shader, ///< 着色器类型（已弃用）。
+        Vec2, ///< 2D向量。
+        Vec3, ///< 3D向量。
+        Vec4, ///< 4D向量。
+        Mat4 ///< 4x4矩阵。
     };
 
     /**
@@ -45,9 +37,9 @@ namespace Data
      */
     struct MaterialUniform
     {
-        std::string name;       ///< 统一变量的名称。
-        UniformType type;       ///< 统一变量的类型。
-        YAML::Node valueNode;   ///< 统一变量的值，以YAML节点形式存储。
+        std::string name; ///< 统一变量的名称。
+        UniformType type; ///< 统一变量的类型。
+        YAML::Node valueNode; ///< 统一变量的值，以YAML节点形式存储。
     };
 
     /**
@@ -58,10 +50,8 @@ namespace Data
     {
     public:
         friend class IData<MaterialDefinition>;
-        std::string shaderName;                 ///< 着色器名称。
-        std::string shaderCode;                 ///< 着色器代码。
-        ShaderType shaderType = ShaderType::WGSL; ///< 着色器类型（WGSL或SkSL）。
-        std::vector<MaterialUniform> uniforms;  ///< 材质中包含的统一变量列表。
+        AssetHandle shaderHandle; ///< 着色器资源的句柄。
+        std::vector<MaterialUniform> uniforms; ///< 材质中包含的统一变量列表。
 
     private:
         static constexpr const char* TypeName = "mat"; ///< 材质类型名称常量。
@@ -167,7 +157,7 @@ namespace YAML
         static Node encode(const Data::MaterialDefinition& rhs)
         {
             Node node;
-            node["shaderCode"] = rhs.shaderCode;
+            node["shaderHandle"] = rhs.shaderHandle;
             Node uniformsNode = node["uniforms"];
             for (const auto& uniform : rhs.uniforms)
             {
@@ -184,9 +174,12 @@ namespace YAML
          */
         static bool decode(const Node& node, Data::MaterialDefinition& rhs)
         {
-            if (!node.IsMap() || !node["shaderCode"]) return false;
+            if (!node.IsMap()) return false;
 
-            rhs.shaderCode = node["shaderCode"].as<std::string>();
+            if (node["shaderHandle"])
+            {
+                rhs.shaderHandle = node["shaderHandle"].as<AssetHandle>();
+            }
 
             if (node["uniforms"] && node["uniforms"].IsMap())
             {
@@ -319,7 +312,6 @@ namespace CustomDrawing
 REGISTRY
 {
     AssetRegistry_<Data::MaterialDefinition>(AssetType::Material)
-        .property("shaderName", &Data::MaterialDefinition::shaderName)
-        .property("shaderCode", &Data::MaterialDefinition::shaderCode)
+        .property("shaderHandle", &Data::MaterialDefinition::shaderHandle)
         .property("uniforms", &Data::MaterialDefinition::uniforms);
 }

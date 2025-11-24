@@ -21,6 +21,7 @@
 #include "Importers/TileImporter.h"
 #include "Importers/TilesetImporter.h"
 #include "Importers/RuleTileImporter.h"
+#include "Importers/ShaderImporter.h"
 
 EditorAssetManager::EditorAssetManager(const std::filesystem::path& projectRootPath)
 {
@@ -438,4 +439,5 @@ void EditorAssetManager::RegisterImporters()
     m_importers.push_back(std::make_unique<TilesetImporter>());
     m_importers.push_back(std::make_unique<RuleTileImporter>());
     m_importers.push_back(std::make_unique<BlueprintImporter>());
+    m_importers.push_back(std::make_unique<ShaderImporter>());
 }

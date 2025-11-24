@@ -3,22 +3,24 @@
 #include "IEditorPanel.h"
 #include "AssetHandle.h"
 #include "MaterialData.h"
+#include "ShaderData.h"
 #include "TextEditor.h"
-#include "Shader.h"
+#include "Nut/Shader.h" // 引入 Nut Shader 模块
+#include "imgui.h"
 #include <string>
 #include <memory>
 #include <vector>
 
-#include "Nut/Shader.h"
+// 前置声明
+class EditorContext;
 
 /**
- * @brief Shader编辑器面板
- * 
- * 提供可视化的WGSL/SkSL着色器编辑界面，包括：
- * - 语法高亮
- * - 代码编辑
- * - 实时编译验证
- * - Uniform参数编辑
+ * @brief 着色器编辑器面板
+ * * 提供可视化的WGSL/SkSL着色器编辑界面，集成以下功能：
+ * - 语法高亮与自定义配色
+ * - 智能代码自动补全 (IntelliSense风格)
+ * - 基于 Nut 引擎的实时编译验证
+ * - Shader 反射信息查看
  */
 class ShaderEditorPanel : public IEditorPanel
 {
@@ -28,11 +30,12 @@ public:
 
     /**
      * @brief 初始化面板
+     * @param context 编辑器上下文，用于访问图形后端
      */
     void Initialize(EditorContext* context) override;
 
     /**
-     * @brief 更新面板状态
+     * @brief 更新每帧逻辑
      */
     void Update(float deltaTime) override;
 
@@ -42,167 +45,135 @@ public:
     void Draw() override;
 
     /**
-     * @brief 关闭面板
+     * @brief 关闭并清理资源
      */
     void Shutdown() override;
 
     /**
-     * @brief 获取面板名称
+     * @brief 获取面板标题
      */
     const char* GetPanelName() const override { return "着色器编辑器"; }
 
     /**
-     * @brief 打开材质进行编辑
-     * @param materialHandle 材质资源句柄
+     * @brief 打开Shader资产进行编辑
+     * @param shaderHandle Shader资源句柄
      */
-    void OpenMaterial(const AssetHandle& materialHandle);
+    void OpenShader(const AssetHandle& shaderHandle);
 
     /**
-     * @brief 保存当前编辑的材质
+     * @brief 保存当前编辑的Shader
      */
-    void SaveMaterial();
+    void SaveShader();
 
     /**
      * @brief 检查是否有未保存的更改
      */
     bool HasUnsavedChanges() const { return m_hasUnsavedChanges; }
 
+    // --- 已弃用的接口 (保留兼容性) ---
+    void OpenMaterial(const AssetHandle& materialHandle);
+    void SaveMaterial();
+
 private:
-    /**
-     * @brief 渲染工具栏
-     */
+    // --- UI 渲染方法 ---
     void RenderToolbar();
-
-    /**
-     * @brief 渲染代码编辑器
-     */
     void RenderCodeEditor();
-
-    /**
-     * @brief 渲染Binding信息面板
-     */
     void RenderBindingsPanel();
+    void RenderCompileOutput();
+    void RenderSettingsPanel();
 
-    /**
-     * @brief 渲染Uniform编辑器（已弃用，保留兼容）
-     */
+    // [Obsolete] 旧版 Uniform 编辑器
     void RenderUniformEditor();
 
-    /**
-     * @brief 渲染编译输出
-     */
-    void RenderCompileOutput();
+    // --- 核心功能 ---
 
     /**
-     * @brief 编译着色器并验证
+     * @brief 编译着色器
+     * 使用 Nut::ShaderManager 进行预编译，验证语法并提取反射数据
      */
     void CompileShader();
 
-    /**
-     * @brief 添加新的Uniform
-     */
-    void AddUniform();
+    // --- 自动补全系统 ---
 
     /**
-     * @brief 删除Uniform
-     * @param index Uniform索引
+     * @brief 处理自动补全的输入逻辑
+     * 在 TextEditor 处理输入前调用，拦截特定按键
      */
+    void HandleAutoComplete();
+
+    /**
+     * @brief 渲染自动补全的悬浮列表
+     */
+    void RenderAutoCompletePopup();
+
+    /**
+     * @brief 获取光标左侧的单词前缀
+     */
+    std::string GetWordUnderCursor() const;
+
+    // --- 配置与状态管理 ---
+    void UpdateTextEditorLanguage();
+    void HandleFontZoom();
+    void LoadFontSize();
+    void SaveFontSize();
+    void LoadColorSettings();
+    void SaveColorSettings();
+    void LoadCustomKeywords();
+    void SaveCustomKeywords();
+    void ApplyColorSettings();
+    void ApplyCustomKeywords();
+
+    // [Obsolete] 辅助函数
+    void AddUniform();
     void RemoveUniform(size_t index);
 
-    AssetHandle m_currentMaterialHandle;
-    Data::MaterialDefinition m_materialData;
-    
-    // 编辑器状态
+    // --- 成员变量 ---
+
+    EditorContext* m_context = nullptr;
+
+    // 资产数据
+    AssetHandle m_currentShaderHandle;
+    Data::ShaderData m_shaderData;
+    AssetHandle m_currentMaterialHandle; // [Obsolete]
+    Data::MaterialDefinition m_materialData; // [Obsolete]
+
+    // 面板状态
     bool m_isOpen = false;
+    bool m_isVisible = true;
     bool m_hasUnsavedChanges = false;
+    bool m_showSettingsPanel = false;
+
+    // 编译状态
     bool m_compileSuccess = false;
     std::string m_compileOutput;
-    
-    // 代码编辑
-    TextEditor m_textEditor;  // 语法高亮的代码编辑器
+
+    // 代码编辑器核心
+    TextEditor m_textEditor;
     std::string m_shaderCodeBuffer;
     bool m_codeChanged = false;
-    
-    // Uniform编辑
+
+    // 自动补全状态
+    bool m_isAutoCompleteOpen = false;
+    std::vector<std::string> m_autoCompleteCandidates;
+    int m_autoCompleteSelectedIndex = 0;
+    std::string m_currentWordPrefix;
+    ImVec2 m_popupPos; // 弹出框屏幕坐标
+
+    // Shader 反射数据
+    std::vector<Nut::ShaderBindingInfo> m_shaderBindings;
+    bool m_bindingsDirty = true;
+
+    // 用户配置
+    float m_fontSize = 16.0f;
+    const float m_fontSizeMin = 8.0f;
+    const float m_fontSizeMax = 48.0f;
+    TextEditor::Palette m_customPalette;
+    bool m_useCustomColors = false;
+    std::vector<std::string> m_customKeywords;
+    std::string m_newKeywordBuffer;
+
+    // [Obsolete] 旧版 Uniform 编辑状态
     int m_selectedUniformIndex = -1;
     bool m_addingUniform = false;
     Data::MaterialUniform m_newUniform;
-    
-    /**
-     * @brief 更新TextEditor的语言定义
-     */
-    void UpdateTextEditorLanguage();
-
-    /**
-     * @brief 解析Shader并提取binding信息
-     */
-    void ParseShaderBindings();
-
-    /**
-     * @brief 处理字体缩放
-     */
-    void HandleFontZoom();
-
-    /**
-     * @brief 加载字体大小设置
-     */
-    void LoadFontSize();
-
-    /**
-     * @brief 保存字体大小设置
-     */
-    void SaveFontSize();
-
-    /**
-     * @brief 渲染颜色和关键字配置面板
-     */
-    void RenderSettingsPanel();
-
-    /**
-     * @brief 加载颜色配置
-     */
-    void LoadColorSettings();
-
-    /**
-     * @brief 保存颜色配置
-     */
-    void SaveColorSettings();
-
-    /**
-     * @brief 加载自定义关键字
-     */
-    void LoadCustomKeywords();
-
-    /**
-     * @brief 保存自定义关键字
-     */
-    void SaveCustomKeywords();
-
-    /**
-     * @brief 应用颜色配置到TextEditor
-     */
-    void ApplyColorSettings();
-
-    /**
-     * @brief 应用自定义关键字到TextEditor
-     */
-    void ApplyCustomKeywords();
-
-    // Shader反射信息
-    std::vector<Nut::ShaderBindingInfo> m_shaderBindings;
-    bool m_bindingsDirty = true;  // binding需要更新
-
-    // 字体缩放
-    float m_fontSize = 16.0f;  // 默认字体大小
-    float m_fontSizeMin = 8.0f;
-    float m_fontSizeMax = 48.0f;
-
-    // 颜色配置
-    TextEditor::Palette m_customPalette;
-    bool m_useCustomColors = false;
-    bool m_showSettingsPanel = false;
-
-    // 自定义关键字
-    std::vector<std::string> m_customKeywords;
-    std::string m_newKeywordBuffer;
 };

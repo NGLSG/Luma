@@ -19,6 +19,7 @@
 #include "Importers/TileImporter.h"
 #include "Importers/TilesetImporter.h"
 #include "Importers/RuleTileImporter.h"
+#include "Importers/ShaderImporter.h"
 
 RuntimeAssetManager::RuntimeAssetManager(const std::filesystem::path& packageManifestPath)
     : m_packageManifestPath(packageManifestPath)
@@ -28,15 +29,14 @@ RuntimeAssetManager::RuntimeAssetManager(const std::filesystem::path& packageMan
 {
     LogInfo("RuntimeAssetManager: 从包初始化 '{}'...", packageManifestPath.string());
 
-    
+
     registerImporters();
 
     try
     {
-        
         m_assetIndex = AssetPacker::LoadIndex(packageManifestPath);
 
-        
+
         m_indexEntries.reserve(m_assetIndex.size());
         for (const auto& [guid, indexEntry] : m_assetIndex)
         {
@@ -72,7 +72,7 @@ const AssetMetadata* RuntimeAssetManager::GetMetadata(const Guid& guid) const
 {
     std::string guidStr = guid.ToString();
 
-    
+
     {
         std::lock_guard<std::mutex> lock(m_cacheMutex);
         auto cacheIt = m_assetCache.find(guidStr);
@@ -82,7 +82,7 @@ const AssetMetadata* RuntimeAssetManager::GetMetadata(const Guid& guid) const
         }
     }
 
-    
+
     return lazyLoadMetadata(guidStr);
 }
 
@@ -92,7 +92,7 @@ const AssetMetadata* RuntimeAssetManager::GetMetadata(const std::filesystem::pat
 
     std::lock_guard<std::mutex> lock(m_cacheMutex);
 
-    
+
     auto pathIt = m_pathToGuid.find(pathKey);
     if (pathIt != m_pathToGuid.end())
     {
@@ -109,17 +109,15 @@ const AssetMetadata* RuntimeAssetManager::GetMetadata(const std::filesystem::pat
 
 const std::unordered_map<std::string, AssetMetadata>& RuntimeAssetManager::GetAssetDatabase() const
 {
-    
     std::lock_guard<std::mutex> lock(m_cacheMutex);
 
-    
+
     if (m_assetCache.size() < m_assetIndex.size())
     {
         LogInfo("RuntimeAssetManager: 按需加载完整资产数据库...");
 
         for (const auto& [guid, indexEntry] : m_assetIndex)
         {
-            
             if (m_assetCache.find(guid) == m_assetCache.end())
             {
                 try
@@ -149,14 +147,13 @@ const std::filesystem::path& RuntimeAssetManager::GetAssetsRootPath() const
 
 bool RuntimeAssetManager::StartPreload()
 {
-    
     if (m_preloadRunning.load() || m_preloadComplete.load())
     {
         LogWarn("RuntimeAssetManager: 预加载已在运行或已完成，无法重复启动");
         return false;
     }
 
-    
+
     if (m_indexEntries.empty())
     {
         LogWarn("RuntimeAssetManager: 没有资产需要预加载");
@@ -164,22 +161,22 @@ bool RuntimeAssetManager::StartPreload()
         return false;
     }
 
-    
+
     m_preloadedCount.store(0);
     m_preloadComplete.store(false);
     m_preloadRunning.store(true);
 
-    
+
     size_t hardwareConcurrency = std::thread::hardware_concurrency();
     size_t numThreads = hardwareConcurrency > 0 ? hardwareConcurrency : 4;
 
-    
+
     numThreads = std::min(numThreads, m_indexEntries.size());
 
     LogInfo("RuntimeAssetManager: 启动后台预加载，使用 {} 个线程，共 {} 个资产",
             numThreads, m_indexEntries.size());
 
-    
+
     m_preloadThreads.clear();
     m_preloadThreads.reserve(numThreads);
 
@@ -193,10 +190,9 @@ bool RuntimeAssetManager::StartPreload()
 
 void RuntimeAssetManager::StopPreload()
 {
-    
     m_preloadRunning.store(false);
 
-    
+
     for (auto& thread : m_preloadThreads)
     {
         if (thread.joinable())
@@ -233,7 +229,7 @@ Guid RuntimeAssetManager::LoadAsset(const std::filesystem::path& assetPath)
 {
     std::string pathKey = assetPath.generic_string();
 
-    
+
     {
         std::lock_guard<std::mutex> lock(m_cacheMutex);
         auto pathIt = m_pathToGuid.find(pathKey);
@@ -244,7 +240,7 @@ Guid RuntimeAssetManager::LoadAsset(const std::filesystem::path& assetPath)
         }
     }
 
-    
+
     IAssetImporter* importer = findImporterFor(assetPath);
     if (!importer)
     {
@@ -252,7 +248,7 @@ Guid RuntimeAssetManager::LoadAsset(const std::filesystem::path& assetPath)
         return Guid::Invalid();
     }
 
-    
+
     std::filesystem::path fullAssetPath = assetPath;
     if (!std::filesystem::exists(fullAssetPath))
     {
@@ -260,13 +256,13 @@ Guid RuntimeAssetManager::LoadAsset(const std::filesystem::path& assetPath)
         return Guid::Invalid();
     }
 
-    
+
     try
     {
         AssetMetadata metadata = importer->Import(fullAssetPath);
         Guid resultGuid = metadata.guid;
 
-        
+
         {
             std::lock_guard<std::mutex> lock(m_cacheMutex);
             m_assetCache[metadata.guid.ToString()] = metadata;
@@ -287,7 +283,6 @@ Guid RuntimeAssetManager::LoadAsset(const std::filesystem::path& assetPath)
 
 const AssetMetadata* RuntimeAssetManager::lazyLoadMetadata(const std::string& guid) const
 {
-    
     auto indexIt = m_assetIndex.find(guid);
     if (indexIt == m_assetIndex.end())
     {
@@ -295,12 +290,12 @@ const AssetMetadata* RuntimeAssetManager::lazyLoadMetadata(const std::string& gu
         return nullptr;
     }
 
-    
+
     try
     {
         std::lock_guard<std::mutex> lock(m_cacheMutex);
 
-        
+
         auto cacheIt = m_assetCache.find(guid);
         if (cacheIt != m_assetCache.end())
         {
@@ -310,7 +305,7 @@ const AssetMetadata* RuntimeAssetManager::lazyLoadMetadata(const std::string& gu
         LogInfo("RuntimeAssetManager: 懒加载资产 {}", guid);
         auto metadata = AssetPacker::LoadSingleAsset(m_packageManifestPath, indexIt->second);
 
-        
+
         std::string pathKey = metadata.assetPath.generic_string();
         m_pathToGuid[pathKey] = metadata.guid;
 
@@ -330,16 +325,15 @@ void RuntimeAssetManager::preloadWorker(size_t threadIndex, size_t totalThreads)
 {
     LogInfo("RuntimeAssetManager: 预加载线程 {} 启动", threadIndex);
 
-    
+
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     int totalCount = static_cast<int>(m_indexEntries.size());
     int threadLoadedCount = 0;
 
-    
+
     for (size_t i = threadIndex; i < m_indexEntries.size(); i += totalThreads)
     {
-        
         if (!m_preloadRunning.load())
         {
             LogInfo("RuntimeAssetManager: 预加载线程 {} 被中断", threadIndex);
@@ -348,7 +342,7 @@ void RuntimeAssetManager::preloadWorker(size_t threadIndex, size_t totalThreads)
 
         const auto& [guid, indexEntry] = m_indexEntries[i];
 
-        
+
         {
             std::lock_guard<std::mutex> lock(m_cacheMutex);
             if (m_assetCache.find(guid) != m_assetCache.end())
@@ -359,7 +353,7 @@ void RuntimeAssetManager::preloadWorker(size_t threadIndex, size_t totalThreads)
             }
         }
 
-        
+
         try
         {
             auto metadata = AssetPacker::LoadSingleAsset(m_packageManifestPath, indexEntry);
@@ -367,7 +361,7 @@ void RuntimeAssetManager::preloadWorker(size_t threadIndex, size_t totalThreads)
             {
                 std::lock_guard<std::mutex> lock(m_cacheMutex);
 
-                
+
                 std::string pathKey = metadata.assetPath.generic_string();
                 m_pathToGuid[pathKey] = metadata.guid;
 
@@ -377,7 +371,7 @@ void RuntimeAssetManager::preloadWorker(size_t threadIndex, size_t totalThreads)
             threadLoadedCount++;
             int currentTotal = m_preloadedCount.fetch_add(1) + 1;
 
-            
+
             if (threadIndex == 0 && currentTotal % std::max(1, totalCount / 10) == 0)
             {
                 float progress = (static_cast<float>(currentTotal) / static_cast<float>(totalCount)) * 100.0f;
@@ -385,7 +379,7 @@ void RuntimeAssetManager::preloadWorker(size_t threadIndex, size_t totalThreads)
                         progress, currentTotal, totalCount);
             }
 
-            
+
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         catch (const std::exception& e)
@@ -398,7 +392,7 @@ void RuntimeAssetManager::preloadWorker(size_t threadIndex, size_t totalThreads)
     LogInfo("RuntimeAssetManager: 预加载线程 {} 完成，共处理 {} 个资产",
             threadIndex, threadLoadedCount);
 
-    
+
     int currentCount = m_preloadedCount.load();
     if (currentCount >= totalCount)
     {
@@ -425,6 +419,7 @@ void RuntimeAssetManager::registerImporters()
     m_importers.push_back(std::make_unique<TilesetImporter>());
     m_importers.push_back(std::make_unique<RuleTileImporter>());
     m_importers.push_back(std::make_unique<BlueprintImporter>());
+    m_importers.push_back(std::make_unique<ShaderImporter>());
 
     LogInfo("RuntimeAssetManager: 已注册 {} 个资产导入器", m_importers.size());
 }

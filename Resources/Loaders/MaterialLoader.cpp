@@ -1,7 +1,10 @@
 #include "MaterialLoader.h"
+
+#include "ShaderLoader.h"
 #include "../../Data/MaterialData.h"
 #include "../AssetManager.h"
 #include "../Managers/RuntimeMaterialManager.h"
+#include "Managers/RuntimeWGSLMaterialManager.h"
 
 sk_sp<Material> MaterialLoader::LoadAsset(const AssetMetadata& metadata)
 {
@@ -12,13 +15,11 @@ sk_sp<Material> MaterialLoader::LoadAsset(const AssetMetadata& metadata)
 
 
     Data::MaterialDefinition definition = metadata.importerSettings.as<Data::MaterialDefinition>();
-
-
-    if (definition.shaderCode.empty()) return nullptr;
-
-    auto [effect, errorText] = SkRuntimeEffect::MakeForShader(SkString(definition.shaderCode.c_str()));
+    auto shader = ShaderLoader(nullptr).LoadAsset(definition.shaderHandle);
+    auto [effect, errorText] = SkRuntimeEffect::MakeForShader(SkString(shader->GetSource().c_str()));
     if (!effect)
     {
+        LogError("MaterialLoader::LoadAsset - Failed to create SkRuntimeEffect: {}", errorText.c_str());
         return nullptr;
     }
 
@@ -100,24 +101,22 @@ sk_sp<RuntimeWGSLMaterial> MaterialLoader::LoadWGSLMaterial(
 
     Data::MaterialDefinition definition = metadata.importerSettings.as<Data::MaterialDefinition>();
 
-    if (definition.shaderCode.empty())
-    {
-        LogError("MaterialLoader::LoadWGSLMaterial - Shader code is empty");
-        return nullptr;
-    }
 
-    
     auto material = sk_make_sp<RuntimeWGSLMaterial>();
     material->SetSourceGuid(metadata.guid);
-
-    
-    if (!material->Initialize(context, definition.shaderCode))
+    auto shader = ShaderLoader(context).LoadAsset(definition.shaderHandle);
+    if (shader && material->Initialize(context, shader))
     {
-        LogError("MaterialLoader::LoadWGSLMaterial - Failed to initialize material");
+        LogInfo("MaterialLoader::LoadWGSLMaterial - Loaded material with GUID: {}", metadata.guid.ToString());
+    }
+    else
+    {
+        LogError("MaterialLoader::LoadWGSLMaterial - Failed to initialize material with GUID: {}",
+                 metadata.guid.ToString());
         return nullptr;
     }
 
-    
+
     for (const auto& uniformDef : definition.uniforms)
     {
         const std::string& name = uniformDef.name;
@@ -177,7 +176,7 @@ sk_sp<RuntimeWGSLMaterial> MaterialLoader::LoadWGSLMaterial(
             break;
 
         case Data::UniformType::Shader:
-            
+
             LogWarn("MaterialLoader::LoadWGSLMaterial - Shader uniform type is deprecated, use SetTexture instead");
             break;
         }
@@ -190,8 +189,6 @@ sk_sp<RuntimeWGSLMaterial> MaterialLoader::LoadWGSLMaterial(
     const Guid& guid,
     const std::shared_ptr<Nut::NutContext>& context)
 {
-    // TODO: 添加WGSL材质缓存管理
-
     auto metadata = AssetManager::GetInstance().GetMetadata(guid);
     if (!metadata || metadata->type != AssetType::Material)
     {
@@ -199,5 +196,16 @@ sk_sp<RuntimeWGSLMaterial> MaterialLoader::LoadWGSLMaterial(
         return nullptr;
     }
 
-    return LoadWGSLMaterial(*metadata, context);
+    sk_sp<RuntimeWGSLMaterial> RuntimeWGSLMaterial;
+    if (RuntimeWGSLMaterialManager::GetInstance().TryGetAsset(guid, RuntimeWGSLMaterial))
+    {
+        return RuntimeWGSLMaterial;
+    }
+
+    RuntimeWGSLMaterial = LoadWGSLMaterial(*metadata, context);
+    if (RuntimeWGSLMaterial == nullptr)
+    {
+        RuntimeWGSLMaterialManager::GetInstance().TryAddOrUpdateAsset(guid, RuntimeWGSLMaterial);
+    }
+    return RuntimeWGSLMaterial;
 }
