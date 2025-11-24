@@ -3,6 +3,7 @@
 #include "Logger.h"
 #include "EditorContext.h"
 #include "Renderer/Nut/NutContext.h"
+#include "Renderer/Nut/ShaderModuleRegistry.h"
 #include "imgui.h"
 #include "imgui_stdlib.h"
 #include <fstream>
@@ -119,18 +120,23 @@ void ShaderEditorPanel::HandleAutoComplete()
         m_popupPos = m_textEditor.GetCursorScreenPosition();
         m_popupPos.y += 20;
 
-        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow))
+        
+        if (isCtrl && ImGui::IsKeyPressed(ImGuiKey_S))
         {
             m_autoCompleteSelectedIndex++;
             if (m_autoCompleteSelectedIndex >= static_cast<int>(m_autoCompleteCandidates.size()))
                 m_autoCompleteSelectedIndex = 0;
+            
+            m_textEditor.SetHandleKeyboardInputs(false);
             return;
         }
-        else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow))
+        else if (isCtrl && ImGui::IsKeyPressed(ImGuiKey_W))
         {
             m_autoCompleteSelectedIndex--;
             if (m_autoCompleteSelectedIndex < 0)
                 m_autoCompleteSelectedIndex = static_cast<int>(m_autoCompleteCandidates.size()) - 1;
+            
+            m_textEditor.SetHandleKeyboardInputs(false);
             return;
         }
         else if (ImGui::IsKeyPressed(ImGuiKey_Tab) || ImGui::IsKeyPressed(ImGuiKey_Enter))
@@ -139,7 +145,7 @@ void ShaderEditorPanel::HandleAutoComplete()
                 m_autoCompleteSelectedIndex >= 0 &&
                 m_autoCompleteSelectedIndex < static_cast<int>(m_autoCompleteCandidates.size()))
             {
-                std::string toInsert = m_autoCompleteCandidates[m_autoCompleteSelectedIndex];
+                std::string toInsert = m_autoCompleteCandidates[m_autoCompleteSelectedIndex].text;
                 if (toInsert.length() > prefix.length())
                 {
                     m_textEditor.InsertText(toInsert.substr(prefix.length()));
@@ -169,26 +175,69 @@ void ShaderEditorPanel::HandleAutoComplete()
 
                 const auto& langDef = m_textEditor.GetLanguageDefinition();
 
-
                 std::string lowerPrefix = prefix;
                 std::transform(lowerPrefix.begin(), lowerPrefix.end(), lowerPrefix.begin(), ::tolower);
 
-                auto AddCandidate = [&](const std::string& candidate)
+                auto AddCandidate = [&](const std::string& candidate, CandidateType type)
                 {
                     std::string lowerCandidate = candidate;
                     std::transform(lowerCandidate.begin(), lowerCandidate.end(), lowerCandidate.begin(), ::tolower);
 
                     if (lowerCandidate.find(lowerPrefix) == 0 && candidate != prefix)
                     {
-                        m_autoCompleteCandidates.push_back(candidate);
+                        m_autoCompleteCandidates.push_back({candidate, type});
                     }
                 };
 
-                for (const auto& kw : langDef.mKeywords) AddCandidate(kw);
-                for (const auto& ident : langDef.mIdentifiers) AddCandidate(ident.first);
-                for (const auto& kw : m_customKeywords) AddCandidate(kw);
+                
+                for (const auto& kw : langDef.mKeywords)
+                {
+                    
+                    if (kw.find("vec") == 0 || kw.find("mat") == 0 || kw == "f32" || kw == "i32" || kw == "u32" || 
+                        kw == "bool" || kw == "f16" || kw.find("texture") == 0 || kw.find("sampler") == 0)
+                    {
+                        AddCandidate(kw, CandidateType::Type);
+                    }
+                    else
+                    {
+                        AddCandidate(kw, CandidateType::Keyword);
+                    }
+                }
+                
+                
+                for (const auto& ident : langDef.mIdentifiers)
+                {
+                    AddCandidate(ident.first, CandidateType::Function);
+                }
+                
+                
+                for (const auto& kw : m_customKeywords)
+                {
+                    AddCandidate(kw, CandidateType::Keyword);
+                }
+                
+                
+                auto& registry = Nut::ShaderModuleRegistry::GetInstance();
+                auto allModules = registry.GetAllModuleNames();
+                for (const auto& moduleName : allModules)
+                {
+                    AddCandidate(moduleName, CandidateType::Module);
+                }
+                
+                
+                auto localVars = ExtractLocalVariables();
+                for (const auto& varName : localVars)
+                {
+                    AddCandidate(varName, CandidateType::Variable);
+                }
 
-                std::sort(m_autoCompleteCandidates.begin(), m_autoCompleteCandidates.end());
+                
+                std::sort(m_autoCompleteCandidates.begin(), m_autoCompleteCandidates.end(),
+                    [](const AutoCompleteCandidate& a, const AutoCompleteCandidate& b)
+                    {
+                        if (a.type != b.type) return static_cast<int>(a.type) < static_cast<int>(b.type);
+                        return a.text < b.text;
+                    });
 
                 if (m_autoCompleteCandidates.empty())
                 {
@@ -212,11 +261,7 @@ void ShaderEditorPanel::HandleAutoComplete()
 
 
     std::string prefix = GetWordUnderCursor();
-
-
-    if (prefix != "")
-        LogInfo("AutoComplete Trigger: prefix='{}', cached='{}', empty={}",
-            prefix, m_currentWordPrefix, prefix.empty());
+    
 
     if (prefix.empty())
     {
@@ -226,12 +271,8 @@ void ShaderEditorPanel::HandleAutoComplete()
         }
         return;
     }
-
     bool prefixChanged = (prefix != m_currentWordPrefix);
     bool shouldUpdate = !isCtrl && !isAlt && prefixChanged;
-
-    LogInfo("AutoComplete Check: prefixChanged={}, shouldUpdate={}, isCtrl={}, isAlt={}",
-            prefixChanged, shouldUpdate, isCtrl, isAlt);
 
     if (shouldUpdate)
     {
@@ -242,29 +283,70 @@ void ShaderEditorPanel::HandleAutoComplete()
 
             const auto& langDef = m_textEditor.GetLanguageDefinition();
 
-
             std::string lowerPrefix = prefix;
             std::transform(lowerPrefix.begin(), lowerPrefix.end(), lowerPrefix.begin(), ::tolower);
 
-            auto AddCandidate = [&](const std::string& candidate)
+            auto AddCandidate = [&](const std::string& candidate, CandidateType type)
             {
                 std::string lowerCandidate = candidate;
                 std::transform(lowerCandidate.begin(), lowerCandidate.end(), lowerCandidate.begin(), ::tolower);
 
                 if (lowerCandidate.find(lowerPrefix) == 0 && candidate != prefix)
                 {
-                    m_autoCompleteCandidates.push_back(candidate);
+                    m_autoCompleteCandidates.push_back({candidate, type});
                 }
             };
 
-            for (const auto& kw : langDef.mKeywords) AddCandidate(kw);
-            for (const auto& ident : langDef.mIdentifiers) AddCandidate(ident.first);
-            for (const auto& kw : m_customKeywords) AddCandidate(kw);
+            
+            for (const auto& kw : langDef.mKeywords)
+            {
+                
+                if (kw.find("vec") == 0 || kw.find("mat") == 0 || kw == "f32" || kw == "i32" || kw == "u32" || 
+                    kw == "bool" || kw == "f16" || kw.find("texture") == 0 || kw.find("sampler") == 0)
+                {
+                    AddCandidate(kw, CandidateType::Type);
+                }
+                else
+                {
+                    AddCandidate(kw, CandidateType::Keyword);
+                }
+            }
+            
+            
+            for (const auto& ident : langDef.mIdentifiers)
+            {
+                AddCandidate(ident.first, CandidateType::Function);
+            }
+            
+            
+            for (const auto& kw : m_customKeywords)
+            {
+                AddCandidate(kw, CandidateType::Keyword);
+            }
+            
+            
+            auto& registry = Nut::ShaderModuleRegistry::GetInstance();
+            auto allModules = registry.GetAllModuleNames();
+            for (const auto& moduleName : allModules)
+            {
+                AddCandidate(moduleName, CandidateType::Module);
+            }
+            
+            
+            auto localVars = ExtractLocalVariables();
+            for (const auto& varName : localVars)
+            {
+                AddCandidate(varName, CandidateType::Variable);
+            }
 
-            std::sort(m_autoCompleteCandidates.begin(), m_autoCompleteCandidates.end());
+            
+            std::sort(m_autoCompleteCandidates.begin(), m_autoCompleteCandidates.end(),
+                [](const AutoCompleteCandidate& a, const AutoCompleteCandidate& b)
+                {
+                    if (a.type != b.type) return static_cast<int>(a.type) < static_cast<int>(b.type);
+                    return a.text < b.text;
+                });
 
-            LogInfo("AutoComplete Result: found {} candidates for prefix '{}'",
-                    m_autoCompleteCandidates.size(), prefix);
 
             if (!m_autoCompleteCandidates.empty())
             {
@@ -275,13 +357,11 @@ void ShaderEditorPanel::HandleAutoComplete()
                 m_popupPos = m_textEditor.GetCursorScreenPosition();
                 m_popupPos.y += 20;
 
-                LogInfo("AutoComplete OPENED at pos ({}, {})", m_popupPos.x, m_popupPos.y);
             }
             else
             {
                 m_isAutoCompleteOpen = false;
                 m_currentWordPrefix.clear();
-                LogInfo("AutoComplete CLOSED: no candidates");
             }
         }
         else
@@ -326,11 +406,13 @@ void ShaderEditorPanel::RenderAutoCompletePopup()
     if (windowVisible)
     {
         ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Auto Complete (%d)", (int)m_autoCompleteCandidates.size());
+        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Ctrl+W/S: 选择 | Tab/Enter: 确认 | Esc: 取消");
         ImGui::Separator();
 
 
         for (int i = 0; i < static_cast<int>(m_autoCompleteCandidates.size()); ++i)
         {
+            const auto& candidate = m_autoCompleteCandidates[i];
             bool isSelected = (i == m_autoCompleteSelectedIndex);
 
             if (isSelected)
@@ -339,10 +421,42 @@ void ShaderEditorPanel::RenderAutoCompletePopup()
                 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.4f, 0.6f, 0.9f, 1.0f));
             }
 
-            if (ImGui::Selectable(m_autoCompleteCandidates[i].c_str(), isSelected))
+            
+            const char* typeIcon = "";
+            ImVec4 typeColor;
+            switch (candidate.type)
+            {
+                case CandidateType::Keyword:
+                    typeIcon = "K";
+                    typeColor = ImVec4(0.4f, 0.6f, 1.0f, 1.0f); 
+                    break;
+                case CandidateType::Function:
+                    typeIcon = "F";
+                    typeColor = ImVec4(1.0f, 0.9f, 0.4f, 1.0f); 
+                    break;
+                case CandidateType::Module:
+                    typeIcon = "M";
+                    typeColor = ImVec4(0.4f, 1.0f, 0.6f, 1.0f); 
+                    break;
+                case CandidateType::Type:
+                    typeIcon = "T";
+                    typeColor = ImVec4(0.4f, 0.9f, 0.9f, 1.0f); 
+                    break;
+                case CandidateType::Variable:
+                    typeIcon = "V";
+                    typeColor = ImVec4(1.0f, 0.7f, 0.4f, 1.0f); 
+                    break;
+            }
+
+            
+            ImGui::TextColored(typeColor, "[%s]", typeIcon);
+            ImGui::SameLine();
+
+            
+            if (ImGui::Selectable(candidate.text.c_str(), isSelected))
             {
                 std::string prefix = GetWordUnderCursor();
-                std::string toInsert = m_autoCompleteCandidates[i];
+                std::string toInsert = candidate.text;
                 if (toInsert.length() > prefix.length())
                 {
                     m_textEditor.InsertText(toInsert.substr(prefix.length()));
@@ -393,6 +507,30 @@ std::string ShaderEditorPanel::GetWordUnderCursor() const
     return line.substr(start + 1, pos.mColumn - (start + 1));
 }
 
+std::vector<std::string> ShaderEditorPanel::ExtractLocalVariables() const
+{
+    std::vector<std::string> variables;
+    std::set<std::string> uniqueVars;
+    
+    std::string text = m_textEditor.GetText();
+    
+    
+    std::regex varPattern(R"(\b(?:var|let|const)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*[:=])");
+    std::smatch match;
+    
+    auto searchStart = text.cbegin();
+    while (std::regex_search(searchStart, text.cend(), match, varPattern))
+    {
+        std::string varName = match[1].str();
+        if (uniqueVars.insert(varName).second)
+        {
+            variables.push_back(varName);
+        }
+        searchStart = match.suffix().first;
+    }
+    
+    return variables;
+}
 
 void ShaderEditorPanel::RenderCodeEditor()
 {

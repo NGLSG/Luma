@@ -111,6 +111,11 @@ private:
      */
     std::string GetWordUnderCursor() const;
 
+    /**
+     * @brief 提取当前文件中的局部变量
+     */
+    std::vector<std::string> ExtractLocalVariables() const;
+
     // --- 配置与状态管理 ---
     void UpdateTextEditorLanguage();
     void HandleFontZoom();
@@ -153,11 +158,26 @@ private:
     bool m_codeChanged = false;
 
     // 自动补全状态
+    enum class CandidateType
+    {
+        Keyword,    // K - 关键字 (蓝色)
+        Function,   // F - 函数 (黄色)
+        Module,     // M - 模块 (绿色)
+        Type,       // T - 类型 (青色)
+        Variable    // V - 变量 (橙色)
+    };
+
+    struct AutoCompleteCandidate
+    {
+        std::string text;
+        CandidateType type;
+    };
+
     bool m_isAutoCompleteOpen = false;
-    std::vector<std::string> m_autoCompleteCandidates;
+    std::vector<AutoCompleteCandidate> m_autoCompleteCandidates;
     int m_autoCompleteSelectedIndex = 0;
     std::string m_currentWordPrefix;
-    ImVec2 m_popupPos; // 弹出框屏幕坐标
+    ImVec2 m_popupPos;
 
     // Shader 反射数据
     std::vector<Nut::ShaderBindingInfo> m_shaderBindings;
