@@ -409,13 +409,14 @@ void InspectorPanel::drawSceneCameraInspector()
             if (ImGui::IsItemActivated()) { m_context->uiCallbacks->onValueChanged.Invoke(); }
             changed |= CustomDrawing::WidgetDrawer<SkPoint>::Draw("位置", camProps.position, *m_context->uiCallbacks);
             if (ImGui::IsItemActivated()) { m_context->uiCallbacks->onValueChanged.Invoke(); }
-            changed |= CustomDrawing::WidgetDrawer<float>::Draw("缩放", camProps.zoom, *m_context->uiCallbacks);
+            changed |= CustomDrawing::WidgetDrawer<SkPoint>::Draw("缩放", camProps.zoom, *m_context->uiCallbacks);
             if (ImGui::IsItemActivated()) { m_context->uiCallbacks->onValueChanged.Invoke(); }
             changed |= CustomDrawing::WidgetDrawer<float>::Draw("旋转", camProps.rotation, *m_context->uiCallbacks);
             if (ImGui::IsItemActivated()) { m_context->uiCallbacks->onValueChanged.Invoke(); }
             changed |= CustomDrawing::WidgetDrawer<SkColor4f>::Draw("清除颜色", camProps.clearColor,
                                                                     *m_context->uiCallbacks);
-            camProps.zoom = std::max(0.f, camProps.zoom);
+            camProps.zoom.fX = std::max(0.f, camProps.zoom.x());
+            camProps.zoom.fY = std::max(0.f, camProps.zoom.y());
             if (changed)
             {
                 m_context->activeScene->SetCameraProperties(camProps);

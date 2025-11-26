@@ -139,7 +139,7 @@ void ApplicationBase::InitializeCoreSystems()
 #elif __linux__ && !defined(__ANDROID__)
     options.backendTypePriority = {BackendType::Vulkan, BackendType::OpenGL, BackendType::OpenGLES};
 #elif __ANDROID__
-    options.backendTypePriority = {BackendType::OpenGLES, BackendType::Vulkan, BackendType::OpenGL};
+    options.backendTypePriority = {BackendType::Vulkan, BackendType::OpenGLES};
 #else
 #error "Unsupported platform"
 #endif

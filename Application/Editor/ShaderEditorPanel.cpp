@@ -120,13 +120,13 @@ void ShaderEditorPanel::HandleAutoComplete()
         m_popupPos = m_textEditor.GetCursorScreenPosition();
         m_popupPos.y += 20;
 
-        
+
         if (isCtrl && ImGui::IsKeyPressed(ImGuiKey_S))
         {
             m_autoCompleteSelectedIndex++;
             if (m_autoCompleteSelectedIndex >= static_cast<int>(m_autoCompleteCandidates.size()))
                 m_autoCompleteSelectedIndex = 0;
-            
+
             m_textEditor.SetHandleKeyboardInputs(false);
             return;
         }
@@ -135,7 +135,7 @@ void ShaderEditorPanel::HandleAutoComplete()
             m_autoCompleteSelectedIndex--;
             if (m_autoCompleteSelectedIndex < 0)
                 m_autoCompleteSelectedIndex = static_cast<int>(m_autoCompleteCandidates.size()) - 1;
-            
+
             m_textEditor.SetHandleKeyboardInputs(false);
             return;
         }
@@ -189,11 +189,10 @@ void ShaderEditorPanel::HandleAutoComplete()
                     }
                 };
 
-                
+
                 for (const auto& kw : langDef.mKeywords)
                 {
-                    
-                    if (kw.find("vec") == 0 || kw.find("mat") == 0 || kw == "f32" || kw == "i32" || kw == "u32" || 
+                    if (kw.find("vec") == 0 || kw.find("mat") == 0 || kw == "f32" || kw == "i32" || kw == "u32" ||
                         kw == "bool" || kw == "f16" || kw.find("texture") == 0 || kw.find("sampler") == 0)
                     {
                         AddCandidate(kw, CandidateType::Type);
@@ -203,41 +202,41 @@ void ShaderEditorPanel::HandleAutoComplete()
                         AddCandidate(kw, CandidateType::Keyword);
                     }
                 }
-                
-                
+
+
                 for (const auto& ident : langDef.mIdentifiers)
                 {
                     AddCandidate(ident.first, CandidateType::Function);
                 }
-                
-                
+
+
                 for (const auto& kw : m_customKeywords)
                 {
                     AddCandidate(kw, CandidateType::Keyword);
                 }
-                
-                
+
+
                 auto& registry = Nut::ShaderModuleRegistry::GetInstance();
                 auto allModules = registry.GetAllModuleNames();
                 for (const auto& moduleName : allModules)
                 {
                     AddCandidate(moduleName, CandidateType::Module);
                 }
-                
-                
+
+
                 auto localVars = ExtractLocalVariables();
                 for (const auto& varName : localVars)
                 {
                     AddCandidate(varName, CandidateType::Variable);
                 }
 
-                
+
                 std::sort(m_autoCompleteCandidates.begin(), m_autoCompleteCandidates.end(),
-                    [](const AutoCompleteCandidate& a, const AutoCompleteCandidate& b)
-                    {
-                        if (a.type != b.type) return static_cast<int>(a.type) < static_cast<int>(b.type);
-                        return a.text < b.text;
-                    });
+                          [](const AutoCompleteCandidate& a, const AutoCompleteCandidate& b)
+                          {
+                              if (a.type != b.type) return static_cast<int>(a.type) < static_cast<int>(b.type);
+                              return a.text < b.text;
+                          });
 
                 if (m_autoCompleteCandidates.empty())
                 {
@@ -261,7 +260,7 @@ void ShaderEditorPanel::HandleAutoComplete()
 
 
     std::string prefix = GetWordUnderCursor();
-    
+
 
     if (prefix.empty())
     {
@@ -297,11 +296,10 @@ void ShaderEditorPanel::HandleAutoComplete()
                 }
             };
 
-            
+
             for (const auto& kw : langDef.mKeywords)
             {
-                
-                if (kw.find("vec") == 0 || kw.find("mat") == 0 || kw == "f32" || kw == "i32" || kw == "u32" || 
+                if (kw.find("vec") == 0 || kw.find("mat") == 0 || kw == "f32" || kw == "i32" || kw == "u32" ||
                     kw == "bool" || kw == "f16" || kw.find("texture") == 0 || kw.find("sampler") == 0)
                 {
                     AddCandidate(kw, CandidateType::Type);
@@ -311,41 +309,41 @@ void ShaderEditorPanel::HandleAutoComplete()
                     AddCandidate(kw, CandidateType::Keyword);
                 }
             }
-            
-            
+
+
             for (const auto& ident : langDef.mIdentifiers)
             {
                 AddCandidate(ident.first, CandidateType::Function);
             }
-            
-            
+
+
             for (const auto& kw : m_customKeywords)
             {
                 AddCandidate(kw, CandidateType::Keyword);
             }
-            
-            
+
+
             auto& registry = Nut::ShaderModuleRegistry::GetInstance();
             auto allModules = registry.GetAllModuleNames();
             for (const auto& moduleName : allModules)
             {
                 AddCandidate(moduleName, CandidateType::Module);
             }
-            
-            
+
+
             auto localVars = ExtractLocalVariables();
             for (const auto& varName : localVars)
             {
                 AddCandidate(varName, CandidateType::Variable);
             }
 
-            
+
             std::sort(m_autoCompleteCandidates.begin(), m_autoCompleteCandidates.end(),
-                [](const AutoCompleteCandidate& a, const AutoCompleteCandidate& b)
-                {
-                    if (a.type != b.type) return static_cast<int>(a.type) < static_cast<int>(b.type);
-                    return a.text < b.text;
-                });
+                      [](const AutoCompleteCandidate& a, const AutoCompleteCandidate& b)
+                      {
+                          if (a.type != b.type) return static_cast<int>(a.type) < static_cast<int>(b.type);
+                          return a.text < b.text;
+                      });
 
 
             if (!m_autoCompleteCandidates.empty())
@@ -356,7 +354,6 @@ void ShaderEditorPanel::HandleAutoComplete()
 
                 m_popupPos = m_textEditor.GetCursorScreenPosition();
                 m_popupPos.y += 20;
-
             }
             else
             {
@@ -421,38 +418,38 @@ void ShaderEditorPanel::RenderAutoCompletePopup()
                 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.4f, 0.6f, 0.9f, 1.0f));
             }
 
-            
+
             const char* typeIcon = "";
             ImVec4 typeColor;
             switch (candidate.type)
             {
-                case CandidateType::Keyword:
-                    typeIcon = "K";
-                    typeColor = ImVec4(0.4f, 0.6f, 1.0f, 1.0f); 
-                    break;
-                case CandidateType::Function:
-                    typeIcon = "F";
-                    typeColor = ImVec4(1.0f, 0.9f, 0.4f, 1.0f); 
-                    break;
-                case CandidateType::Module:
-                    typeIcon = "M";
-                    typeColor = ImVec4(0.4f, 1.0f, 0.6f, 1.0f); 
-                    break;
-                case CandidateType::Type:
-                    typeIcon = "T";
-                    typeColor = ImVec4(0.4f, 0.9f, 0.9f, 1.0f); 
-                    break;
-                case CandidateType::Variable:
-                    typeIcon = "V";
-                    typeColor = ImVec4(1.0f, 0.7f, 0.4f, 1.0f); 
-                    break;
+            case CandidateType::Keyword:
+                typeIcon = "K";
+                typeColor = ImVec4(0.4f, 0.6f, 1.0f, 1.0f);
+                break;
+            case CandidateType::Function:
+                typeIcon = "F";
+                typeColor = ImVec4(1.0f, 0.9f, 0.4f, 1.0f);
+                break;
+            case CandidateType::Module:
+                typeIcon = "M";
+                typeColor = ImVec4(0.4f, 1.0f, 0.6f, 1.0f);
+                break;
+            case CandidateType::Type:
+                typeIcon = "T";
+                typeColor = ImVec4(0.4f, 0.9f, 0.9f, 1.0f);
+                break;
+            case CandidateType::Variable:
+                typeIcon = "V";
+                typeColor = ImVec4(1.0f, 0.7f, 0.4f, 1.0f);
+                break;
             }
 
-            
+
             ImGui::TextColored(typeColor, "[%s]", typeIcon);
             ImGui::SameLine();
 
-            
+
             if (ImGui::Selectable(candidate.text.c_str(), isSelected))
             {
                 std::string prefix = GetWordUnderCursor();
@@ -511,13 +508,13 @@ std::vector<std::string> ShaderEditorPanel::ExtractLocalVariables() const
 {
     std::vector<std::string> variables;
     std::set<std::string> uniqueVars;
-    
+
     std::string text = m_textEditor.GetText();
-    
-    
+
+
     std::regex varPattern(R"(\b(?:var|let|const)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*[:=])");
     std::smatch match;
-    
+
     auto searchStart = text.cbegin();
     while (std::regex_search(searchStart, text.cend(), match, varPattern))
     {
@@ -528,7 +525,7 @@ std::vector<std::string> ShaderEditorPanel::ExtractLocalVariables() const
         }
         searchStart = match.suffix().first;
     }
-    
+
     return variables;
 }
 
@@ -780,7 +777,7 @@ void ShaderEditorPanel::SaveShader()
     YAML::Node node;
     node = m_shaderData;
 
-    std::ofstream file(metadata->assetPath);
+    std::ofstream file(AssetManager::GetInstance().GetAssetsRootPath() / metadata->assetPath);
     if (!file.is_open())
     {
         LogError("ShaderEditorPanel::SaveShader - Failed to write file: {}", metadata->assetPath.string());

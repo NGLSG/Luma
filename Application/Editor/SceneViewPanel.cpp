@@ -28,6 +28,7 @@
 #include "RenderableManager.h"
 #include "TextComponent.h"
 #include "UIComponents.h"
+#include "../ProjectSettings.h"
 #include "glm/gtx/transform.hpp"
 #include "include/core/SkFont.h"
 #include "include/core/SkFontMetrics.h"
@@ -456,7 +457,7 @@ void SceneViewPanel::Draw()
 
             drawEditorGizmos(viewportScreenPos, viewportSize);
             drawCameraGizmo(ImGui::GetWindowDrawList());
-
+            drawDesignResolutionFrame(viewportScreenPos, viewportSize);
 
             handleNavigationAndPick(viewportScreenPos, viewportSize);
 
@@ -776,7 +777,7 @@ void SceneViewPanel::drawCircleColliderOutline(ImDrawList* drawList, const ECS::
 
 
     float radius = circleCollider.radius * std::max(transform.scale.x, transform.scale.y);
-    float screenRadius = radius * m_editorCameraProperties.zoom;
+    float screenRadius = radius * m_editorCameraProperties.zoom.x();
 
 
     drawList->AddCircleFilled(screenCenter, screenRadius, fillColor, 32);
@@ -1115,7 +1116,7 @@ void SceneViewPanel::drawCapsuleColliderOutline(ImDrawList* drawList, const ECS:
 
     ImVec2 screenCenter1 = worldToScreenWith(m_editorCameraProperties, worldCenter1);
     ImVec2 screenCenter2 = worldToScreenWith(m_editorCameraProperties, worldCenter2);
-    float screenRadius = radius * m_editorCameraProperties.zoom;
+    float screenRadius = radius * m_editorCameraProperties.zoom.x();
 
 
     drawList->AddCircleFilled(screenCenter1, screenRadius, fillColor, 16);
@@ -1712,9 +1713,10 @@ void SceneViewPanel::drawTilemapGrid(ImDrawList* drawList, const ECS::TransformC
                                      const ECS::TilemapComponent& tilemap, const ImVec2& viewportScreenPos,
                                      const ImVec2& viewportSize)
 {
-    const float zoom = m_editorCameraProperties.zoom;
-    const float halfW = viewportSize.x * 0.5f / zoom;
-    const float halfH = viewportSize.y * 0.5f / zoom;
+    const float zoomX = m_editorCameraProperties.zoom.x();
+    const float zoomY = m_editorCameraProperties.zoom.y();
+    const float halfW = viewportSize.x * 0.5f / zoomX;
+    const float halfH = viewportSize.y * 0.5f / zoomY;
     const float cx = m_editorCameraProperties.position.x();
     const float cy = m_editorCameraProperties.position.y();
     const float left = cx - halfW;
@@ -1801,10 +1803,10 @@ void SceneViewPanel::drawEditorGrid(const ImVec2& viewportScreenPos, const ImVec
 {
     ImDrawList* dl = ImGui::GetWindowDrawList();
 
-
-    const float zoom = m_editorCameraProperties.zoom;
-    const float halfW = viewportSize.x * 0.5f / zoom;
-    const float halfH = viewportSize.y * 0.5f / zoom;
+    const float zoomX = m_editorCameraProperties.zoom.x();
+    const float zoomY = m_editorCameraProperties.zoom.y();
+    const float halfW = viewportSize.x * 0.5f / zoomX;
+    const float halfH = viewportSize.y * 0.5f / zoomY;
     const float cx = m_editorCameraProperties.position.x();
     const float cy = m_editorCameraProperties.position.y();
     const float left = cx - halfW;
@@ -1815,16 +1817,16 @@ void SceneViewPanel::drawEditorGrid(const ImVec2& viewportScreenPos, const ImVec
 
     float baseStep = PIXELS_PER_METER;
     float step = baseStep;
-    float pxPerStep = step * zoom;
+    float pxPerStep = step * zoomX;
     while (pxPerStep < 16.0f)
     {
         step *= 2.0f;
-        pxPerStep = step * zoom;
+        pxPerStep = step * zoomX;
     }
     while (pxPerStep > 256.0f)
     {
         step *= 0.5f;
-        pxPerStep = step * zoom;
+        pxPerStep = step * zoomX;
     }
 
 
@@ -2020,9 +2022,10 @@ void SceneViewPanel::handleNavigationAndPick(const ImVec2& viewportScreenPos, co
     if (wheel != 0.0f)
     {
         const ECS::Vector2f worldBeforeZoom = screenToWorldWith(m_editorCameraProperties, io.MousePos);
-        const float zoomFactor = 1.1f;
-        m_editorCameraProperties.zoom *= (wheel > 0.0f ? zoomFactor : 1.0f / zoomFactor);
-        m_editorCameraProperties.zoom = std::clamp(m_editorCameraProperties.zoom, 0.02f, 50.0f);
+        const float zoomMult = 1.1f;
+        float newZoom = m_editorCameraProperties.zoom.x() * (wheel > 0.0f ? zoomMult : 1.0f / zoomMult);
+        newZoom = std::clamp(newZoom, 0.02f, 50.0f);
+        m_editorCameraProperties.zoom = {newZoom, newZoom};
         const ECS::Vector2f worldAfterZoom = screenToWorldWith(m_editorCameraProperties, io.MousePos);
         const float dx = worldBeforeZoom.x - worldAfterZoom.x;
         const float dy = worldBeforeZoom.y - worldAfterZoom.y;
@@ -2031,10 +2034,11 @@ void SceneViewPanel::handleNavigationAndPick(const ImVec2& viewportScreenPos, co
     }
     if (ImGui::IsMouseDown(ImGuiMouseButton_Right) && (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f))
     {
-        const float invZoom = 1.0f / m_editorCameraProperties.zoom;
+        const float invZoomX = 1.0f / m_editorCameraProperties.zoom.x();
+        const float invZoomY = 1.0f / m_editorCameraProperties.zoom.y();
         m_editorCameraProperties.position = SkPoint::Make(
-            m_editorCameraProperties.position.x() - io.MouseDelta.x * invZoom,
-            m_editorCameraProperties.position.y() - io.MouseDelta.y * invZoom);
+            m_editorCameraProperties.position.x() - io.MouseDelta.x * invZoomX,
+            m_editorCameraProperties.position.y() - io.MouseDelta.y * invZoomY);
     }
 
 
@@ -2561,16 +2565,15 @@ ECS::Vector2f SceneViewPanel::screenToWorldWith(const Camera::CamProperties& pro
     const float localX = screenPos.x - props.viewport.x();
     const float localY = screenPos.y - props.viewport.y();
 
-
-    const float worldX = (localX - props.viewport.width() * 0.5f) / props.zoom + props.position.x();
-    const float worldY = (localY - props.viewport.height() * 0.5f) / props.zoom + props.position.y();
+    const float worldX = (localX - props.viewport.width() * 0.5f) / props.zoom.x() + props.position.x();
+    const float worldY = (localY - props.viewport.height() * 0.5f) / props.zoom.y() + props.position.y();
     return {worldX, worldY};
 }
 
 ImVec2 SceneViewPanel::worldToScreenWith(const Camera::CamProperties& props, const ECS::Vector2f& worldPos) const
 {
-    const float localX = (worldPos.x - props.position.x()) * props.zoom + props.viewport.width() * 0.5f;
-    const float localY = (worldPos.y - props.position.y()) * props.zoom + props.viewport.height() * 0.5f;
+    const float localX = (worldPos.x - props.position.x()) * props.zoom.x() + props.viewport.width() * 0.5f;
+    const float localY = (worldPos.y - props.position.y()) * props.zoom.y() + props.viewport.height() * 0.5f;
 
 
     const float screenX = localX + props.viewport.x();
@@ -2590,9 +2593,10 @@ void SceneViewPanel::drawCameraGizmo(ImDrawList* drawList)
     const auto& gameCamProps = m_context->activeScene->GetCameraProperties();
 
 
-    if (gameCamProps.zoom <= 0.0f) return;
-    const float worldViewWidth = m_context->engineContext->sceneViewRect.Width() / gameCamProps.zoom;
-    const float worldViewHeight = m_context->engineContext->sceneViewRect.Height() / gameCamProps.zoom;
+    SkPoint effectiveZoom = gameCamProps.GetEffectiveZoom();
+    if (effectiveZoom.x() <= 0.0f || effectiveZoom.y() <= 0.0f) return;
+    const float worldViewWidth = m_context->engineContext->sceneViewRect.Width() / effectiveZoom.x();
+    const float worldViewHeight = m_context->engineContext->sceneViewRect.Height() / effectiveZoom.y();
     const float halfWorldW = worldViewWidth * 0.5f;
     const float halfWorldH = worldViewHeight * 0.5f;
 
@@ -2634,4 +2638,73 @@ void SceneViewPanel::drawCameraGizmo(ImDrawList* drawList)
     const ImU32 gizmoColor = IM_COL32(255, 255, 255, 150);
     const float thickness = 2.0f;
     drawList->AddPolyline(screenCorners.data(), 4, gizmoColor, ImDrawFlags_Closed, thickness);
+}
+
+void SceneViewPanel::drawDesignResolutionFrame(const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
+{
+    auto scaleMode = ProjectSettings::GetInstance().GetViewportScaleMode();
+    if (scaleMode == ViewportScaleMode::None)
+    {
+        return; 
+    }
+
+    float designWidth = static_cast<float>(ProjectSettings::GetInstance().GetDesignWidth());
+    float designHeight = static_cast<float>(ProjectSettings::GetInstance().GetDesignHeight());
+
+    if (designWidth <= 0 || designHeight <= 0)
+    {
+        return;
+    }
+
+    
+    float halfDesignW = designWidth * 0.5f;
+    float halfDesignH = designHeight * 0.5f;
+
+    
+    if (!m_context->activeScene) return;
+    const auto& gameCamProps = m_context->activeScene->GetCameraProperties();
+
+    
+    std::vector<ECS::Vector2f> worldCorners = {
+        {gameCamProps.position.x() - halfDesignW, gameCamProps.position.y() - halfDesignH},
+        {gameCamProps.position.x() + halfDesignW, gameCamProps.position.y() - halfDesignH},
+        {gameCamProps.position.x() + halfDesignW, gameCamProps.position.y() + halfDesignH},
+        {gameCamProps.position.x() - halfDesignW, gameCamProps.position.y() + halfDesignH}
+    };
+
+    
+    std::vector<ImVec2> screenCorners;
+    screenCorners.reserve(4);
+    for (const auto& worldCorner : worldCorners)
+    {
+        screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldCorner));
+    }
+
+    
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    const ImU32 frameColor = IM_COL32(100, 200, 255, 180);
+    const ImU32 fillColor = IM_COL32(100, 200, 255, 15);
+    const float thickness = 2.0f;
+
+    
+    drawList->AddConvexPolyFilled(screenCorners.data(), 4, fillColor);
+    
+    drawList->AddPolyline(screenCorners.data(), 4, frameColor, ImDrawFlags_Closed, thickness);
+
+    
+    char label[64];
+    snprintf(label, sizeof(label), "%dx%d", (int)designWidth, (int)designHeight);
+    ImVec2 labelPos = screenCorners[0];
+    labelPos.x += 5.0f;
+    labelPos.y += 5.0f;
+
+    const ImU32 labelBgColor = IM_COL32(0, 0, 0, 180);
+    const ImU32 labelTextColor = IM_COL32(100, 200, 255, 255);
+    ImVec2 labelSize = ImGui::CalcTextSize(label);
+    drawList->AddRectFilled(
+        ImVec2(labelPos.x - 2, labelPos.y - 2),
+        ImVec2(labelPos.x + labelSize.x + 2, labelPos.y + labelSize.y + 2),
+        labelBgColor, 2.0f
+    );
+    drawList->AddText(labelPos, labelTextColor, label);
 }

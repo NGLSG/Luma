@@ -17,7 +17,9 @@ public:
 
     sk_sp<RuntimeShader> LoadAsset(const AssetMetadata& metadata) override;
     sk_sp<RuntimeShader> LoadAsset(const Guid& Guid) override;
+    Data::ShaderData LoadShaderDataFromGuid(const Guid& guid);
 };
+
 
 
 #endif //LUMAENGINE_SHADERLOADER_H

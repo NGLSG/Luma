@@ -334,8 +334,16 @@ namespace Nut
         ShaderModule m_shaderModule;
         std::shared_ptr<Buffer> m_reservedFrameBuffer;
         std::shared_ptr<Buffer> m_reservedInstanceBuffer;
+        
+        // 占位 Buffer 管理
+        std::unordered_map<std::string, std::shared_ptr<Buffer>> m_placeholderBuffers;
+        std::unordered_map<std::string, ShaderBindingInfo> m_bindingInfoMap;
+        std::shared_ptr<NutContext> m_context;
 
         size_t ComputeBindGroupKey(size_t groupIdx, const BindGroup& group) const;
+        
+        // 为 UniformBuffer 创建占位 buffer
+        void CreatePlaceholderBuffers();
 
     public:
         virtual std::vector<std::string> GetShaderBindings() { return m_shaderBindings; }
@@ -360,8 +368,29 @@ namespace Nut
         void SetReservedBuffers(const EngineData& engineData, std::vector<InstanceData>& instanceData,
                                 const std::shared_ptr<NutContext>& ctx);
 
-        // 仅用于引擎保留的 group0：binding2 (texture), binding3 (sampler)，缓存命中则复用，未命中则创建。
+        /**
+         * @brief 交换 group0 的纹理和采样器，同时保持所有 uniform buffer 绑定
+         * @note 用于引擎保留的 group0：binding2 (texture), binding3 (sampler)
+         *       会自动绑定 m_reservedFrameBuffer, m_reservedInstanceBuffer 和所有占位 uniform buffer
+         *       缓存命中则复用，未命中则创建
+         */
         bool SwapTexture(const TextureAPtr& texture, Sampler* sampler, const std::shared_ptr<NutContext>& ctx);
+        
+        /**
+         * @brief 通过名称获取 uniform buffer
+         * @param name binding 名称
+         * @return Buffer 指针，如果不存在返回 nullptr
+         */
+        std::shared_ptr<Buffer> GetUniformBuffer(const std::string& name);
+        
+        /**
+         * @brief 更新 uniform buffer 数据，如果 size 变化则自动重建 buffer 和 bindgroup
+         * @param name binding 名称
+         * @param data 数据指针
+         * @param size 数据大小（字节）
+         * @return 是否成功
+         */
+        bool UpdateUniformBuffer(const std::string& name, const void* data, size_t size);
     };
 
     class LUMA_API RenderPipeline : public Pipeline

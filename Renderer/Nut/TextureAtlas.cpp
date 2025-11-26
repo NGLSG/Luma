@@ -23,7 +23,8 @@ void TextureAtlas::Create(const std::vector<std::string>& imageFiles)
         atlasHeight = std::max(imageData[i].height, atlasHeight);
         if (!imageData[i].data)
         {
-            std::cerr << "Failed to load image: " << image.c_str() << std::endl;
+            LogError("Failed to load image for texture atlas: {}", image);
+            continue;
         }
         imageData[i].name = image;
         i++;

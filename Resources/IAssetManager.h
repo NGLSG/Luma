@@ -11,6 +11,8 @@
 #include <filesystem>
 #include <unordered_map>
 #include <optional>
+#include <future>
+#include <functional>
 
 /**
  * @brief 资产管理器接口。
@@ -115,6 +117,53 @@ public:
      * @return 如果预加载正在运行返回 true,否则返回 false
      */
     virtual bool IsPreloadRunning() const
+    {
+        return false;
+    }
+
+    /**
+     * @brief 启动 shader 预热
+     * 
+     * 在 Runtime 模式下预热所有 shader 到 GPU 并触发缓存
+     * Editor 模式不实现此功能（因为需要实时更新）
+     * 
+     * @return 如果成功启动返回 true，如果已在运行或已完成返回 false
+     */
+    virtual bool StartPreWarmingShader()
+    {
+        return true;
+    }
+
+    /**
+     * @brief 停止 shader 预热
+     */
+    virtual void StopPreWarmingShader()
+    {
+    }
+
+    /**
+     * @brief 获取 shader 预热进度
+     * @return pair<总数, 已处理数>
+     */
+    virtual std::pair<int, int> GetPreWarmingProgress() const
+    {
+        return std::make_pair(0, 0);
+    }
+
+    /**
+     * @brief 检查 shader 预热是否完成
+     * @return 如果预热完成返回 true，否则返回 false
+     */
+    virtual bool IsPreWarmingComplete() const
+    {
+        return true;
+    }
+
+    /**
+     * @brief 检查 shader 预热是否正在运行
+     * @return 如果预热正在运行返回 true，否则返回 false
+     */
+    virtual bool IsPreWarmingRunning() const
     {
         return false;
     }

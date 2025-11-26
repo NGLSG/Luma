@@ -29,6 +29,27 @@ namespace
         return AndroidScreenOrientation::Portrait;
     }
 
+    std::string ViewportScaleModeToString(ViewportScaleMode mode)
+    {
+        switch (mode)
+        {
+        case ViewportScaleMode::FixedAspect: return "FixedAspect";
+        case ViewportScaleMode::FixedWidth: return "FixedWidth";
+        case ViewportScaleMode::FixedHeight: return "FixedHeight";
+        case ViewportScaleMode::Expand: return "Expand";
+        default: return "None";
+        }
+    }
+
+    ViewportScaleMode StringToViewportScaleMode(const std::string& value)
+    {
+        if (value == "FixedAspect") return ViewportScaleMode::FixedAspect;
+        if (value == "FixedWidth") return ViewportScaleMode::FixedWidth;
+        if (value == "FixedHeight") return ViewportScaleMode::FixedHeight;
+        if (value == "Expand") return ViewportScaleMode::Expand;
+        return ViewportScaleMode::None;
+    }
+
     std::string OrientationToManifestValue(AndroidScreenOrientation orientation)
     {
         switch (orientation)
@@ -137,6 +158,9 @@ namespace YAML
 
             node["TargetWidth"] = rhs.GetTargetWidth();
             node["TargetHeight"] = rhs.GetTargetHeight();
+            node["ViewportScaleMode"] = ViewportScaleModeToString(rhs.GetViewportScaleMode());
+            node["DesignWidth"] = rhs.GetDesignWidth();
+            node["DesignHeight"] = rhs.GetDesignHeight();
             node["IsBorderless"] = rhs.IsBorderless();
             node["EnableConsole"] = rhs.IsConsoleEnabled();
 
@@ -221,6 +245,9 @@ namespace YAML
 
             rhs.SetTargetWidth(node["TargetWidth"].as<int>(1280));
             rhs.SetTargetHeight(node["TargetHeight"].as<int>(720));
+            rhs.SetViewportScaleMode(StringToViewportScaleMode(node["ViewportScaleMode"].as<std::string>("None")));
+            rhs.SetDesignWidth(node["DesignWidth"].as<int>(1920));
+            rhs.SetDesignHeight(node["DesignHeight"].as<int>(1080));
             rhs.SetBorderless(node["IsBorderless"].as<bool>(false));
             rhs.SetConsoleEnabled(node["EnableConsole"].as<bool>(false));
 

@@ -42,8 +42,9 @@ namespace
         const float centeredX = localX - (viewport.z * 0.5f);
         const float centeredY = localY - (viewport.w * 0.5f);
 
-        const float unzoomedX = centeredX / cameraProps.zoom;
-        const float unzoomedY = centeredY / cameraProps.zoom;
+        SkPoint effectiveZoom = cameraProps.GetEffectiveZoom();
+        const float unzoomedX = centeredX / effectiveZoom.x();
+        const float unzoomedY = centeredY / effectiveZoom.y();
 
         const float worldX = unzoomedX + cameraProps.position.x();
         const float worldY = unzoomedY + cameraProps.position.y();

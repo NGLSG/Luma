@@ -142,6 +142,37 @@ private:
      */
     void WorkerLoop();
 
+    /**
+     * @brief 扫描并注册所有 shader 资产到 ShaderRegistry
+     */
+    void RegisterShadersToRegistry();
+
+    /**
+     * @brief 烘焙所有 shader（Editor 模式预热）
+     * @return 如果成功启动返回 true
+     */
+    bool StartPreWarmingShader() override;
+
+    /**
+     * @brief 停止 shader 预热
+     */
+    void StopPreWarmingShader() override;
+
+    /**
+     * @brief 获取 shader 预热进度
+     */
+    std::pair<int, int> GetPreWarmingProgress() const override;
+
+    /**
+     * @brief 检查 shader 预热是否完成
+     */
+    bool IsPreWarmingComplete() const override;
+
+    /**
+     * @brief 检查 shader 预热是否正在运行
+     */
+    bool IsPreWarmingRunning() const override;
+
 private:
     std::filesystem::path m_assetsRoot; ///< 资产的根目录路径。
     std::vector<std::unique_ptr<IAssetImporter>> m_importers; ///< 注册的资产导入器列表。
@@ -162,6 +193,13 @@ private:
     std::mutex m_taskQueueMutex; ///< 保护任务队列的互斥锁。
     std::condition_variable m_taskCondition; ///< 用于工作线程等待任务的条件变量。
     std::atomic<bool> m_stopThreads = false; ///< 原子标志，指示是否停止所有工作线程。
+
+    // Shader 预热相关
+    std::thread m_preWarmingThread; ///< Shader 预热线程
+    std::atomic<bool> m_preWarmingRunning{false}; ///< Shader 预热运行标志
+    std::atomic<bool> m_preWarmingComplete{false}; ///< Shader 预热完成标志
+    std::atomic<int> m_preWarmingTotal{0}; ///< Shader 总数
+    std::atomic<int> m_preWarmingLoaded{0}; ///< 已加载的 Shader 数量
 };
 
 #endif

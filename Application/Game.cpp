@@ -75,9 +75,75 @@ void Game::Update(float deltaTime)
 
         auto& cameraProps = activeScene->GetCameraProperties();
 
+        
+        float windowWidth = m_window->GetWidth();
+        float windowHeight = m_window->GetHeight();
 
-        cameraProps.viewport = SkRect::MakeWH(m_window->GetWidth(), m_window->GetHeight());
+        
+        auto scaleMode = ProjectSettings::GetInstance().GetViewportScaleMode();
+        float designWidth = static_cast<float>(ProjectSettings::GetInstance().GetDesignWidth());
+        float designHeight = static_cast<float>(ProjectSettings::GetInstance().GetDesignHeight());
 
+        
+        cameraProps.zoomFactor = {1.0f, 1.0f};
+
+        switch (scaleMode)
+        {
+        case ViewportScaleMode::None:
+            cameraProps.viewport = SkRect::MakeWH(windowWidth, windowHeight);
+            break;
+
+        case ViewportScaleMode::FixedAspect:
+            {
+                float designAspect = designWidth / designHeight;
+                float windowAspect = windowWidth / windowHeight;
+
+                if (windowAspect > designAspect)
+                {
+                    
+                    float scale = windowHeight / designHeight;
+                    float scaledWidth = designWidth * scale;
+                    float offsetX = (windowWidth - scaledWidth) * 0.5f;
+                    cameraProps.viewport = SkRect::MakeXYWH(offsetX, 0, scaledWidth, windowHeight);
+                    cameraProps.zoomFactor = {scale, scale};
+                }
+                else
+                {
+                    
+                    float scale = windowWidth / designWidth;
+                    float scaledHeight = designHeight * scale;
+                    float offsetY = (windowHeight - scaledHeight) * 0.5f;
+                    cameraProps.viewport = SkRect::MakeXYWH(0, offsetY, windowWidth, scaledHeight);
+                    cameraProps.zoomFactor = {scale, scale};
+                }
+            }
+            break;
+
+        case ViewportScaleMode::FixedWidth:
+            {
+                float scale = windowWidth / designWidth;
+                cameraProps.viewport = SkRect::MakeWH(windowWidth, windowHeight);
+                cameraProps.zoomFactor = {scale, scale};
+            }
+            break;
+
+        case ViewportScaleMode::FixedHeight:
+            {
+                float scale = windowHeight / designHeight;
+                cameraProps.viewport = SkRect::MakeWH(windowWidth, windowHeight);
+                cameraProps.zoomFactor = {scale, scale};
+            }
+            break;
+
+        case ViewportScaleMode::Expand:
+            {
+                float scaleX = windowWidth / designWidth;
+                float scaleY = windowHeight / designHeight;
+                cameraProps.viewport = SkRect::MakeWH(windowWidth, windowHeight);
+                cameraProps.zoomFactor = {scaleX, scaleY};
+            }
+            break;
+        }
 
         Camera::GetInstance().SetProperties(cameraProps);
         m_sceneRenderer->ExtractToRenderableManager(activeScene->GetRegistry());

@@ -5,24 +5,19 @@
 #include <algorithm>
 #include <functional>
 #include <iostream>
+#include <queue>
 
 #include "Logger.h"
 
 namespace Nut
 {
-    
-    
-    
-
     ShaderModuleRegistry::ShaderModuleRegistry()
     {
-        
         InitializeEngineModules();
     }
 
     void ShaderModuleRegistry::InitializeEngineModules()
     {
-        
         std::filesystem::path shadersPath = ShaderModuleInitializer::GetDefaultShadersPath();
         int registeredCount = 0;
 
@@ -59,10 +54,8 @@ namespace Nut
 
         for (const auto& [name, info] : m_modules)
         {
-            
             if (name.size() > prefix.size() && name.substr(0, prefix.size()) == prefix)
             {
-                
                 std::string remainder = name.substr(prefix.size());
                 if (remainder.find('.') == std::string::npos)
                 {
@@ -92,26 +85,20 @@ namespace Nut
         return names;
     }
 
-    
-    
-    
 
     bool ShaderModuleExpander::ParseImportStatement(const std::string& line, std::string& moduleName)
     {
-        
-        
         std::regex importRegex(R"(^\s*import\s+(::)?[\w\.]+\s*;)");
         std::smatch match;
 
         if (std::regex_search(line, match, importRegex))
         {
-            
             std::string fullMatch = match[0].str();
             size_t importPos = fullMatch.find("import");
             size_t semicolonPos = fullMatch.find(';');
 
             std::string namepart = fullMatch.substr(importPos + 6, semicolonPos - importPos - 6);
-            
+
             namepart.erase(0, namepart.find_first_not_of(" \t"));
             namepart.erase(namepart.find_last_not_of(" \t;") + 1);
 
@@ -124,8 +111,6 @@ namespace Nut
 
     bool ShaderModuleExpander::ParseExportStatement(const std::string& line, std::string& moduleName)
     {
-        
-        
         std::regex exportRegex(R"(^\s*export\s+([\w\.]+)\s*;)");
         std::smatch match;
 
@@ -141,17 +126,14 @@ namespace Nut
     std::string ShaderModuleExpander::ResolveModuleName(const std::string& moduleName,
                                                         const std::string& currentContext)
     {
-        
         if (moduleName.length() >= 2 && moduleName.substr(0, 2) == "::")
         {
             if (currentContext.empty())
             {
-                
                 return moduleName.substr(2);
             }
 
-            
-            
+
             size_t lastDot = currentContext.find_last_of('.');
             if (lastDot != std::string::npos)
             {
@@ -160,12 +142,11 @@ namespace Nut
             }
             else
             {
-                
                 return moduleName.substr(2);
             }
         }
 
-        
+
         return moduleName;
     }
 
@@ -176,7 +157,6 @@ namespace Nut
         std::string& errorMessage,
         const std::string& currentContext)
     {
-        
         if (std::find(moduleStack.begin(), moduleStack.end(), moduleName) != moduleStack.end())
         {
             errorMessage = "Circular module dependency detected: ";
@@ -188,7 +168,7 @@ namespace Nut
             return false;
         }
 
-        
+
         if (allModules.count(moduleName) > 0)
         {
             return true;
@@ -196,12 +176,12 @@ namespace Nut
 
         auto& registry = ShaderModuleRegistry::GetInstance();
 
-        
+
         if (registry.HasModule(moduleName))
         {
             allModules.insert(moduleName);
 
-            
+
             const ShaderModuleInfo* moduleInfo = registry.GetModule(moduleName);
             if (moduleInfo)
             {
@@ -215,10 +195,9 @@ namespace Nut
                     std::string depModuleName;
                     if (ParseImportStatement(line, depModuleName))
                     {
-                        
                         std::string resolvedName = ResolveModuleName(depModuleName, moduleName);
 
-                        
+
                         if (!CollectAllDependencies(resolvedName, allModules, moduleStack, errorMessage,
                                                     currentContext))
                         {
@@ -231,7 +210,7 @@ namespace Nut
             }
         }
 
-        
+
         std::vector<std::string> children = registry.GetChildModules(moduleName);
         for (const auto& child : children)
         {
@@ -241,7 +220,7 @@ namespace Nut
             }
         }
 
-        
+
         std::function<void(const std::string&)> collectAllChildren = [&](const std::string& parent)
         {
             std::vector<std::string> directChildren = registry.GetChildModules(parent);
@@ -269,18 +248,18 @@ namespace Nut
     {
         auto& registry = ShaderModuleRegistry::GetInstance();
 
-        
+
         std::unordered_map<std::string, std::set<std::string>> dependencies;
         std::unordered_map<std::string, int> inDegree;
 
-        
+
         for (const auto& moduleName : modules)
         {
             dependencies[moduleName] = std::set<std::string>();
             inDegree[moduleName] = 0;
         }
 
-        
+
         for (const auto& moduleName : modules)
         {
             const ShaderModuleInfo* moduleInfo = registry.GetModule(moduleName);
@@ -296,7 +275,7 @@ namespace Nut
                 {
                     std::string resolvedName = ResolveModuleName(depModuleName, moduleName);
 
-                    
+
                     if (modules.count(resolvedName) > 0)
                     {
                         dependencies[moduleName].insert(resolvedName);
@@ -305,49 +284,44 @@ namespace Nut
             }
         }
 
-        
+
         for (const auto& [moduleName, deps] : dependencies)
         {
-            for (const auto& dep : deps)
-            {
-                inDegree[dep]++;
-            }
+            inDegree[moduleName] += static_cast<int>(deps.size());
         }
 
-        
+
         std::vector<std::string> result;
-        std::set<std::pair<int, std::string>> queue; 
+        std::queue<std::string> zeroInDegreeQueue;
 
         for (const auto& moduleName : modules)
         {
-            queue.insert({inDegree[moduleName], moduleName});
+            if (inDegree[moduleName] == 0)
+            {
+                zeroInDegreeQueue.push(moduleName);
+            }
         }
 
-        while (!queue.empty())
+        while (!zeroInDegreeQueue.empty())
         {
-            
-            auto it = queue.begin();
-            std::string current = it->second;
-            queue.erase(it);
-
+            std::string current = zeroInDegreeQueue.front();
+            zeroInDegreeQueue.pop();
             result.push_back(current);
 
-            
             for (const auto& [moduleName, deps] : dependencies)
             {
                 if (deps.count(current) > 0)
                 {
-                    
-                    queue.erase({inDegree[moduleName], moduleName});
-                    
                     inDegree[moduleName]--;
-                    
-                    queue.insert({inDegree[moduleName], moduleName});
+                    if (inDegree[moduleName] == 0)
+                    {
+                        zeroInDegreeQueue.push(moduleName);
+                    }
                 }
             }
         }
 
-        
+
         if (result.size() != modules.size())
         {
             errorMessage = "Circular dependency detected in module graph";
@@ -364,7 +338,6 @@ namespace Nut
         std::ostringstream& output,
         std::string& errorMessage)
     {
-        
         if (std::find(moduleStack.begin(), moduleStack.end(), moduleName) != moduleStack.end())
         {
             errorMessage = "Circular module dependency detected: ";
@@ -376,13 +349,13 @@ namespace Nut
             return false;
         }
 
-        
+
         if (expandedModules.count(moduleName) > 0)
         {
             return true;
         }
 
-        
+
         auto& registry = ShaderModuleRegistry::GetInstance();
         const ShaderModuleInfo* moduleInfo = registry.GetModule(moduleName);
 
@@ -392,10 +365,10 @@ namespace Nut
             return false;
         }
 
-        
+
         moduleStack.push_back(moduleName);
 
-        
+
         std::istringstream input(moduleInfo->sourceCode);
         std::string line;
         std::ostringstream moduleOutput;
@@ -405,38 +378,36 @@ namespace Nut
             std::string dependencyModule;
             std::string exportName;
 
-            
+
             if (ParseImportStatement(line, dependencyModule))
             {
-                
                 if (!ExpandModuleWithChildren(dependencyModule, expandedModules, moduleStack, output, errorMessage))
                 {
                     return false;
                 }
-                
+
                 continue;
             }
 
-            
+
             if (ParseExportStatement(line, exportName))
             {
-                
                 continue;
             }
 
-            
+
             moduleOutput << line << "\n";
         }
 
-        
+
         expandedModules.insert(moduleName);
 
-        
+
         output << "// ========== Module: " << moduleName << " ==========\n";
         output << moduleOutput.str();
         output << "// ========== End Module: " << moduleName << " ==========\n\n";
 
-        
+
         moduleStack.pop_back();
 
         return true;
@@ -449,30 +420,29 @@ namespace Nut
         std::ostringstream& output,
         std::string& errorMessage)
     {
-        
         if (!ExpandModuleRecursive(moduleName, expandedModules, moduleStack, output, errorMessage))
         {
             return false;
         }
 
-        
+
         auto& registry = ShaderModuleRegistry::GetInstance();
         std::vector<std::string> allChildren;
 
-        
+
         std::function<void(const std::string&)> collectChildren = [&](const std::string& parent)
         {
             auto children = registry.GetChildModules(parent);
             for (const auto& child : children)
             {
                 allChildren.push_back(child);
-                collectChildren(child); 
+                collectChildren(child);
             }
         };
 
         collectChildren(moduleName);
 
-        
+
         for (const auto& childModule : allChildren)
         {
             if (!ExpandModuleRecursive(childModule, expandedModules, moduleStack, output, errorMessage))
@@ -487,34 +457,32 @@ namespace Nut
     std::string ShaderModuleExpander::ExpandModules(const std::string& sourceCode, std::string& errorMessage,
                                                     std::string& exportedModuleName)
     {
-        
         std::istringstream input(sourceCode);
         std::string line;
         std::ostringstream mainCode;
         bool hasExport = false;
         std::set<std::string> directImports;
-        std::string currentModuleContext = ""; 
+        std::string currentModuleContext = "";
 
         while (std::getline(input, line))
         {
             std::string moduleName;
 
-            
+
             if (ParseImportStatement(line, moduleName))
             {
-                
                 std::string resolvedName = ResolveModuleName(moduleName, currentModuleContext);
                 directImports.insert(resolvedName);
                 continue;
             }
 
-            
+
             if (ParseExportStatement(line, moduleName))
             {
                 if (hasExport)
                 {
                     errorMessage = "Multiple export statements found. Only one export per file is allowed.";
-                    LogError("[ShaderModuleExpander] Error: {}", errorMessage);
+                    LogError("Error: {}", errorMessage);
                     return "";
                 }
                 exportedModuleName = moduleName;
@@ -523,11 +491,11 @@ namespace Nut
                 continue;
             }
 
-            
+
             mainCode << line << "\n";
         }
 
-        
+
         std::set<std::string> allModules;
         std::vector<std::string> moduleStack;
 
@@ -535,21 +503,23 @@ namespace Nut
         {
             if (!CollectAllDependencies(importName, allModules, moduleStack, errorMessage, currentModuleContext))
             {
-                std::cerr << "[ShaderModuleExpander] Error: " << errorMessage << std::endl;
+                LogError("{}", errorMessage);
                 return "";
             }
         }
 
-        
+
         std::vector<std::string> sortedModules = TopologicalSort(allModules, errorMessage);
         if (sortedModules.empty() && !allModules.empty())
         {
-            std::cerr << "[ShaderModuleExpander] Error: " << errorMessage << std::endl;
+            LogError("{}", errorMessage);
             return "";
         }
 
-        
+
         std::ostringstream output;
+        std::set<std::string> alreadyExpanded;
+        
         for (const auto& moduleName : sortedModules)
         {
             auto& registry = ShaderModuleRegistry::GetInstance();
@@ -563,15 +533,36 @@ namespace Nut
 
             
             output << "// ========== Module: " << moduleName << " ==========\n";
-            output << moduleInfo->sourceCode;
-            if (!moduleInfo->sourceCode.empty() && moduleInfo->sourceCode.back() != '\n')
+            
+            std::istringstream moduleInput(moduleInfo->sourceCode);
+            std::string line;
+            
+            while (std::getline(moduleInput, line))
             {
-                output << "\n";
+                std::string importedModule;
+                
+                
+                if (ParseImportStatement(line, importedModule))
+                {
+                    continue;
+                }
+                
+                
+                std::string exportName;
+                if (ParseExportStatement(line, exportName))
+                {
+                    continue;
+                }
+                
+                
+                output << line << "\n";
             }
+            
             output << "// ========== End Module: " << moduleName << " ==========\n\n";
+            alreadyExpanded.insert(moduleName);
         }
 
-        
+
         if (hasExport)
         {
             output << "// ========== Module: " << exportedModuleName << " ==========\n";
@@ -587,14 +578,11 @@ namespace Nut
         }
 
         std::string result = output.str();
-
-        LogInfo("[ShaderModuleExpander] Successfully expanded shader module with {} modules imported",
-                allModules.size());
         if (hasExport)
         {
-            LogInfo("[ShaderModuleExpander] Exported module: {}", exportedModuleName);
+            LogInfo("Exported module: {}", exportedModuleName);
         }
 
         return result;
     }
-} 
+}

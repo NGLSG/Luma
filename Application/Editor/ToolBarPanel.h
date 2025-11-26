@@ -59,6 +59,7 @@ public:
     void OnKeystoreSavePathChosen(const std::filesystem::path& path);
 private:
     void drawMainMenuBar();
+    void drawViewportMenu();
     void drawProjectMenu();
     void drawFileMenu();
     void drawEditMenu();

@@ -10,6 +10,21 @@ public struct Vector2
 {
     public float X;
     public float Y;
+
+    public Vector2(float x, float y)
+    {
+        X = x;
+        Y = y;
+    }
+
+    public static Vector2 Zero => new(0, 0);
+    public static Vector2 One => new(1, 1);
+
+    public static Vector2 operator +(Vector2 a, Vector2 b) => new(a.X + b.X, a.Y + b.Y);
+    public static Vector2 operator -(Vector2 a, Vector2 b) => new(a.X - b.X, a.Y - b.Y);
+    public static Vector2 operator *(Vector2 a, float s) => new(a.X * s, a.Y * s);
+    public static Vector2 operator *(float s, Vector2 a) => new(a.X * s, a.Y * s);
+    public static Vector2 operator /(Vector2 a, float s) => new(a.X / s, a.Y / s);
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -17,6 +32,20 @@ public struct Vector2Int
 {
     public int X;
     public int Y;
+
+    public Vector2Int(int x, int y)
+    {
+        X = x;
+        Y = y;
+    }
+
+    public static Vector2Int Zero => new(0, 0);
+    public static Vector2Int One => new(1, 1);
+
+    public static Vector2Int operator +(Vector2Int a, Vector2Int b) => new(a.X + b.X, a.Y + b.Y);
+    public static Vector2Int operator -(Vector2Int a, Vector2Int b) => new(a.X - b.X, a.Y - b.Y);
+    public static Vector2Int operator *(Vector2Int a, int s) => new(a.X * s, a.Y * s);
+    public static Vector2Int operator *(int s, Vector2Int a) => new(a.X * s, a.Y * s);
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -26,6 +55,21 @@ public struct Color
     public float G;
     public float B;
     public float A;
+
+    public Color(float r, float g, float b, float a)
+    {
+        R = r;
+        G = g;
+        B = b;
+        A = a;
+    }
+
+    public static Color White => new(1, 1, 1, 1);
+    public static Color Black => new(0, 0, 0, 1);
+    public static Color Red => new(1, 0, 0, 1);
+    public static Color Green => new(0, 1, 0, 1);
+    public static Color Blue => new(0, 0, 1, 1);
+    public static Color Transparent => new(0, 0, 0, 0);
 }
 
 [StructLayout(LayoutKind.Sequential)]

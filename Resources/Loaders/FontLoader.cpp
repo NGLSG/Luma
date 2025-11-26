@@ -81,8 +81,6 @@ static sk_sp<SkFontMgr> GetFontManager()
 
     std::call_once(initFlag, []()
     {
-        LogInfo("FontLoader: 正在初始化字体管理器...");
-
         try
         {
             gFontMgr = CreatePlatformFontManager();
@@ -109,10 +107,6 @@ static sk_sp<SkFontMgr> GetFontManager()
             {
                 LogError("FontLoader: 创建空字体管理器失败");
             }
-        }
-        else
-        {
-            LogInfo("FontLoader: 字体管理器初始化成功");
         }
     });
 
@@ -151,7 +145,6 @@ sk_sp<SkData> FontLoader::GetFontData(const AssetMetadata& fontMetadata)
             return nullptr;
         }
 
-        LogInfo("FontLoader: 成功创建字体数据，大小: {} 字节", binaryData.size());
         return skData;
     }
     catch (const std::exception& e)
@@ -168,7 +161,6 @@ sk_sp<SkData> FontLoader::GetFontData(const AssetMetadata& fontMetadata)
 
 sk_sp<SkTypeface> FontLoader::LoadAsset(const AssetMetadata& metadata)
 {
-    LogInfo("FontLoader: 开始加载字体资产，GUID: {}", metadata.guid.ToString());
 
     
     sk_sp<SkData> fontData = GetFontData(metadata);
@@ -208,14 +200,11 @@ sk_sp<SkTypeface> FontLoader::LoadAsset(const AssetMetadata& metadata)
         LogError("FontLoader: 无法从字体数据创建 Typeface，GUID: {}", metadata.guid.ToString());
         return nullptr;
     }
-
-    LogInfo("FontLoader: 字体资产加载成功，GUID: {}", metadata.guid.ToString());
     return typeface;
 }
 
 sk_sp<SkTypeface> FontLoader::LoadAsset(const Guid& guid)
 {
-    LogInfo("FontLoader: 尝试加载字体资源，GUID: {}", guid.ToString());
 
     const AssetMetadata* metadata = AssetManager::GetInstance().GetMetadata(guid);
     if (!metadata)
@@ -236,7 +225,6 @@ sk_sp<SkTypeface> FontLoader::LoadAsset(const Guid& guid)
     
     if (RuntimeFontManager::GetInstance().TryGetAsset(guid, typeface))
     {
-        LogInfo("FontLoader: 从缓存加载字体，GUID: {}", guid.ToString());
         return typeface;
     }
 
@@ -246,7 +234,6 @@ sk_sp<SkTypeface> FontLoader::LoadAsset(const Guid& guid)
     {
         
         RuntimeFontManager::GetInstance().TryAddOrUpdateAsset(guid, font);
-        LogInfo("FontLoader: 字体加载成功并已缓存，GUID: {}", guid.ToString());
     }
     else
     {

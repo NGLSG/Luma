@@ -1,9 +1,12 @@
 #ifndef NOAI_GRAPHICSCONTEXT_H
 #define NOAI_GRAPHICSCONTEXT_H
+#include <chrono>
 #include "RenderPass.h"
 #include "RenderTarget.h"
 #include "TextureA.h"
 #include "dawn/native/DawnNative.h"
+
+class ShaderLoader;
 
 namespace Nut
 {
@@ -106,7 +109,7 @@ namespace Nut
         wgpu::Surface m_surface;
         NutContextDescriptor m_descriptor;
         std::unordered_map<std::string, std::shared_ptr<RenderTarget>> m_renderTargets;
-        wgpu::TextureFormat m_graphicsFormat = wgpu::TextureFormat::BGRA8Unorm;
+        wgpu::TextureFormat m_graphicsFormat = wgpu::TextureFormat::RGBA8Unorm;
         Size m_size = {0, 0};
         std::shared_ptr<RenderTarget> m_currentRenderTarget;
         bool m_isDeviceLost = false;
@@ -115,6 +118,11 @@ namespace Nut
 
         std::vector<wgpu::CommandEncoder> m_computeCommandEncoders;
         std::mutex m_cmutex;
+        inline static ShaderLoader* m_shaderLoader = nullptr;
+        
+        // Surface reconfigure rate limiting
+        std::chrono::steady_clock::time_point m_lastReconfigureTime{};
+        static constexpr std::chrono::milliseconds kReconfigureCooldown{100};
 
     public:
         NutContext(const NutContext&) = delete;
@@ -176,6 +184,7 @@ namespace Nut
         bool ResolveTexture(const TextureAPtr& source, const TextureAPtr& resolveTarget);
 
         TextureAPtr AcquireSwapChainTexture();
+        static ShaderLoader* GetShaderLoader(){ return m_shaderLoader; }
     };
 } // namespace Nut
 

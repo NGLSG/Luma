@@ -57,6 +57,13 @@ namespace Nut
         static std::string RemoveExportStatement(const std::string& shaderCode);
 
         /**
+         * @brief 从shader代码中移除所有import和export语句
+         * @param shaderCode shader源代码
+         * @return 移除import和export语句后的纯净代码
+         */
+        static std::string RemoveImportAndExportStatements(const std::string& shaderCode);
+
+        /**
          * @brief 获取默认的shader目录路径
          * @return shader目录路径
          */

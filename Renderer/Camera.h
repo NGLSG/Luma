@@ -32,8 +32,12 @@ public:
         SkPoint position{0.0f, 0.0f}; ///< 摄像机在世界坐标系中的位置。
         SkRect viewport{0, 0, 1, 1}; ///< 摄像机的视口矩形，通常表示屏幕或渲染区域。
         float rotation = 0.0f; ///< 摄像机的旋转角度（以弧度为单位）。
-        float zoom = 1.0f; ///< 摄像机的缩放级别。
+        SkPoint zoom{1.0f, 1.0f}; ///< 摄像机的缩放级别 (x, y)。
+        SkPoint zoomFactor{1.0f, 1.0f}; ///< 布局系统设置的缩放因子，最终缩放 = zoom * zoomFactor。
         SkColor4f clearColor = SkColor4f{0.15f, 0.16f, 0.18f, 1.0f}; ///< 渲染前用于清除背景的颜色。
+        
+        /// 获取最终缩放值 (zoom * zoomFactor)
+        SkPoint GetEffectiveZoom() const { return {zoom.x() * zoomFactor.x(), zoom.y() * zoomFactor.y()}; }
     } m_properties; ///< 当前摄像机的属性实例。
     mutable std::shared_mutex m_mutex; ///< 保护摄像机属性的读写锁。
 

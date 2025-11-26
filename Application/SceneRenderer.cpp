@@ -91,20 +91,20 @@ namespace
             if (go.HasComponent<ECS::ChildrenComponent>())
             {
                 const auto& children = go.GetComponent<ECS::ChildrenComponent>().children;
-                for (auto it = children.rbegin(); it != children.rend(); ++it)
+                for (auto childEntity : children)
                 {
-                    RuntimeGameObject child(*it, scenePtr);
+                    RuntimeGameObject child(childEntity, scenePtr);
                     traverse(child);
                 }
             }
         };
 
         auto& roots = scene->GetRootGameObjects();
-        for (auto it = roots.rbegin(); it != roots.rend(); ++it)
+        for (auto& go : roots)
         {
-            if (it->IsValid())
+            if (go.IsValid())
             {
-                traverse(*it);
+                traverse(go);
             }
         }
     }

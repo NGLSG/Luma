@@ -25,7 +25,7 @@ class RuntimeWGSLMaterial;
 /**
  * @brief 定义图形后端类型。
  */
-using BackendType=Nut::BackendType;
+using BackendType = Nut::BackendType;
 /**
  * @brief 定义渲染质量等级。
  */
@@ -92,10 +92,12 @@ private:
 
 
     void initialize(const GraphicsBackendOptions& options);
+    inline static GraphicsBackend* m_instance;
     /**
      * @brief 解析多重采样抗锯齿纹理。
      */
     void ResolveMSAA();
+
 public:
     GraphicsBackend(const GraphicsBackend&) = delete; ///< 禁用拷贝构造函数。
     GraphicsBackend& operator=(const GraphicsBackend&) = delete; ///< 禁用赋值操作符。
@@ -267,6 +269,11 @@ public:
     uint32_t GetSampleCount() const { return m_msaaSampleCount; }
 
     RuntimeWGSLMaterial* CreateOrGetDefaultMaterial();
+
+    static GraphicsBackend* GetInstance()
+    {
+        return m_instance;
+    }
 };
 
 #endif

@@ -23,15 +23,13 @@ namespace
         const float localX = globalScreenPos.x - viewport.x;
         const float localY = globalScreenPos.y - viewport.y;
 
-        
         const float centeredX = localX - (viewport.z / 2.0f);
         const float centeredY = localY - (viewport.w / 2.0f);
 
-        
-        const float unzoomedX = centeredX / cameraProps.zoom;
-        const float unzoomedY = centeredY / cameraProps.zoom;
+        SkPoint effectiveZoom = cameraProps.GetEffectiveZoom();
+        const float unzoomedX = centeredX / effectiveZoom.x();
+        const float unzoomedY = centeredY / effectiveZoom.y();
 
-        
         const float worldX = unzoomedX + cameraProps.position.x();
         const float worldY = unzoomedY + cameraProps.position.y();
 
@@ -589,8 +587,9 @@ namespace Systems
         const float localX = globalScreenPos.x - viewport.x;
         const float localY = globalScreenPos.y - viewport.y;
 
-        const float worldX = (localX / cameraProps.zoom) + cameraProps.position.x();
-        const float worldY = (localY / cameraProps.zoom) + cameraProps.position.y();
+        SkPoint effectiveZoom = cameraProps.GetEffectiveZoom();
+        const float worldX = (localX / effectiveZoom.x()) + cameraProps.position.x();
+        const float worldY = (localY / effectiveZoom.y()) + cameraProps.position.y();
 
         return {worldX, worldY};
     }

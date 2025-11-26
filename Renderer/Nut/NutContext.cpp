@@ -3,10 +3,13 @@
 #include <format>
 #include <future>
 #include <iostream>
+#include <cstring>
 
 #include "stb_image.h"
 #include "stb_image_write.h"
 #include "dawn/dawn_proc.h"
+#include "ShaderCache.h"
+#include "Loaders/ShaderLoader.h"
 
 namespace Nut
 {
@@ -86,21 +89,27 @@ namespace Nut
             switch (backend)
             {
             case BackendType::OpenGL:
+                LogInfo ("NutContext: Trying to create adapter with OpenGL backend");
                 adapterOptions.backendType = wgpu::BackendType::OpenGL;
                 break;
             case BackendType::Vulkan:
+                LogInfo ("NutContext: Trying to create adapter with Vulkan backend");
                 adapterOptions.backendType = wgpu::BackendType::Vulkan;
                 break;
             case BackendType::Metal:
+                LogInfo ("NutContext: Trying to create adapter with Metal backend");
                 adapterOptions.backendType = wgpu::BackendType::Metal;
                 break;
             case BackendType::OpenGLES:
+                LogInfo ("NutContext: Trying to create adapter with OpenGLES backend");
                 adapterOptions.backendType = wgpu::BackendType::OpenGLES;
                 break;
             case BackendType::D3D12:
+                LogInfo("NutContext: Trying to create adapter with D3D12 backend");
                 adapterOptions.backendType = wgpu::BackendType::D3D12;
                 break;
             case BackendType::D3D11:
+                LogInfo("NutContext: Trying to create adapter with D3D11 backend");
                 adapterOptions.backendType = wgpu::BackendType::D3D11;
                 break;
             default:
@@ -110,6 +119,11 @@ namespace Nut
             adapterOptions.nextInChain = &togglesDesc;
             adapterOptions.featureLevel = wgpu::FeatureLevel::Core;
             auto adapters = m_instance->EnumerateAdapters(&adapterOptions);
+            if (adapters.empty())
+            {
+                LogWarn("NutContext: No adapter found for backend type {}", static_cast<int>(adapterOptions.backendType));
+                continue;
+            }
             wgpu::Adapter adapter = adapters[0].Get();
 
 
@@ -204,10 +218,60 @@ namespace Nut
                     features.push_back(feature);
                 }
             }
+
+
+            wgpu::DawnCacheDeviceDescriptor cacheDesc;
+            cacheDesc.nextInChain = &togglesDesc;
+            cacheDesc.isolationKey = "luma_engine_v1_0";
+
+
+            cacheDesc.loadDataFunction = [](const void* key, size_t keySize,
+                                            void* value, size_t valueSize,
+                                            void* userdata) -> size_t
+            {
+                auto blob = ShaderCache::LoadFromCacheRaw(key, keySize);
+                if (!blob.has_value())
+                {
+                    return 0;
+                }
+
+
+                if (valueSize == 0)
+                {
+                    return blob->size();
+                }
+
+
+                if (blob->size() > valueSize)
+                {
+                    LogWarn("ShaderCache: Cached blob size ({}) exceeds buffer size ({})",
+                            blob->size(), valueSize);
+                    return 0;
+                }
+
+
+                std::memcpy(value, blob->data(), blob->size());
+                return blob->size();
+            };
+
+
+            cacheDesc.storeDataFunction = [](const void* key, size_t keySize,
+                                             const void* value, size_t valueSize,
+                                             void* userdata)
+            {
+                std::vector<uint8_t> blob(static_cast<const uint8_t*>(value),
+                                          static_cast<const uint8_t*>(value) + valueSize);
+                ShaderCache::SaveToCacheRaw(key, keySize, blob);
+            };
+
+
+            cacheDesc.functionUserdata = nullptr;
+
+
             wgpu::DeviceDescriptor deviceDescriptor;
             deviceDescriptor.requiredFeatures = features.data();
             deviceDescriptor.requiredFeatureCount = features.size();
-            deviceDescriptor.nextInChain = &togglesDesc;
+            deviceDescriptor.nextInChain = &cacheDesc;
             deviceDescriptor.SetDeviceLostCallback(
                 wgpu::CallbackMode::AllowSpontaneous,
                 [this](const wgpu::Device&, wgpu::DeviceLostReason reason, wgpu::StringView msg)
@@ -216,8 +280,7 @@ namespace Nut
                     {
                         return;
                     }
-                    std::cerr << std::format("Dawn 设备丢失 - 原因代码: {}, 消息: {}", static_cast<int>(reason),
-                                             msg.data ? msg.data : "无消息") << std::endl;
+                    LogError("[WGPU Device Lost]: {}", msg.data);
                     m_isDeviceLost = true;
                 });
             deviceDescriptor.SetUncapturedErrorCallback(onDeviceLog);
@@ -230,13 +293,13 @@ namespace Nut
 
                     break;
                 case wgpu::LoggingType::Warning:
-                    std::cout << "[WGPU Warning] " << msg.data << std::endl;
+                    LogWarn("[WGPU Warning]: {}", msg.data);
                     break;
                 case wgpu::LoggingType::Error:
-                    std::cerr << "[WGPU Error] " << msg.data << std::endl;
+                    LogError("[WGPU Error]: {}", msg.data);
                     break;
                 case wgpu::LoggingType::Verbose:
-                    std::cout << "[WGPU Verbose] " << msg.data << std::endl;
+                    LogDebug("[WGPU Verbose]: {}", msg.data);
                     break;
                 }
             });
@@ -282,18 +345,22 @@ namespace Nut
     {
         if (!m_surface)
         {
-            std::cerr << "Surface is null" << std::endl;
+            LogError("Surface is not created");
             return;
         }
         if (width == 0 || height == 0)
         {
-            std::cerr << "Invalid size" << std::endl;
+            LogError("Invalid size ({}x{})", width, height);
             return;
         }
         wgpu::SurfaceConfiguration surfaceConfig;
         surfaceConfig.width = width;
         surfaceConfig.height = height;
         surfaceConfig.device = m_device;
+#if defined(__ANDROID__)
+        surfaceConfig.presentMode = wgpu::PresentMode::Fifo;
+        LogInfo("NutContext: Android 平台强制启用 VSync (PresentMode::Fifo) 以保持缓冲队列同步");
+#else
         if (m_descriptor.enableVSync)
         {
             surfaceConfig.presentMode = wgpu::PresentMode::Fifo;
@@ -302,6 +369,7 @@ namespace Nut
         {
             surfaceConfig.presentMode = wgpu::PresentMode::Mailbox;
         }
+#endif
         surfaceConfig.usage = wgpu::TextureUsage::RenderAttachment;
         surfaceConfig.format = m_graphicsFormat;
         m_size.width = width;
@@ -339,6 +407,7 @@ namespace Nut
         }
         Initialized = true;
         configureSurface(desc.width, desc.height);
+        m_shaderLoader = new ShaderLoader(shared_from_this());
         return SUCCESS;
     }
 
@@ -347,13 +416,13 @@ namespace Nut
     {
         if (name.empty())
         {
-            std::cerr << "Invalid name" << std::endl;
+            LogError("Invalid name ({})", name);
             return nullptr;
         }
 
         if (width == 0 || height == 0)
         {
-            std::cerr << "Invalid size" << std::endl;
+            LogError("Invalid size ({}x{})", width, height);
             return nullptr;
         }
 
@@ -385,7 +454,7 @@ namespace Nut
         wgpu::Texture tex = m_device.CreateTexture(&texDesc);
         if (!tex)
         {
-            std::cerr << "Failed to create texture" << std::endl;
+            LogError("Failed to create texture for RenderTarget {}", name);
             return nullptr;
         }
         auto newTarget = std::make_shared<RenderTarget>(tex, width, height);
@@ -466,7 +535,7 @@ namespace Nut
 
         if (wgpu::Status::Success != m_surface.Present())
         {
-            std::cerr << "Failed to present the surface." << std::endl;
+            LogWarn("Failed to present the current surface texture.");
         }
 
         if (m_currentSurfaceTexture.texture)
@@ -506,19 +575,18 @@ namespace Nut
 
     TextureAPtr NutContext::GetCurrentTexture()
     {
-        
         if (m_currentRenderTarget)
         {
             return std::make_shared<TextureA>(m_currentRenderTarget->GetTexture(), shared_from_this());
         }
 
-        
+
         if (m_currentSurfaceTexture.texture)
         {
             return std::make_shared<TextureA>(m_currentSurfaceTexture.texture, shared_from_this());
         }
 
-        
+
         wgpu::SurfaceTexture surfaceTexture;
         m_surface.GetCurrentTexture(&surfaceTexture);
 
@@ -529,8 +597,7 @@ namespace Nut
             return std::make_shared<TextureA>(m_currentSurfaceTexture.texture, shared_from_this());
         }
 
-        
-        std::cerr << "获取 Surface Texture 失败，状态码: " << static_cast<int>(surfaceTexture.status) << std::endl;
+        LogWarn("Surface texture not available (status: {}), skipping frame.", static_cast<int>(surfaceTexture.status));
         return nullptr;
     }
 
@@ -564,7 +631,7 @@ namespace Nut
 
         if (!texture)
         {
-            std::cerr << "创建纹理失败" << std::endl;
+            LogError("Failed to create texture.");
             return nullptr;
         }
 
@@ -577,7 +644,7 @@ namespace Nut
     {
         if (!data || size == 0 || width == 0 || height == 0)
         {
-            std::cerr << "CreateTextureFromCompressedData: invalid input data/size." << std::endl;
+            LogError("Invalid arguments.");
             return nullptr;
         }
 
@@ -590,7 +657,7 @@ namespace Nut
         wgpu::Texture texture = m_device.CreateTexture(&textureDesc);
         if (!texture)
         {
-            std::cerr << "CreateTextureFromCompressedData: failed to create texture." << std::endl;
+            LogError("Failed to create texture.");
             return nullptr;
         }
 
@@ -610,14 +677,14 @@ namespace Nut
     {
         if (!source || !resolveTarget)
         {
-            std::cerr << "ResolveTexture: source or destination texture is invalid." << std::endl;
+            LogError("Invalid arguments.");
             return false;
         }
 
         wgpu::CommandEncoder encoder = m_device.CreateCommandEncoder();
         if (!encoder)
         {
-            std::cerr << "ResolveTexture: failed to create command encoder." << std::endl;
+            LogError("Failed to create command encoder.");
             return false;
         }
 
@@ -634,7 +701,7 @@ namespace Nut
         wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&passDesc);
         if (!pass)
         {
-            std::cerr << "ResolveTexture: failed to begin render pass." << std::endl;
+            LogError("Failed to begin render pass.");
             return false;
         }
         pass.End();
@@ -642,7 +709,7 @@ namespace Nut
         wgpu::CommandBuffer commands = encoder.Finish();
         if (!commands)
         {
-            std::cerr << "ResolveTexture: failed to finish command buffer." << std::endl;
+            LogError("Failed to finish command buffer.");
             return false;
         }
 

@@ -141,6 +141,35 @@ public:
      */
     Guid LoadAsset(const std::filesystem::path& assetPath);
 
+    /**
+     * @brief 启动 shader 预热
+     * @return 如果成功启动返回 true，如果已在运行或已完成返回 false
+     */
+    bool StartPreWarmingShader();
+
+    /**
+     * @brief 停止 shader 预热
+     */
+    void StopPreWarmingShader();
+
+    /**
+     * @brief 获取 shader 预热进度
+     * @return pair<总数, 已处理数>
+     */
+    std::pair<int, int> GetPreWarmingProgress() const;
+
+    /**
+     * @brief 检查 shader 预热是否完成
+     * @return 如果预热完成返回 true，否则返回 false
+     */
+    bool IsPreWarmingComplete() const;
+
+    /**
+     * @brief 检查 shader 预热是否正在运行
+     * @return 如果预热正在运行返回 true，否则返回 false
+     */
+    bool IsPreWarmingRunning() const;
+
 private:
     /**
      * @brief 私有默认构造函数。

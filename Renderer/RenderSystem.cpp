@@ -335,7 +335,7 @@ void RenderSystem::Flush()
 
     bool hasClip = pImpl->clipRect.has_value();
 
-    
+
     auto SetupCanvasState = [&](SkCanvas* cvs)
     {
         if (hasClip)
@@ -346,11 +346,11 @@ void RenderSystem::Flush()
             cvs->translate(viewport.fLeft, viewport.fTop);
         }
         cvs->save();
-        
+
     };
 
-    
-    
+
+
     canvas->clear(Camera::GetInstance().GetProperties().clearColor);
 
     SetupCanvasState(canvas);
@@ -368,10 +368,10 @@ void RenderSystem::Flush()
             surface.reset();
             canvas = nullptr;
 
-            
+
             pImpl->DrawWGPUSpriteBatch(pImpl->wgpuSpriteBatches[entry.index], pImpl->backend.GetNutContext());
 
-            
+
             surface = pImpl->backend.GetSurface();
             if (!surface)
             {
@@ -380,13 +380,13 @@ void RenderSystem::Flush()
             }
             canvas = surface->getCanvas();
 
-            
+
             SetupCanvasState(canvas);
             Camera::GetInstance().ApplyTo(canvas);
         }
         else
         {
-            
+
             switch (entry.type)
             {
             case RenderSystemImpl::BatchType::Sprite:
@@ -418,10 +418,10 @@ void RenderSystem::Flush()
         }
     }
 
-    
+
     pImpl->DrawAllCursorBatches(canvas);
 
-    
+
     if (canvas)
     {
         canvas->restore();
@@ -1058,15 +1058,15 @@ void RenderSystem::RenderSystemImpl::DrawWGPUSpriteBatch(const WGPUSpriteBatch& 
 
     std::call_once(geoInit, [nutContext]()
     {
-        
-        
-        
+
+
+
         std::vector<Vertex> vertices = {
-            
-            {-0.5f, -0.5f, 0.0f, 0.0f}, 
-            {-0.5f, 0.5f, 0.0f, 1.0f},  
-            {0.5f, 0.5f, 1.0f, 1.0f},   
-            {0.5f, -0.5f, 1.0f, 0.0f}   
+
+            {-0.5f, -0.5f, 0.0f, 0.0f},
+            {-0.5f, 0.5f, 0.0f, 1.0f},
+            {0.5f, 0.5f, 1.0f, 1.0f},
+            {0.5f, -0.5f, 1.0f, 0.0f}
         };
         std::vector<uint16_t> indices = {0, 1, 2, 0, 2, 3};
 
@@ -1125,10 +1125,10 @@ void RenderSystem::RenderSystemImpl::DrawWGPUSpriteBatch(const WGPUSpriteBatch& 
     EngineData engineData{};
     Camera::GetInstance().FillEngineData(engineData);
 
-    
-    
-    
-    
+
+
+
+
     engineData.CameraScaleY *= -1.0f;
 
     if (engineData.ViewportSize.x <= 1 || engineData.ViewportSize.y <= 1)
@@ -1143,8 +1143,8 @@ void RenderSystem::RenderSystemImpl::DrawWGPUSpriteBatch(const WGPUSpriteBatch& 
     auto msaaTexture = backend.GetMSAATexture();
     bool useMSAA = false;
 
-    
-    
+
+
     if (sampleCount > 1 && msaaTexture && swapChainTexture)
     {
         if (msaaTexture->GetWidth() == swapChainTexture->GetWidth() &&

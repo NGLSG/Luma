@@ -1,6 +1,8 @@
 #include "RuntimeAssetManager.h"
 #include "AssetPacker.h"
 #include "../Utils/Logger.h"
+#include "../Renderer/Nut/ShaderRegistry.h"
+#include "../Utils/PathUtils.h"
 #include <chrono>
 #include <thread>
 #include <algorithm>
@@ -26,6 +28,10 @@ RuntimeAssetManager::RuntimeAssetManager(const std::filesystem::path& packageMan
       , m_preloadRunning(false)
       , m_preloadComplete(false)
       , m_preloadedCount(0)
+      , m_preWarmingRunning(false)
+      , m_preWarmingComplete(false)
+      , m_preWarmingTotal(0)
+      , m_preWarmingLoaded(0)
 {
     LogInfo("RuntimeAssetManager: 从包初始化 '{}'...", packageManifestPath.string());
 
@@ -56,6 +62,7 @@ RuntimeAssetManager::RuntimeAssetManager(const std::filesystem::path& packageMan
 RuntimeAssetManager::~RuntimeAssetManager()
 {
     StopPreload();
+    StopPreWarmingShader();
 }
 
 std::string RuntimeAssetManager::GetAssetName(const Guid& guid) const
@@ -438,4 +445,114 @@ IAssetImporter* RuntimeAssetManager::findImporterFor(const std::filesystem::path
         }
     }
     return nullptr;
+}
+
+bool RuntimeAssetManager::StartPreWarmingShader()
+{
+    if (m_preWarmingRunning.load() || m_preWarmingComplete.load())
+    {
+        return false;
+    }
+
+    m_preWarmingRunning.store(true);
+    m_preWarmingComplete.store(false);
+    m_preWarmingTotal.store(0);
+    m_preWarmingLoaded.store(0);
+
+    m_preWarmingThread = std::thread(&RuntimeAssetManager::preWarmingWorker, this);
+
+    LogInfo("RuntimeAssetManager: Shader pre-warming started");
+    return true;
+}
+
+void RuntimeAssetManager::StopPreWarmingShader()
+{
+    if (m_preWarmingThread.joinable())
+    {
+        m_preWarmingRunning.store(false);
+        m_preWarmingThread.join();
+        LogInfo("RuntimeAssetManager: Shader pre-warming stopped");
+    }
+}
+
+std::pair<int, int> RuntimeAssetManager::GetPreWarmingProgress() const
+{
+    int total = m_preWarmingTotal.load();
+    int loaded = m_preWarmingLoaded.load();
+    return std::make_pair(total, loaded);
+}
+
+bool RuntimeAssetManager::IsPreWarmingComplete() const
+{
+    return m_preWarmingComplete.load();
+}
+
+bool RuntimeAssetManager::IsPreWarmingRunning() const
+{
+    return m_preWarmingRunning.load();
+}
+
+void RuntimeAssetManager::preWarmingWorker()
+{
+    LogInfo("RuntimeAssetManager: Shader pre-warming worker started");
+    
+    auto& shaderRegistry = Nut::ShaderRegistry::GetInstance();
+    
+    
+    std::filesystem::path shaderRegistryPath;
+    
+    
+    std::vector<std::filesystem::path> possiblePaths = {
+        PathUtils::GetExecutableDir() / "Resources" / "ShaderRegistry.yaml",
+        PathUtils::GetExecutableDir() / ".." / "Resources" / "ShaderRegistry.yaml",
+        "Resources/ShaderRegistry.yaml",
+        "ShaderRegistry.yaml"
+    };
+    
+    bool found = false;
+    for (const auto& path : possiblePaths)
+    {
+        if (std::filesystem::exists(path))
+        {
+            shaderRegistryPath = path;
+            found = true;
+            LogInfo("RuntimeAssetManager: Found ShaderRegistry at: {}", path.string());
+            break;
+        }
+    }
+    
+    if (!found)
+    {
+        LogWarn("RuntimeAssetManager: ShaderRegistry.yaml not found, skipping shader pre-warming");
+        m_preWarmingRunning.store(false);
+        m_preWarmingComplete.store(true);
+        return;
+    }
+    
+    
+    if (!shaderRegistry.LoadFromFile(shaderRegistryPath.string()))
+    {
+        LogError("RuntimeAssetManager: Failed to load ShaderRegistry from: {}", shaderRegistryPath.string());
+        m_preWarmingRunning.store(false);
+        m_preWarmingComplete.store(true);
+        return;
+    }
+    
+    int total = static_cast<int>(shaderRegistry.GetShaderCount());
+    m_preWarmingTotal.store(total);
+    
+    LogInfo("RuntimeAssetManager: Loaded {} shaders from registry", total);
+    
+    
+    shaderRegistry.PreWarming();
+    
+    
+    auto state = shaderRegistry.GetPreWarmingState();
+    m_preWarmingTotal.store(state.total);
+    m_preWarmingLoaded.store(state.loaded);
+    
+    m_preWarmingRunning.store(false);
+    m_preWarmingComplete.store(true);
+    
+    LogInfo("RuntimeAssetManager: Shader pre-warming complete");
 }

@@ -70,7 +70,7 @@ int main(int argc, char* argv[])
     Camera::CamProperties camProps;
     camProps.position = {0.0f, 0.0f};
     camProps.viewport = SkRect::MakeXYWH(0, 0, (float)WIDTH, (float)HEIGHT);
-    camProps.zoom = 1.0f;
+    camProps.zoom = {1.0f,1.0f};
     camProps.rotation = 0.0f;
     camProps.clearColor = {0.15f, 0.15f, 0.15f, 1.0f};
     Camera::GetInstance().SetProperties(camProps);

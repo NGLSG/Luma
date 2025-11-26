@@ -8,6 +8,7 @@
 #include "SceneRenderer.h"
 #include "../Utils/Profiler.h"
 #include "RuntimeAsset/RuntimeScene.h"
+#include "../ProjectSettings.h"
 
 void GameViewPanel::Initialize(EditorContext* context)
 {
@@ -49,12 +50,73 @@ void GameViewPanel::Draw()
             {
                 auto cameraProperties = m_context->activeScene->GetCameraProperties();
 
+                
+                float windowWidth = viewportSize.x;
+                float windowHeight = viewportSize.y;
+                auto scaleMode = ProjectSettings::GetInstance().GetViewportScaleMode();
+                float designWidth = static_cast<float>(ProjectSettings::GetInstance().GetDesignWidth());
+                float designHeight = static_cast<float>(ProjectSettings::GetInstance().GetDesignHeight());
 
-                cameraProperties.viewport = SkRect::MakeWH(viewportSize.x, viewportSize.y);
+                
+                cameraProperties.zoomFactor = {1.0f, 1.0f};
 
+                switch (scaleMode)
+                {
+                case ViewportScaleMode::None:
+                    cameraProperties.viewport = SkRect::MakeWH(windowWidth, windowHeight);
+                    break;
+
+                case ViewportScaleMode::FixedAspect:
+                    {
+                        float designAspect = designWidth / designHeight;
+                        float windowAspect = windowWidth / windowHeight;
+
+                        if (windowAspect > designAspect)
+                        {
+                            float scale = windowHeight / designHeight;
+                            float scaledWidth = designWidth * scale;
+                            float offsetX = (windowWidth - scaledWidth) * 0.5f;
+                            cameraProperties.viewport = SkRect::MakeXYWH(offsetX, 0, scaledWidth, windowHeight);
+                            cameraProperties.zoomFactor = {scale, scale};
+                        }
+                        else
+                        {
+                            float scale = windowWidth / designWidth;
+                            float scaledHeight = designHeight * scale;
+                            float offsetY = (windowHeight - scaledHeight) * 0.5f;
+                            cameraProperties.viewport = SkRect::MakeXYWH(0, offsetY, windowWidth, scaledHeight);
+                            cameraProperties.zoomFactor = {scale, scale};
+                        }
+                    }
+                    break;
+
+                case ViewportScaleMode::FixedWidth:
+                    {
+                        float scale = windowWidth / designWidth;
+                        cameraProperties.viewport = SkRect::MakeWH(windowWidth, windowHeight);
+                        cameraProperties.zoomFactor = {scale, scale};
+                    }
+                    break;
+
+                case ViewportScaleMode::FixedHeight:
+                    {
+                        float scale = windowHeight / designHeight;
+                        cameraProperties.viewport = SkRect::MakeWH(windowWidth, windowHeight);
+                        cameraProperties.zoomFactor = {scale, scale};
+                    }
+                    break;
+
+                case ViewportScaleMode::Expand:
+                    {
+                        float scaleX = windowWidth / designWidth;
+                        float scaleY = windowHeight / designHeight;
+                        cameraProperties.viewport = SkRect::MakeWH(windowWidth, windowHeight);
+                        cameraProperties.zoomFactor = {scaleX, scaleY};
+                    }
+                    break;
+                }
 
                 Camera::GetInstance().SetProperties(cameraProperties);
-
 
                 m_context->graphicsBackend->SetActiveRenderTarget(m_gameViewTarget);
 
@@ -62,7 +124,6 @@ void GameViewPanel::Draw()
                 {
                     m_context->engineContext->renderSystem->Submit(packet);
                 }
-
 
                 m_context->engineContext->renderSystem->Flush();
                 m_context->graphicsBackend->Submit();

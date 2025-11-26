@@ -178,6 +178,11 @@ internal static class Native
     public static extern bool Physics_CircleCheck(IntPtr scene, Vector2 center, float radius,
         [In] string[] tags, int tagCount, out RaycastHit outHit);
 
+    [DllImport(DllName)]
+    public static extern bool Physics_OverlapCircle(IntPtr scene, Vector2 center, float radius,
+        [In] string[]? tags, int tagCount,
+        [Out] uint[] outEntities, int maxEntities, out int outEntityCount);
+
     #region SIMD Bindings
 
     [DllImport(DllName)]
@@ -623,4 +628,172 @@ internal static class Native
 
     [DllImport(DllName)]
     internal static extern IntPtr PathUtils_GetAndroidExternalDataDir();
+
+    #region Graphics - WGSLMaterial
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern IntPtr WGSLMaterial_Load(Guid assetGuid);
+
+    [DllImport(DllName)]
+    internal static extern IntPtr WGSLMaterial_GetFromSprite(IntPtr scene, uint entityId);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool WGSLMaterial_IsValid(IntPtr material);
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern void WGSLMaterial_SetFloat(IntPtr material, string name, float value);
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern void WGSLMaterial_SetInt(IntPtr material, string name, int value);
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern void WGSLMaterial_SetVec2(IntPtr material, string name, float x, float y);
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern void WGSLMaterial_SetVec3(IntPtr material, string name, float x, float y, float z);
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern void WGSLMaterial_SetVec4(IntPtr material, string name, float r, float g, float b, float a);
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern void WGSLMaterial_SetUniformStruct(IntPtr material, string name, IntPtr data, int size);
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern void WGSLMaterial_SetTexture(IntPtr material, string name, IntPtr texture, uint binding, uint group);
+
+    [DllImport(DllName)]
+    internal static extern void WGSLMaterial_UpdateUniformBuffer(IntPtr material);
+
+    #endregion
+
+    #region Graphics - TextureA
+
+    [DllImport(DllName)]
+    internal static extern IntPtr TextureA_Load(Guid assetGuid);
+
+    [DllImport(DllName)]
+    internal static extern IntPtr TextureA_Create(uint width, uint height);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool TextureA_IsValid(IntPtr texture);
+
+    [DllImport(DllName)]
+    internal static extern void TextureA_Release(IntPtr texture);
+
+    [DllImport(DllName)]
+    internal static extern uint TextureA_GetWidth(IntPtr texture);
+
+    [DllImport(DllName)]
+    internal static extern uint TextureA_GetHeight(IntPtr texture);
+
+    [DllImport(DllName)]
+    internal static extern uint TextureA_GetDepth(IntPtr texture);
+
+    [DllImport(DllName)]
+    internal static extern uint TextureA_GetMipLevelCount(IntPtr texture);
+
+    [DllImport(DllName)]
+    internal static extern uint TextureA_GetSampleCount(IntPtr texture);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool TextureA_Is3D(IntPtr texture);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool TextureA_IsArray(IntPtr texture);
+
+    #endregion
+
+    #region Graphics - GpuBuffer
+
+    [DllImport(DllName)]
+    internal static extern IntPtr GpuBuffer_Create(uint size, uint usage);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool GpuBuffer_IsValid(IntPtr buffer);
+
+    [DllImport(DllName)]
+    internal static extern void GpuBuffer_Release(IntPtr buffer);
+
+    [DllImport(DllName)]
+    internal static extern uint GpuBuffer_GetSize(IntPtr buffer);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool GpuBuffer_Write(IntPtr buffer, IntPtr data, uint size, uint offset);
+
+    #endregion
+
+    #region Camera
+
+    [DllImport(DllName)]
+    internal static extern float Camera_GetPositionX();
+
+    [DllImport(DllName)]
+    internal static extern float Camera_GetPositionY();
+
+    [DllImport(DllName)]
+    internal static extern void Camera_SetPosition(float x, float y);
+
+    [DllImport(DllName)]
+    internal static extern float Camera_GetZoom();
+
+    [DllImport(DllName)]
+    internal static extern void Camera_SetZoom(float zoom);
+
+    [DllImport(DllName)]
+    internal static extern float Camera_GetRotation();
+
+    [DllImport(DllName)]
+    internal static extern void Camera_SetRotation(float rotation);
+
+    [DllImport(DllName)]
+    internal static extern float Camera_GetViewportWidth();
+
+    [DllImport(DllName)]
+    internal static extern float Camera_GetViewportHeight();
+
+    [DllImport(DllName)]
+    internal static extern void Camera_GetClearColor(out float r, out float g, out float b, out float a);
+
+    [DllImport(DllName)]
+    internal static extern void Camera_SetClearColor(float r, float g, float b, float a);
+
+    [DllImport(DllName)]
+    internal static extern void Camera_ScreenToWorld(float screenX, float screenY, out float worldX, out float worldY);
+
+    [DllImport(DllName)]
+    internal static extern void Camera_WorldToScreen(float worldX, float worldY, out float screenX, out float screenY);
+
+    #endregion
+
+    #region Shader PreWarming
+
+    [DllImport(DllName)]
+    internal static extern void Shader_StartPreWarmingAsync();
+
+    [DllImport(DllName)]
+    internal static extern void Shader_PreWarming();
+
+    [DllImport(DllName)]
+    internal static extern void Shader_StopPreWarming();
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool Shader_IsPreWarmingRunning();
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool Shader_IsPreWarmingComplete();
+
+    [DllImport(DllName)]
+    internal static extern void Shader_GetPreWarmingState(out int outTotal, out int outLoaded,
+        [MarshalAs(UnmanagedType.I1)] out bool outIsRunning,
+        [MarshalAs(UnmanagedType.I1)] out bool outIsComplete);
+
+    #endregion
 }

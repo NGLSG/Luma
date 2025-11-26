@@ -301,15 +301,6 @@ add_library(LumaEngine SHARED
         EngineEntry.h
 )
 
-add_library(LumaEngine_static SHARED
-        ${LUMA_ENGINE_SOURCES}
-        Luma_CAPI.cpp
-        Luma_CAPI.h
-        GameEntry.cpp
-        EditorEntry.cpp
-        EngineEntry.h
-)
-
 # 设置包含目录
 target_include_directories(LumaEngine PUBLIC
         ${ENGINE_ROOT_DIR}
@@ -575,6 +566,15 @@ if (NOT ANDROID)
     add_custom_command(TARGET publish POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:Game>" "${PUBLISH_PLATFORM_DIR}/"
             COMMENT "正在复制 Game 可执行文件到 Publish/${LUMA_PLATFORM_NAME}..."
+    )
+endif ()
+
+# 复制 Shaders 文件夹到 Publish 目录（Game 运行时需要）
+if (EXISTS "${CMAKE_SOURCE_DIR}/Shaders")
+    add_custom_command(TARGET publish POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/Shaders" "${PUBLISH_PLATFORM_DIR}/Shaders"
+            COMMENT "正在复制 Shaders 文件夹到 Publish/${LUMA_PLATFORM_NAME}..."
     )
 endif ()
 

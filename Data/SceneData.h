@@ -145,7 +145,7 @@ namespace YAML
         {
             if (!node.IsMap()) return false;
             rhs.position = node["position"].as<SkPoint>(SkPoint{0, 0});
-            rhs.zoom = node["zoom"].as<float>(1.0f);
+            rhs.zoom = node["zoom"].as<SkPoint>(SkPoint{1.0f, 1.0f});
             rhs.rotation = node["rotation"].as<float>(0.0f);
             rhs.clearColor = node["clearColor"].as<SkColor4f>(SkColor4f{0.1f, 0.1f, 0.1f, 1.0f});
             return true;

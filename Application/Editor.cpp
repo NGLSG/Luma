@@ -497,11 +497,23 @@ void Editor::ShutdownDerived()
 
 void Editor::CreateNewProject()
 {
+    
+    if (m_editorContext.editorState != EditorState::Editing)
+    {
+        LogWarn("请先停止播放场景后再切换项目");
+        return;
+    }
     SDL_ShowOpenFolderDialog(OnNewProjectFolderSelected, this, m_window->GetSdlWindow(), nullptr, false);
 }
 
 void Editor::OpenProject()
 {
+    
+    if (m_editorContext.editorState != EditorState::Editing)
+    {
+        LogWarn("请先停止播放场景后再切换项目");
+        return;
+    }
     const SDL_DialogFileFilter filters[] = {
         {"Luma Project", "lproj"}
     };
@@ -510,6 +522,13 @@ void Editor::OpenProject()
 
 void Editor::LoadProject(const std::filesystem::path& projectPath)
 {
+    
+    if (m_editorContext.editorState != EditorState::Editing)
+    {
+        LogWarn("请先停止播放场景后再切换项目");
+        return;
+    }
+
     if (m_editorContext.activeScene)
     {
         LogInfo("停用当前场景以切换项目");
@@ -551,6 +570,13 @@ void Editor::LoadProject(const std::filesystem::path& projectPath)
 
 void Editor::CreateNewProjectAtPath(const std::filesystem::path& projectPath)
 {
+    
+    if (m_editorContext.editorState != EditorState::Editing)
+    {
+        LogWarn("请先停止播放场景后再切换项目");
+        return;
+    }
+
     std::string projectName = projectPath.filename().string();
     std::filesystem::path projectFilePath = projectPath / (projectName + ".lproj");
     std::filesystem::path assetsPath = projectPath / "Assets";

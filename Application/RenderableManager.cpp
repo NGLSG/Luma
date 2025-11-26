@@ -2014,7 +2014,7 @@ namespace
             auto& group = result->textBatchGroups[groupIndex];
             if (!createdNewGroup)
             {
-                group.sortKey = std::min(group.sortKey, currIt->sortKey);
+                group.sortKey = std::max(group.sortKey, currIt->sortKey);
             }
             group.transforms.emplace_back(
                 transform.position, transform.scale.x, transform.scale.y,
@@ -2391,7 +2391,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
             else
             {
                 auto& masterGroup = textBatchGroups[it->second];
-                masterGroup.sortKey = std::min(masterGroup.sortKey, threadGroup.sortKey);
+                masterGroup.sortKey = std::max(masterGroup.sortKey, threadGroup.sortKey);
                 masterGroup.transforms.insert(masterGroup.transforms.end(),
                                               threadGroup.transforms.begin(),
                                               threadGroup.transforms.end());

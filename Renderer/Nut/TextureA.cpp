@@ -25,14 +25,11 @@ namespace Nut
 
             if (!loadedPixels)
             {
-                std::cerr << "加载纹理失败: " << m_filePath << std::endl;
+                LogError("Failed to load texture from file: {}", m_filePath);
                 return nullptr;
             }
-
-            std::cout << "纹理加载成功: " << m_filePath
-                << " 宽度: " << width
-                << " 高度: " << height
-                << " 通道: " << channels << std::endl;
+            LogDebug("Texture loaded from file: {} (Width: {}, Height: {}, Channels: {})", m_filePath, width, height,
+                     channels);
 
             finalPixels = loadedPixels;
             finalWidth = static_cast<uint32_t>(width);
@@ -51,15 +48,10 @@ namespace Nut
 
             if (!loadedPixels)
             {
-                std::cerr << "从内存加载纹理失败" << std::endl;
+                LogError("Failed to load texture from memory.");
                 return nullptr;
             }
-
-            std::cout << "从内存加载纹理成功"
-                << " 宽度: " << width
-                << " 高度: " << height
-                << " 通道: " << channels << std::endl;
-
+            LogDebug("Texture loaded from memory (Width: {}, Height: {}, Channels: {})", width, height, channels);
             finalPixels = loadedPixels;
             finalWidth = static_cast<uint32_t>(width);
             finalHeight = static_cast<uint32_t>(height);
@@ -74,7 +66,7 @@ namespace Nut
         }
         else
         {
-            std::cerr << "没有提供纹理数据源" << std::endl;
+            LogError("No pixel data source specified for texture creation.");
             return nullptr;
         }
 
@@ -90,7 +82,7 @@ namespace Nut
 
         if (!texture)
         {
-            std::cerr << "创建纹理失败" << std::endl;
+            LogError("Failed to create texture.");
             if (loadedPixels)
                 stbi_image_free(loadedPixels);
             return nullptr;
@@ -149,7 +141,7 @@ namespace Nut
 
                 if (!pixels)
                 {
-                    std::cerr << "加载纹理数组层失败: " << filePath << std::endl;
+                    LogError("Failed to load texture array layer from file: {}", filePath);
                     continue;
                 }
 
@@ -178,11 +170,8 @@ namespace Nut
 
                 stbi_image_free(pixels);
                 layerIndex++;
-
-                std::cout << "纹理数组层 " << layerIndex << " 加载成功: " << filePath << std::endl;
             }
-
-            std::cout << "纹理数组加载完成，共 " << layerIndex << " 层" << std::endl;
+            LogDebug("Texture array loaded from files, total layers: {}", layerIndex);
         }
 
 
@@ -219,7 +208,7 @@ namespace Nut
             wgpu::CommandBuffer commands = encoder.Finish();
             context->GetWGPUDevice().GetQueue().Submit(1, &commands);
 
-            std::cout << "Mipmap框架生成完成，共 " << descriptor.mipLevelCount << " 级（需配合shader实现完整功能）" << std::endl;
+            LogDebug("Mipmaps generated for texture.");
         }
 
 
@@ -315,7 +304,7 @@ namespace Nut
     {
         if (!m_texture)
         {
-            std::cerr << "TextureA::CreateView: Invalid texture" << std::endl;
+            LogError("Cannot create texture view: underlying texture is null.");
             return nullptr;
         }
 
@@ -442,7 +431,7 @@ namespace Nut
 
         if (wgpu::WaitStatus::Success != m_Context->GetWGPUInstance().WaitAny(f1, -1))
         {
-            std::cout << "Timeout while waiting for buffer mapping." << std::endl;
+            LogWarn("Timeout or error while waiting for texture readback buffer to map.");
             readbackBuffer.Unmap();
             return;
         }
@@ -488,7 +477,6 @@ namespace Nut
             unpaddedBytesPerRow
         );
 
-        std::cout << "Done." << std::endl;
         readbackBuffer.Unmap();
     }
 }

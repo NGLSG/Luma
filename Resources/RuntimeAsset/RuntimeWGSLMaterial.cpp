@@ -117,6 +117,59 @@ Nut::RenderPipeline* RuntimeWGSLMaterial::GetOrBuildPipeline(uint32_t sampleCoun
     return ptr;
 }
 
+RuntimeWGSLMaterial::RuntimeWGSLMaterial() = default;
+RuntimeWGSLMaterial::~RuntimeWGSLMaterial() = default;
+
+void RuntimeWGSLMaterial::SetUniformVec2(const std::string& name, float x, float y)
+{
+    SetUniform(name, std::array<float, 2>{x, y});
+}
+
+void RuntimeWGSLMaterial::SetUniformVec3(const std::string& name, float x, float y, float z)
+{
+    SetUniform(name, std::array<float, 3>{x, y, z});
+}
+
+void RuntimeWGSLMaterial::SetUniformVec4(const std::string& name, float r, float g, float b, float a)
+{
+    SetUniform(name, std::array<float, 4>{r, g, b, a});
+}
+
+void RuntimeWGSLMaterial::SetUniformStruct(const std::string& name, const void* data, size_t size)
+{
+    std::vector<uint8_t> byteData(size);
+    std::memcpy(byteData.data(), data, size);
+
+    if (m_uniforms.contains(name))
+    {
+        m_uniforms[name].value = std::move(byteData);
+        m_uniformBufferDirty = true;
+    }
+    else
+    {
+        UniformData uniformData;
+        uniformData.name = name;
+        uniformData.value = std::move(byteData);
+        m_uniforms[name] = uniformData;
+        m_uniformBufferDirty = true;
+    }
+}
+
+const Nut::ShaderModule& RuntimeWGSLMaterial::GetShaderModule() const
+{
+    return m_shaderModule;
+}
+
+bool RuntimeWGSLMaterial::IsValid()
+{
+    return m_shaderModule.Get() != nullptr;
+}
+
+void RuntimeWGSLMaterial::SetSourceGuid(const Guid& guid)
+{
+    m_sourceGuid = guid;
+}
+
 Nut::RenderPipeline* RuntimeWGSLMaterial::GetPipeline(uint32_t sampleCount)
 {
     return GetOrBuildPipeline(sampleCount);
@@ -141,68 +194,52 @@ void RuntimeWGSLMaterial::UpdateUniformBuffer()
         return;
     }
 
-    size_t totalSize = 0;
-    size_t currentOffset = 0;
-
-    for (auto& [name, uniformData] : m_uniforms)
+    auto pipeline = GetPipeline();
+    if (!pipeline)
     {
-        size_t uniformSize = std::visit([](auto&& value) -> size_t
-        {
-            using T = std::decay_t<decltype(value)>;
-            if constexpr (std::is_same_v<T, float>) return sizeof(float);
-            else if constexpr (std::is_same_v<T, int>) return sizeof(int);
-            else if constexpr (std::is_same_v<T, std::array<float, 2>>) return sizeof(float) * 2;
-            else if constexpr (std::is_same_v<T, std::array<float, 3>>) return sizeof(float) * 3;
-            else if constexpr (std::is_same_v<T, std::array<float, 4>>) return sizeof(float) * 4;
-            else if constexpr (std::is_same_v<T, std::array<float, 16>>) return sizeof(float) * 16;
-            return 0;
-        }, uniformData.value);
-
-        if (currentOffset % 16 != 0)
-        {
-            currentOffset = (currentOffset + 15) & ~15;
-        }
-
-        uniformData.offset = currentOffset;
-        uniformData.size = uniformSize;
-        currentOffset += uniformSize;
-        totalSize = currentOffset;
+        LogError("RuntimeWGSLMaterial::UpdateUniformBuffer - Pipeline is null");
+        return;
     }
 
-    totalSize = (totalSize + 15) & ~15;
-
-    if (!m_uniformBuffer || m_uniformBuffer->GetSize() < totalSize)
-    {
-        Nut::BufferLayout uniformLayout;
-        uniformLayout.size = totalSize;
-        uniformLayout.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
-        uniformLayout.mapped = false;
-        m_uniformBuffer = Nut::Buffer::Create(uniformLayout, m_context);
-    }
-
-    std::vector<uint8_t> bufferData(totalSize, 0);
-
+    
+    
     for (const auto& [name, uniformData] : m_uniforms)
     {
         std::visit([&](auto&& value)
         {
             using T = std::decay_t<decltype(value)>;
+            
             if constexpr (std::is_same_v<T, float>)
-                std::memcpy(bufferData.data() + uniformData.offset, &value, sizeof(float));
+            {
+                pipeline->UpdateUniformBuffer(name, &value, sizeof(float));
+            }
             else if constexpr (std::is_same_v<T, int>)
-                std::memcpy(bufferData.data() + uniformData.offset, &value, sizeof(int));
+            {
+                pipeline->UpdateUniformBuffer(name, &value, sizeof(int));
+            }
             else if constexpr (std::is_same_v<T, std::array<float, 2>>)
-                std::memcpy(bufferData.data() + uniformData.offset, value.data(), sizeof(float) * 2);
+            {
+                pipeline->UpdateUniformBuffer(name, value.data(), sizeof(float) * 2);
+            }
             else if constexpr (std::is_same_v<T, std::array<float, 3>>)
-                std::memcpy(bufferData.data() + uniformData.offset, value.data(), sizeof(float) * 3);
+            {
+                pipeline->UpdateUniformBuffer(name, value.data(), sizeof(float) * 3);
+            }
             else if constexpr (std::is_same_v<T, std::array<float, 4>>)
-                std::memcpy(bufferData.data() + uniformData.offset, value.data(), sizeof(float) * 4);
+            {
+                pipeline->UpdateUniformBuffer(name, value.data(), sizeof(float) * 4);
+            }
             else if constexpr (std::is_same_v<T, std::array<float, 16>>)
-                std::memcpy(bufferData.data() + uniformData.offset, value.data(), sizeof(float) * 16);
+            {
+                pipeline->UpdateUniformBuffer(name, value.data(), sizeof(float) * 16);
+            }
+            else if constexpr (std::is_same_v<T, std::vector<uint8_t>>)
+            {
+                pipeline->UpdateUniformBuffer(name, value.data(), value.size());
+            }
         }, uniformData.value);
     }
 
-    m_uniformBuffer->WriteBuffer(bufferData.data(), totalSize);
     m_uniformBufferDirty = false;
 }
 

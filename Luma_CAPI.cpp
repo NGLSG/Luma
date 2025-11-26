@@ -25,6 +25,15 @@
 #include "Renderer/GraphicsBackend.h"
 #include "Renderer/RenderSystem.h"
 #include "Renderer/Camera.h"
+#include "Renderer/Nut/NutContext.h"
+#include "Renderer/Nut/Buffer.h"
+#include "Renderer/Nut/TextureA.h"
+#include "Renderer/Nut/ShaderRegistry.h"
+#include "Resources/RuntimeAsset/RuntimeWGSLMaterial.h"
+#include "Resources/RuntimeAsset/RuntimeTexture.h"
+#include "Resources/Managers/RuntimeWGSLMaterialManager.h"
+#include "Components/Sprite.h"
+#include "Loaders/TextureLoader.h"
 #include "Utils/AndroidPermissions.h"
 #ifdef __ANDROID__
 #include <android/native_window.h>
@@ -1793,6 +1802,50 @@ LUMA_API bool Physics_CircleCheck(LumaSceneHandle scene, Vector2f_CAPI center, f
     return false;
 }
 
+LUMA_API bool Physics_OverlapCircle(LumaSceneHandle scene, Vector2f_CAPI center, float radius,
+                                    const char* tags[], int tagCount,
+                                    LumaEntityHandle* outEntities, int maxEntities, int* outEntityCount)
+{
+    if (!outEntityCount) return false;
+    *outEntityCount = 0;
+
+    auto* runtimeScene = AsScene(scene);
+    if (!runtimeScene) return false;
+
+    auto* physicsSystem = runtimeScene->GetSystem<Systems::PhysicsSystem>();
+    if (!physicsSystem) return false;
+
+    ECS::Vector2f c = {center.x, center.y};
+    std::vector<std::string> tagsVec;
+    if (tags && tagCount > 0)
+    {
+        for (int i = 0; i < tagCount; ++i)
+        {
+            if (tags[i]) tagsVec.emplace_back(tags[i]);
+        }
+    }
+
+    auto results = physicsSystem->OverlapCircle(c, radius, runtimeScene->GetRegistry(), tagsVec);
+
+    if (results.empty())
+    {
+        return false;
+    }
+
+    *outEntityCount = static_cast<int>(results.size());
+
+    if (outEntities && maxEntities > 0)
+    {
+        int numToCopy = std::min(*outEntityCount, maxEntities);
+        for (int i = 0; i < numToCopy; ++i)
+        {
+            outEntities[i] = static_cast<LumaEntityHandle>(results[i]);
+        }
+    }
+
+    return true;
+}
+
 LUMA_API uint32_t AudioManager_Play(PlayDesc_CAPI desc)
 {
     if (!desc.audioHandle.Valid()) return 0;
@@ -2114,4 +2167,380 @@ LUMA_API const char* PathUtils_GetAndroidExternalDataDir()
 {
     static std::string path = PathUtils::GetAndroidExternalDataDir().string();
     return path.c_str();
+}
+
+
+
+
+
+LUMA_API WGSLMaterialHandle WGSLMaterial_Load(Guid_CAPI assetGuid)
+{
+    Guid guid = FromGuidCAPI(assetGuid);
+    if (!guid.Valid()) return nullptr;
+
+    auto material = RuntimeWGSLMaterialManager::GetInstance().TryGetAsset(guid);
+    return static_cast<WGSLMaterialHandle>(material.get());
+}
+
+LUMA_API WGSLMaterialHandle WGSLMaterial_GetFromSprite(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    RuntimeScene* runtimeScene = AsScene(scene);
+    if (!runtimeScene) return nullptr;
+
+    auto* sprite = TryGetComponent<ECS::SpriteComponent>(runtimeScene, entity);
+    if (!sprite || !sprite->wgslMaterial) return nullptr;
+
+    return static_cast<WGSLMaterialHandle>(sprite->wgslMaterial.get());
+}
+
+LUMA_API bool WGSLMaterial_IsValid(WGSLMaterialHandle material)
+{
+    if (!material) return false;
+    auto* mat = static_cast<RuntimeWGSLMaterial*>(material);
+    return mat->IsValid();
+}
+
+LUMA_API void WGSLMaterial_SetFloat(WGSLMaterialHandle material, const char* name, float value)
+{
+    if (!material || !name) return;
+    auto* mat = static_cast<RuntimeWGSLMaterial*>(material);
+    mat->SetUniform<float>(name, value);
+}
+
+LUMA_API void WGSLMaterial_SetInt(WGSLMaterialHandle material, const char* name, int value)
+{
+    if (!material || !name) return;
+    auto* mat = static_cast<RuntimeWGSLMaterial*>(material);
+    mat->SetUniform<int>(name, value);
+}
+
+LUMA_API void WGSLMaterial_SetVec2(WGSLMaterialHandle material, const char* name, float x, float y)
+{
+    if (!material || !name) return;
+    auto* mat = static_cast<RuntimeWGSLMaterial*>(material);
+    mat->SetUniformVec2(name, x, y);
+}
+
+LUMA_API void WGSLMaterial_SetVec3(WGSLMaterialHandle material, const char* name, float x, float y, float z)
+{
+    if (!material || !name) return;
+    auto* mat = static_cast<RuntimeWGSLMaterial*>(material);
+    mat->SetUniformVec3(name, x, y, z);
+}
+
+LUMA_API void WGSLMaterial_SetVec4(WGSLMaterialHandle material, const char* name, float r, float g, float b, float a)
+{
+    if (!material || !name) return;
+    auto* mat = static_cast<RuntimeWGSLMaterial*>(material);
+    mat->SetUniformVec4(name, r, g, b, a);
+}
+
+LUMA_API void WGSLMaterial_SetUniformStruct(WGSLMaterialHandle material, const char* name, const void* data, int size)
+{
+    if (!material || !name || !data || size <= 0) return;
+    auto* mat = static_cast<RuntimeWGSLMaterial*>(material);
+    mat->SetUniformStruct(name, data, static_cast<size_t>(size));
+}
+
+LUMA_API void WGSLMaterial_SetTexture(WGSLMaterialHandle material, const char* name, void* texture, uint32_t binding,
+                                      uint32_t group)
+{
+    if (!material || !name || !texture) return;
+    auto* mat = static_cast<RuntimeWGSLMaterial*>(material);
+    auto* tex = static_cast<Nut::TextureA*>(texture);
+    
+    Nut::TextureAPtr texPtr(tex, [](Nut::TextureA*)
+    {
+    });
+    mat->SetTexture(name, texPtr, binding, group);
+}
+
+LUMA_API void WGSLMaterial_UpdateUniformBuffer(WGSLMaterialHandle material)
+{
+    if (!material) return;
+    auto* mat = static_cast<RuntimeWGSLMaterial*>(material);
+    mat->UpdateUniformBuffer();
+}
+
+
+
+
+
+LUMA_API TextureAHandle TextureA_Load(Guid_CAPI assetGuid)
+{
+    Guid guid = FromGuidCAPI(assetGuid);
+    if (!guid.Valid()) return nullptr;
+
+    auto loader = new TextureLoader(*GraphicsBackend::GetInstance());
+    if (!loader) return nullptr;
+    auto texture = loader->LoadAsset(guid);
+    if (!texture) return nullptr;
+
+    auto nutTexture = texture->getNutTexture();
+    return static_cast<TextureAHandle>(nutTexture.get());
+}
+
+LUMA_API TextureAHandle TextureA_Create(uint32_t width, uint32_t height)
+{
+    auto context = GraphicsBackend::GetInstance()->GetNutContext();
+    if (!context) return nullptr;
+
+    auto texture = Nut::TextureBuilder()
+                   .SetSize(width, height)
+                   .SetFormat(wgpu::TextureFormat::RGBA8Unorm)
+                   .SetUsage(Nut::TextureUsageFlags::GetCommonTextureUsage().GetUsage())
+                   .Build(context);
+
+    if (!texture) return nullptr;
+
+    
+    
+    static std::vector<Nut::TextureAPtr> s_createdTextures;
+    s_createdTextures.push_back(texture);
+
+    return static_cast<TextureAHandle>(texture.get());
+}
+
+LUMA_API bool TextureA_IsValid(TextureAHandle texture)
+{
+    if (!texture) return false;
+    auto* tex = static_cast<Nut::TextureA*>(texture);
+    return static_cast<bool>(*tex);
+}
+
+LUMA_API void TextureA_Release(TextureAHandle texture)
+{
+    
+    
+    (void)texture;
+}
+
+LUMA_API uint32_t TextureA_GetWidth(TextureAHandle texture)
+{
+    if (!texture) return 0;
+    auto* tex = static_cast<Nut::TextureA*>(texture);
+    return static_cast<uint32_t>(tex->GetWidth());
+}
+
+LUMA_API uint32_t TextureA_GetHeight(TextureAHandle texture)
+{
+    if (!texture) return 0;
+    auto* tex = static_cast<Nut::TextureA*>(texture);
+    return static_cast<uint32_t>(tex->GetHeight());
+}
+
+LUMA_API uint32_t TextureA_GetDepth(TextureAHandle texture)
+{
+    if (!texture) return 0;
+    auto* tex = static_cast<Nut::TextureA*>(texture);
+    return static_cast<uint32_t>(tex->GetDepth());
+}
+
+LUMA_API uint32_t TextureA_GetMipLevelCount(TextureAHandle texture)
+{
+    if (!texture) return 0;
+    auto* tex = static_cast<Nut::TextureA*>(texture);
+    return tex->GetMipLevelCount();
+}
+
+LUMA_API uint32_t TextureA_GetSampleCount(TextureAHandle texture)
+{
+    if (!texture) return 0;
+    auto* tex = static_cast<Nut::TextureA*>(texture);
+    return tex->GetSampleCount();
+}
+
+LUMA_API bool TextureA_Is3D(TextureAHandle texture)
+{
+    if (!texture) return false;
+    auto* tex = static_cast<Nut::TextureA*>(texture);
+    return tex->Is3D();
+}
+
+LUMA_API bool TextureA_IsArray(TextureAHandle texture)
+{
+    if (!texture) return false;
+    auto* tex = static_cast<Nut::TextureA*>(texture);
+    return tex->IsArray();
+}
+
+
+
+
+
+LUMA_API GpuBufferHandle GpuBuffer_Create(uint32_t size, uint32_t usage)
+{
+    auto context = GraphicsBackend::GetInstance()->GetNutContext();
+    if (!context) return nullptr;
+
+    Nut::BufferLayout layout;
+    layout.size = size;
+    layout.usage = static_cast<wgpu::BufferUsage>(usage);
+    layout.mapped = false;
+
+    auto buffer = std::make_unique<Nut::Buffer>(layout, context);
+    if (!buffer || !(*buffer)) return nullptr;
+
+    
+    static std::vector<std::unique_ptr<Nut::Buffer>> s_createdBuffers;
+    s_createdBuffers.push_back(std::move(buffer));
+
+    return static_cast<GpuBufferHandle>(s_createdBuffers.back().get());
+}
+
+LUMA_API bool GpuBuffer_IsValid(GpuBufferHandle buffer)
+{
+    if (!buffer) return false;
+    auto* buf = static_cast<Nut::Buffer*>(buffer);
+    return static_cast<bool>(*buf);
+}
+
+LUMA_API void GpuBuffer_Release(GpuBufferHandle buffer)
+{
+    
+    
+    (void)buffer;
+}
+
+LUMA_API uint32_t GpuBuffer_GetSize(GpuBufferHandle buffer)
+{
+    if (!buffer) return 0;
+    auto* buf = static_cast<Nut::Buffer*>(buffer);
+    return static_cast<uint32_t>(buf->GetSize());
+}
+
+LUMA_API bool GpuBuffer_Write(GpuBufferHandle buffer, const void* data, uint32_t size, uint32_t offset)
+{
+    if (!buffer || !data) return false;
+    auto* buf = static_cast<Nut::Buffer*>(buffer);
+    return buf->WriteBuffer(data, size, offset);
+}
+
+
+
+
+
+LUMA_API float Camera_GetPositionX()
+{
+    auto props = Camera::GetInstance().GetProperties();
+    return props.position.x();
+}
+
+LUMA_API float Camera_GetPositionY()
+{
+    auto props = Camera::GetInstance().GetProperties();
+    return props.position.y();
+}
+
+LUMA_API void Camera_SetPosition(float x, float y)
+{
+    auto props = Camera::GetInstance().GetProperties();
+    props.position = SkPoint::Make(x, y);
+    Camera::GetInstance().SetProperties(props);
+}
+
+LUMA_API float Camera_GetZoom()
+{
+    
+    return Camera::GetInstance().GetProperties().zoom.x();
+}
+
+LUMA_API void Camera_SetZoom(float zoom)
+{
+    auto props = Camera::GetInstance().GetProperties();
+    props.zoom = {zoom, zoom};  
+    Camera::GetInstance().SetProperties(props);
+}
+
+LUMA_API float Camera_GetRotation()
+{
+    return Camera::GetInstance().GetProperties().rotation;
+}
+
+LUMA_API void Camera_SetRotation(float rotation)
+{
+    auto props = Camera::GetInstance().GetProperties();
+    props.rotation = rotation;
+    Camera::GetInstance().SetProperties(props);
+}
+
+LUMA_API float Camera_GetViewportWidth()
+{
+    return Camera::GetInstance().GetProperties().viewport.width();
+}
+
+LUMA_API float Camera_GetViewportHeight()
+{
+    return Camera::GetInstance().GetProperties().viewport.height();
+}
+
+LUMA_API void Camera_GetClearColor(float* r, float* g, float* b, float* a)
+{
+    if (!r || !g || !b || !a) return;
+    auto props = Camera::GetInstance().GetProperties();
+    *r = props.clearColor.fR;
+    *g = props.clearColor.fG;
+    *b = props.clearColor.fB;
+    *a = props.clearColor.fA;
+}
+
+LUMA_API void Camera_SetClearColor(float r, float g, float b, float a)
+{
+    auto props = Camera::GetInstance().GetProperties();
+    props.clearColor = SkColor4f{r, g, b, a};
+    Camera::GetInstance().SetProperties(props);
+}
+
+LUMA_API void Camera_ScreenToWorld(float screenX, float screenY, float* worldX, float* worldY)
+{
+    if (!worldX || !worldY) return;
+    SkPoint result = Camera::GetInstance().ScreenToWorld(SkPoint::Make(screenX, screenY));
+    *worldX = result.x();
+    *worldY = result.y();
+}
+
+LUMA_API void Camera_WorldToScreen(float worldX, float worldY, float* screenX, float* screenY)
+{
+    if (!screenX || !screenY) return;
+    SkPoint result = Camera::GetInstance().WorldToScreen(SkPoint::Make(worldX, worldY));
+    *screenX = result.x();
+    *screenY = result.y();
+}
+
+
+
+
+
+LUMA_API void Shader_StartPreWarmingAsync()
+{
+    Nut::ShaderRegistry::GetInstance().StartPreWarmingAsync();
+}
+
+LUMA_API void Shader_PreWarming()
+{
+    Nut::ShaderRegistry::GetInstance().PreWarming();
+}
+
+LUMA_API void Shader_StopPreWarming()
+{
+    Nut::ShaderRegistry::GetInstance().StopPreWarming();
+}
+
+LUMA_API bool Shader_IsPreWarmingRunning()
+{
+    return Nut::ShaderRegistry::GetInstance().IsPreWarmingRunning();
+}
+
+LUMA_API bool Shader_IsPreWarmingComplete()
+{
+    return Nut::ShaderRegistry::GetInstance().IsPreWarmingComplete();
+}
+
+LUMA_API void Shader_GetPreWarmingState(int* outTotal, int* outLoaded, bool* outIsRunning, bool* outIsComplete)
+{
+    auto state = Nut::ShaderRegistry::GetInstance().GetPreWarmingState();
+    if (outTotal) *outTotal = state.total;
+    if (outLoaded) *outLoaded = state.loaded;
+    if (outIsRunning) *outIsRunning = state.isRunning;
+    if (outIsComplete) *outIsComplete = state.isComplete;
 }

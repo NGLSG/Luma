@@ -4,6 +4,19 @@
 #include "GraphicsBackend.h"
 #include "Managers/RuntimeShaderManager.h"
 
+Data::ShaderData ShaderLoader::LoadShaderDataFromGuid(const Guid& guid)
+{
+    const AssetMetadata* metadata = AssetManager::GetInstance().GetMetadata(guid);
+    if (!metadata || metadata->type != AssetType::Shader || !metadata->importerSettings.IsDefined())
+    {
+        LogError("ShaderLoader::LoadShaderDataFromFile - Invalid shader GUID: {}", guid.ToString());
+        return {};
+    }
+
+    Data::ShaderData shaderData = metadata->importerSettings.as<Data::ShaderData>();
+    return shaderData;
+}
+
 sk_sp<RuntimeShader> ShaderLoader::LoadAsset(const AssetMetadata& metadata)
 {
     if (metadata.type != AssetType::Shader || !metadata.importerSettings.IsDefined())

@@ -26,6 +26,20 @@ enum class AndroidScreenOrientation
     LandscapeRight
 };
 
+/**
+ * @brief 视口缩放模式枚举。
+ * 
+ * 定义渲染时如何处理设计分辨率与实际窗口分辨率的差异。
+ */
+enum class ViewportScaleMode
+{
+    None,           ///< 无缩放，直接使用窗口分辨率。
+    FixedAspect,    ///< 固定宽高比，保持设计分辨率的宽高比，可能出现黑边。
+    FixedWidth,     ///< 固定宽度，高度根据窗口比例调整。
+    FixedHeight,    ///< 固定高度，宽度根据窗口比例调整。
+    Expand          ///< 扩展模式，填充整个窗口，可能拉伸。
+};
+
 struct AndroidAliasEntry
 {
     std::string alias;
@@ -164,6 +178,39 @@ public:
      * @param height 要设置的目标窗口高度。
      */
     void SetTargetHeight(int height) { m_targetHeight = height; }
+
+    /**
+     * @brief 获取视口缩放模式。
+     * @return 当前的视口缩放模式。
+     */
+    ViewportScaleMode GetViewportScaleMode() const { return m_viewportScaleMode; }
+    /**
+     * @brief 设置视口缩放模式。
+     * @param mode 要设置的视口缩放模式。
+     */
+    void SetViewportScaleMode(ViewportScaleMode mode) { m_viewportScaleMode = mode; }
+
+    /**
+     * @brief 获取设计画布宽度（逻辑分辨率）。
+     * @return 设计画布宽度。
+     */
+    int GetDesignWidth() const { return m_designWidth; }
+    /**
+     * @brief 设置设计画布宽度（逻辑分辨率）。
+     * @param width 要设置的设计画布宽度。
+     */
+    void SetDesignWidth(int width) { m_designWidth = width; }
+
+    /**
+     * @brief 获取设计画布高度（逻辑分辨率）。
+     * @return 设计画布高度。
+     */
+    int GetDesignHeight() const { return m_designHeight; }
+    /**
+     * @brief 设置设计画布高度（逻辑分辨率）。
+     * @param height 要设置的设计画布高度。
+     */
+    void SetDesignHeight(int height) { m_designHeight = height; }
 
     /**
      * @brief 检查窗口是否无边框。
@@ -313,6 +360,9 @@ private:
 
     int m_targetWidth = 1280; ///< 目标窗口宽度。
     int m_targetHeight = 720; ///< 目标窗口高度。
+    ViewportScaleMode m_viewportScaleMode = ViewportScaleMode::None; ///< 视口缩放模式。
+    int m_designWidth = 1920; ///< 设计画布宽度（逻辑分辨率）。
+    int m_designHeight = 1080; ///< 设计画布高度（逻辑分辨率）。
     bool m_isBorderless = false; ///< 指示窗口是否无边框。
     bool m_enableConsole = false; ///< 指示控制台是否启用。
 

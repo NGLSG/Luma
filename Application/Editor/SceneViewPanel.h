@@ -423,6 +423,13 @@ private:
      * @param drawList ImGui绘图列表。
      */
     void drawCameraGizmo(ImDrawList* drawList);
+    /**
+     * @brief 绘制设计分辨率边框。
+     * 当视口布局模式不是None时，在场景视图中显示设计分辨率的边界。
+     * @param viewportScreenPos 视口在屏幕上的起始位置。
+     * @param viewportSize 视口的大小。
+     */
+    void drawDesignResolutionFrame(const ImVec2& viewportScreenPos, const ImVec2& viewportSize);
 
 private:
     std::vector<ColliderHandle> m_colliderHandles; ///< 存储碰撞体编辑手柄的列表。

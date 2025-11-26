@@ -102,6 +102,38 @@ public:
      */
     Guid LoadAsset(const std::filesystem::path& assetPath) override;
 
+    /**
+     * @brief 启动 shader 预热
+     * 
+     * Runtime 模式下从打包的 ShaderRegistry.yaml 加载并预热所有 shader
+     * 
+     * @return 如果成功启动返回 true，如果已在运行或已完成返回 false
+     */
+    bool StartPreWarmingShader() override;
+
+    /**
+     * @brief 停止 shader 预热
+     */
+    void StopPreWarmingShader() override;
+
+    /**
+     * @brief 获取 shader 预热进度
+     * @return pair<总数, 已处理数>
+     */
+    std::pair<int, int> GetPreWarmingProgress() const override;
+
+    /**
+     * @brief 检查 shader 预热是否完成
+     * @return 如果预热完成返回 true，否则返回 false
+     */
+    bool IsPreWarmingComplete() const override;
+
+    /**
+     * @brief 检查 shader 预热是否正在运行
+     * @return 如果预热正在运行返回 true，否则返回 false
+     */
+    bool IsPreWarmingRunning() const override;
+
 private:
     /**
      * @brief 懒加载指定GUID的资产元数据
@@ -116,6 +148,11 @@ private:
      * @param totalThreads 总线程数
      */
     void preloadWorker(size_t threadIndex, size_t totalThreads);
+
+    /**
+     * @brief Shader 预热工作线程函数
+     */
+    void preWarmingWorker();
 
     /**
      * @brief 注册所有可用的资产导入器
@@ -145,6 +182,13 @@ private:
     std::vector<std::pair<std::string, AssetIndexEntry>> m_indexEntries; ///< 索引条目列表，用于分配任务
 
     std::vector<std::unique_ptr<IAssetImporter>> m_importers; ///< 注册的资产导入器列表
+
+    // Shader 预热相关
+    std::thread m_preWarmingThread; ///< Shader 预热线程
+    std::atomic<bool> m_preWarmingRunning; ///< Shader 预热运行标志
+    std::atomic<bool> m_preWarmingComplete; ///< Shader 预热完成标志
+    std::atomic<int> m_preWarmingTotal; ///< Shader 总数
+    std::atomic<int> m_preWarmingLoaded; ///< 已加载的 Shader 数量
 };
 
 #endif

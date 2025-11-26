@@ -306,7 +306,6 @@ namespace Nut
     void Pipeline::SetReservedBuffers(const EngineData& engineData, std::vector<InstanceData>& instanceData,
                                       const std::shared_ptr<NutContext>& ctx)
     {
-        
         if (!m_reservedFrameBuffer)
         {
             m_reservedFrameBuffer = BufferBuilder().SetUsage(BufferBuilder::GetCommonUniformUsage())
@@ -318,7 +317,7 @@ namespace Nut
             m_reservedFrameBuffer->WriteBuffer(&engineData, sizeof(EngineData));
         }
 
-        
+
         if (!m_reservedInstanceBuffer)
         {
             m_reservedInstanceBuffer = BufferBuilder().SetUsage(BufferBuilder::GetCommonInstanceUsage())
@@ -343,7 +342,6 @@ namespace Nut
         }
     }
 
-    
 
     bool Pipeline::SwapTexture(const TextureAPtr& texture, Sampler* sampler, const std::shared_ptr<NutContext>& ctx)
     {
@@ -363,35 +361,27 @@ namespace Nut
             return false;
         }
 
-        
-        
-        
 
-        
         if (!m_reservedFrameBuffer)
         {
             auto data = EngineData();
             m_reservedFrameBuffer = BufferBuilder()
                                     .SetUsage(BufferBuilder::GetCommonUniformUsage())
-                                    
+
                                     .SetData(&data)
                                     .BuildPtr(ctx);
         }
 
-        
-        
+
         if (!m_reservedInstanceBuffer)
         {
-            
             auto datas = std::vector<InstanceData>(1);
             m_reservedInstanceBuffer = BufferBuilder()
-                                       .SetUsage(BufferBuilder::GetCommonInstanceUsage()) 
+                                       .SetUsage(BufferBuilder::GetCommonInstanceUsage())
                                        .SetData(datas)
                                        .BuildPtr(ctx);
         }
-        
-        
-        
+
 
         if (m_reservedFrameBuffer)
         {
@@ -400,6 +390,21 @@ namespace Nut
         if (m_reservedInstanceBuffer)
         {
             it->second.SetBuffer(1, *m_reservedInstanceBuffer);
+        }
+
+        
+        for (const auto& [name, buffer] : m_placeholderBuffers)
+        {
+            auto infoIt = m_bindingInfoMap.find(name);
+            if (infoIt != m_bindingInfoMap.end())
+            {
+                const auto& info = infoIt->second;
+                
+                if (info.groupIndex == groupIdx && info.location != 0 && info.location != 1)
+                {
+                    it->second.SetBuffer(info.location, *buffer);
+                }
+            }
         }
 
         it->second.SetTexture(texLoc, texture);
@@ -429,7 +434,6 @@ namespace Nut
 
     size_t Pipeline::ComputeBindGroupKey(size_t groupIdx, const BindGroup& group) const
     {
-        
         if (groupIdx != 0)
         {
             return 0;
@@ -441,8 +445,8 @@ namespace Nut
             return 0;
         }
 
-        
-        size_t hash = 1469598103934665603ull; 
+
+        size_t hash = 1469598103934665603ull;
         auto mix = [&hash](size_t v)
         {
             hash ^= v + 0x9e3779b97f4a7c15ull + (hash << 6) + (hash >> 2);
@@ -467,7 +471,7 @@ namespace Nut
     {
         if (!desc.context)
         {
-            std::cerr << "GraphicsContext is null" << std::endl;
+            LogError("Context is null");
             return;
         }
         wgpu::RenderPipelineDescriptor descriptor{};
@@ -484,27 +488,32 @@ namespace Nut
 
         if (!desc.context->GetWGPUDevice())
         {
-            std::cerr << "WGPU Device is null" << std::endl;
+            LogError("WGPU Device is null");
             return;
         }
         pipeline = desc.context->GetWGPUDevice().CreateRenderPipeline(&descriptor);
+        m_context = desc.context;
         desc.shaderModule.ForeachBinding([this](const ShaderBindingInfo& info)
         {
             this->m_shaderBindings.emplace_back(info.name);
             this->m_groupAttributes[info.groupIndex].emplace_back(info.name);
+            this->m_bindingInfoMap[info.name] = info;
         });
         for (const auto& groupId : m_groupAttributes | std::views::keys)
         {
             m_groups[groupId] = BindGroup::Create(groupId, this);
         }
         m_shaderModule = desc.shaderModule;
+
+        
+        CreatePlaceholderBuffers();
     }
 
     ComputePipeline::ComputePipeline(const ComputePipelineDescriptor& desc)
     {
         if (!desc.context)
         {
-            std::cerr << "GraphicsContext is null" << std::endl;
+            LogError("Context is null");
             return;
         }
         wgpu::ComputePipelineDescriptor descriptor{};
@@ -512,21 +521,25 @@ namespace Nut
         descriptor.compute.module = desc.shaderModule.Get();
         if (!desc.context->GetWGPUDevice())
         {
-            std::cerr << "WGPU Device is null" << std::endl;
+            LogError("WGPU Device is null");
             return;
         }
         pipeline = desc.context->GetWGPUDevice().CreateComputePipeline(&descriptor);
-
+        m_context = desc.context;
         desc.shaderModule.ForeachBinding([this](const ShaderBindingInfo& info)
         {
             this->m_shaderBindings.emplace_back(info.name);
             this->m_groupAttributes[info.groupIndex].emplace_back(info.name);
+            this->m_bindingInfoMap[info.name] = info;
         });
         for (const auto& groupId : m_groupAttributes | std::views::keys)
         {
             m_groups[groupId] = BindGroup::Create(groupId, this);
         }
         m_shaderModule = desc.shaderModule;
+
+        
+        CreatePlaceholderBuffers();
     }
 
 
@@ -852,13 +865,13 @@ namespace Nut
     {
         if (!m_shaderModule)
         {
-            std::cerr << "RenderPipelineBuilder: ShaderModule is required" << std::endl;
+            LogError("Build failed: ShaderModule is null");
             return nullptr;
         }
 
         if (m_colorTargets.empty())
         {
-            std::cerr << "RenderPipelineBuilder: At least one color target is required" << std::endl;
+            LogError("Build failed: No color targets specified");
             return nullptr;
         }
 
@@ -927,6 +940,133 @@ namespace Nut
     void PipelineCache::ClearRenderPipelines()
     {
         s_renderPipelines.clear();
+    }
+
+    void Pipeline::CreatePlaceholderBuffers()
+    {
+        if (!m_context)
+        {
+            LogError("Context is null");
+            return;
+        }
+
+        for (const auto& [name, info] : m_bindingInfoMap)
+        {
+            
+            if (info.type != BindingType::UniformBuffer && info.type != BindingType::StorageBuffer)
+                continue;
+
+            if (info.groupIndex == 0 && (info.location == 0 || info.location == 1))
+            {
+                continue;
+            }
+
+            size_t bufferSize = info.size;
+
+            
+            if (bufferSize == 0)
+            {
+                
+                bufferSize = 1024;
+            }
+
+            
+            std::vector<uint8_t> placeholderData(bufferSize, 0);
+
+            
+            auto usage = (info.type == BindingType::UniformBuffer)
+                             ? BufferUsage::Uniform | BufferUsage::CopyDst
+                             : BufferUsage::Storage | BufferUsage::CopyDst;
+
+
+            auto buffer = BufferBuilder().SetData(placeholderData)
+                                         .SetUsage(usage)
+                                         .BuildPtr(m_context);
+
+            if (buffer)
+            {
+                
+                SetBinding(name, *buffer, 0, 0);
+                m_placeholderBuffers[name] = std::move(buffer);
+            }
+            else
+            {
+                LogError("Failed to create placeholder buffer");
+            }
+        }
+    }
+
+    std::shared_ptr<Buffer> Pipeline::GetUniformBuffer(const std::string& name)
+    {
+        auto it = m_placeholderBuffers.find(name);
+        if (it != m_placeholderBuffers.end())
+        {
+            return it->second;
+        }
+        return nullptr;
+    }
+
+    bool Pipeline::UpdateUniformBuffer(const std::string& name, const void* data, size_t size)
+    {
+        if (!data || size == 0)
+        {
+            LogError("Invalid data or size for uniform buffer: {}", name);
+            return false;
+        }
+
+        auto it = m_bindingInfoMap.find(name);
+        if (it == m_bindingInfoMap.end())
+        {
+            LogError("Binding info not found for uniform buffer: {}", name);
+            return false;
+        }
+
+        const auto& info = it->second;
+        if (info.type != BindingType::UniformBuffer && info.type != BindingType::StorageBuffer)
+        {
+            LogError("Binding {} is not a uniform or storage buffer", name);
+            return false;
+        }
+
+        auto bufferIt = m_placeholderBuffers.find(name);
+        bool needRebuild = false;
+
+        
+        if (bufferIt == m_placeholderBuffers.end() || bufferIt->second->GetSize() < size)
+        {
+            needRebuild = true;
+        }
+
+        if (needRebuild)
+        {
+            
+            BufferLayout layout;
+            layout.usage = (info.type == BindingType::UniformBuffer)
+                               ? BufferUsage::Uniform | BufferUsage::CopyDst
+                               : BufferUsage::Storage | BufferUsage::CopyDst;
+            layout.size = static_cast<uint32_t>(size);
+            layout.mapped = false;
+
+            auto newBuffer = Buffer::Create(layout, m_context);
+            if (!newBuffer)
+            {
+                LogError("Failed to create new buffer");
+                return false;
+            }
+
+            
+            SetBinding(name, *newBuffer, 0, 0);
+            m_placeholderBuffers[name] = std::move(newBuffer);
+
+            
+            ClearBindGroupCache();
+        }
+
+        
+        auto& buffer = m_placeholderBuffers[name];
+        buffer->WriteBuffer(data, size);
+
+        return true;
     }
 
     void PipelineCache::ClearComputePipelines()

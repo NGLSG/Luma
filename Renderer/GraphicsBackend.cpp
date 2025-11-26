@@ -1,14 +1,15 @@
 #include "GraphicsBackend.h"
 
-#include "include/core/SkData.h"
-#include "include/gpu/graphite/Image.h"
+#include <iostream>
 
-#include "include/core/SkCanvas.h"
-#include "include/core/SkImage.h"
-#include "include/core/SkSurface.h"
-#include "../Utils/PCH.h"
+#include "Nut/NutContext.h"
+#include "Nut/TextureA.h"
+#include "Nut/Buffer.h"
+#include "Nut/ShaderCache.h"
+#include "Logger.h"
 #include "Resources/RuntimeAsset/RuntimeWGSLMaterial.h"
-
+#include "include/gpu/graphite/Image.h"
+#include "include/core/SkCanvas.h"
 #if defined(_WIN32)
 #include <windows.h>
 #elif defined(__linux__) && !defined(__ANDROID__)
@@ -103,30 +104,7 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
 #endif
 
 
-        for (const auto& type : opts.backendTypePriority)
-        {
-            switch (type)
-            {
-            case BackendType::D3D12:
-                nutDesc.backendTypePriority.push_back(Nut::BackendType::D3D12);
-                break;
-            case BackendType::D3D11:
-                nutDesc.backendTypePriority.push_back(Nut::BackendType::D3D11);
-                break;
-            case BackendType::Vulkan:
-                nutDesc.backendTypePriority.push_back(Nut::BackendType::Vulkan);
-                break;
-            case BackendType::Metal:
-                nutDesc.backendTypePriority.push_back(Nut::BackendType::Metal);
-                break;
-            case BackendType::OpenGL:
-                nutDesc.backendTypePriority.push_back(Nut::BackendType::OpenGL);
-                break;
-            case BackendType::OpenGLES:
-                nutDesc.backendTypePriority.push_back(Nut::BackendType::OpenGLES);
-                break;
-            }
-        }
+        nutDesc.backendTypePriority = opts.backendTypePriority;
 
 
         switch (opts.qualityLevel)
@@ -151,6 +129,8 @@ void GraphicsBackend::initialize(const GraphicsBackendOptions& opts)
             throw std::runtime_error("创建 NutContext 失败");
         }
 
+
+        Nut::ShaderCache::Initialize();
 
         skgpu::graphite::DawnBackendContext backendContext;
         backendContext.fInstance = nutContext->GetWGPUInstance();
@@ -334,7 +314,7 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
 
         auto surface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(),
                                                       backendTex,
-                                                      kBGRA_8888_SkColorType,
+                                                      kRGBA_8888_SkColorType,
                                                       SkColorSpace::MakeSRGB(),
                                                       nullptr);
         if (!surface)
@@ -353,7 +333,7 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
             if (!backendTex.isValid()) return nullptr;
 
             return SkSurfaces::WrapBackendTexture(graphiteRecorder.get(), backendTex,
-                                                  kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
+                                                  kRGBA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
         }
 
 
@@ -374,7 +354,7 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
 
 
         auto skSurface = SkSurfaces::WrapBackendTexture(graphiteRecorder.get(), backendTex,
-                                                        kBGRA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
+                                                        kRGBA_8888_SkColorType, SkColorSpace::MakeSRGB(), nullptr);
 
 
         m_currentSwapChainSurface = skSurface;
@@ -388,7 +368,7 @@ sk_sp<SkSurface> GraphicsBackend::GetSurface()
         {
             SkImageInfo imageInfo = SkImageInfo::Make(
                 currentWidth, currentHeight,
-                kBGRA_8888_SkColorType,
+                kRGBA_8888_SkColorType,
                 kPremul_SkAlphaType,
                 SkColorSpace::MakeSRGB()
             );
@@ -682,7 +662,7 @@ skgpu::graphite::Recorder* GraphicsBackend::GetRecorder() const
 
 wgpu::TextureFormat GraphicsBackend::GetSurfaceFormat() const
 {
-    return wgpu::TextureFormat::BGRA8Unorm;
+    return wgpu::TextureFormat::RGBA8Unorm;
 }
 
 sk_sp<SkImage> GraphicsBackend::DetachLastOffscreenImage()
@@ -828,6 +808,9 @@ void GraphicsBackend::shutdown()
 
     nutContext.reset();
 
+
+    Nut::ShaderCache::Shutdown();
+
     isDeviceLost = false;
 }
 
@@ -843,5 +826,6 @@ std::unique_ptr<GraphicsBackend> GraphicsBackend::Create(const GraphicsBackendOp
         LogError("初始化图形后端失败: {}", e.what());
         return nullptr;
     }
+    m_instance = backend.get();
     return backend;
 }

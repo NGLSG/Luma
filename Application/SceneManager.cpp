@@ -161,8 +161,6 @@ bool SceneManager::SaveScene(sk_sp<RuntimeScene> scene)
     std::ofstream fout(targetPath);
     fout << sceneNode;
     fout.close();
-
-    LogInfo("场景 '{}' 保存成功，路径: {}", scene->GetName(), sceneName.string());
     return true;
 }
 

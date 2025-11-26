@@ -22,6 +22,7 @@
 #include "Importers/TilesetImporter.h"
 #include "Importers/RuleTileImporter.h"
 #include "Importers/ShaderImporter.h"
+#include "../Renderer/Nut/ShaderRegistry.h"
 
 EditorAssetManager::EditorAssetManager(const std::filesystem::path& projectRootPath)
 {
@@ -328,6 +329,112 @@ void EditorAssetManager::InitialScan()
     m_pathToGuid = std::move(result.pathToGuid);
 
     LogInfo("AssetManager: 首次扫描结束，加载了 {} 个资产。", m_guidToMeta.size());
+    
+    
+    RegisterShadersToRegistry();
+}
+
+void EditorAssetManager::RegisterShadersToRegistry()
+{
+    auto& shaderRegistry = Nut::ShaderRegistry::GetInstance();
+    int shaderCount = 0;
+    
+    LogInfo("AssetManager: Scanning for shader assets...");
+    
+    std::lock_guard<std::mutex> lock(m_dbMutex);
+    
+    for (const auto& [guidStr, metadata] : m_guidToMeta)
+    {
+        
+        if (metadata.type == AssetType::Shader)
+        {
+            
+            Guid guid = Guid::FromString(guidStr);
+            AssetHandle handle(guid, AssetType::Shader);
+            
+            
+            shaderRegistry.RegisterShader(handle);
+            shaderCount++;
+        }
+    }
+    
+    LogInfo("AssetManager: Registered {} shader assets to ShaderRegistry", shaderCount);
+    
+    
+    std::filesystem::path shaderRegistryPath = m_assetsRoot.parent_path() / "ShaderRegistry.yaml";
+    
+    if (shaderRegistry.SaveToFile(shaderRegistryPath.string()))
+    {
+        LogInfo("AssetManager: ShaderRegistry saved to: {}", shaderRegistryPath.string());
+    }
+    else
+    {
+        LogWarn("AssetManager: Failed to save ShaderRegistry");
+    }
+}
+
+bool EditorAssetManager::StartPreWarmingShader()
+{
+    if (m_preWarmingRunning.load() || m_preWarmingComplete.load())
+    {
+        return false;
+    }
+
+    m_preWarmingRunning.store(true);
+    m_preWarmingComplete.store(false);
+    m_preWarmingTotal.store(0);
+    m_preWarmingLoaded.store(0);
+
+    
+    m_preWarmingThread = std::thread([this]()
+    {
+        LogInfo("EditorAssetManager: Starting shader pre-warming (baking)...");
+        
+        auto& shaderRegistry = Nut::ShaderRegistry::GetInstance();
+        
+        
+        shaderRegistry.PreWarming();
+        
+        
+        auto state = shaderRegistry.GetPreWarmingState();
+        m_preWarmingTotal.store(state.total);
+        m_preWarmingLoaded.store(state.loaded);
+        
+        m_preWarmingRunning.store(false);
+        m_preWarmingComplete.store(true);
+        
+        LogInfo("EditorAssetManager: Shader pre-warming complete");
+    });
+
+    LogInfo("EditorAssetManager: Shader pre-warming started");
+    return true;
+}
+
+void EditorAssetManager::StopPreWarmingShader()
+{
+    if (m_preWarmingThread.joinable())
+    {
+        m_preWarmingRunning.store(false);
+        m_preWarmingThread.join();
+        LogInfo("EditorAssetManager: Shader pre-warming stopped");
+    }
+}
+
+std::pair<int, int> EditorAssetManager::GetPreWarmingProgress() const
+{
+    int total = m_preWarmingTotal.load();
+    int loaded = m_preWarmingLoaded.load();
+    return std::make_pair(total, loaded);
+}
+
+bool EditorAssetManager::IsPreWarmingComplete() const
+{
+    return m_preWarmingComplete.load();
+}
+
+bool EditorAssetManager::IsPreWarmingRunning() const
+{
+    return m_preWarmingRunning.load();
 }
 
 const AssetMetadata* EditorAssetManager::GetMetadata(const std::filesystem::path& assetPath) const

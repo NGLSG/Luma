@@ -1,10 +1,13 @@
 #ifndef NOAI_SHADER_H
 #define NOAI_SHADER_H
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <filesystem>
+#include <vector>
+#include <functional>
 
 #include "dawn/webgpu_cpp.h"
 #include "ShaderModuleRegistry.h"
@@ -13,7 +16,7 @@ namespace Nut
 {
     class NutContext;
 
-    enum class BindingType:uint32_t
+    enum class BindingType : uint32_t
     {
         UniformBuffer = 0,
         StorageBuffer = 1,
@@ -27,6 +30,7 @@ namespace Nut
         size_t location;
         BindingType type;
         std::string name;
+        uint32_t size; // [新增] Binding 的字节大小 (仅对 Buffer 类型有效)
     };
 
     class LUMA_API ShaderModule
@@ -34,7 +38,13 @@ namespace Nut
         wgpu::ShaderModule shaderModule;
         std::unordered_map<std::string, ShaderBindingInfo> bindings;
 
+        // [新增] 辅助函数：计算类型的大小和对齐
+        void CalculateBindingSize(const std::string& typeName, const std::string& fullShaderCode, ShaderBindingInfo& info);
+
     public:
+        /**
+         * @brief 构造函数：解析 Shader 代码并提取 Binding 信息
+         */
         ShaderModule(const std::string& shaderCode, const std::shared_ptr<NutContext>& ctx);
 
         ShaderModule();

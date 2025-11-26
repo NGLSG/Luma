@@ -142,6 +142,17 @@ namespace Systems
                                                  entt::registry& registry,
                                                  const std::vector<std::string>& tags = {}) const;
         /**
+         * @brief 执行圆形区域检测，返回所有在指定区域内的实体。
+         * @param center 圆形区域的中心点。
+         * @param radius 圆形区域的半径。
+         * @param registry ECS注册表。
+         * @param tags 可选的标签列表，用于过滤检测结果。
+         * @return 返回所有匹配的实体列表。
+         */
+        std::vector<entt::entity> OverlapCircle(const ECS::Vector2f& center, float radius,
+                                                entt::registry& registry,
+                                                const std::vector<std::string>& tags = {}) const;
+        /**
          * @brief 对指定实体施加力或冲量。
          * @param entity 要施加力的实体。
          * @param force 施加的力向量。

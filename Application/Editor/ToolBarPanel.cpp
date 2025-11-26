@@ -14,6 +14,7 @@
 #include "Profiler.h"
 #include "ProjectSettings.h"
 #include "ScriptMetadataRegistry.h"
+#include "../Renderer/Nut/ShaderRegistry.h"
 #include "../Utils/PCH.h"
 #include "../SceneManager.h"
 #include "../Resources/Managers/RuntimeTextureManager.h"
@@ -733,12 +734,110 @@ void ToolbarPanel::Shutdown()
     EventBus::GetInstance().Unsubscribe(m_CSharpScriptUpdated);
 }
 
+void ToolbarPanel::drawViewportMenu()
+{
+    if (ImGui::BeginMenu("视图"))
+    {
+        auto& settings = ProjectSettings::GetInstance();
+        bool isProjectLoaded = settings.IsProjectLoaded();
+        if (!isProjectLoaded) ImGui::BeginDisabled();
+
+        ImGui::Text("视口布局");
+        ImGui::Separator();
+
+        
+        ViewportScaleMode currentMode = settings.GetViewportScaleMode();
+        const char* modeNames[] = {"无布局", "固定比例", "固定宽度", "固定高度", "拉伸填充"};
+        const ViewportScaleMode modeValues[] = {
+            ViewportScaleMode::None,
+            ViewportScaleMode::FixedAspect,
+            ViewportScaleMode::FixedWidth,
+            ViewportScaleMode::FixedHeight,
+            ViewportScaleMode::Expand
+        };
+
+        for (int i = 0; i < IM_ARRAYSIZE(modeNames); ++i)
+        {
+            bool isSelected = (currentMode == modeValues[i]);
+            if (ImGui::MenuItem(modeNames[i], nullptr, isSelected))
+            {
+                settings.SetViewportScaleMode(modeValues[i]);
+                settings.Save();
+            }
+        }
+
+        
+        if (currentMode != ViewportScaleMode::None)
+        {
+            ImGui::Separator();
+            ImGui::Text("设计分辨率");
+
+            int designWidth = settings.GetDesignWidth();
+            int designHeight = settings.GetDesignHeight();
+
+            ImGui::SetNextItemWidth(100);
+            if (ImGui::InputInt("##DesignWidth", &designWidth, 0, 0))
+            {
+                if (designWidth > 0)
+                {
+                    settings.SetDesignWidth(designWidth);
+                    settings.Save();
+                }
+            }
+            ImGui::SameLine();
+            ImGui::Text("x");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(100);
+            if (ImGui::InputInt("##DesignHeight", &designHeight, 0, 0))
+            {
+                if (designHeight > 0)
+                {
+                    settings.SetDesignHeight(designHeight);
+                    settings.Save();
+                }
+            }
+
+            
+            ImGui::Separator();
+            ImGui::Text("预设");
+            if (ImGui::MenuItem("1920 x 1080 (16:9)"))
+            {
+                settings.SetDesignWidth(1920);
+                settings.SetDesignHeight(1080);
+                settings.Save();
+            }
+            if (ImGui::MenuItem("1280 x 720 (16:9)"))
+            {
+                settings.SetDesignWidth(1280);
+                settings.SetDesignHeight(720);
+                settings.Save();
+            }
+            if (ImGui::MenuItem("1080 x 1920 (9:16 竖屏)"))
+            {
+                settings.SetDesignWidth(1080);
+                settings.SetDesignHeight(1920);
+                settings.Save();
+            }
+            if (ImGui::MenuItem("2048 x 1536 (4:3)"))
+            {
+                settings.SetDesignWidth(2048);
+                settings.SetDesignHeight(1536);
+                settings.Save();
+            }
+        }
+
+        if (!isProjectLoaded) ImGui::EndDisabled();
+        ImGui::EndMenu();
+    }
+}
+
 void ToolbarPanel::drawMainMenuBar()
 {
     if (ImGui::BeginMainMenuBar())
     {
         drawFileMenu();
         drawEditMenu();
+        drawViewportMenu();
         drawProjectMenu();
         {
             float totalWidth = 0;
@@ -790,6 +889,46 @@ void ToolbarPanel::drawProjectMenu()
             m_isSettingsWindowVisible = true;
         }
 
+        ImGui::Separator();
+        
+        
+        auto& assetManager = AssetManager::GetInstance();
+        bool isPreWarming = assetManager.IsPreWarmingRunning();
+        
+        if (isPreWarming)
+        {
+            ImGui::BeginDisabled();
+        }
+        
+        if (ImGui::MenuItem("烘焙 Shader"))
+        {
+            if (assetManager.StartPreWarmingShader())
+            {
+                LogInfo("开始烘焙 Shader...");
+            }
+            else
+            {
+                LogWarn("Shader 烘焙已在运行或已完成");
+            }
+        }
+        
+        if (isPreWarming)
+        {
+            ImGui::EndDisabled();
+            
+            
+            auto [total, loaded] = assetManager.GetPreWarmingProgress();
+            if (total > 0)
+            {
+                float progress = static_cast<float>(loaded) / static_cast<float>(total);
+                ImGui::Text("烘焙进度: %d/%d (%.1f%%)", loaded, total, progress * 100.0f);
+            }
+        }
+        else if (assetManager.IsPreWarmingComplete())
+        {
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "✓ 烘焙完成");
+        }
+        
         ImGui::Separator();
         if (ImGui::MenuItem("编译脚本")) { rebuildScripts(); }
         if (ImGui::MenuItem("清理编译产物"))
@@ -1810,7 +1949,21 @@ void ToolbarPanel::startPackagingProcess()
             std::filesystem::create_directories(gameDataDir);
             std::filesystem::create_directories(rawDestDir);
 
+            
             m_packagingProgress = 0.25f;
+            m_packagingStatus = "正在导出 Shader 注册表...";
+            auto& shaderRegistry = Nut::ShaderRegistry::GetInstance();
+            std::filesystem::path shaderRegistryPath = resourcesDir / "ShaderRegistry.yaml";
+            if (!shaderRegistry.SaveToFile(shaderRegistryPath.string()))
+            {
+                LogWarn("Shader 注册表导出失败，运行时可能无法预热 shader");
+            }
+            else
+            {
+                LogInfo("Shader 注册表已导出到: {}", shaderRegistryPath.string());
+            }
+
+            m_packagingProgress = 0.3f;
             m_packagingStatus = "正在打包项目资源...";
             if (!AssetPacker::Pack(AssetManager::GetInstance().GetAssetDatabase(), resourcesDir))
             {

@@ -667,6 +667,92 @@ namespace Systems
         return std::nullopt;
     }
 
+    namespace
+    {
+        struct OverlapCircleCallbackContext
+        {
+            entt::registry& registry;
+            const std::vector<std::string>& tags;
+            b2Vec2 queryCenter;
+            float radiusSq;
+            std::vector<entt::entity> results;
+        };
+
+        bool OverlapCircleCallback(b2ShapeId shapeId, void* context)
+        {
+            auto* queryContext = static_cast<OverlapCircleCallbackContext*>(context);
+
+            b2BodyId bodyId = b2Shape_GetBody(shapeId);
+            void* userData = b2Body_GetUserData(bodyId);
+            if (userData == nullptr)
+            {
+                return true;
+            }
+            entt::entity hitEntity = static_cast<entt::entity>(reinterpret_cast<uintptr_t>(userData));
+
+            
+            b2Vec2 bodyPos = b2Body_GetPosition(bodyId);
+            float distanceSq = b2DistanceSquared(bodyPos, queryContext->queryCenter);
+            if (distanceSq > queryContext->radiusSq)
+            {
+                return true; 
+            }
+
+            
+            if (!queryContext->tags.empty())
+            {
+                auto* tagComponent = queryContext->registry.try_get<ECS::TagComponent>(hitEntity);
+                bool tagMatch = false;
+                if (tagComponent)
+                {
+                    for (const auto& tag : queryContext->tags)
+                    {
+                        if (tagComponent->tag == tag)
+                        {
+                            tagMatch = true;
+                            break;
+                        }
+                    }
+                }
+                if (!tagMatch)
+                {
+                    return true;
+                }
+            }
+
+            
+            if (std::find(queryContext->results.begin(), queryContext->results.end(), hitEntity) == queryContext->results.end())
+            {
+                queryContext->results.push_back(hitEntity);
+            }
+
+            return true; 
+        }
+    }
+
+    std::vector<entt::entity> PhysicsSystem::OverlapCircle(const ECS::Vector2f& center, float radius,
+                                                           entt::registry& registry,
+                                                           const std::vector<std::string>& tags) const
+    {
+        if (m_world.index1 == B2_NULL_INDEX || radius <= 0.0f)
+        {
+            return {};
+        }
+
+        b2Vec2 queryCenter = {center.x * METER_PER_PIXEL, -center.y * METER_PER_PIXEL};
+        float scaledRadius = radius * METER_PER_PIXEL;
+        
+        OverlapCircleCallbackContext context = {registry, tags, queryCenter, scaledRadius * scaledRadius, {}};
+
+        b2AABB aabb;
+        aabb.lowerBound = {queryCenter.x - scaledRadius, queryCenter.y - scaledRadius};
+        aabb.upperBound = {queryCenter.x + scaledRadius, queryCenter.y + scaledRadius};
+
+        b2World_OverlapAABB(m_world, aabb, b2DefaultQueryFilter(), OverlapCircleCallback, &context);
+
+        return std::move(context.results);
+    }
+
     void PhysicsSystem::ApplyForce(entt::entity entity, const ECS::Vector2f& force, ForceMode mode)
     {
         auto& registry = m_scene->GetRegistry();

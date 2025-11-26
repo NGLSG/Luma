@@ -25,6 +25,7 @@ public:
         shaderCode = shaderData.source;
         if (shaderData.language == Data::ShaderLanguage::WGSL)
         {
+
             if (!context)
             {
                 LogError("RuntimeShader - NutContext is null for WGSL shader");
@@ -44,10 +45,30 @@ public:
     ~RuntimeShader() override = default;
 
     [[nodiscard]] const std::string& GetSource() const { return shaderCode; }
+    [[nodiscard]] const std::string& GetShaderCode() const { return shaderCode; }
     [[nodiscard]] const Nut::ShaderModule& GetWGPUShader() const { return wgpuShader; }
     [[nodiscard]] const Nut::ShaderModule& GetComputeShader() const { return computeShader; }
     [[nodiscard]] Data::ShaderLanguage GetLanguage() const { return language; }
     [[nodiscard]] Data::ShaderType GetShaderType() const { return shaderType; }
+
+    /**
+     * @brief 确保 shader 已编译到 GPU
+     * 这会触发 Dawn Blob Cache 的保存
+     */
+    void EnsureCompiled()
+    {
+        // ShaderModule 在构造时已经编译
+        // 这里只是确保访问，触发缓存
+        if (shaderType == Data::ShaderType::VertFrag && wgpuShader.Get())
+        {
+            // 访问 shader module 确保已编译
+            [[maybe_unused]] auto module = wgpuShader.Get();
+        }
+        else if (shaderType == Data::ShaderType::Compute && computeShader.Get())
+        {
+            [[maybe_unused]] auto module = computeShader.Get();
+        }
+    }
 };
 
 

@@ -132,3 +132,47 @@ Guid AssetManager::LoadAsset(const std::filesystem::path& assetPath)
     }
     return Guid::Invalid();
 }
+
+bool AssetManager::StartPreWarmingShader()
+{
+    if (m_implementation)
+    {
+        return m_implementation->StartPreWarmingShader();
+    }
+    return false;
+}
+
+void AssetManager::StopPreWarmingShader()
+{
+    if (m_implementation)
+    {
+        m_implementation->StopPreWarmingShader();
+    }
+}
+
+std::pair<int, int> AssetManager::GetPreWarmingProgress() const
+{
+    if (m_implementation)
+    {
+        return m_implementation->GetPreWarmingProgress();
+    }
+    return std::make_pair(0, 0);
+}
+
+bool AssetManager::IsPreWarmingComplete() const
+{
+    if (m_implementation)
+    {
+        return m_implementation->IsPreWarmingComplete();
+    }
+    return false;
+}
+
+bool AssetManager::IsPreWarmingRunning() const
+{
+    if (m_implementation)
+    {
+        return m_implementation->IsPreWarmingRunning();
+    }
+    return false;
+}
