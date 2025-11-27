@@ -1271,10 +1271,12 @@ void HierarchyPanel::drawContextMenu()
     if (ImGui::MenuItem("创建空对象"))
     {
         CreateEmptyGameObject();
+        PopupManager::GetInstance().Close("HierarchyContextMenu");
     }
     if (ImGui::MenuItem("粘贴", nullptr, false, m_context->gameObjectClipboard.has_value()))
     {
         PasteGameObjects(nullptr);
+        PopupManager::GetInstance().Close("HierarchyContextMenu");
     }
 }
 

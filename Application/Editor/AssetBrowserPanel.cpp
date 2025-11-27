@@ -804,35 +804,39 @@ void AssetBrowserPanel::drawAssetContentView()
 
 void AssetBrowserPanel::drawAssetBrowserContextMenu()
 {
+    auto closeMenu = []() { PopupManager::GetInstance().Close("AssetBrowserContextMenu"); };
+
     if (ImGui::BeginMenu("创建"))
     {
-        if (ImGui::MenuItem("文件夹")) { createNewAsset(AssetType::Unknown); }
+        if (ImGui::MenuItem("文件夹")) { createNewAsset(AssetType::Unknown); closeMenu(); }
         ImGui::Separator();
-        if (ImGui::MenuItem("C# 脚本")) { createNewAsset(AssetType::CSharpScript); }
-        if (ImGui::MenuItem("场景")) { createNewAsset(AssetType::Scene); }
-        if (ImGui::MenuItem("材质")) { createNewAsset(AssetType::Material); }
-        if (ImGui::MenuItem("着色器")) { createNewAsset(AssetType::Shader); }
-        if (ImGui::MenuItem("物理材质")) { createNewAsset(AssetType::PhysicsMaterial); }
-        if (ImGui::MenuItem("蓝图")) { createNewAsset(AssetType::Blueprint); }
+        if (ImGui::MenuItem("C# 脚本")) { createNewAsset(AssetType::CSharpScript); closeMenu(); }
+        if (ImGui::MenuItem("场景")) { createNewAsset(AssetType::Scene); closeMenu(); }
+        if (ImGui::MenuItem("材质")) { createNewAsset(AssetType::Material); closeMenu(); }
+        if (ImGui::MenuItem("着色器")) { createNewAsset(AssetType::Shader); closeMenu(); }
+        if (ImGui::MenuItem("物理材质")) { createNewAsset(AssetType::PhysicsMaterial); closeMenu(); }
+        if (ImGui::MenuItem("蓝图")) { createNewAsset(AssetType::Blueprint); closeMenu(); }
         ImGui::Separator();
-        if (ImGui::MenuItem("动画切片")) { createNewAsset(AssetType::AnimationClip); }
-        if (ImGui::MenuItem("动画控制器")) { createNewAsset(AssetType::AnimationController); }
+        if (ImGui::MenuItem("动画切片")) { createNewAsset(AssetType::AnimationClip); closeMenu(); }
+        if (ImGui::MenuItem("动画控制器")) { createNewAsset(AssetType::AnimationController); closeMenu(); }
         ImGui::Separator();
 
-        if (ImGui::MenuItem("瓦片")) { createNewAsset(AssetType::Tile); }
-        if (ImGui::MenuItem("规则瓦片")) { createNewAsset(AssetType::RuleTile); }
-        if (ImGui::MenuItem("瓦片集")) { createNewAsset(AssetType::Tileset); }
+        if (ImGui::MenuItem("瓦片")) { createNewAsset(AssetType::Tile); closeMenu(); }
+        if (ImGui::MenuItem("规则瓦片")) { createNewAsset(AssetType::RuleTile); closeMenu(); }
+        if (ImGui::MenuItem("瓦片集")) { createNewAsset(AssetType::Tileset); closeMenu(); }
         ImGui::EndMenu();
     }
     if (ImGui::MenuItem("粘贴", nullptr, false, !m_context->assetClipboard.empty()))
     {
         pasteCopiedItems();
+        closeMenu();
     }
     if (ImGui::MenuItem("打开资源文件夹"))
     {
         std::filesystem::path fullPath = ProjectSettings::GetInstance().GetAssetsDirectory() / m_context->
             currentAssetDirectory->path;
         Utils::OpenFileExplorerAt(fullPath);
+        closeMenu();
     }
 }
 
@@ -1120,7 +1124,7 @@ void AssetBrowserPanel::drawConfirmDeleteAssetsPopupContent()
     if (m_context->selectedAssets.empty())
     {
         ImGui::Text("没有选中的项目。");
-        if (ImGui::Button("关闭")) ImGui::CloseCurrentPopup();
+        if (ImGui::Button("关闭")) PopupManager::GetInstance().Close("ConfirmDeleteAssets");
         return;
     }
 
@@ -1133,12 +1137,12 @@ void AssetBrowserPanel::drawConfirmDeleteAssetsPopupContent()
     if (ImGui::Button("删除", ImVec2(120, 0)))
     {
         deleteSelectedItems();
-        ImGui::CloseCurrentPopup();
+        PopupManager::GetInstance().Close("ConfirmDeleteAssets");
     }
     ImGui::SetItemDefaultFocus();
     ImGui::SameLine();
     if (ImGui::Button("取消", ImVec2(120, 0)))
-        ImGui::CloseCurrentPopup();
+        PopupManager::GetInstance().Close("ConfirmDeleteAssets");
 }
 
 void AssetBrowserPanel::buildAssetTree()

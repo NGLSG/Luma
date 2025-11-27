@@ -14,25 +14,26 @@ bool PopupManager::IsAnyPopupOpen() const
 void PopupManager::Open(const std::string& id)
 {
     
+    m_pendingOpen.insert(id);
     m_activePopups.insert(id);
 }
 
 void PopupManager::Close(const std::string& id)
 {
-    
     m_activePopups.erase(id);
+    m_pendingOpen.erase(id);
+    ImGui::CloseCurrentPopup();
 }
 
 void PopupManager::Render()
 {
-    
     for (auto it = m_activePopups.begin(); it != m_activePopups.end();)
     {
         const std::string& id = *it;
         auto popupIt = m_popups.find(id);
         if (popupIt == m_popups.end())
         {
-            
+            m_pendingOpen.erase(id);
             it = m_activePopups.erase(it);
             continue;
         }
@@ -40,20 +41,13 @@ void PopupManager::Render()
         const auto& data = popupIt->second;
 
         
-        if (!data.isModal)
+        bool needsOpen = m_pendingOpen.count(id) > 0;
+        if (needsOpen)
         {
             ImGui::OpenPopup(id.c_str());
-        }
-        else
-        {
-            
-            if (!ImGui::IsPopupOpen(id.c_str()))
-            {
-                ImGui::OpenPopup(id.c_str());
-            }
+            m_pendingOpen.erase(id);
         }
 
-        
         bool isOpen = true;
         if (data.isModal)
         {
@@ -77,7 +71,6 @@ void PopupManager::Render()
             }
         }
 
-        
         if (!isOpen)
         {
             it = m_activePopups.erase(it);

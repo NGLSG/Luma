@@ -661,7 +661,7 @@ void ToolbarPanel::drawPreferencesPopup()
 
     ImGui::Dummy(ImVec2(0.0f, 20.0f));
     ImGui::Separator();
-    if (ImGui::Button("关闭", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+    if (ImGui::Button("关闭", ImVec2(120, 0))) { PopupManager::GetInstance().Close("PreferencesPopup"); }
     ImGui::SetItemDefaultFocus();
 }
 
@@ -1767,7 +1767,7 @@ void ToolbarPanel::drawSaveBeforePackagingPopup()
     {
         saveScene();
         startPackagingProcess();
-        ImGui::CloseCurrentPopup();
+        PopupManager::GetInstance().Close("SaveScene");
     }
     ImGui::SetItemDefaultFocus();
 
@@ -1776,7 +1776,7 @@ void ToolbarPanel::drawSaveBeforePackagingPopup()
     if (ImGui::Button("取消", ImVec2(120, 0)))
     {
         startPackagingProcess();
-        ImGui::CloseCurrentPopup();
+        PopupManager::GetInstance().Close("SaveScene");
     }
 }
 

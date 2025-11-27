@@ -739,7 +739,7 @@ void Editor::drawAddComponentPopupContent()
                     compInfo->add(registry, static_cast<entt::entity>(obj));
                 }
             }
-            ImGui::CloseCurrentPopup();
+            PopupManager::GetInstance().Close("AddComponentPopup");
         }
 
         if (allHaveComponent)
@@ -761,7 +761,7 @@ void Editor::drawFileConflictPopupContent()
         std::filesystem::copy(m_editorContext.conflictSourcePath, m_editorContext.conflictDestPath,
                               std::filesystem::copy_options::overwrite_existing);
         LogInfo("资产已覆盖: {}", file.filename().string());
-        ImGui::CloseCurrentPopup();
+        PopupManager::GetInstance().Close("File Exists");
     }
     ImGui::SetItemDefaultFocus();
     ImGui::SameLine();
@@ -793,13 +793,13 @@ void Editor::drawFileConflictPopupContent()
             LogError("重命名并复制资产失败: {}", e.what());
         }
 
-        ImGui::CloseCurrentPopup();
+        PopupManager::GetInstance().Close("File Exists");
     }
     ImGui::SameLine();
 
     if (ImGui::Button("取消", ImVec2(120, 0)))
     {
-        ImGui::CloseCurrentPopup();
+        PopupManager::GetInstance().Close("File Exists");
     }
 }
 
