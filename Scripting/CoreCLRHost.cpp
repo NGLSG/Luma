@@ -1,3 +1,4 @@
+#ifndef ANDROID
 #include "CoreCLRHost.h"
 #include <iostream>
 #include <chrono>
@@ -37,6 +38,15 @@ namespace
     const std::wstring CallOnEnableMethodName = L"OnEnable";
     const std::wstring CallOnDisableMethodName = L"OnDisable";
     const std::wstring DebugWaitForDebuggerMethodName = L"Debug_WaitForDebugger";
+
+
+    const std::wstring PluginLoadMethodName = L"Plugin_Load";
+    const std::wstring PluginUnloadMethodName = L"Plugin_Unload";
+    const std::wstring PluginUnloadAllMethodName = L"Plugin_UnloadAll";
+    const std::wstring PluginUpdateEditorMethodName = L"Plugin_UpdateEditorPlugins";
+    const std::wstring PluginDrawPanelsMethodName = L"Plugin_DrawEditorPluginPanels";
+    const std::wstring PluginDrawMenuBarMethodName = L"Plugin_DrawEditorPluginMenuBar";
+    const std::wstring PluginDrawMenuItemsMethodName = L"Plugin_DrawMenuItems";
 }
 
 std::filesystem::path get_executable_directory()
@@ -53,7 +63,7 @@ std::filesystem::path get_executable_directory()
         return std::filesystem::path(result).parent_path();
     }
 #endif
-    
+
     return std::filesystem::current_path();
 }
 
@@ -62,6 +72,11 @@ std::mutex CoreCLRHost::s_mutex;
 CoreCLRHost* CoreCLRHost::GetInstance()
 {
     return s_instance.get();
+}
+
+CoreCLRHost* CoreCLRHost::GetPluginInstance()
+{
+    return s_pluginInstance.get();
 }
 
 void CoreCLRHost::CreateNewInstance()
@@ -78,6 +93,20 @@ void CoreCLRHost::CreateNewInstance()
     s_instance = std::unique_ptr<CoreCLRHost>(new CoreCLRHost());
 }
 
+void CoreCLRHost::CreateNewPluginInstance()
+{
+    std::lock_guard<std::mutex> lock(s_mutex);
+
+    if (s_pluginInstance)
+    {
+        LogInfo("CoreCLRHost: 销毁旧的插件单例实例");
+        s_pluginInstance->Shutdown();
+        s_pluginInstance.reset();
+    }
+
+    s_pluginInstance = std::unique_ptr<CoreCLRHost>(new CoreCLRHost());
+}
+
 void CoreCLRHost::DestroyInstance()
 {
     std::lock_guard<std::mutex> lock(s_mutex);
@@ -87,6 +116,18 @@ void CoreCLRHost::DestroyInstance()
         s_instance->Shutdown();
         s_instance.reset();
         s_instance = nullptr;
+    }
+}
+
+void CoreCLRHost::DestroyPluginInstance()
+{
+    std::lock_guard<std::mutex> lock(s_mutex);
+
+    if (s_pluginInstance)
+    {
+        s_pluginInstance->Shutdown();
+        s_pluginInstance.reset();
+        s_pluginInstance = nullptr;
     }
 }
 
@@ -130,10 +171,10 @@ bool CoreCLRHost::Initialize(const std::filesystem::path& mainAssemblyPath, bool
             LogWarn("CoreCLRHost: 更新PATH环境变量失败");
         }
     }
-#else 
-    std::filesystem::path engineDir = get_executable_directory(); 
+#else
+    std::filesystem::path engineDir = get_executable_directory();
     const char* ld_path = getenv("LD_LIBRARY_PATH");
-    std::string new_ld_path = engineDir.string(); 
+    std::string new_ld_path = engineDir.string();
     if (ld_path && ld_path[0] != '\0')
     {
         new_ld_path += ":";
@@ -201,6 +242,21 @@ bool CoreCLRHost::Initialize(const std::filesystem::path& mainAssemblyPath, bool
                                                             CallOnDisableMethodName);
     m_callOnEnableFn = (CallOnEnableFn)getManagedFunction(SdkAssemblyName, InteropTypeName,
                                                           CallOnEnableMethodName);
+
+
+    m_pluginLoadFn = (PluginLoadFn)getManagedFunction(SdkAssemblyName, InteropTypeName, PluginLoadMethodName);
+    m_pluginUnloadFn = (PluginUnloadFn)getManagedFunction(SdkAssemblyName, InteropTypeName, PluginUnloadMethodName);
+    m_pluginUnloadAllFn = (PluginUnloadAllFn)getManagedFunction(SdkAssemblyName, InteropTypeName,
+                                                                PluginUnloadAllMethodName);
+    m_pluginUpdateEditorFn = (PluginUpdateEditorFn)getManagedFunction(SdkAssemblyName, InteropTypeName,
+                                                                      PluginUpdateEditorMethodName);
+    m_pluginDrawPanelsFn = (PluginDrawPanelsFn)getManagedFunction(SdkAssemblyName, InteropTypeName,
+                                                                  PluginDrawPanelsMethodName);
+    m_pluginDrawMenuBarFn = (PluginDrawMenuBarFn)getManagedFunction(SdkAssemblyName, InteropTypeName,
+                                                                    PluginDrawMenuBarMethodName);
+    m_pluginDrawMenuItemsFn = (PluginDrawMenuItemsFn)getManagedFunction(SdkAssemblyName, InteropTypeName,
+                                                                        PluginDrawMenuItemsMethodName);
+
     if (!m_createInstanceFn || !m_destroyInstanceFn || !m_updateInstanceFn || !m_setPropertyFn ||
         !m_debugListFn || !m_invokeMethodFn || !m_onCreateFn || !m_dispatchCollisionEventFn || !
         m_callOnDisableFn || !m_callOnEnableFn)
@@ -210,7 +266,13 @@ bool CoreCLRHost::Initialize(const std::filesystem::path& mainAssemblyPath, bool
         return false;
     }
 
-    
+
+    if (!m_pluginLoadFn || !m_pluginUnloadFn)
+    {
+        LogWarn("CoreCLRHost: 插件系统函数未找到，插件功能将不可用。");
+    }
+
+
     if (ProjectSettings::GetInstance().GetScriptDebugEnabled() &&
         ProjectSettings::GetInstance().GetScriptDebugWaitForAttach())
     {
@@ -218,7 +280,6 @@ bool CoreCLRHost::Initialize(const std::filesystem::path& mainAssemblyPath, bool
                                                                  DebugWaitForDebuggerMethodName);
         if (waitFn)
         {
-            
             waitFn(60000);
         }
     }
@@ -516,3 +577,4 @@ std::string CoreCLRHost::pathToUtf8(const std::filesystem::path& p)
     return p.string();
 #endif
 }
+#endif

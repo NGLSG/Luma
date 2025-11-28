@@ -24,6 +24,11 @@ struct UIDrawData;
 class LUMA_API Editor final : public ApplicationBase
 {
 public:
+    static Editor* GetInstance()
+    {
+        return s_instance;
+    }
+
     /**
      * @brief 构造函数，初始化编辑器实例。
      * @param config 应用程序的配置信息。
@@ -55,9 +60,14 @@ public:
     void RequestFocusInBrowser(const Guid& guid);
 
     /**
-     * @brief 创建一个新的项目。
+     * @brief 创建一个新的游戏项目。
      */
     void CreateNewProject();
+
+    /**
+     * @brief 创建一个新的插件项目。
+     */
+    void CreateNewPluginProject();
 
     /**
      * @brief 打开一个现有项目。
@@ -71,10 +81,26 @@ public:
     void LoadProject(const std::filesystem::path& projectPath);
 
     /**
-     * @brief 在指定路径创建一个新项目。
+     * @brief 在指定路径创建一个新游戏项目。
      * @param projectPath 新项目的创建路径。
      */
     void CreateNewProjectAtPath(const std::filesystem::path& projectPath);
+
+    /**
+     * @brief 在指定路径创建一个新插件项目。
+     * @param projectPath 新插件项目的创建路径。
+     */
+    void CreatePluginProjectAtPath(const std::filesystem::path& projectPath);
+
+    /**
+     * @brief 设置待创建项目的路径（用于popup选择后创建）
+     */
+    void SetPendingProjectPath(const std::filesystem::path& path) { m_pendingProjectPath = path; }
+
+    /**
+     * @brief 获取待创建项目的路径
+     */
+    const std::filesystem::path& GetPendingProjectPath() const { return m_pendingProjectPath; }
 
     /**
      * @brief 根据名称获取编辑器面板。
@@ -83,6 +109,7 @@ public:
      */
     IEditorPanel* GetPanelByName(const std::string& name);
     PlatformWindow* GetPlatWindow();
+    EditorContext& GetEditorContext() { return m_editorContext; }
 
 protected:
     /**
@@ -112,9 +139,9 @@ protected:
 
 private:
     void initializeEditorContext(); ///< 初始化编辑器上下文。
-    void initializePanels();        ///< 初始化所有编辑器面板。
-    void registerPopups();          ///< 注册所有弹出窗口。
-    void loadStartupScene();        ///< 加载启动场景。
+    void initializePanels(); ///< 初始化所有编辑器面板。
+    void registerPopups(); ///< 注册所有弹出窗口。
+    void loadStartupScene(); ///< 加载启动场景。
 
 
     void drawAddComponentPopupContent(); ///< 绘制添加组件弹出窗口的内容。
@@ -136,6 +163,9 @@ private:
 
     std::unique_ptr<ImGuiRenderer> m_imguiRenderer; ///< ImGui渲染器的智能指针。
     std::unique_ptr<SceneRenderer> m_sceneRenderer; ///< 场景渲染器的智能指针。
+
+    std::filesystem::path m_pendingProjectPath; ///< 待创建项目的路径
+    inline static Editor* s_instance; ///< 编辑器单例实例。
 };
 
 #endif

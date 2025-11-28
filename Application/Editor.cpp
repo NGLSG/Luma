@@ -1,6 +1,9 @@
 #include "../Utils/PCH.h"
 #include "Editor.h"
 
+#include <fstream>
+#include <cstdlib>
+#include <vector>
 
 #include "Window.h"
 #include "ProjectSettings.h"
@@ -59,6 +62,8 @@
 #include "Editor/RuleTilePanel.h"
 #include "Editor/TextureSlicerPanel.h"
 #include "Editor/ShaderEditorPanel.h"
+#include "Editor/PluginManagerPanel.h"
+#include "Plugins/PluginManager.h"
 #include "Managers/RuntimeAnimationClipManager.h"
 #include "Managers/RuntimeFontManager.h"
 #include "RuntimeAsset/RuntimeAnimationClip.h"
@@ -133,9 +138,23 @@ static void SDLCALL OnNewProjectFolderSelected(void* userdata, const char* const
     }
 }
 
+static void SDLCALL OnNewPluginProjectFolderSelected(void* userdata, const char* const* filelist, int filter)
+{
+    if (filelist && filelist[0])
+    {
+        Editor* editor = static_cast<Editor*>(userdata);
+        editor->CreatePluginProjectAtPath(std::filesystem::path(filelist[0]));
+    }
+}
+
 
 Editor::Editor(ApplicationConfig config) : ApplicationBase(config)
 {
+    if (s_instance)
+    {
+        throw std::runtime_error("只能有一个Editor实例");
+    }
+    s_instance = this;
     CURRENT_MODE = ApplicationMode::Editor;
 
     m_uiCallbacks = std::make_unique<UIDrawData>();
@@ -227,6 +246,9 @@ void Editor::InitializeDerived()
 
     registerPopups();
 
+    
+    std::filesystem::path pluginsRoot = std::filesystem::current_path() / "Plugins";
+    PluginManager::GetInstance().Initialize(pluginsRoot);
 
     auto lastProjectPath = GetLastEditingProject();
     if (!lastProjectPath.empty())
@@ -275,6 +297,7 @@ void Editor::initializePanels()
     m_panels.push_back(std::make_unique<BlueprintPanel>());
     m_panels.push_back(std::make_unique<TextureSlicerPanel>());
     m_panels.push_back(std::make_unique<ShaderEditorPanel>());
+    m_panels.push_back(std::make_unique<PluginManagerPanel>());
 
     for (auto& panel : m_panels)
     {
@@ -416,6 +439,9 @@ void Editor::Render()
                 panel->Update(1.f / m_context.currentFps);
             }
         }
+
+        
+        PluginManager::GetInstance().UpdateEditorPlugins(1.f / m_context.currentFps);
     }
 
     RenderableManager::GetInstance().SetExternalAlpha(m_context.interpolationAlpha);
@@ -446,6 +472,9 @@ void Editor::Render()
                 panel->Draw();
             }
         }
+
+        
+        PluginManager::GetInstance().DrawEditorPluginPanels();
     }
 
     PopupManager::GetInstance().Render();
@@ -463,6 +492,9 @@ void Editor::Render()
 
 void Editor::ShutdownDerived()
 {
+    
+    PluginManager::GetInstance().Shutdown();
+
     for (auto& panel : m_panels)
     {
         panel->Shutdown();
@@ -497,7 +529,6 @@ void Editor::ShutdownDerived()
 
 void Editor::CreateNewProject()
 {
-    
     if (m_editorContext.editorState != EditorState::Editing)
     {
         LogWarn("请先停止播放场景后再切换项目");
@@ -506,9 +537,13 @@ void Editor::CreateNewProject()
     SDL_ShowOpenFolderDialog(OnNewProjectFolderSelected, this, m_window->GetSdlWindow(), nullptr, false);
 }
 
+void Editor::CreateNewPluginProject()
+{
+    SDL_ShowOpenFolderDialog(OnNewPluginProjectFolderSelected, this, m_window->GetSdlWindow(), nullptr, false);
+}
+
 void Editor::OpenProject()
 {
-    
     if (m_editorContext.editorState != EditorState::Editing)
     {
         LogWarn("请先停止播放场景后再切换项目");
@@ -522,7 +557,6 @@ void Editor::OpenProject()
 
 void Editor::LoadProject(const std::filesystem::path& projectPath)
 {
-    
     if (m_editorContext.editorState != EditorState::Editing)
     {
         LogWarn("请先停止播放场景后再切换项目");
@@ -570,7 +604,6 @@ void Editor::LoadProject(const std::filesystem::path& projectPath)
 
 void Editor::CreateNewProjectAtPath(const std::filesystem::path& projectPath)
 {
-    
     if (m_editorContext.editorState != EditorState::Editing)
     {
         LogWarn("请先停止播放场景后再切换项目");
@@ -641,6 +674,210 @@ void Editor::CreateNewProjectAtPath(const std::filesystem::path& projectPath)
 
     LogInfo("成功创建新项目: {}", projectName);
     LoadProject(projectFilePath);
+}
+
+void Editor::CreatePluginProjectAtPath(const std::filesystem::path& projectPath)
+{
+    std::string pluginName = projectPath.filename().string();
+
+    
+    std::filesystem::path engineRoot = std::filesystem::current_path();
+    std::filesystem::path templatePath = engineRoot / "Plugins" / "Template";
+
+    if (!std::filesystem::exists(templatePath))
+    {
+        LogError("插件模板目录不存在: {}", templatePath.string());
+        return;
+    }
+
+    try
+    {
+        
+        if (!std::filesystem::exists(projectPath))
+        {
+            std::filesystem::create_directories(projectPath);
+        }
+
+        
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(templatePath))
+        {
+            const auto& srcPath = entry.path();
+            auto relativePath = std::filesystem::relative(srcPath, templatePath);
+            auto destPath = projectPath / relativePath;
+
+            if (entry.is_directory())
+            {
+                std::filesystem::create_directories(destPath);
+            }
+            else if (entry.is_regular_file())
+            {
+                
+                if (srcPath.filename() == ".gitkeep")
+                    continue;
+
+                std::filesystem::copy_file(srcPath, destPath,
+                                           std::filesystem::copy_options::overwrite_existing);
+            }
+        }
+
+        
+        std::filesystem::path oldCsproj = projectPath / "Template.csproj";
+        std::filesystem::path newCsproj = projectPath / (pluginName + ".csproj");
+        if (std::filesystem::exists(oldCsproj))
+        {
+            std::filesystem::rename(oldCsproj, newCsproj);
+        }
+
+        
+        std::filesystem::path manifestPath = projectPath / "plugin.yaml";
+        if (std::filesystem::exists(manifestPath))
+        {
+            std::ifstream inFile(manifestPath);
+            std::string content((std::istreambuf_iterator<char>(inFile)),
+                                std::istreambuf_iterator<char>());
+            inFile.close();
+
+            
+            size_t pos;
+            while ((pos = content.find("com.sample.plugin")) != std::string::npos)
+            {
+                content.replace(pos, 17, "com." + pluginName + ".plugin");
+            }
+            while ((pos = content.find("示例插件")) != std::string::npos)
+            {
+                content.replace(pos, 12, pluginName);
+            }
+            while ((pos = content.find("Template.dll")) != std::string::npos)
+            {
+                content.replace(pos, 12, pluginName + ".dll");
+            }
+
+            std::ofstream outFile(manifestPath);
+            outFile << content;
+            outFile.close();
+        }
+
+        
+        std::filesystem::path oldSln = projectPath / "Template.sln";
+        std::filesystem::path newSln = projectPath / (pluginName + ".sln");
+        if (std::filesystem::exists(oldSln))
+        {
+            std::ifstream inFile(oldSln);
+            std::string content((std::istreambuf_iterator<char>(inFile)),
+                                std::istreambuf_iterator<char>());
+            inFile.close();
+
+            
+            size_t pos;
+            while ((pos = content.find("Template")) != std::string::npos)
+            {
+                content.replace(pos, 8, pluginName);
+            }
+
+            std::ofstream outFile(newSln);
+            outFile << content;
+            outFile.close();
+
+            
+            std::filesystem::remove(oldSln);
+
+            
+            std::filesystem::path oldSlnSettings = projectPath / "Template.sln.DotSettings.user";
+            if (std::filesystem::exists(oldSlnSettings))
+            {
+                std::filesystem::remove(oldSlnSettings);
+            }
+        }
+
+        
+        std::filesystem::path samplePath = projectPath / "Sample.cs";
+        if (std::filesystem::exists(samplePath))
+        {
+            std::ifstream inFile(samplePath);
+            std::string content((std::istreambuf_iterator<char>(inFile)),
+                                std::istreambuf_iterator<char>());
+            inFile.close();
+
+            
+            size_t pos;
+            while ((pos = content.find("namespace Template")) != std::string::npos)
+            {
+                content.replace(pos, 18, "namespace " + pluginName);
+            }
+
+            std::ofstream outFile(samplePath);
+            outFile << content;
+            outFile.close();
+        }
+
+        
+        std::filesystem::path refsPath = projectPath / "refs";
+        std::filesystem::create_directories(refsPath);
+
+#ifdef _WIN32
+        std::filesystem::path toolsDir = engineRoot / "Tools" / "Windows";
+#elif defined(__ANDROID__)
+        std::filesystem::path toolsDir = engineRoot / "Tools" / "Android";
+#elif defined(__linux__)
+        std::filesystem::path toolsDir = engineRoot / "Tools" / "Linux";
+#else
+        std::filesystem::path toolsDir = engineRoot / "Tools" / "Linux";
+#endif
+
+        const std::vector<std::string> sdkFiles = {
+            "Luma.SDK.dll",
+            "Luma.SDK.deps.json",
+            "Luma.SDK.runtimeconfig.json",
+            "YamlDotNet.dll"
+        };
+
+        for (const auto& fileName : sdkFiles)
+        {
+            std::filesystem::path srcFile = toolsDir / fileName;
+            if (std::filesystem::exists(srcFile))
+            {
+                std::filesystem::copy_file(srcFile, refsPath / fileName,
+                                           std::filesystem::copy_options::overwrite_existing);
+            }
+        }
+
+        if (!std::filesystem::exists(refsPath / "Luma.SDK.dll"))
+        {
+            LogWarn("Luma.SDK.dll 未找到，请检查 Tools 目录");
+        }
+
+        LogInfo("成功创建插件项目: {}", pluginName);
+
+        
+#ifdef _WIN32
+        
+        std::string riderCmd = "where rider64";
+        if (std::system(riderCmd.c_str()) == 0)
+        {
+            std::string cmd = "start rider64 \"" + newCsproj.string() + "\"";
+            std::system(cmd.c_str());
+        }
+        else
+        {
+            
+            std::string cmd = "code \"" + projectPath.string() + "\"";
+            if (std::system(cmd.c_str()) != 0)
+            {
+                
+                std::string explorerCmd = "explorer \"" + projectPath.string() + "\"";
+                std::system(explorerCmd.c_str());
+            }
+        }
+#else
+        
+        std::string cmd = "code \"" + projectPath.string() + "\" || xdg-open \"" + projectPath.string() + "\"";
+        std::system(cmd.c_str());
+#endif
+    }
+    catch (const std::exception& e)
+    {
+        LogError("创建插件项目失败: {}", e.what());
+    }
 }
 
 IEditorPanel* Editor::GetPanelByName(const std::string& name)

@@ -403,6 +403,11 @@ int RuntimeScene::GetRootSiblingIndex(const RuntimeGameObject& object) const
     return -1;
 }
 
+uint32_t RuntimeScene::GetGameObjectCount() const
+{
+    return m_guidToEntityMap.size();
+}
+
 void RuntimeScene::SetRootSiblingIndex(RuntimeGameObject& object, int newIndex)
 {
     if (object.HasComponent<ECS::ParentComponent>()) return;

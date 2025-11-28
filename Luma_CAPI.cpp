@@ -12,6 +12,7 @@
 #include "PathUtils.h"
 #include "UIComponents.h"
 #include "PhysicsSystem.h"
+#include "ProjectSettings.h"
 #include "SceneManager.h"
 #include "SIMDWrapper.h"
 #include "TagComponent.h"
@@ -2170,9 +2171,6 @@ LUMA_API const char* PathUtils_GetAndroidExternalDataDir()
 }
 
 
-
-
-
 LUMA_API WGSLMaterialHandle WGSLMaterial_Load(Guid_CAPI assetGuid)
 {
     Guid guid = FromGuidCAPI(assetGuid);
@@ -2248,7 +2246,7 @@ LUMA_API void WGSLMaterial_SetTexture(WGSLMaterialHandle material, const char* n
     if (!material || !name || !texture) return;
     auto* mat = static_cast<RuntimeWGSLMaterial*>(material);
     auto* tex = static_cast<Nut::TextureA*>(texture);
-    
+
     Nut::TextureAPtr texPtr(tex, [](Nut::TextureA*)
     {
     });
@@ -2261,9 +2259,6 @@ LUMA_API void WGSLMaterial_UpdateUniformBuffer(WGSLMaterialHandle material)
     auto* mat = static_cast<RuntimeWGSLMaterial*>(material);
     mat->UpdateUniformBuffer();
 }
-
-
-
 
 
 LUMA_API TextureAHandle TextureA_Load(Guid_CAPI assetGuid)
@@ -2293,8 +2288,7 @@ LUMA_API TextureAHandle TextureA_Create(uint32_t width, uint32_t height)
 
     if (!texture) return nullptr;
 
-    
-    
+
     static std::vector<Nut::TextureAPtr> s_createdTextures;
     s_createdTextures.push_back(texture);
 
@@ -2310,8 +2304,6 @@ LUMA_API bool TextureA_IsValid(TextureAHandle texture)
 
 LUMA_API void TextureA_Release(TextureAHandle texture)
 {
-    
-    
     (void)texture;
 }
 
@@ -2365,9 +2357,6 @@ LUMA_API bool TextureA_IsArray(TextureAHandle texture)
 }
 
 
-
-
-
 LUMA_API GpuBufferHandle GpuBuffer_Create(uint32_t size, uint32_t usage)
 {
     auto context = GraphicsBackend::GetInstance()->GetNutContext();
@@ -2381,7 +2370,7 @@ LUMA_API GpuBufferHandle GpuBuffer_Create(uint32_t size, uint32_t usage)
     auto buffer = std::make_unique<Nut::Buffer>(layout, context);
     if (!buffer || !(*buffer)) return nullptr;
 
-    
+
     static std::vector<std::unique_ptr<Nut::Buffer>> s_createdBuffers;
     s_createdBuffers.push_back(std::move(buffer));
 
@@ -2397,8 +2386,6 @@ LUMA_API bool GpuBuffer_IsValid(GpuBufferHandle buffer)
 
 LUMA_API void GpuBuffer_Release(GpuBufferHandle buffer)
 {
-    
-    
     (void)buffer;
 }
 
@@ -2415,9 +2402,6 @@ LUMA_API bool GpuBuffer_Write(GpuBufferHandle buffer, const void* data, uint32_t
     auto* buf = static_cast<Nut::Buffer*>(buffer);
     return buf->WriteBuffer(data, size, offset);
 }
-
-
-
 
 
 LUMA_API float Camera_GetPositionX()
@@ -2441,14 +2425,13 @@ LUMA_API void Camera_SetPosition(float x, float y)
 
 LUMA_API float Camera_GetZoom()
 {
-    
     return Camera::GetInstance().GetProperties().zoom.x();
 }
 
 LUMA_API void Camera_SetZoom(float zoom)
 {
     auto props = Camera::GetInstance().GetProperties();
-    props.zoom = {zoom, zoom};  
+    props.zoom = {zoom, zoom};
     Camera::GetInstance().SetProperties(props);
 }
 
@@ -2508,9 +2491,6 @@ LUMA_API void Camera_WorldToScreen(float worldX, float worldY, float* screenX, f
 }
 
 
-
-
-
 LUMA_API void Shader_StartPreWarmingAsync()
 {
     Nut::ShaderRegistry::GetInstance().StartPreWarmingAsync();
@@ -2543,4 +2523,662 @@ LUMA_API void Shader_GetPreWarmingState(int* outTotal, int* outLoaded, bool* out
     if (outLoaded) *outLoaded = state.loaded;
     if (outIsRunning) *outIsRunning = state.isRunning;
     if (outIsComplete) *outIsComplete = state.isComplete;
+}
+
+
+
+
+
+#include <imgui.h>
+#include "Plugins/PluginManager.h"
+
+LUMA_API bool ImGui_Begin(const char* name)
+{
+    return ImGui::Begin(name);
+}
+
+LUMA_API bool ImGui_BeginWithOpen(const char* name, bool* open)
+{
+    return ImGui::Begin(name, open);
+}
+
+LUMA_API void ImGui_End()
+{
+    ImGui::End();
+}
+
+LUMA_API void ImGui_Text(const char* text)
+{
+    ImGui::TextUnformatted(text);
+}
+
+LUMA_API void ImGui_TextColored(float r, float g, float b, float a, const char* text)
+{
+    ImGui::TextColored(ImVec4(r, g, b, a), "%s", text);
+}
+
+LUMA_API void ImGui_TextDisabled(const char* text)
+{
+    ImGui::TextDisabled("%s", text);
+}
+
+LUMA_API void ImGui_TextWrapped(const char* text)
+{
+    ImGui::TextWrapped("%s", text);
+}
+
+LUMA_API void ImGui_LabelText(const char* label, const char* text)
+{
+    ImGui::LabelText(label, "%s", text);
+}
+
+LUMA_API bool ImGui_Button(const char* label)
+{
+    return ImGui::Button(label);
+}
+
+LUMA_API bool ImGui_ButtonEx(const char* label, float width, float height)
+{
+    return ImGui::Button(label, ImVec2(width, height));
+}
+
+LUMA_API bool ImGui_SmallButton(const char* label)
+{
+    return ImGui::SmallButton(label);
+}
+
+LUMA_API bool ImGui_Checkbox(const char* label, bool* value)
+{
+    return ImGui::Checkbox(label, value);
+}
+
+LUMA_API bool ImGui_InputText(const char* label, char* buffer, int bufferSize)
+{
+    return ImGui::InputText(label, buffer, static_cast<size_t>(bufferSize));
+}
+
+
+LUMA_API bool ImGui_InputTextCallback(const char* label, const char* text, char* outBuffer, int outBufferSize,
+                                      bool* changed)
+{
+    
+    if (text)
+    {
+        strncpy(outBuffer, text, outBufferSize - 1);
+        outBuffer[outBufferSize - 1] = '\0';
+    }
+    else
+    {
+        outBuffer[0] = '\0';
+    }
+
+    bool result = ImGui::InputText(label, outBuffer, static_cast<size_t>(outBufferSize));
+    if (changed)
+    {
+        *changed = result;
+    }
+    return result;
+}
+
+LUMA_API bool ImGui_InputTextMultiline(const char* label, char* buffer, int bufferSize, float width, float height)
+{
+    return ImGui::InputTextMultiline(label, buffer, static_cast<size_t>(bufferSize), ImVec2(width, height));
+}
+
+LUMA_API bool ImGui_InputTextMultilineCallback(const char* label, const char* text, char* outBuffer, int outBufferSize,
+                                               float width, float height, bool* changed)
+{
+    if (text)
+    {
+        strncpy(outBuffer, text, outBufferSize - 1);
+        outBuffer[outBufferSize - 1] = '\0';
+    }
+    else
+    {
+        outBuffer[0] = '\0';
+    }
+
+    bool result = ImGui::InputTextMultiline(label, outBuffer, static_cast<size_t>(outBufferSize),
+                                            ImVec2(width, height));
+    if (changed)
+    {
+        *changed = result;
+    }
+    return result;
+}
+
+LUMA_API bool ImGui_InputFloat(const char* label, float* value)
+{
+    return ImGui::InputFloat(label, value);
+}
+
+LUMA_API bool ImGui_InputInt(const char* label, int* value)
+{
+    return ImGui::InputInt(label, value);
+}
+
+LUMA_API bool ImGui_SliderFloat(const char* label, float* value, float min, float max)
+{
+    return ImGui::SliderFloat(label, value, min, max);
+}
+
+LUMA_API bool ImGui_SliderInt(const char* label, int* value, int min, int max)
+{
+    return ImGui::SliderInt(label, value, min, max);
+}
+
+LUMA_API void ImGui_Separator()
+{
+    ImGui::Separator();
+}
+
+LUMA_API void ImGui_SameLine()
+{
+    ImGui::SameLine();
+}
+
+LUMA_API void ImGui_SameLineEx(float offsetFromStartX, float spacing)
+{
+    ImGui::SameLine(offsetFromStartX, spacing);
+}
+
+LUMA_API void ImGui_Spacing()
+{
+    ImGui::Spacing();
+}
+
+LUMA_API void ImGui_Dummy(float width, float height)
+{
+    ImGui::Dummy(ImVec2(width, height));
+}
+
+LUMA_API void ImGui_Indent()
+{
+    ImGui::Indent();
+}
+
+LUMA_API void ImGui_Unindent()
+{
+    ImGui::Unindent();
+}
+
+LUMA_API bool ImGui_TreeNode(const char* label)
+{
+    return ImGui::TreeNode(label);
+}
+
+LUMA_API void ImGui_TreePop()
+{
+    ImGui::TreePop();
+}
+
+LUMA_API bool ImGui_CollapsingHeader(const char* label)
+{
+    return ImGui::CollapsingHeader(label);
+}
+
+LUMA_API bool ImGui_Selectable(const char* label, bool selected)
+{
+    return ImGui::Selectable(label, selected);
+}
+
+LUMA_API bool ImGui_BeginMenuBar()
+{
+    return ImGui::BeginMenuBar();
+}
+
+LUMA_API void ImGui_EndMenuBar()
+{
+    ImGui::EndMenuBar();
+}
+
+LUMA_API bool ImGui_BeginMenu(const char* label)
+{
+    return ImGui::BeginMenu(label);
+}
+
+LUMA_API void ImGui_EndMenu()
+{
+    ImGui::EndMenu();
+}
+
+LUMA_API bool ImGui_MenuItem(const char* label)
+{
+    return ImGui::MenuItem(label);
+}
+
+LUMA_API bool ImGui_MenuItemEx(const char* label, const char* shortcut, bool selected)
+{
+    return ImGui::MenuItem(label, shortcut, selected);
+}
+
+LUMA_API void ImGui_OpenPopup(const char* strId)
+{
+    ImGui::OpenPopup(strId);
+}
+
+LUMA_API bool ImGui_BeginPopup(const char* strId)
+{
+    return ImGui::BeginPopup(strId);
+}
+
+LUMA_API bool ImGui_BeginPopupModal(const char* name)
+{
+    return ImGui::BeginPopupModal(name);
+}
+
+LUMA_API void ImGui_EndPopup()
+{
+    ImGui::EndPopup();
+}
+
+LUMA_API void ImGui_CloseCurrentPopup()
+{
+    ImGui::CloseCurrentPopup();
+}
+
+LUMA_API bool ImGui_IsItemHovered()
+{
+    return ImGui::IsItemHovered();
+}
+
+LUMA_API bool ImGui_IsItemClicked()
+{
+    return ImGui::IsItemClicked();
+}
+
+LUMA_API void ImGui_SetTooltip(const char* text)
+{
+    ImGui::SetTooltip("%s", text);
+}
+
+LUMA_API float ImGui_GetWindowWidth()
+{
+    return ImGui::GetWindowWidth();
+}
+
+LUMA_API float ImGui_GetWindowHeight()
+{
+    return ImGui::GetWindowHeight();
+}
+
+LUMA_API void ImGui_SetNextWindowSize(float width, float height)
+{
+    ImGui::SetNextWindowSize(ImVec2(width, height));
+}
+
+LUMA_API void ImGui_SetNextWindowPos(float x, float y)
+{
+    ImGui::SetNextWindowPos(ImVec2(x, y));
+}
+
+LUMA_API void ImGui_PushID(int id)
+{
+    ImGui::PushID(id);
+}
+
+LUMA_API void ImGui_PushIDStr(const char* strId)
+{
+    ImGui::PushID(strId);
+}
+
+LUMA_API void ImGui_PopID()
+{
+    ImGui::PopID();
+}
+
+
+LUMA_API bool ImGui_ColorEdit3(const char* label, float* r, float* g, float* b)
+{
+    float col[3] = {*r, *g, *b};
+    bool result = ImGui::ColorEdit3(label, col);
+    if (result)
+    {
+        *r = col[0];
+        *g = col[1];
+        *b = col[2];
+    }
+    return result;
+}
+
+LUMA_API bool ImGui_ColorEdit4(const char* label, float* r, float* g, float* b, float* a)
+{
+    float col[4] = {*r, *g, *b, *a};
+    bool result = ImGui::ColorEdit4(label, col);
+    if (result)
+    {
+        *r = col[0];
+        *g = col[1];
+        *b = col[2];
+        *a = col[3];
+    }
+    return result;
+}
+
+
+LUMA_API bool ImGui_DragFloat(const char* label, float* value, float speed, float min, float max)
+{
+    return ImGui::DragFloat(label, value, speed, min, max);
+}
+
+LUMA_API bool ImGui_DragInt(const char* label, int* value, float speed, int min, int max)
+{
+    return ImGui::DragInt(label, value, speed, min, max);
+}
+
+
+LUMA_API void ImGui_ProgressBar(float fraction, float width, float height, const char* overlay)
+{
+    ImGui::ProgressBar(fraction, ImVec2(width, height), overlay);
+}
+
+
+LUMA_API bool ImGui_BeginChild(const char* strId, float width, float height, bool border)
+{
+    return ImGui::BeginChild(strId, ImVec2(width, height), border ? ImGuiChildFlags_Border : ImGuiChildFlags_None);
+}
+
+LUMA_API void ImGui_EndChild()
+{
+    ImGui::EndChild();
+}
+
+
+LUMA_API bool ImGui_BeginTabBar(const char* strId)
+{
+    return ImGui::BeginTabBar(strId);
+}
+
+LUMA_API void ImGui_EndTabBar()
+{
+    ImGui::EndTabBar();
+}
+
+LUMA_API bool ImGui_BeginTabItem(const char* label)
+{
+    return ImGui::BeginTabItem(label);
+}
+
+LUMA_API void ImGui_EndTabItem()
+{
+    ImGui::EndTabItem();
+}
+
+
+LUMA_API bool ImGui_BeginTable(const char* strId, int columns)
+{
+    return ImGui::BeginTable(strId, columns);
+}
+
+LUMA_API void ImGui_EndTable()
+{
+    ImGui::EndTable();
+}
+
+LUMA_API void ImGui_TableNextRow()
+{
+    ImGui::TableNextRow();
+}
+
+LUMA_API bool ImGui_TableNextColumn()
+{
+    return ImGui::TableNextColumn();
+}
+
+LUMA_API void ImGui_TableSetupColumn(const char* label)
+{
+    ImGui::TableSetupColumn(label);
+}
+
+LUMA_API void ImGui_TableHeadersRow()
+{
+    ImGui::TableHeadersRow();
+}
+
+
+LUMA_API void ImGui_Image(ImTextureID textureId, float width, float height)
+{
+    ImGui::Image(textureId, ImVec2(width, height));
+}
+
+LUMA_API bool ImGui_ImageButton(const char* strId, ImTextureID textureId, float width, float height)
+{
+    return ImGui::ImageButton(strId, textureId, ImVec2(width, height));
+}
+
+
+
+
+
+LUMA_API bool Plugin_Load(const char* dllPath, const char* pluginId)
+{
+    return PluginManager::GetInstance().LoadPlugin(pluginId);
+}
+
+LUMA_API bool Plugin_Unload(const char* pluginId)
+{
+    return PluginManager::GetInstance().UnloadPlugin(pluginId);
+}
+
+LUMA_API int Plugin_GetCount()
+{
+    return static_cast<int>(PluginManager::GetInstance().GetAllPlugins().size());
+}
+
+LUMA_API bool Plugin_GetInfo(int index, char* idBuffer, int idBufferSize,
+                             char* nameBuffer, int nameBufferSize,
+                             char* versionBuffer, int versionBufferSize,
+                             bool* enabled, bool* loaded)
+{
+    const auto& plugins = PluginManager::GetInstance().GetAllPlugins();
+    if (index < 0 || index >= static_cast<int>(plugins.size()))
+        return false;
+
+    const auto& plugin = plugins[index];
+
+    if (idBuffer && idBufferSize > 0)
+    {
+        strncpy(idBuffer, plugin.id.c_str(), idBufferSize - 1);
+        idBuffer[idBufferSize - 1] = '\0';
+    }
+    if (nameBuffer && nameBufferSize > 0)
+    {
+        strncpy(nameBuffer, plugin.name.c_str(), nameBufferSize - 1);
+        nameBuffer[nameBufferSize - 1] = '\0';
+    }
+    if (versionBuffer && versionBufferSize > 0)
+    {
+        strncpy(versionBuffer, plugin.version.c_str(), versionBufferSize - 1);
+        versionBuffer[versionBufferSize - 1] = '\0';
+    }
+    if (enabled) *enabled = plugin.enabled;
+    if (loaded) *loaded = plugin.loaded;
+
+    return true;
+}
+
+
+
+
+
+LUMA_API void Luma_LogInfo(const char* message)
+{
+    LogInfo("[Plugin] {}", message);
+}
+
+LUMA_API void Luma_LogWarn(const char* message)
+{
+    LogWarn("[Plugin] {}", message);
+}
+
+LUMA_API void Luma_LogError(const char* message)
+{
+    LogError("[Plugin] {}", message);
+}
+
+LUMA_API void Luma_LogDebug(const char* message)
+{
+    LogDebug("[Plugin] {}", message);
+}
+
+
+
+
+
+#include "Application/Editor.h"
+#include "Application/Editor/EditorContext.h"
+
+LUMA_API bool Luma_IsEditorMode()
+{
+    return ApplicationBase::CURRENT_MODE == ApplicationMode::Editor;
+}
+
+LUMA_API bool Luma_IsPlaying()
+{
+    if (!Luma_IsEditorMode()) return false;
+    return Editor::GetInstance()->GetEditorContext().editorState == EditorState::Playing;
+}
+
+LUMA_API int Luma_GetSelectedEntityCount()
+{
+    if (!Luma_IsEditorMode()) return 0;
+    auto& context = Editor::GetInstance()->GetEditorContext();
+    if (context.selectionType != SelectionType::GameObject) return 0;
+    return static_cast<int>(context.selectionList.size());
+}
+
+LUMA_API Guid_CAPI Luma_GetSelectedEntityGuid(int index)
+{
+    Guid_CAPI result = {0, 0};
+    if (!Luma_IsEditorMode()) return result;
+
+    auto& context = Editor::GetInstance()->GetEditorContext();
+    if (context.selectionType != SelectionType::GameObject) return result;
+    if (index < 0 || index >= static_cast<int>(context.selectionList.size())) return result;
+
+    const Guid& guid = context.selectionList[index];
+    return ToGuidCAPI(guid);
+}
+
+LUMA_API void Luma_GetSelectedEntityName(int index, char* buffer, int bufferSize)
+{
+    if (!buffer || bufferSize <= 0) return;
+    buffer[0] = '\0';
+
+    if (!Luma_IsEditorMode()) return;
+
+    auto& context = Editor::GetInstance()->GetEditorContext();
+    if (context.selectionType != SelectionType::GameObject) return;
+    if (index < 0 || index >= static_cast<int>(context.selectionList.size())) return;
+
+    const Guid& guid = context.selectionList[index];
+    if (!context.activeScene) return;
+
+    auto gameObject = context.activeScene->FindGameObjectByGuid(guid);
+    if (gameObject.IsValid())
+    {
+        strncpy(buffer, gameObject.GetName().c_str(), bufferSize - 1);
+        buffer[bufferSize - 1] = '\0';
+    }
+}
+
+
+
+
+
+LUMA_API bool Luma_IsProjectLoaded()
+{
+    return ProjectSettings::GetInstance().IsProjectLoaded();
+}
+
+LUMA_API void Luma_GetProjectName(char* buffer, int bufferSize)
+{
+    if (!buffer || bufferSize <= 0) return;
+
+    auto& settings = ProjectSettings::GetInstance();
+    if (settings.IsProjectLoaded())
+    {
+        strncpy(buffer, settings.GetAppName().c_str(), bufferSize - 1);
+        buffer[bufferSize - 1] = '\0';
+    }
+    else
+    {
+        buffer[0] = '\0';
+    }
+}
+
+LUMA_API void Luma_GetProjectPath(char* buffer, int bufferSize)
+{
+    if (!buffer || bufferSize <= 0) return;
+
+    auto& settings = ProjectSettings::GetInstance();
+    if (settings.IsProjectLoaded())
+    {
+        strncpy(buffer, settings.GetProjectRoot().string().c_str(), bufferSize - 1);
+        buffer[bufferSize - 1] = '\0';
+    }
+    else
+    {
+        buffer[0] = '\0';
+    }
+}
+
+LUMA_API void Luma_GetAssetsPath(char* buffer, int bufferSize)
+{
+    if (!buffer || bufferSize <= 0) return;
+
+    auto& settings = ProjectSettings::GetInstance();
+    if (settings.IsProjectLoaded())
+    {
+        auto assetsPath = settings.GetProjectRoot() / "Assets";
+        strncpy(buffer, assetsPath.string().c_str(), bufferSize - 1);
+        buffer[bufferSize - 1] = '\0';
+    }
+    else
+    {
+        buffer[0] = '\0';
+    }
+}
+
+
+
+
+
+#include "Resources/RuntimeAsset/RuntimeScene.h"
+
+LUMA_API int Luma_GetEntityCount()
+{
+    auto currentScene = SceneManager::GetInstance().GetCurrentScene();
+    if (currentScene)
+        return currentScene->GetGameObjectCount();
+    return 0;
+}
+
+LUMA_API void Luma_GetCurrentSceneName(char* buffer, int bufferSize)
+{
+    if (!buffer || bufferSize <= 0) return;
+    buffer[0] = '\0';
+    auto currentScene = SceneManager::GetInstance().GetCurrentScene();
+    if (currentScene)
+    {
+        auto sceneName = currentScene->GetName();
+        strncpy(buffer, sceneName.c_str(), bufferSize - 1);
+    }
+}
+
+
+
+
+
+#include "AssetManager.h"
+
+LUMA_API int Luma_GetAssetCount()
+{
+    return static_cast<int>(AssetManager::GetInstance().GetAssetDatabase().size());
+}
+
+LUMA_API bool Luma_AssetExists(const char* path)
+{
+    if (!path) return false;
+    return AssetManager::GetInstance().GetMetadata(path) != nullptr;
 }

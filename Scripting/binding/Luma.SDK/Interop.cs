@@ -870,4 +870,125 @@ public static class Interop
             Debug.Log($"[EXCEPTION] InvokeMethod failed: {e.Message}");
         }
     }
+
+    
+    
+    
+
+    [UnmanagedCallersOnly]
+    public static byte Plugin_Load(IntPtr dllPathPtr, IntPtr pluginIdPtr)
+    {
+        try
+        {
+            string? dllPath = Marshal.PtrToStringUTF8(dllPathPtr);
+            string? pluginId = Marshal.PtrToStringUTF8(pluginIdPtr);
+
+            if (string.IsNullOrEmpty(dllPath) || string.IsNullOrEmpty(pluginId))
+            {
+                Debug.Log("[Plugin] Load failed: dllPath or pluginId is null");
+                return 0;
+            }
+
+            bool result = Plugins.PluginLoader.LoadPlugin(dllPath, pluginId);
+            Debug.Log($"[Plugin] Load {pluginId}: {(result ? "success" : "failed")}");
+            return (byte)(result ? 1 : 0);
+        }
+        catch (Exception e)
+        {
+            Debug.Log($"[EXCEPTION] Plugin_Load failed: {e.Message}");
+            return 0;
+        }
+    }
+
+    [UnmanagedCallersOnly]
+    public static byte Plugin_Unload(IntPtr pluginIdPtr)
+    {
+        try
+        {
+            string? pluginId = Marshal.PtrToStringUTF8(pluginIdPtr);
+            if (string.IsNullOrEmpty(pluginId))
+            {
+                return 0;
+            }
+
+            bool result = Plugins.PluginLoader.UnloadPlugin(pluginId);
+            Debug.Log($"[Plugin] Unload {pluginId}: {(result ? "success" : "failed")}");
+            return (byte)(result ? 1 : 0);
+        }
+        catch (Exception e)
+        {
+            Debug.Log($"[EXCEPTION] Plugin_Unload failed: {e.Message}");
+            return 0;
+        }
+    }
+
+    [UnmanagedCallersOnly]
+    public static void Plugin_UnloadAll()
+    {
+        try
+        {
+            Plugins.PluginLoader.UnloadAllPlugins();
+            Debug.Log("[Plugin] All plugins unloaded");
+        }
+        catch (Exception e)
+        {
+            Debug.Log($"[EXCEPTION] Plugin_UnloadAll failed: {e.Message}");
+        }
+    }
+
+    [UnmanagedCallersOnly]
+    public static void Plugin_UpdateEditorPlugins(float deltaTime)
+    {
+        try
+        {
+            Plugins.PluginLoader.UpdateEditorPlugins(deltaTime);
+        }
+        catch (Exception e)
+        {
+            Debug.Log($"[EXCEPTION] Plugin_UpdateEditorPlugins failed: {e.Message}");
+        }
+    }
+
+    [UnmanagedCallersOnly]
+    public static void Plugin_DrawEditorPluginPanels()
+    {
+        try
+        {
+            Plugins.PluginLoader.DrawEditorPluginPanels();
+        }
+        catch (Exception e)
+        {
+            Debug.Log($"[EXCEPTION] Plugin_DrawEditorPluginPanels failed: {e.Message}");
+        }
+    }
+
+    [UnmanagedCallersOnly]
+    public static void Plugin_DrawEditorPluginMenuBar()
+    {
+        try
+        {
+            Plugins.PluginLoader.DrawPluginMenuBar();
+        }
+        catch (Exception e)
+        {
+            Debug.Log($"[EXCEPTION] Plugin_DrawEditorPluginMenuBar failed: {e.Message}");
+        }
+    }
+
+    [UnmanagedCallersOnly]
+    public static void Plugin_DrawMenuItems(IntPtr menuNamePtr)
+    {
+        try
+        {
+            string? menuName = Marshal.PtrToStringUTF8(menuNamePtr);
+            if (!string.IsNullOrEmpty(menuName))
+            {
+                Plugins.PluginLoader.DrawMenuItems(menuName);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.Log($"[EXCEPTION] Plugin_DrawMenuItems failed: {e.Message}");
+        }
+    }
 }

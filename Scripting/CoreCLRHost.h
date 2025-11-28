@@ -1,6 +1,6 @@
 #ifndef CORECLRHOST_H
 #define CORECLRHOST_H
-
+#ifndef ANDROID
 #include <string>
 #include <filesystem>
 #include <memory>
@@ -69,6 +69,21 @@ using DispatchCollisionEventFn = void (LUMA_CALLBACK *)(ManagedGCHandle handlePt
 using DebugWaitForDebuggerFn = void (LUMA_CALLBACK *)(int timeoutMs);
 using DebugBreakFn = void (LUMA_CALLBACK *)();
 
+// Plugin system
+/// 加载插件函数的类型别名。
+using PluginLoadFn = uint8_t (LUMA_CALLBACK *)(const char* dllPath, const char* pluginId);
+/// 卸载插件函数的类型别名。
+using PluginUnloadFn = uint8_t (LUMA_CALLBACK *)(const char* pluginId);
+/// 卸载所有插件函数的类型别名。
+using PluginUnloadAllFn = void (LUMA_CALLBACK *)();
+/// 更新编辑器插件函数的类型别名。
+using PluginUpdateEditorFn = void (LUMA_CALLBACK *)(float deltaTime);
+/// 绘制编辑器插件面板函数的类型别名。
+using PluginDrawPanelsFn = void (LUMA_CALLBACK *)();
+/// 绘制编辑器插件菜单栏函数的类型别名。
+using PluginDrawMenuBarFn = void (LUMA_CALLBACK *)();
+/// 绘制指定菜单的插件扩展项函数的类型别名。
+using PluginDrawMenuItemsFn = void (LUMA_CALLBACK *)(const char* menuName);
 
 /// 初始化托管域函数的类型别名。
 using InitializeDomainFn = void (LUMA_CALLBACK *)(const char* baseDirUtf8);
@@ -91,6 +106,12 @@ public:
     static CoreCLRHost* GetInstance();
 
     /**
+     * @brief 获取CoreCLRHost的单例实例。
+     * @return CoreCLRHost* 返回CoreCLRHost的单例指针。
+     */
+    static CoreCLRHost* GetPluginInstance();
+
+    /**
      * @brief 创建CoreCLRHost的新单例实例。
      *
      * 如果实例已存在，此方法将销毁旧实例并创建新实例。
@@ -98,9 +119,21 @@ public:
     static void CreateNewInstance();
 
     /**
+     * @brief 创建CoreCLRHost的新单例实例。
+     *
+     * 如果实例已存在，此方法将销毁旧实例并创建新实例。
+     */
+    static void CreateNewPluginInstance();
+
+    /**
      * @brief 销毁CoreCLRHost的单例实例。
      */
     static void DestroyInstance();
+
+    /**
+     * @brief 销毁CoreCLRHost的单例实例。
+     */
+    static void DestroyPluginInstance();
 
     /**
      * @brief 初始化CoreCLR宿主。
@@ -166,6 +199,15 @@ public:
      * @return CallOnDisableFn 禁用时回调函数的指针。
      */
     CallOnDisableFn GetCallOnDisableFn() const { return m_callOnDisableFn; }
+
+    // Plugin system getters
+    PluginLoadFn GetPluginLoadFn() const { return m_pluginLoadFn; }
+    PluginUnloadFn GetPluginUnloadFn() const { return m_pluginUnloadFn; }
+    PluginUnloadAllFn GetPluginUnloadAllFn() const { return m_pluginUnloadAllFn; }
+    PluginUpdateEditorFn GetPluginUpdateEditorFn() const { return m_pluginUpdateEditorFn; }
+    PluginDrawPanelsFn GetPluginDrawPanelsFn() const { return m_pluginDrawPanelsFn; }
+    PluginDrawMenuBarFn GetPluginDrawMenuBarFn() const { return m_pluginDrawMenuBarFn; }
+    PluginDrawMenuItemsFn GetPluginDrawMenuItemsFn() const { return m_pluginDrawMenuItemsFn; }
 
     /**
      * @brief CoreCLRHost的默认构造函数。
@@ -233,6 +275,7 @@ private:
 
     /// CoreCLRHost的单例实例。
     inline static std::unique_ptr<CoreCLRHost> s_instance = nullptr;
+    inline static std::unique_ptr<CoreCLRHost> s_pluginInstance = nullptr;
     /// 用于保护单例实例访问的静态互斥锁。
     static std::mutex s_mutex;
 
@@ -274,6 +317,15 @@ private:
     /// 托管实例禁用时回调的函数指针。
     CallOnDisableFn m_callOnDisableFn = nullptr;
 
+    // Plugin system function pointers
+    PluginLoadFn m_pluginLoadFn = nullptr;
+    PluginUnloadFn m_pluginUnloadFn = nullptr;
+    PluginUnloadAllFn m_pluginUnloadAllFn = nullptr;
+    PluginUpdateEditorFn m_pluginUpdateEditorFn = nullptr;
+    PluginDrawPanelsFn m_pluginDrawPanelsFn = nullptr;
+    PluginDrawMenuBarFn m_pluginDrawMenuBarFn = nullptr;
+    PluginDrawMenuItemsFn m_pluginDrawMenuItemsFn = nullptr;
+
     /// 宿主是否已初始化的标志。
     bool m_isInitialized = false;
     /// 宿主是否处于编辑器模式的标志。
@@ -286,4 +338,5 @@ private:
     bool m_isFirstInitialization = true;
 };
 
+#endif
 #endif

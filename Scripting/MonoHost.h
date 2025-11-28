@@ -57,6 +57,22 @@ using InitializeDomainFn = void (LUMA_CALLBACK *)(const char* baseDirUtf8);
 /// 卸载托管域函数的类型别名
 using UnloadDomainFn = void (LUMA_CALLBACK *)();
 
+// Plugin system
+/// 加载插件函数的类型别名
+using PluginLoadFn = uint8_t (LUMA_CALLBACK *)(const char* dllPath, const char* pluginId);
+/// 卸载插件函数的类型别名
+using PluginUnloadFn = uint8_t (LUMA_CALLBACK *)(const char* pluginId);
+/// 卸载所有插件函数的类型别名
+using PluginUnloadAllFn = void (LUMA_CALLBACK *)();
+/// 更新编辑器插件函数的类型别名
+using PluginUpdateEditorFn = void (LUMA_CALLBACK *)(float deltaTime);
+/// 绘制编辑器插件面板函数的类型别名
+using PluginDrawPanelsFn = void (LUMA_CALLBACK *)();
+/// 绘制编辑器插件菜单栏函数的类型别名
+using PluginDrawMenuBarFn = void (LUMA_CALLBACK *)();
+/// 绘制指定菜单的插件扩展项函数的类型别名
+using PluginDrawMenuItemsFn = void (LUMA_CALLBACK *)(const char* menuName);
+
 /**
  * @brief Mono运行时宿主类，为Android平台提供托管代码执行环境
  */
@@ -64,8 +80,11 @@ class LUMA_API MonoHost
 {
 public:
     static MonoHost* GetInstance();
+    static MonoHost* GetPluginInstance();
     static void CreateNewInstance();
+    static void CreateNewPluginInstance();
     static void DestroyInstance();
+    static void DestroyPluginInstance();
 
     bool Initialize(const std::filesystem::path& mainAssemblyPath, bool isEditorMode);
     void Shutdown();
@@ -80,6 +99,15 @@ public:
     DispatchCollisionEventFn GetDispatchCollisionEventFn() const { return m_dispatchCollisionEventFn; }
     CallOnEnableFn GetCallOnEnableFn() const { return m_callOnEnableFn; }
     CallOnDisableFn GetCallOnDisableFn() const { return m_callOnDisableFn; }
+
+    // Plugin system getters
+    PluginLoadFn GetPluginLoadFn() const { return m_pluginLoadFn; }
+    PluginUnloadFn GetPluginUnloadFn() const { return m_pluginUnloadFn; }
+    PluginUnloadAllFn GetPluginUnloadAllFn() const { return m_pluginUnloadAllFn; }
+    PluginUpdateEditorFn GetPluginUpdateEditorFn() const { return m_pluginUpdateEditorFn; }
+    PluginDrawPanelsFn GetPluginDrawPanelsFn() const { return m_pluginDrawPanelsFn; }
+    PluginDrawMenuBarFn GetPluginDrawMenuBarFn() const { return m_pluginDrawMenuBarFn; }
+    PluginDrawMenuItemsFn GetPluginDrawMenuItemsFn() const { return m_pluginDrawMenuItemsFn; }
 
     MonoHost() = default;
     ~MonoHost() = default;
@@ -113,6 +141,7 @@ private:
 
     // 静态成员
     inline static std::unique_ptr<MonoHost> s_instance = nullptr;
+    inline static std::unique_ptr<MonoHost> s_pluginInstance = nullptr;
     static std::mutex s_mutex;
 
     // Mono运行时相关句柄
@@ -139,6 +168,15 @@ private:
     DispatchCollisionEventFn m_dispatchCollisionEventFn = nullptr;
     CallOnEnableFn m_callOnEnableFn = nullptr;
     CallOnDisableFn m_callOnDisableFn = nullptr;
+
+    // Plugin system function pointers
+    PluginLoadFn m_pluginLoadFn = nullptr;
+    PluginUnloadFn m_pluginUnloadFn = nullptr;
+    PluginUnloadAllFn m_pluginUnloadAllFn = nullptr;
+    PluginUpdateEditorFn m_pluginUpdateEditorFn = nullptr;
+    PluginDrawPanelsFn m_pluginDrawPanelsFn = nullptr;
+    PluginDrawMenuBarFn m_pluginDrawMenuBarFn = nullptr;
+    PluginDrawMenuItemsFn m_pluginDrawMenuItemsFn = nullptr;
 
     // 状态标志
     bool m_isInitialized = false;

@@ -323,6 +323,8 @@ public:
      */
     int GetRootSiblingIndex(const RuntimeGameObject& object) const;
 
+    uint32_t GetGameObjectCount() const;
+
 private:
     friend class ApplicationBase; ///< 允许 ApplicationBase 访问私有成员。
     friend class Editor; ///< 允许 Editor 访问私有成员。

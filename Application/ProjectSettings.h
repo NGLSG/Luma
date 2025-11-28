@@ -40,6 +40,15 @@ enum class ViewportScaleMode
     Expand          ///< 扩展模式，填充整个窗口，可能拉伸。
 };
 
+/**
+ * @brief 项目类型枚举。
+ */
+enum class ProjectType
+{
+    Game,           ///< 游戏项目
+    Plugin          ///< 插件项目
+};
+
 struct AndroidAliasEntry
 {
     std::string alias;
@@ -123,6 +132,22 @@ public:
      * @param name 要设置的应用程序名称。
      */
     void SetAppName(const std::string& name) { m_appName = name; }
+
+    /**
+     * @brief 获取项目类型。
+     * @return 项目类型。
+     */
+    ProjectType GetProjectType() const { return m_projectType; }
+    /**
+     * @brief 设置项目类型。
+     * @param type 项目类型。
+     */
+    void SetProjectType(ProjectType type) { m_projectType = type; }
+    /**
+     * @brief 检查是否为插件项目。
+     * @return 如果是插件项目则返回 true。
+     */
+    bool IsPluginProject() const { return m_projectType == ProjectType::Plugin; }
 
     /**
      * @brief 获取启动场景的全局唯一标识符 (GUID)。
@@ -354,6 +379,7 @@ private:
     void LoadWithCrypto(const std::filesystem::path& filePath);
 
     std::string m_appName = "Luma Game"; ///< 应用程序名称。
+    ProjectType m_projectType = ProjectType::Game; ///< 项目类型。
     Guid m_startScene; ///< 启动场景的全局唯一标识符。
     std::filesystem::path m_appIconPath; ///< 应用程序图标的路径。
     bool m_isFullscreen = false; ///< 指示应用程序是否处于全屏模式。

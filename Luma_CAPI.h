@@ -2242,6 +2242,408 @@ LUMA_API bool Shader_IsPreWarmingComplete();
  */
 LUMA_API void Shader_GetPreWarmingState(int* outTotal, int* outLoaded, bool* outIsRunning, bool* outIsComplete);
 
+// ============================================================================
+// ImGui C API (供 C# 插件使用)
+// ============================================================================
+
+/**
+ * @brief 开始一个 ImGui 窗口。
+ */
+LUMA_API bool ImGui_Begin(const char* name);
+
+/**
+ * @brief 开始一个带关闭按钮的 ImGui 窗口。
+ */
+LUMA_API bool ImGui_BeginWithOpen(const char* name, bool* open);
+
+/**
+ * @brief 结束当前 ImGui 窗口。
+ */
+LUMA_API void ImGui_End();
+
+/**
+ * @brief 显示文本。
+ */
+LUMA_API void ImGui_Text(const char* text);
+
+/**
+ * @brief 显示带颜色的文本。
+ */
+LUMA_API void ImGui_TextColored(float r, float g, float b, float a, const char* text);
+
+/**
+ * @brief 显示禁用样式的文本。
+ */
+LUMA_API void ImGui_TextDisabled(const char* text);
+
+/**
+ * @brief 显示自动换行的文本。
+ */
+LUMA_API void ImGui_TextWrapped(const char* text);
+
+/**
+ * @brief 显示标签文本。
+ */
+LUMA_API void ImGui_LabelText(const char* label, const char* text);
+
+/**
+ * @brief 创建按钮。
+ */
+LUMA_API bool ImGui_Button(const char* label);
+
+/**
+ * @brief 创建指定大小的按钮。
+ */
+LUMA_API bool ImGui_ButtonEx(const char* label, float width, float height);
+
+/**
+ * @brief 创建小按钮。
+ */
+LUMA_API bool ImGui_SmallButton(const char* label);
+
+/**
+ * @brief 创建复选框。
+ */
+LUMA_API bool ImGui_Checkbox(const char* label, bool* value);
+
+/**
+ * @brief 创建文本输入框。
+ */
+LUMA_API bool ImGui_InputText(const char* label, char* buffer, int bufferSize);
+
+/**
+ * @brief 创建浮点输入框。
+ */
+LUMA_API bool ImGui_InputFloat(const char* label, float* value);
+
+/**
+ * @brief 创建整数输入框。
+ */
+LUMA_API bool ImGui_InputInt(const char* label, int* value);
+
+/**
+ * @brief 创建浮点滑动条。
+ */
+LUMA_API bool ImGui_SliderFloat(const char* label, float* value, float min, float max);
+
+/**
+ * @brief 创建整数滑动条。
+ */
+LUMA_API bool ImGui_SliderInt(const char* label, int* value, int min, int max);
+
+/**
+ * @brief 添加分隔线。
+ */
+LUMA_API void ImGui_Separator();
+
+/**
+ * @brief 同一行布局。
+ */
+LUMA_API void ImGui_SameLine();
+
+/**
+ * @brief 同一行布局(带偏移)。
+ */
+LUMA_API void ImGui_SameLineEx(float offsetFromStartX, float spacing);
+
+/**
+ * @brief 添加间距。
+ */
+LUMA_API void ImGui_Spacing();
+
+/**
+ * @brief 添加空白区域。
+ */
+LUMA_API void ImGui_Dummy(float width, float height);
+
+/**
+ * @brief 增加缩进。
+ */
+LUMA_API void ImGui_Indent();
+
+/**
+ * @brief 减少缩进。
+ */
+LUMA_API void ImGui_Unindent();
+
+/**
+ * @brief 创建树节点。
+ */
+LUMA_API bool ImGui_TreeNode(const char* label);
+
+/**
+ * @brief 结束树节点。
+ */
+LUMA_API void ImGui_TreePop();
+
+/**
+ * @brief 创建可折叠标题。
+ */
+LUMA_API bool ImGui_CollapsingHeader(const char* label);
+
+/**
+ * @brief 创建可选择项。
+ */
+LUMA_API bool ImGui_Selectable(const char* label, bool selected);
+
+/**
+ * @brief 开始菜单栏。
+ */
+LUMA_API bool ImGui_BeginMenuBar();
+
+/**
+ * @brief 结束菜单栏。
+ */
+LUMA_API void ImGui_EndMenuBar();
+
+/**
+ * @brief 开始菜单。
+ */
+LUMA_API bool ImGui_BeginMenu(const char* label);
+
+/**
+ * @brief 结束菜单。
+ */
+LUMA_API void ImGui_EndMenu();
+
+/**
+ * @brief 创建菜单项。
+ */
+LUMA_API bool ImGui_MenuItem(const char* label);
+
+/**
+ * @brief 创建带快捷键的菜单项。
+ */
+LUMA_API bool ImGui_MenuItemEx(const char* label, const char* shortcut, bool selected);
+
+/**
+ * @brief 打开弹窗。
+ */
+LUMA_API void ImGui_OpenPopup(const char* strId);
+
+/**
+ * @brief 开始弹窗。
+ */
+LUMA_API bool ImGui_BeginPopup(const char* strId);
+
+/**
+ * @brief 开始模态弹窗。
+ */
+LUMA_API bool ImGui_BeginPopupModal(const char* name);
+
+/**
+ * @brief 结束弹窗。
+ */
+LUMA_API void ImGui_EndPopup();
+
+/**
+ * @brief 关闭当前弹窗。
+ */
+LUMA_API void ImGui_CloseCurrentPopup();
+
+/**
+ * @brief 检查当前项是否被悬停。
+ */
+LUMA_API bool ImGui_IsItemHovered();
+
+/**
+ * @brief 检查当前项是否被点击。
+ */
+LUMA_API bool ImGui_IsItemClicked();
+
+/**
+ * @brief 设置工具提示。
+ */
+LUMA_API void ImGui_SetTooltip(const char* text);
+
+/**
+ * @brief 获取窗口宽度。
+ */
+LUMA_API float ImGui_GetWindowWidth();
+
+/**
+ * @brief 获取窗口高度。
+ */
+LUMA_API float ImGui_GetWindowHeight();
+
+/**
+ * @brief 设置下一个窗口大小。
+ */
+LUMA_API void ImGui_SetNextWindowSize(float width, float height);
+
+/**
+ * @brief 设置下一个窗口位置。
+ */
+LUMA_API void ImGui_SetNextWindowPos(float x, float y);
+
+/**
+ * @brief 推入 ID（整数）。
+ */
+LUMA_API void ImGui_PushID(int id);
+
+/**
+ * @brief 推入 ID（字符串）。
+ */
+LUMA_API void ImGui_PushIDStr(const char* strId);
+
+/**
+ * @brief 弹出 ID。
+ */
+LUMA_API void ImGui_PopID();
+
+/**
+ * @brief 颜色编辑器（RGB）。
+ */
+LUMA_API bool ImGui_ColorEdit3(const char* label, float* r, float* g, float* b);
+
+/**
+ * @brief 颜色编辑器（RGBA）。
+ */
+LUMA_API bool ImGui_ColorEdit4(const char* label, float* r, float* g, float* b, float* a);
+
+/**
+ * @brief 浮点拖拽控件。
+ */
+LUMA_API bool ImGui_DragFloat(const char* label, float* value, float speed, float min, float max);
+
+/**
+ * @brief 整数拖拽控件。
+ */
+LUMA_API bool ImGui_DragInt(const char* label, int* value, float speed, int min, int max);
+
+/**
+ * @brief 进度条。
+ */
+LUMA_API void ImGui_ProgressBar(float fraction, float width, float height, const char* overlay);
+
+/**
+ * @brief 开始子窗口。
+ */
+LUMA_API bool ImGui_BeginChild(const char* strId, float width, float height, bool border);
+
+/**
+ * @brief 结束子窗口。
+ */
+LUMA_API void ImGui_EndChild();
+
+/**
+ * @brief 开始标签栏。
+ */
+LUMA_API bool ImGui_BeginTabBar(const char* strId);
+
+/**
+ * @brief 结束标签栏。
+ */
+LUMA_API void ImGui_EndTabBar();
+
+/**
+ * @brief 开始标签项。
+ */
+LUMA_API bool ImGui_BeginTabItem(const char* label);
+
+/**
+ * @brief 结束标签项。
+ */
+LUMA_API void ImGui_EndTabItem();
+
+/**
+ * @brief 开始表格。
+ */
+LUMA_API bool ImGui_BeginTable(const char* strId, int columns);
+
+/**
+ * @brief 结束表格。
+ */
+LUMA_API void ImGui_EndTable();
+
+/**
+ * @brief 表格下一行。
+ */
+LUMA_API void ImGui_TableNextRow();
+
+/**
+ * @brief 表格下一列。
+ */
+LUMA_API bool ImGui_TableNextColumn();
+
+/**
+ * @brief 设置表格列。
+ */
+LUMA_API void ImGui_TableSetupColumn(const char* label);
+
+/**
+ * @brief 表格头部行。
+ */
+LUMA_API void ImGui_TableHeadersRow();
+
+/**
+ * @brief 显示图像。
+ */
+LUMA_API void ImGui_Image(void* textureId, float width, float height);
+
+/**
+ * @brief 图像按钮。
+ */
+LUMA_API bool ImGui_ImageButton(const char* strId, void* textureId, float width, float height);
+
+/**
+ * @brief C# 友好的单行文本输入框。
+ */
+LUMA_API bool ImGui_InputTextCallback(const char* label, const char* text, char* outBuffer, int outBufferSize, bool* changed);
+
+/**
+ * @brief 多行文本输入框。
+ */
+LUMA_API bool ImGui_InputTextMultiline(const char* label, char* buffer, int bufferSize, float width, float height);
+
+/**
+ * @brief C# 友好的多行文本输入框。
+ */
+LUMA_API bool ImGui_InputTextMultilineCallback(const char* label, const char* text, char* outBuffer, int outBufferSize, float width, float height, bool* changed);
+
+// ============================================================================
+// Plugin C API
+// ============================================================================
+
+/**
+ * @brief 加载插件。
+ */
+LUMA_API bool Plugin_Load(const char* dllPath, const char* pluginId);
+
+/**
+ * @brief 卸载插件。
+ */
+LUMA_API bool Plugin_Unload(const char* pluginId);
+
+/**
+ * @brief 获取插件数量。
+ */
+LUMA_API int Plugin_GetCount();
+
+/**
+ * @brief 获取插件信息。
+ */
+LUMA_API bool Plugin_GetInfo(int index, char* idBuffer, int idBufferSize,
+                             char* nameBuffer, int nameBufferSize,
+                             char* versionBuffer, int versionBufferSize,
+                             bool* enabled, bool* loaded);
+LUMA_API void Luma_GetCurrentSceneName(char* buffer, int bufferSize);
+LUMA_API int Luma_GetEntityCount();
+LUMA_API int Luma_GetAssetCount();
+LUMA_API bool Luma_AssetExists(const char* path);
+LUMA_API bool Luma_IsEditorMode();
+LUMA_API bool Luma_IsPlaying();
+LUMA_API bool Luma_IsProjectLoaded();
+LUMA_API void Luma_GetProjectName(char* buffer, int bufferSize);
+LUMA_API void Luma_GetProjectPath(char* buffer, int bufferSize);
+LUMA_API void Luma_GetAssetsPath(char* buffer, int bufferSize);
+LUMA_API void Luma_LogInfo(const char* message);
+LUMA_API void Luma_LogWarn(const char* message);
+LUMA_API void Luma_LogError(const char* message);
+LUMA_API void Luma_LogDebug(const char* message);
+LUMA_API int Luma_GetSelectedEntityCount();
+LUMA_API Guid_CAPI Luma_GetSelectedEntityGuid(int index);
+LUMA_API void Luma_GetSelectedEntityName(int index, char* buffer, int bufferSize);
 #ifdef __cplusplus
 }
 

@@ -61,6 +61,7 @@ private:
     void drawMainMenuBar();
     void drawViewportMenu();
     void drawProjectMenu();
+    void drawWindowMenu();
     void drawFileMenu();
     void drawEditMenu();
     void drawSettingsWindow();

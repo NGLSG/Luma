@@ -263,6 +263,7 @@ endif ()
 file(GLOB_RECURSE LUMA_ENGINE_SOURCES CONFIGURE_DEPENDS
         "Application/*.cpp" "Application/*.h"
         "Components/*.cpp" "Components/*.h"
+        "Plugins/*.cpp" "Plugins/*.h"
         "Data/*.cpp" "Data/*.h"
         "Renderer/*.cpp" "Renderer/*.h"
         "Resources/*.cpp" "Resources/*.h"

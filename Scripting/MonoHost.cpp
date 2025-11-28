@@ -54,6 +54,37 @@ void MonoHost::DestroyInstance()
     }
 }
 
+MonoHost* MonoHost::GetPluginInstance()
+{
+    return s_pluginInstance.get();
+}
+
+void MonoHost::CreateNewPluginInstance()
+{
+    std::lock_guard<std::mutex> lock(s_mutex);
+
+    if (s_pluginInstance)
+    {
+        LogInfo("MonoHost: 销毁旧的插件实例");
+        s_pluginInstance->Shutdown();
+        s_pluginInstance.reset();
+    }
+
+    s_pluginInstance = std::unique_ptr<MonoHost>(new MonoHost());
+}
+
+void MonoHost::DestroyPluginInstance()
+{
+    std::lock_guard<std::mutex> lock(s_mutex);
+
+    if (s_pluginInstance)
+    {
+        s_pluginInstance->Shutdown();
+        s_pluginInstance.reset();
+        s_pluginInstance = nullptr;
+    }
+}
+
 bool MonoHost::Initialize(const std::filesystem::path& mainAssemblyPath, bool isEditorMode)
 {
     if (m_isInitialized)
@@ -591,6 +622,15 @@ bool MonoHost::initializeDelegates()
     m_dispatchCollisionEventFn = &MonoHost::wrapperDispatchCollisionEvent;
     m_callOnEnableFn = &MonoHost::wrapperOnEnable;
     m_callOnDisableFn = &MonoHost::wrapperOnDisable;
+
+    
+    m_pluginLoadFn = nullptr;
+    m_pluginUnloadFn = nullptr;
+    m_pluginUnloadAllFn = nullptr;
+    m_pluginUpdateEditorFn = nullptr;
+    m_pluginDrawPanelsFn = nullptr;
+    m_pluginDrawMenuBarFn = nullptr;
+    m_pluginDrawMenuItemsFn = nullptr;
 
     LogInfo("MonoHost: 所有委托函数指针初始化成功");
     return true;

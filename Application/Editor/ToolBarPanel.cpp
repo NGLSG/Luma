@@ -30,6 +30,7 @@
 #include "../Utils/Logger.h"
 #include "../Data/SceneData.h"
 #include "../../Systems/HydrateResources.h"
+#include "Plugins/PluginManager.h"
 #include "Input/Keyboards.h"
 #include <sstream>
 #include <cstring>
@@ -831,6 +832,59 @@ void ToolbarPanel::drawViewportMenu()
     }
 }
 
+void ToolbarPanel::drawWindowMenu()
+{
+    if (ImGui::BeginMenu("窗口"))
+    {
+        
+        IEditorPanel* pluginPanel = m_context->editor->GetPanelByName("插件管理");
+        IEditorPanel* consolePanel = m_context->editor->GetPanelByName("控制台");
+        IEditorPanel* animPanel = m_context->editor->GetPanelByName("动画编辑器");
+        IEditorPanel* aiPanel = m_context->editor->GetPanelByName("AI 助手");
+
+        if (pluginPanel)
+        {
+            bool visible = pluginPanel->IsVisible();
+            if (ImGui::MenuItem("插件管理", nullptr, &visible))
+            {
+                pluginPanel->SetVisible(visible);
+            }
+        }
+
+        if (consolePanel)
+        {
+            bool visible = consolePanel->IsVisible();
+            if (ImGui::MenuItem("控制台", nullptr, &visible))
+            {
+                consolePanel->SetVisible(visible);
+            }
+        }
+
+        if (animPanel)
+        {
+            bool visible = animPanel->IsVisible();
+            if (ImGui::MenuItem("动画编辑器", nullptr, &visible))
+            {
+                animPanel->SetVisible(visible);
+            }
+        }
+
+        if (aiPanel)
+        {
+            bool visible = aiPanel->IsVisible();
+            if (ImGui::MenuItem("AI 助手", nullptr, &visible))
+            {
+                aiPanel->SetVisible(visible);
+            }
+        }
+
+        
+        PluginManager::GetInstance().DrawPluginMenuItems("窗口");
+
+        ImGui::EndMenu();
+    }
+}
+
 void ToolbarPanel::drawMainMenuBar()
 {
     if (ImGui::BeginMainMenuBar())
@@ -839,6 +893,11 @@ void ToolbarPanel::drawMainMenuBar()
         drawEditMenu();
         drawViewportMenu();
         drawProjectMenu();
+        drawWindowMenu();
+        
+        
+        PluginManager::GetInstance().DrawEditorPluginMenuBar();
+        
         {
             float totalWidth = 0;
             const float spacing = ImGui::GetStyle().ItemSpacing.x;
@@ -945,6 +1004,9 @@ void ToolbarPanel::drawProjectMenu()
             else { LogInfo("Library 目录不存在，无需清理。"); }
         }
 
+        
+        ImGui::Separator();
+        PluginManager::GetInstance().DrawPluginMenuItems("项目");
 
         if (!isProjectLoaded) ImGui::EndDisabled();
         ImGui::EndMenu();
@@ -1499,7 +1561,8 @@ void ToolbarPanel::drawFileMenu()
 {
     if (ImGui::BeginMenu("文件"))
     {
-        if (ImGui::MenuItem("新建项目...")) { m_context->editor->CreateNewProject(); }
+        if (ImGui::MenuItem("新建游戏项目...")) { m_context->editor->CreateNewProject(); }
+        if (ImGui::MenuItem("新建插件项目...")) { m_context->editor->CreateNewPluginProject(); }
         if (ImGui::MenuItem("打开项目...")) { m_context->editor->OpenProject(); }
         ImGui::Separator();
         bool isProjectLoaded = ProjectSettings::GetInstance().IsProjectLoaded();
@@ -1518,6 +1581,10 @@ void ToolbarPanel::drawFileMenu()
         if (ImGui::MenuItem("退出"))
         {
         }
+        
+        
+        PluginManager::GetInstance().DrawPluginMenuItems("文件");
+        
         ImGui::EndMenu();
     }
 }
