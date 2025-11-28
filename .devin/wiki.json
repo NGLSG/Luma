@@ -1,0 +1,302 @@
+{
+  "repo_notes": [
+    {
+      "content": "This wiki documents the full architecture and implementation details of the Luma Engine. It must reflect both the C++ runtime and the C# scripting surface that developers interact with.\n\n# Global Documentation Rules\n- Always describe low-level implementation details: memory handling, ownership rules, threading constraints.\n- Diagrams or pseudo-code should be used where system architecture benefits from visualization.\n- Clearly link related modules: ECS → Rendering extraction → Assets → Scripts.\n- Mention real classes, namespaces, and API shapes from the codebase.\n- Differentiate Runtime vs Editor behaviors.\n- Make explicit the behavior differences between WebGPU (Nut) and Skia Graphite paths.\n\n# Scripting System — Global Guidance\nThe scripting system has three major pillars:\n1. **C# SDK (Luma.SDK)** — user-facing API with Components, Events, and Helpers.\n2. **Native–C# Binding Layer** — files inside: `/Scriptings/Binding/*`\n   - AutoBind.cs\n   - ComponentBindings.cs\n   - SceneBindings.cs\n   - InputBindings.cs\n   - MathBindings.cs\n   These expose RuntimeScene, Entity operations, component get/set, transforms, input, physics, and asset access.\n3. **Metadata Extraction** — YamlExtractor & Luma.Parser scan C# assemblies to generate metadata YAML used by editor & runtime.\n\nAll scripting pages must:\n- Explain the binding generation model.\n- Show concrete examples: calling native → C# → native round-trip.\n- Document C# side lifetime rules: script instance creation, domain reload, hot-reload behavior.\n- Mention ScriptComponent: OnCreate, OnUpdate, OnDestroy.\n- Document how C# interacts with ECS (via internal native calls).\n\n# Plugin Development Guide — Global Instructions\nLuma supports creation of editor/runtime plugins:\n- Plugins can contribute:\n  - New Components\n  - New Systems\n  - Asset Importers\n  - Editor Panels\n  - Script libraries\n- Plugin folder structure must be documented.\n- Metadata rules: GUIDs, manifest files, assembly references.\n- How to register plugins in Editor (EditorContext).\n- How plugins participate in build pipeline.\n\nThis repo_notes defines the global rules for all pages."
+    }
+  ],
+  "pages": [
+    {
+      "title": "Overview and Core Engine Architecture",
+      "purpose": "High-level overview of engine goals, major systems, architecture, and threading model",
+      "page_notes": [
+        {
+          "content": "Combine high-level repository introduction and engine architecture. Include diagrams: subsystem overview, main loop, simulation/render threading model. Describe Application → RuntimeScene → Systems flow."
+        }
+      ]
+    },
+    {
+      "title": "Application Structure and Threading",
+      "purpose": "Explain the multi-threaded execution model with simulation and render threads, command queues, and the main application loop",
+      "parent": "Overview and Core Engine Architecture",
+      "page_notes": [
+        {
+          "content": "Include diagram: main thread (UI), simulation thread, render thread. Document thread communication via command queues (RenderCommands). Document frame interpolation."
+        }
+      ]
+    },
+    {
+      "title": "Entity Component System",
+      "purpose": "Document the ECS architecture using EnTT, component types, and how systems process entities",
+      "parent": "Overview and Core Engine Architecture",
+      "page_notes": [
+        {
+          "content": "Explain EnTT registry ownership, component storage rules, entity lifecycle. Document common components such as Transform, SpriteRenderer, ScriptComponent. Link ECS to scripting layer."
+        }
+      ]
+    },
+    {
+      "title": "Scene Management",
+      "purpose": "Explain RuntimeScene lifecycle, scene loading/saving, undo/redo system, and scene serialization",
+      "parent": "Overview and Core Engine Architecture",
+      "page_notes": [
+        {
+          "content": "Document .lscene format (YAML/JSON), scene transitions, editor vs runtime, undo/redo stack, serialization routines, and metadata."
+        }
+      ]
+    },
+    {
+      "title": "Physics System",
+      "purpose": "Document the Box2D integration, collider types, physics lifecycle, and ECS synchronization",
+      "parent": "Overview and Core Engine Architecture",
+      "page_notes": [
+        {
+          "content": "Explain rigid body lifecycle, fixed timestep simulation, transform sync, colliders, joints, contact callbacks, and script event involvement."
+        }
+      ]
+    },
+    {
+      "title": "Rendering System",
+      "purpose": "Overview of the complete rendering architecture from ECS extraction to GPU presentation",
+      "page_notes": [
+        {
+          "content": "Show global rendering pipeline: ECS extraction → RenderableManager → batching → GraphicsBackend → GPU commands → present."
+        }
+      ]
+    },
+    {
+      "title": "Rendering Pipeline Overview",
+      "purpose": "High-level view of the complete rendering pipeline from component extraction to frame presentation",
+      "parent": "Rendering System",
+      "page_notes": [
+        {
+          "content": "Describe extraction phase, transformation of draw data, GPU resource upload, command buffer lifetime, and final swapchain presentation."
+        }
+      ]
+    },
+    {
+      "title": "RenderableManager and Frame Interpolation",
+      "purpose": "Detail the frame interpolation system, double-buffering, batching strategies, and SIMD optimizations",
+      "parent": "Rendering System",
+      "page_notes": [
+        {
+          "content": "Document double-buffered render states, SIMD transforms, interpolation between previous/current frames, and packed sprite buffers."
+        }
+      ]
+    },
+    {
+      "title": "Graphics Backend Abstraction",
+      "purpose": "Document the GraphicsBackend class that unifies Skia Graphite and WebGPU rendering paths",
+      "parent": "Rendering System",
+      "page_notes": [
+        {
+          "content": "Describe backend interface, fallback order (WebGPU → Graphite → CPU), pipeline creation APIs, texture abstraction, shared device context."
+        }
+      ]
+    },
+    {
+      "title": "WebGPU Integration (Nut)",
+      "purpose": "Explain the Nut library abstractions for WebGPU including NutContext, TextureA, and Pipeline management",
+      "parent": "Rendering System",
+      "page_notes": [
+        {
+          "content": "Explain how Nut wraps WebGPU API: contexts, command encoders, render pass builders, buffer upload routines, WGSL pipeline creation."
+        }
+      ]
+    },
+    {
+      "title": "Render System Batching",
+      "purpose": "Detail the RenderSystem's batch processing, SIMD sprite rendering, and dual rendering path execution",
+      "parent": "Rendering System",
+      "page_notes": [
+        {
+          "content": "Document sorting rules, material/texture batches, GPU upload order, shared vertex/index buffers, CPU-side SIMD sprite packing."
+        }
+      ]
+    },
+    {
+      "title": "User Interface System",
+      "purpose": "Document the UI architecture including controls, input handling, and interaction system",
+      "page_notes": [
+        {
+          "content": "Describe UI tree, layout phases, event system (capture/bubble), rendering of UI elements, integration with InputSystem."
+        }
+      ]
+    },
+    {
+      "title": "UI Control System",
+      "purpose": "Explain the CommonUIControlSystem handling buttons, sliders, checkboxes, and other UI components",
+      "parent": "User Interface System",
+      "page_notes": [
+        {
+          "content": "Document layout rules, control state transitions, event bindings for hover/press/change events."
+        }
+      ]
+    },
+    {
+      "title": "Input Text System",
+      "purpose": "Document text input handling, cursor management, and concurrent data structures (DynamicArray)",
+      "parent": "User Interface System",
+      "page_notes": [
+        {
+          "content": "Explain text buffer structures, UTF-8 vs UTF-16 support, cursor/selection, composition support, clipboard integration."
+        }
+      ]
+    },
+    {
+      "title": "Interaction System",
+      "purpose": "Explain geometric picking, mouse/touch handling, and interaction events in the scene view",
+      "parent": "User Interface System",
+      "page_notes": [
+        {
+          "content": "Document picking pipeline, scene-view interaction, hit testing, editor gizmos interaction, selection."
+        }
+      ]
+    },
+    {
+      "title": "Asset Pipeline",
+      "purpose": "Overview of asset management, hydration, and the editor asset tools",
+      "page_notes": [
+        {
+          "content": "Document recursive asset discovery, GUID generation, importer pipeline, metadata files, and cached asset database."
+        }
+      ]
+    },
+    {
+      "title": "Asset Management",
+      "purpose": "Document the AssetManager, asset database, GUID system, and metadata files",
+      "parent": "Asset Pipeline",
+      "page_notes": [
+        {
+          "content": "Document AssetHandle, hot-reload, async loading, dependency graph modeling, and caching strategies."
+        }
+      ]
+    },
+    {
+      "title": "Resource Hydration",
+      "purpose": "Explain the HydrateResources system that loads runtime assets into ECS components with hot-reload support",
+      "parent": "Asset Pipeline",
+      "page_notes": [
+        {
+          "content": "Explain GPU texture hydration, material hydration, font/tilemap hydration, and how ECS components receive updated resources on reload."
+        }
+      ]
+    },
+    {
+      "title": "Asset Browser and Inspector",
+      "purpose": "Document the editor's asset browsing UI, inspector panel, and importer configuration",
+      "parent": "Asset Pipeline",
+      "page_notes": [
+        {
+          "content": "Explain asset tree view, metadata editor, preview rendering, custom inspector extensions, and plugin-extended inspectors."
+        }
+      ]
+    },
+    {
+      "title": "Asset Importers",
+      "purpose": "Detail the asset importer system including texture, material, font, and tilemap importers",
+      "parent": "Asset Pipeline",
+      "page_notes": [
+        {
+          "content": "Document importer registry, file-type matching, configuration files (.import), and plugin-defined importer extensions."
+        }
+      ]
+    },
+    {
+      "title": "Material System",
+      "purpose": "Explain material definitions, shader integration (SkSL and WGSL), and material loading",
+      "parent": "Asset Pipeline",
+      "page_notes": [
+        {
+          "content": "Explain material descriptor, shader variants, pipeline compatibility with WebGPU/Graphite, uniform bindings, and texture slots."
+        }
+      ]
+    },
+    {
+      "title": "Scripting System",
+      "purpose": "Overview of C# scripting integration including the SDK, metadata extraction, and runtime execution",
+      "page_notes": [
+        {
+          "content": "Describe entire scripting pipeline: loading assemblies → creating script domains → binding native calls → script lifecycles. Include binding files: AutoBind.cs, ComponentBindings.cs, SceneBindings.cs."
+        }
+      ]
+    },
+    {
+      "title": "C# SDK Architecture",
+      "purpose": "Document the Luma.SDK structure, component types, event system, and API design",
+      "parent": "Scripting System",
+      "page_notes": [
+        {
+          "content": "Explain Transform, SpriteRenderer, Input, Scene API. Provide typical usage examples and code patterns recommended for scripts."
+        }
+      ]
+    },
+    {
+      "title": "Script Components and Lifecycle",
+      "purpose": "Explain script component structure, lifecycle methods, domain management, and script loading",
+      "parent": "Scripting System",
+      "page_notes": [
+        {
+          "content": "Explain ScriptComponent: OnCreate/OnUpdate/OnDestroy; lifecycle with scene load; hot-reload behavior; script re-instantiation rules."
+        }
+      ]
+    },
+    {
+      "title": "Metadata Extraction Tools",
+      "purpose": "Document YamlExtractor and Luma.Parser tools for generating script metadata from compiled assemblies",
+      "parent": "Scripting System",
+      "page_notes": [
+        {
+          "content": "Explain assembly scanning, extracting fields/methods/attributes, producing metadata YAML used by the editor inspector."
+        }
+      ]
+    },
+    {
+      "title": "Plugin Development Guide",
+      "purpose": "Explain how to create plugins for Luma, including editor extensions, runtime modules, custom components, and asset importers",
+      "page_notes": [
+        {
+          "content": "Document plugin structure, manifest format, registering components/systems, defining custom asset importers, adding editor panels, integration with scripting assemblies."
+        }
+      ]
+    },
+    {
+      "title": "Editor Application",
+      "purpose": "Overview of the editor architecture, panels, and project management features",
+      "page_notes": [
+        {
+          "content": "Describe EditorContext, docking system, major panels (SceneView, Inspector, AssetBrowser), and UI update loop."
+        }
+      ]
+    },
+    {
+      "title": "Editor Architecture",
+      "purpose": "Document the Editor class structure, EditorContext, panel system, and editor lifecycle",
+      "parent": "Editor Application",
+      "page_notes": [
+        {
+          "content": "Document panel registration, panel lifecycle, undo/redo command system, selection model, and data binding."
+        }
+      ]
+    },
+    {
+      "title": "Project Management",
+      "purpose": "Explain project creation, loading, ProjectSettings, and the .lproj format",
+      "parent": "Editor Application",
+      "page_notes": [
+        {
+          "content": "Document .lproj JSON structure, project creation, asset folder structure, templates, and settings."
+        }
+      ]
+    },
+    {
+      "title": "Build System and Packaging",
+      "purpose": "Detail script compilation, game packaging for different platforms, and the Android build pipeline",
+      "parent": "Editor Application",
+      "page_notes": [
+        {
+          "content": "Explain steps: script compilation, asset packing, runtime build, platform templates, Android Gradle integration, native libs bundling."
+        }
+      ]
+    }
+  ]
+}
