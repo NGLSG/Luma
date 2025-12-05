@@ -12,82 +12,62 @@
 #include "Sprite.h"
 #include "Input/Keyboards.h"
 #include "Loaders/TextureLoader.h"
-
 void AnimationEditorPanel::Initialize(EditorContext* context)
 {
     m_context = context;
     m_textureLoader = std::make_unique<TextureLoader>(*m_context->graphicsBackend);
-
     m_totalFrames = 60;
 }
-
 void AnimationEditorPanel::Update(float deltaTime)
 {
     PROFILE_FUNCTION();
     if (!m_isVisible)
         return;
-
-
     if (m_context->currentEditingAnimationClipGuid.Valid() &&
         m_context->currentEditingAnimationClipGuid != m_currentClipGuid)
     {
         openAnimationClipFromContext(m_context->currentEditingAnimationClipGuid);
     }
-
-
     if (!m_context->currentEditingAnimationClipGuid.Valid() && m_currentClip)
     {
         closeCurrentClipFromContext();
     }
-
-
     updateTargetObject();
-
-
     if (m_currentClip)
     {
         updatePlayback(deltaTime);
     }
 }
-
 void AnimationEditorPanel::Shutdown()
 {
     CloseCurrentClip();
 }
-
 void AnimationEditorPanel::OpenAnimationClip(const Guid& clipGuid)
 {
     m_context->currentEditingAnimationClipGuid = clipGuid;
 }
-
 void AnimationEditorPanel::CloseCurrentClip()
 {
     m_context->currentEditingAnimationClipGuid = Guid();
 }
-
 void AnimationEditorPanel::Focus()
 {
     m_isVisible = true;
     m_requestFocus = true;
 }
-
 void AnimationEditorPanel::openAnimationClipFromContext(const Guid& clipGuid)
 {
     if (m_currentClipGuid == clipGuid && m_currentClip)
         return;
-
     closeCurrentClipFromContext();
-
     auto loader = AnimationClipLoader();
     m_currentClip = loader.LoadAsset(clipGuid);
-
     if (!m_currentClip)
     {
         LogError("无法加载动画切片，GUID: {}", clipGuid.ToString());
         m_context->currentEditingAnimationClipGuid = Guid();
         return;
     }
-
     m_currentClipGuid = clipGuid;
     m_currentClipName = m_currentClip->getAnimationClip().Name;
     m_targetObjectGuid = m_currentClip->getAnimationClip().TargetEntityGuid;
@@ -100,17 +80,13 @@ void AnimationEditorPanel::openAnimationClipFromContext(const Guid& clipGuid)
     }
     m_multiSelectedFrames.clear();
     m_frameEditWindowOpen = false;
-
     LogInfo("打开动画切片进行编辑: {}", m_currentClipName);
 }
-
 void AnimationEditorPanel::closeCurrentClipFromContext()
 {
     if (!m_currentClip)
         return;
-
     LogInfo("关闭动画切片: {}", m_currentClipName);
-
     m_currentClip = nullptr;
     m_currentClipGuid = Guid();
     m_currentClipName.clear();
@@ -123,13 +99,10 @@ void AnimationEditorPanel::closeCurrentClipFromContext()
     m_multiSelectedFrames.clear();
     m_frameEditWindowOpen = false;
 }
-
 void AnimationEditorPanel::createNewAnimation()
 {
     AnimationClip newClip;
     newClip.Name = "新动画";
-
-
     if (!m_context->selectionList.empty() && m_context->selectionType == SelectionType::GameObject)
     {
         newClip.TargetEntityGuid = m_context->selectionList[0];
@@ -138,36 +111,26 @@ void AnimationEditorPanel::createNewAnimation()
     {
         newClip.TargetEntityGuid = Guid::NewGuid();
     }
-
-
     Guid newGuid = Guid::NewGuid();
     m_currentClip = sk_make_sp<RuntimeAnimationClip>(newGuid, newClip);
     m_currentClipGuid = newGuid;
     m_currentClipName = newClip.Name;
     m_targetObjectGuid = newClip.TargetEntityGuid;
-
-
     m_currentTime = 0.0f;
     m_currentFrame = 0;
     m_totalFrames = 60;
     m_selectedFrameIndex = -1;
-
-
     m_context->currentEditingAnimationClipGuid = newGuid;
-
     LogInfo("创建新动画: {}", m_currentClipName);
 }
-
 void AnimationEditorPanel::drawTargetObjectSelector()
 {
     ImGui::Text("目标物体:");
     ImGui::SameLine();
-
     if (hasValidTargetObject())
     {
         ImGui::Text("%s", m_targetObjectName.c_str());
         ImGui::SameLine();
-
         if (ImGui::Button("选中"))
         {
             m_context->selectionType = SelectionType::GameObject;
@@ -181,20 +144,16 @@ void AnimationEditorPanel::drawTargetObjectSelector()
     {
         ImGui::Text("没有有效的目标物体");
     }
-
     ImGui::SameLine();
     if (ImGui::Button("从选中设置"))
     {
         if (!m_context->selectionList.empty() && m_context->selectionType == SelectionType::GameObject)
         {
             m_targetObjectGuid = m_context->selectionList[0];
-
-
             if (m_currentClip)
             {
                 m_currentClip->getAnimationClip().TargetEntityGuid = m_targetObjectGuid;
             }
-
             LogInfo("设置目标物体为当前选中的物体");
         }
         else
@@ -203,8 +162,6 @@ void AnimationEditorPanel::drawTargetObjectSelector()
         }
     }
 }
-
-
 void AnimationEditorPanel::drawControlPanel()
 {
     if (m_currentClip)
@@ -212,12 +169,9 @@ void AnimationEditorPanel::drawControlPanel()
         char nameBuffer[256];
         strncpy(nameBuffer, m_currentClipName.c_str(), sizeof(nameBuffer));
         nameBuffer[sizeof(nameBuffer) - 1] = '\0';
-
         ImGui::Text("动画名称:");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(220.0f);
-
-
         if (ImGui::InputText("##AnimationNameEditor", nameBuffer, sizeof(nameBuffer)))
         {
             m_currentClipName = nameBuffer;
@@ -228,65 +182,48 @@ void AnimationEditorPanel::drawControlPanel()
     {
         ImGui::Text("没有打开的动画");
     }
-
     ImGui::SameLine();
-
-
     if (ImGui::Button(m_isPlaying ? "暂停" : "播放"))
     {
         m_isPlaying = !m_isPlaying;
     }
-
     ImGui::SameLine();
     if (ImGui::Button("停止"))
     {
         m_isPlaying = false;
         seekToFrame(0);
     }
-
     ImGui::SameLine();
     if (ImGui::Button("前一帧"))
     {
         seekToFrame(std::max(0, m_currentFrame - 1));
     }
-
     ImGui::SameLine();
     if (ImGui::Button("后一帧"))
     {
         seekToFrame(std::min(m_totalFrames - 1, m_currentFrame + 1));
     }
-
     ImGui::SameLine();
     ImGui::Checkbox("循环", &m_isLooping);
-
-
     ImGui::SetNextItemWidth(100);
     if (ImGui::DragFloat("帧率", &m_frameRate, 1.0f, 1.0f, 120.0f, "%.1f"))
     {
         m_frameRate = std::clamp(m_frameRate, 1.0f, 120.0f);
     }
-
     ImGui::SameLine();
     ImGui::Text("当前帧: %d / %d", m_currentFrame, m_totalFrames);
-
-
     ImGui::SetNextItemWidth(100);
     if (ImGui::DragInt("总帧数", &m_totalFrames, 1.0f, 1, 1000))
     {
         m_totalFrames = std::clamp(m_totalFrames, 1, 1000);
-
         m_currentFrame = std::clamp(m_currentFrame, 0, m_totalFrames - 1);
     }
-
-
     float maxTime = static_cast<float>(m_totalFrames) / m_frameRate;
     if (ImGui::SliderFloat("时间", &m_currentTime, 0.0f, maxTime, "%.2fs"))
     {
         m_currentFrame = static_cast<int>(m_currentTime * m_frameRate);
         m_currentFrame = std::clamp(m_currentFrame, 0, m_totalFrames - 1);
     }
-
-
     if (hasValidTargetObject() && m_currentClip)
     {
         ImGui::SameLine();
@@ -296,25 +233,18 @@ void AnimationEditorPanel::drawControlPanel()
         }
     }
 }
-
 void AnimationEditorPanel::drawTimeline()
 {
     ImGui::Text("时间轴 (总帧数: %d)", m_totalFrames);
-
     ImVec2 canvasPos = ImGui::GetCursorScreenPos();
     ImVec2 canvasSize = ImGui::GetContentRegionAvail();
     canvasSize.y = m_timelineHeight;
-
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const float keyframeRadius = 6.0f;
     const float rulerHeight = 25.0f;
     float pixelsPerFrame = 20.0f * m_timelineZoom;
-
-
     drawList->AddRectFilled(canvasPos, ImVec2(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y),
                             IM_COL32(50, 50, 50, 255));
-
-
     int visibleFrameStart = (pixelsPerFrame > 0)
                                 ? std::max(0, static_cast<int>(m_timelineScrollX / pixelsPerFrame))
                                 : 0;
@@ -335,26 +265,20 @@ void AnimationEditorPanel::drawTimeline()
             drawList->AddText(ImVec2(x + 2, canvasPos.y + 2), IM_COL32(200, 200, 200, 255), buf);
         }
     }
-
-
     if (m_currentClip)
     {
         for (const auto& [frameIndex, frameData] : m_currentClip->getAnimationClip().Frames)
         {
             float x = canvasPos.x + (static_cast<float>(frameIndex) * pixelsPerFrame) - m_timelineScrollX;
             if (x < canvasPos.x - keyframeRadius || x > canvasPos.x + canvasSize.x + keyframeRadius) continue;
-
             bool isSelected = m_multiSelectedFrames.count(frameIndex);
             ImU32 color = isSelected ? IM_COL32(255, 255, 0, 255) : IM_COL32(255, 100, 100, 255);
             drawList->AddCircleFilled(ImVec2(x, canvasPos.y + (canvasSize.y + rulerHeight) * 0.5f), keyframeRadius,
                                       color);
         }
     }
-
-
     ImGui::SetCursorScreenPos(canvasPos);
     ImGui::InvisibleButton("##TimelineCanvas", canvasSize);
-
     const bool isCanvasHovered = ImGui::IsItemHovered();
     const bool isCtrlDown = ImGui::GetIO().KeyCtrl;
     const float mouseXOnCanvas = ImGui::GetIO().MousePos.x - canvasPos.x;
@@ -362,7 +286,6 @@ void AnimationEditorPanel::drawTimeline()
                            ? static_cast<int>(round((mouseXOnCanvas + m_timelineScrollX) / pixelsPerFrame))
                            : 0;
     hoveredFrame = std::clamp(hoveredFrame, 0, m_totalFrames - 1);
-
     int clickedOnFrame = -1;
     if (m_currentClip && isCanvasHovered && ImGui::GetIO().MousePos.y > canvasPos.y + rulerHeight)
     {
@@ -376,8 +299,6 @@ void AnimationEditorPanel::drawTimeline()
             }
         }
     }
-
-
     if (isCanvasHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
     {
         bool clickedOnRuler = ImGui::GetIO().MousePos.y < canvasPos.y + rulerHeight;
@@ -390,7 +311,6 @@ void AnimationEditorPanel::drawTimeline()
         {
             m_isDraggingKeyframe = true;
             m_dragHandleFrame = clickedOnFrame;
-
             if (isCtrlDown)
             {
                 if (m_multiSelectedFrames.count(clickedOnFrame)) m_multiSelectedFrames.erase(clickedOnFrame);
@@ -411,8 +331,6 @@ void AnimationEditorPanel::drawTimeline()
             if (!isCtrlDown) m_multiSelectedFrames.clear();
         }
     }
-
-
     if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
     {
         if (m_isDraggingPlayhead)
@@ -429,14 +347,11 @@ void AnimationEditorPanel::drawTimeline()
             drawList->AddRect(m_boxSelectionStart, currentMousePos, IM_COL32(100, 150, 255, 150));
         }
     }
-
-
     if (m_isDraggingKeyframe && !m_dragInitialSelectionState.empty())
     {
         int draggedFrameNewPos = hoveredFrame;
         int firstSelectedFrame = m_dragInitialSelectionState.front();
         bool isTranslation = (m_dragHandleFrame == firstSelectedFrame);
-
         if (isTranslation)
         {
             int delta = draggedFrameNewPos - m_dragHandleFrame;
@@ -454,7 +369,6 @@ void AnimationEditorPanel::drawTimeline()
             int anchorFrame = firstSelectedFrame;
             float oldSpan = static_cast<float>(m_dragHandleFrame - anchorFrame);
             float newSpan = static_cast<float>(draggedFrameNewPos - anchorFrame);
-
             if (std::abs(oldSpan) > 0.001f)
             {
                 float scale = newSpan / oldSpan;
@@ -469,8 +383,6 @@ void AnimationEditorPanel::drawTimeline()
             }
         }
     }
-
-
     if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
     {
         if (m_isDraggingPlayhead) { m_isDraggingPlayhead = false; }
@@ -480,9 +392,7 @@ void AnimationEditorPanel::drawTimeline()
             {
                 std::map<int, int> newPositions;
                 int firstSelectedFrame = m_dragInitialSelectionState.front();
-
                 bool isTranslation = (m_dragHandleFrame == firstSelectedFrame);
-
                 if (isTranslation)
                 {
                     int delta = hoveredFrame - m_dragHandleFrame;
@@ -496,7 +406,6 @@ void AnimationEditorPanel::drawTimeline()
                     int anchorFrame = firstSelectedFrame;
                     float oldSpan = static_cast<float>(m_dragHandleFrame - anchorFrame);
                     float newSpan = static_cast<float>(hoveredFrame - anchorFrame);
-
                     if (std::abs(oldSpan) > 0.001f)
                     {
                         float scale = newSpan / oldSpan;
@@ -519,12 +428,8 @@ void AnimationEditorPanel::drawTimeline()
                         for (int oldIndex : m_dragInitialSelectionState) newPositions[oldIndex] = oldIndex + delta;
                     }
                 }
-
-
                 bool collision = false;
                 std::set<int> finalDestinations;
-
-
                 std::set<int> unselectedFrames;
                 for (const auto& [frameIndex, frameData] : m_currentClip->getAnimationClip().Frames)
                 {
@@ -533,8 +438,6 @@ void AnimationEditorPanel::drawTimeline()
                         unselectedFrames.insert(frameIndex);
                     }
                 }
-
-
                 for (const auto& [oldIndex, newIndex] : newPositions)
                 {
                     if (newIndex < 0)
@@ -542,35 +445,26 @@ void AnimationEditorPanel::drawTimeline()
                         collision = true;
                         break;
                     }
-
                     if (!finalDestinations.insert(newIndex).second)
                     {
                         collision = true;
                         break;
                     }
-
                     if (unselectedFrames.count(newIndex))
                     {
                         collision = true;
                         break;
                     }
                 }
-
-
                 if (!collision)
                 {
                     auto& frames = m_currentClip->getAnimationClip().Frames;
                     std::vector<std::pair<int, AnimFrame>> framesToMove;
-
                     for (int oldIndex : m_dragInitialSelectionState)
                     {
                         framesToMove.push_back({newPositions.at(oldIndex), frames.at(oldIndex)});
                     }
-
-
                     for (int oldIndex : m_dragInitialSelectionState) frames.erase(oldIndex);
-
-
                     m_multiSelectedFrames.clear();
                     for (const auto& pair : framesToMove)
                     {
@@ -608,8 +502,6 @@ void AnimationEditorPanel::drawTimeline()
             m_isBoxSelecting = false;
         }
     }
-
-
     if (isCanvasHovered && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
     {
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
@@ -631,8 +523,6 @@ void AnimationEditorPanel::drawTimeline()
             }
         }
     }
-
-
     float currentX = canvasPos.x + (static_cast<float>(m_currentFrame) * pixelsPerFrame) - m_timelineScrollX;
     if (currentX >= canvasPos.x && currentX <= canvasPos.x + canvasSize.x)
     {
@@ -644,8 +534,6 @@ void AnimationEditorPanel::drawTimeline()
         drawList->AddTriangleFilled(trianglePoints[0], trianglePoints[1], trianglePoints[2],
                                     IM_COL32(255, 255, 255, 255));
     }
-
-
     if (ImGui::BeginDragDropTarget())
     {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DRAG_DROP_ASSET_HANDLES_MULTI"))
@@ -654,11 +542,9 @@ void AnimationEditorPanel::drawTimeline()
             {
                 size_t handleCount = payload->DataSize / sizeof(AssetHandle);
                 const AssetHandle* handles = static_cast<const AssetHandle*>(payload->Data);
-
                 auto scene = SceneManager::GetInstance().GetCurrentScene();
                 auto targetObject = scene->FindGameObjectByGuid(m_targetObjectGuid);
                 const auto* compInfo = ComponentRegistry::GetInstance().Get("SpriteComponent");
-
                 if (compInfo)
                 {
                     if (!targetObject.HasComponent<ECS::SpriteComponent>())
@@ -666,24 +552,18 @@ void AnimationEditorPanel::drawTimeline()
                         targetObject.AddComponent<ECS::SpriteComponent>();
                     }
                     auto& spriteComp = targetObject.GetComponent<ECS::SpriteComponent>();
-
                     int keyframesCreated = 0;
                     for (size_t i = 0; i < handleCount; ++i)
                     {
                         const AssetHandle& handle = handles[i];
                         if (handle.assetType != AssetType::Texture) continue;
-
                         int frameIndex = hoveredFrame + keyframesCreated;
-
                         spriteComp.textureHandle = handle;
-
                         AnimFrame& frame = m_currentClip->getAnimationClip().Frames[frameIndex];
                         frame.animationData["SpriteComponent"] = compInfo->serialize(
                             scene->GetRegistry(), targetObject.GetEntityHandle());
-
                         keyframesCreated++;
                     }
-
                     if (keyframesCreated > 0)
                     {
                         const AssetHandle& lastHandle = handles[handleCount - 1];
@@ -693,7 +573,6 @@ void AnimationEditorPanel::drawTimeline()
                 }
             }
         }
-
         else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DRAG_DROP_ASSET_HANDLE"))
         {
             AssetHandle handle = *static_cast<const AssetHandle*>(payload->Data);
@@ -703,26 +582,20 @@ void AnimationEditorPanel::drawTimeline()
                 {
                     auto scene = SceneManager::GetInstance().GetCurrentScene();
                     auto targetObject = scene->FindGameObjectByGuid(m_targetObjectGuid);
-
                     if (!targetObject.HasComponent<ECS::SpriteComponent>())
                     {
                         targetObject.AddComponent<ECS::SpriteComponent>();
                     }
                     auto& spriteComp = targetObject.GetComponent<ECS::SpriteComponent>();
-
                     spriteComp.textureHandle = handle;
-
                     AnimFrame& frame = m_currentClip->getAnimationClip().Frames[hoveredFrame];
-
                     const auto* compInfo = ComponentRegistry::GetInstance().Get("SpriteComponent");
                     if (compInfo)
                     {
                         frame.animationData["SpriteComponent"] = compInfo->serialize(
                             scene->GetRegistry(), targetObject.GetEntityHandle());
-
                         m_multiSelectedFrames.clear();
                         m_multiSelectedFrames.insert(hoveredFrame);
-
                         LogInfo("拖放纹理到第 {} 帧，已记录SpriteComponent", hoveredFrame);
                     }
                 }
@@ -734,30 +607,22 @@ void AnimationEditorPanel::drawTimeline()
         }
         ImGui::EndDragDropTarget();
     }
-
-
     ImGui::SetNextItemWidth(120);
     ImGui::SliderFloat("缩放", &m_timelineZoom, 0.1f, 5.0f, "%.1fx");
     ImGui::SameLine();
     if (ImGui::Button("跟随播放头")) { centerTimelineOnCurrentFrame(); }
-
     const char* fitAllText = "适应所有";
     float fitAllButtonWidth = ImGui::CalcTextSize(fitAllText).x + ImGui::GetStyle().FramePadding.x * 2.0f;
     float spacing = ImGui::GetContentRegionAvail().x - fitAllButtonWidth;
     ImGui::SameLine(0, spacing > 0 ? spacing : 0);
-
     if (ImGui::Button(fitAllText)) { fitTimelineToAllFrames(canvasSize.x); }
 }
-
-
 void AnimationEditorPanel::updatePlayback(float deltaTime)
 {
     if (!m_isPlaying || m_totalFrames == 0)
         return;
-
     m_currentTime += deltaTime;
     float maxTime = static_cast<float>(m_totalFrames) / m_frameRate;
-
     if (m_currentTime >= maxTime)
     {
         if (m_isLooping)
@@ -770,23 +635,16 @@ void AnimationEditorPanel::updatePlayback(float deltaTime)
             m_isPlaying = false;
         }
     }
-
     m_currentFrame = static_cast<int>(m_currentTime * m_frameRate);
     m_currentFrame = std::clamp(m_currentFrame, 0, m_totalFrames - 1);
-
-
     if (hasValidTargetObject() && m_currentClip)
     {
         applyFrameToObject(m_currentFrame);
     }
 }
-
-
 void AnimationEditorPanel::seekToFrame(int frameIndex)
 {
     int newFrame = std::clamp(frameIndex, 0, m_totalFrames - 1);
-
-
     if (newFrame != m_currentFrame)
     {
         m_currentFrame = newFrame;
@@ -799,14 +657,11 @@ void AnimationEditorPanel::seekToFrame(int frameIndex)
             m_currentTime = 0.0f;
         }
     }
-
-
     if (hasValidTargetObject() && m_currentClip)
     {
         applyFrameToObject(m_currentFrame);
     }
 }
-
 void AnimationEditorPanel::addKeyFrame(int frameIndex)
 {
     if (!m_currentClip)
@@ -823,10 +678,8 @@ void AnimationEditorPanel::addKeyFrame(int frameIndex)
     m_currentClip->getAnimationClip().Frames[frameIndex] = newFrame;
     m_multiSelectedFrames.clear();
     m_multiSelectedFrames.insert(frameIndex);
-
     LogInfo("添加空关键帧: {}", frameIndex);
 }
-
 void AnimationEditorPanel::removeKeyFrame(int frameIndex)
 {
     if (!m_currentClip) return;
@@ -840,50 +693,38 @@ void AnimationEditorPanel::removeKeyFrame(int frameIndex)
     m_multiSelectedFrames.erase(frameIndex);
     LogInfo("删除关键帧: {}", frameIndex);
 }
-
 void AnimationEditorPanel::copyFrameData(int fromFrame, int toFrame)
 {
     if (!m_currentClip)
         return;
-
     auto fromIt = m_currentClip->getAnimationClip().Frames.find(fromFrame);
     if (fromIt == m_currentClip->getAnimationClip().Frames.end())
     {
         LogWarn("源帧 {} 不存在", fromFrame);
         return;
     }
-
     m_currentClip->getAnimationClip().Frames[toFrame] = fromIt->second;
     LogInfo("复制帧数据: {} -> {}", fromFrame, toFrame);
 }
-
 void AnimationEditorPanel::saveCurrentClip()
 {
     if (!m_currentClip)
         return;
-
-
     AnimationClip& clipData = m_currentClip->getAnimationClip();
-
-
     if (clipData.Name.empty())
     {
         clipData.Name = m_currentClipName.empty() ? "未命名动画" : m_currentClipName;
     }
-
-
     if (!clipData.TargetEntityGuid.Valid() && m_targetObjectGuid.Valid())
     {
         clipData.TargetEntityGuid = m_targetObjectGuid;
     }
-
     auto meta = AssetManager::GetInstance().GetMetadata(m_currentClipGuid);
     if (!meta)
     {
         LogError("无法找到动画切片的元数据，GUID: {}", m_currentClipGuid.ToString());
         return;
     }
-
     auto path = AssetManager::GetInstance().GetAssetsRootPath() / meta->assetPath.filename();
     std::ofstream fout(path);
     if (!fout.is_open())
@@ -891,54 +732,41 @@ void AnimationEditorPanel::saveCurrentClip()
         LogError("无法打开文件保存动画切片: {}", path.c_str());
         return;
     }
-
-
     std::string content = YAML::Dump(YAML::convert<AnimationClip>::encode(clipData));
     fout << content;
     fout.close();
-
     LogInfo("保存动画切片: {} (包含 {} 个关键帧)", clipData.Name, clipData.Frames.size());
 }
-
 void AnimationEditorPanel::centerTimelineOnCurrentFrame()
 {
     float pixelsPerFrame = 20.0f * m_timelineZoom;
     m_timelineScrollX = m_currentFrame * pixelsPerFrame - 200.0f;
     m_timelineScrollX = std::max(0.0f, m_timelineScrollX);
 }
-
 void AnimationEditorPanel::fitTimelineToAllFrames(float viewWidth)
 {
     if (m_totalFrames <= 0)
         return;
-
     float neededPixelsPerFrame = viewWidth / static_cast<float>(m_totalFrames);
     m_timelineZoom = neededPixelsPerFrame / 20.0f;
     m_timelineZoom = std::clamp(m_timelineZoom, 0.1f, 5.0f);
     m_timelineScrollX = 0.0f;
 }
-
 void AnimationEditorPanel::applyFrameToObject(int frameIndex)
 {
     if (!m_currentClip || !hasValidTargetObject())
         return;
-
     auto frameIt = m_currentClip->getAnimationClip().Frames.find(frameIndex);
     if (frameIt == m_currentClip->getAnimationClip().Frames.end())
         return;
-
     auto scene = SceneManager::GetInstance().GetCurrentScene();
     if (!scene)
         return;
-
     auto targetObject = scene->FindGameObjectByGuid(m_targetObjectGuid);
     if (!targetObject.IsValid())
         return;
-
     const AnimFrame& frame = frameIt->second;
     auto& registry = ComponentRegistry::GetInstance();
-
-
     for (const auto& [componentName, componentData] : frame.animationData)
     {
         const auto* componentInfo = registry.Get(componentName);
@@ -947,7 +775,6 @@ void AnimationEditorPanel::applyFrameToObject(int frameIndex)
             try
             {
                 componentInfo->deserialize(scene->GetRegistry(), targetObject.GetEntityHandle(), componentData);
-
                 EventBus::GetInstance().Publish(ComponentUpdatedEvent{
                     scene->GetRegistry(), targetObject.GetEntityHandle()
                 });
@@ -959,7 +786,6 @@ void AnimationEditorPanel::applyFrameToObject(int frameIndex)
         }
     }
 }
-
 void AnimationEditorPanel::updateTargetObject()
 {
     if (m_targetObjectGuid.Valid())
@@ -987,20 +813,16 @@ void AnimationEditorPanel::updateTargetObject()
         m_targetObjectName.clear();
     }
 }
-
 bool AnimationEditorPanel::hasValidTargetObject() const
 {
     if (!m_targetObjectGuid.Valid())
         return false;
-
     auto scene = SceneManager::GetInstance().GetCurrentScene();
     if (!scene)
         return false;
-
     auto targetObject = scene->FindGameObjectByGuid(m_targetObjectGuid);
     return targetObject.IsValid();
 }
-
 void AnimationEditorPanel::addKeyFrameFromCurrentObject(int frameIndex)
 {
     if (!m_currentClip || !hasValidTargetObject())
@@ -1008,25 +830,19 @@ void AnimationEditorPanel::addKeyFrameFromCurrentObject(int frameIndex)
         LogWarn("没有打开的动画切片或没有有效的目标物体，无法添加关键帧");
         return;
     }
-
-
     auto scene = SceneManager::GetInstance().GetCurrentScene();
     if (!scene)
         return;
-
     auto targetObject = scene->FindGameObjectByGuid(m_targetObjectGuid);
     if (!targetObject.IsValid())
     {
         LogError("找不到目标物体: {}", m_targetObjectGuid.ToString());
         return;
     }
-
-
     std::vector<std::string> availableComponents;
     const auto& registry = ComponentRegistry::GetInstance();
     auto entityHandle = targetObject.GetEntityHandle();
     auto& sceneRegistry = scene->GetRegistry();
-
     for (const auto& componentName : registry.GetAllRegisteredNames())
     {
         const auto* componentInfo = registry.Get(componentName);
@@ -1035,20 +851,15 @@ void AnimationEditorPanel::addKeyFrameFromCurrentObject(int frameIndex)
             availableComponents.push_back(componentName);
         }
     }
-
     if (availableComponents.empty())
     {
         LogWarn("目标物体没有任何组件可以记录");
         return;
     }
-
-
     m_componentSelectorOpen = true;
     m_selectedComponents.clear();
     m_availableComponents = availableComponents;
     m_pendingFrameIndex = frameIndex;
-
-
     for (const auto& componentName : m_availableComponents)
     {
         if (componentName == "Transform")
@@ -1057,7 +868,6 @@ void AnimationEditorPanel::addKeyFrameFromCurrentObject(int frameIndex)
         }
     }
 }
-
 void AnimationEditorPanel::drawComponentSelector()
 {
     if (!ImGui::Begin("选择要记录的组件", &m_componentSelectorOpen, ImGuiWindowFlags_AlwaysAutoResize))
@@ -1065,11 +875,8 @@ void AnimationEditorPanel::drawComponentSelector()
         ImGui::End();
         return;
     }
-
     ImGui::Text("选择要在关键帧中记录的组件:");
     ImGui::Separator();
-
-
     if (ImGui::Button("全选"))
     {
         m_selectedComponents.clear();
@@ -1078,13 +885,11 @@ void AnimationEditorPanel::drawComponentSelector()
             m_selectedComponents.insert(componentName);
         }
     }
-
     ImGui::SameLine();
     if (ImGui::Button("全不选"))
     {
         m_selectedComponents.clear();
     }
-
     ImGui::SameLine();
     if (ImGui::Button("仅Transform"))
     {
@@ -1098,10 +903,7 @@ void AnimationEditorPanel::drawComponentSelector()
             }
         }
     }
-
     ImGui::Separator();
-
-
     for (const auto& componentName : m_availableComponents)
     {
         bool isSelected = m_selectedComponents.find(componentName) != m_selectedComponents.end();
@@ -1117,25 +919,19 @@ void AnimationEditorPanel::drawComponentSelector()
             }
         }
     }
-
     ImGui::Separator();
-
-
     if (ImGui::Button("确认添加关键帧"))
     {
         createKeyFrameWithSelectedComponents();
         m_componentSelectorOpen = false;
     }
-
     ImGui::SameLine();
     if (ImGui::Button("取消"))
     {
         m_componentSelectorOpen = false;
     }
-
     ImGui::End();
 }
-
 void AnimationEditorPanel::createKeyFrameWithSelectedComponents()
 {
     if (m_selectedComponents.empty())
@@ -1146,7 +942,6 @@ void AnimationEditorPanel::createKeyFrameWithSelectedComponents()
     bool frameExists = m_currentClip->getAnimationClip().Frames.find(m_pendingFrameIndex) != m_currentClip->
         getAnimationClip().Frames.end();
     AnimFrame& frame = m_currentClip->getAnimationClip().Frames[m_pendingFrameIndex];
-
     if (frameExists)
     {
         for (const auto& componentName : m_selectedComponents)
@@ -1154,7 +949,6 @@ void AnimationEditorPanel::createKeyFrameWithSelectedComponents()
             frame.animationData.erase(componentName);
         }
     }
-
     auto scene = SceneManager::GetInstance().GetCurrentScene();
     if (scene)
     {
@@ -1164,7 +958,6 @@ void AnimationEditorPanel::createKeyFrameWithSelectedComponents()
             const auto& registry = ComponentRegistry::GetInstance();
             auto entityHandle = targetObject.GetEntityHandle();
             auto& sceneRegistry = scene->GetRegistry();
-
             for (const auto& componentName : m_selectedComponents)
             {
                 const auto* componentInfo = registry.Get(componentName);
@@ -1180,8 +973,6 @@ void AnimationEditorPanel::createKeyFrameWithSelectedComponents()
         }
     }
 }
-
-
 void AnimationEditorPanel::drawFrameEditor()
 {
     if (!ImGui::Begin("帧编辑器", &m_frameEditWindowOpen))
@@ -1189,14 +980,12 @@ void AnimationEditorPanel::drawFrameEditor()
         ImGui::End();
         return;
     }
-
     if (m_editingFrameIndex < 0 || !m_currentClip)
     {
         ImGui::Text("无效的编辑帧");
         ImGui::End();
         return;
     }
-
     auto it = m_currentClip->getAnimationClip().Frames.find(m_editingFrameIndex);
     if (it == m_currentClip->getAnimationClip().Frames.end())
     {
@@ -1204,29 +993,20 @@ void AnimationEditorPanel::drawFrameEditor()
         ImGui::End();
         return;
     }
-
     ImGui::Text("编辑帧 %d", m_editingFrameIndex);
     ImGui::Separator();
-
     AnimFrame& frame = it->second;
-
-
     if (ImGui::CollapsingHeader("组件数据", ImGuiTreeNodeFlags_DefaultOpen))
     {
         ImGui::Text("此帧记录了 %zu 个组件的数据:", frame.animationData.size());
         ImGui::Separator();
-
-
         for (auto animDataIt = frame.animationData.begin(); animDataIt != frame.animationData.end();)
         {
             auto& componentName = animDataIt->first;
             auto& componentData = animDataIt->second;
-
             if (ImGui::TreeNode(componentName.c_str()))
             {
                 ImGui::Text("组件类型: %s", componentName.c_str());
-
-
                 if (componentData.IsMap())
                 {
                     ImGui::Text("记录的属性数量: %zu", componentData.size());
@@ -1235,21 +1015,17 @@ void AnimationEditorPanel::drawFrameEditor()
                 {
                     ImGui::Text("数据: %s", componentData.as<std::string>().c_str());
                 }
-
                 if (ImGui::Button("删除组件数据"))
                 {
                     animDataIt = frame.animationData.erase(animDataIt);
                     ImGui::TreePop();
                     continue;
                 }
-
                 ImGui::TreePop();
             }
             ++animDataIt;
         }
-
         ImGui::Separator();
-
         if (ImGui::Button("添加更多组件"))
         {
             if (hasValidTargetObject())
@@ -1264,7 +1040,6 @@ void AnimationEditorPanel::drawFrameEditor()
                         const auto& registry = ComponentRegistry::GetInstance();
                         auto entityHandle = targetObject.GetEntityHandle();
                         auto& sceneRegistry = scene->GetRegistry();
-
                         for (const auto& componentName : registry.GetAllRegisteredNames())
                         {
                             const auto* componentInfo = registry.Get(componentName);
@@ -1276,7 +1051,6 @@ void AnimationEditorPanel::drawFrameEditor()
                                 }
                             }
                         }
-
                         if (!unrecordedComponents.empty())
                         {
                             m_componentSelectorOpen = true;
@@ -1307,7 +1081,6 @@ void AnimationEditorPanel::drawFrameEditor()
                         const auto& registry = ComponentRegistry::GetInstance();
                         auto entityHandle = targetObject.GetEntityHandle();
                         auto& sceneRegistry = scene->GetRegistry();
-
                         int refreshedCount = 0;
                         for (auto& [componentName, componentData] : frame.animationData)
                         {
@@ -1324,18 +1097,14 @@ void AnimationEditorPanel::drawFrameEditor()
             }
         }
     }
-
-
     if (ImGui::CollapsingHeader("动画事件", ImGuiTreeNodeFlags_DefaultOpen))
     {
         ImGui::Text("在此帧触发的事件:");
         ImGui::Separator();
-
         std::vector<int> indicesToRemove;
         for (size_t i = 0; i < frame.eventTargets.size(); ++i)
         {
             ImGui::PushID(static_cast<int>(i));
-
             std::string eventLabel = std::format("事件 {} [{}]", i,
                                                  frame.eventTargets[i].targetMethodName.empty()
                                                      ? "未设置"
@@ -1348,17 +1117,14 @@ void AnimationEditorPanel::drawFrameEditor()
                     m_editingEventIndex = static_cast<int>(i);
                     m_eventEditorOpen = true;
                 }
-
                 if (CustomDrawing::WidgetDrawer<Guid>::Draw("目标实体", target.targetEntityGuid, *m_context->uiCallbacks))
                 {
                     target.targetComponentName = "ScriptComponent";
                     target.targetMethodName.clear();
                     m_context->uiCallbacks->onValueChanged.Invoke();
                 }
-
                 ImGui::Text("组件名称: ScriptComponent");
                 target.targetComponentName = "ScriptComponent";
-
                 ImGui::Text("方法名称:");
                 ImGui::SameLine();
                 auto availableMethods = CustomDrawing::ScriptMetadataHelper::GetAvailableMethods(
@@ -1376,7 +1142,6 @@ void AnimationEditorPanel::drawFrameEditor()
                         }
                     }
                 }
-
                 ImGui::SetNextItemWidth(200.0f);
                 if (ImGui::BeginCombo("##MethodSelector",
                                       target.targetMethodName.empty() ? "选择方法" : currentMethodDisplay.c_str()))
@@ -1395,31 +1160,25 @@ void AnimationEditorPanel::drawFrameEditor()
                     }
                     ImGui::EndCombo();
                 }
-
                 if (ImGui::Button("删除事件"))
                 {
                     indicesToRemove.push_back(static_cast<int>(i));
                     m_context->uiCallbacks->onValueChanged.Invoke();
                 }
-
                 ImGui::TreePop();
             }
             ImGui::PopID();
         }
-
         for (int i = static_cast<int>(indicesToRemove.size()) - 1; i >= 0; --i)
         {
             frame.eventTargets.erase(frame.eventTargets.begin() + indicesToRemove[i]);
         }
-
         if (ImGui::Button("添加动画事件"))
         {
             addEventTarget(frame);
         }
     }
-
     ImGui::Separator();
-
     if (ImGui::Button("确认"))
     {
         saveCurrentClip();
@@ -1430,15 +1189,12 @@ void AnimationEditorPanel::drawFrameEditor()
     {
         m_frameEditWindowOpen = false;
     }
-
     ImGui::End();
 }
-
 void AnimationEditorPanel::addEventTarget(AnimFrame& frame)
 {
     ECS::SerializableEventTarget newTarget;
     newTarget.targetComponentName = "ScriptComponent";
-
     if (hasValidTargetObject())
     {
         newTarget.targetEntityGuid = m_targetObjectGuid;
@@ -1447,7 +1203,6 @@ void AnimationEditorPanel::addEventTarget(AnimFrame& frame)
     m_context->uiCallbacks->onValueChanged.Invoke();
     LogInfo("添加新的动画事件目标");
 }
-
 void AnimationEditorPanel::removeEventTarget(AnimFrame& frame, size_t index)
 {
     if (index < frame.eventTargets.size())
@@ -1457,7 +1212,6 @@ void AnimationEditorPanel::removeEventTarget(AnimFrame& frame, size_t index)
         LogInfo("删除动画事件目标");
     }
 }
-
 void AnimationEditorPanel::handleShortcutInput()
 {
     if (!m_isFocused) return;
@@ -1481,7 +1235,6 @@ void AnimationEditorPanel::handleShortcutInput()
         }
     }
 }
-
 void AnimationEditorPanel::drawEventEditor()
 {
     if (!ImGui::Begin("动画事件编辑器", &m_eventEditorOpen))
@@ -1489,15 +1242,12 @@ void AnimationEditorPanel::drawEventEditor()
         ImGui::End();
         return;
     }
-
     if (!m_currentClip || m_editingEventIndex < 0)
     {
         ImGui::Text("没有选中的事件进行编辑");
         ImGui::End();
         return;
     }
-
-
     auto frameIt = m_currentClip->getAnimationClip().Frames.find(m_editingFrameIndex);
     if (frameIt == m_currentClip->getAnimationClip().Frames.end())
     {
@@ -1505,48 +1255,31 @@ void AnimationEditorPanel::drawEventEditor()
         ImGui::End();
         return;
     }
-
     AnimFrame& frame = frameIt->second;
-
     if (m_editingEventIndex >= static_cast<int>(frame.eventTargets.size()))
     {
         ImGui::Text("无效的事件索引");
         ImGui::End();
         return;
     }
-
     ECS::SerializableEventTarget& target = frame.eventTargets[m_editingEventIndex];
-
     ImGui::Text("编辑帧 %d 的事件 %d", m_editingFrameIndex, m_editingEventIndex);
     ImGui::Separator();
-
-
     bool changed = false;
-
-
     if (CustomDrawing::WidgetDrawer<Guid>::Draw("目标实体", target.targetEntityGuid, *m_context->uiCallbacks))
     {
         changed = true;
-
         target.targetComponentName = "ScriptComponent";
         target.targetMethodName.clear();
     }
-
-
     ImGui::Text("组件名称:");
     ImGui::SameLine();
     ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "ScriptComponent");
     target.targetComponentName = "ScriptComponent";
-
-
     ImGui::Text("方法名称:");
     ImGui::SameLine();
-
-
     auto availableMethods = CustomDrawing::ScriptMetadataHelper::GetAvailableMethods(
         target.targetEntityGuid, "");
-
-
     std::string currentMethodDisplay = target.targetMethodName;
     if (!target.targetMethodName.empty())
     {
@@ -1560,7 +1293,6 @@ void AnimationEditorPanel::drawEventEditor()
             }
         }
     }
-
     ImGui::SetNextItemWidth(200.0f);
     if (ImGui::BeginCombo("##MethodSelector",
                           target.targetMethodName.empty() ? "选择方法" : currentMethodDisplay.c_str()))
@@ -1576,19 +1308,15 @@ void AnimationEditorPanel::drawEventEditor()
                 bool isSelected = (target.targetMethodName == methodName);
                 std::string methodDisplay = std::format("{}({})", methodName,
                                                         signature == "void" ? "" : signature);
-
                 if (ImGui::Selectable(methodDisplay.c_str(), isSelected))
                 {
                     target.targetMethodName = methodName;
                     changed = true;
                 }
-
                 if (isSelected)
                 {
                     ImGui::SetItemDefaultFocus();
                 }
-
-
                 if (ImGui::IsItemHovered())
                 {
                     ImGui::BeginTooltip();
@@ -1598,27 +1326,19 @@ void AnimationEditorPanel::drawEventEditor()
                 }
             }
         }
-
         ImGui::EndCombo();
     }
-
-
     RuntimeGameObject targetObject = CustomDrawing::ScriptMetadataHelper::GetGameObjectByGuid(
         target.targetEntityGuid);
     if (targetObject.IsValid())
     {
         ImGui::Text("目标对象: %s", targetObject.GetName().c_str());
-
-
         ImGui::Separator();
         ImGui::Text("对象详情:");
         ImGui::Text("  GUID: %s", target.targetEntityGuid.ToString().c_str());
-
-
         if (targetObject.HasComponent<ECS::ScriptsComponent>())
         {
             auto& scriptsComp = targetObject.GetComponent<ECS::ScriptsComponent>();
-
             if (scriptsComp.scripts.empty())
             {
                 ImGui::TextDisabled("  (无脚本)");
@@ -1653,10 +1373,7 @@ void AnimationEditorPanel::drawEventEditor()
     {
         ImGui::TextDisabled("请选择目标实体");
     }
-
     ImGui::Separator();
-
-
     if (ImGui::CollapsingHeader("事件预览"))
     {
         if (!target.targetEntityGuid.Valid())
@@ -1676,10 +1393,7 @@ void AnimationEditorPanel::drawEventEditor()
             ImGui::Text("  触发帧: %d", m_editingFrameIndex);
         }
     }
-
     ImGui::Separator();
-
-
     if (ImGui::Button("保存"))
     {
         if (changed)
@@ -1688,13 +1402,11 @@ void AnimationEditorPanel::drawEventEditor()
         }
         m_eventEditorOpen = false;
     }
-
     ImGui::SameLine();
     if (ImGui::Button("取消"))
     {
         m_eventEditorOpen = false;
     }
-
     ImGui::SameLine();
     if (ImGui::Button("删除此事件"))
     {
@@ -1703,10 +1415,8 @@ void AnimationEditorPanel::drawEventEditor()
         m_eventEditorOpen = false;
         LogInfo("删除动画事件目标");
     }
-
     ImGui::End();
 }
-
 void AnimationEditorPanel::Draw()
 {
     PROFILE_FUNCTION();
@@ -1716,7 +1426,6 @@ void AnimationEditorPanel::Draw()
         ImGui::SetNextWindowFocus();
         m_requestFocus = false;
     }
-
     if (ImGui::Begin(GetPanelName(), &m_isVisible, ImGuiWindowFlags_MenuBar))
     {
         m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
@@ -1792,7 +1501,6 @@ void AnimationEditorPanel::Draw()
     if (m_componentSelectorOpen) { drawComponentSelector(); }
     if (m_eventEditorOpen) { drawEventEditor(); }
 }
-
 void AnimationEditorPanel::drawPropertiesPanel()
 {
     if (!m_currentClip)
@@ -1800,9 +1508,7 @@ void AnimationEditorPanel::drawPropertiesPanel()
         ImGui::Text("没有打开的动画切片");
         return;
     }
-
     ImGui::Text("属性面板");
-
     if (m_multiSelectedFrames.size() == 1)
     {
         int selectedFrame = *m_multiSelectedFrames.begin();
@@ -1819,7 +1525,6 @@ void AnimationEditorPanel::drawPropertiesPanel()
             if (ImGui::Button("删除关键帧"))
             {
                 removeKeyFrame(selectedFrame);
-
                 return;
             }
             ImGui::SameLine();
@@ -1833,7 +1538,6 @@ void AnimationEditorPanel::drawPropertiesPanel()
             {
                 applyFrameToObject(selectedFrame);
             }
-
             const AnimFrame& frame = it->second;
             ImGui::Text("记录的组件: %zu 个", frame.animationData.size());
             if (ImGui::BeginChild("ComponentData", ImVec2(0, 150), true))
@@ -1888,7 +1592,6 @@ void AnimationEditorPanel::drawPropertiesPanel()
                 ImGui::Text("请先设置目标物体");
             }
         }
-
         if (m_hasFrameDataToCopy)
         {
             if (ImGui::Button("粘贴帧数据"))

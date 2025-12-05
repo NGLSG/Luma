@@ -1,5 +1,4 @@
 #pragma once
-
 #include <entt/entt.hpp>
 #include <variant>
 #include <string>
@@ -7,23 +6,15 @@
 #include <vector>
 #include <vector>
 #include <memory>
-
 #include <include/core/SkImage.h>
 #include <include/core/SkTypeface.h>
 #include <include/core/SkRect.h>
 #include <include/core/SkColor.h>
-
 #include "../Components/Transform.h"
 #include "../Renderer/RenderComponent.h"
-#include "../Components/UIComponents.h" // 包含 Button 和 InputText 的定义
-
-// 前向声明
+#include "../Components/UIComponents.h" 
 namespace Nut { class TextureA; }
 class RuntimeWGSLMaterial;
-
-/**
- * @brief 存储精灵渲染所需的所有原始数据。
- */
 struct SpriteRenderData
 {
     SkImage* image = nullptr;
@@ -35,12 +26,8 @@ struct SpriteRenderData
     int filterQuality;
     int wrapMode;
     float ppuScaleFactor;
-    bool isUISprite = false; // 标记是否为UI精灵（UI使用Skia，非UI使用WGPU）
+    bool isUISprite = false; 
 };
-
-/**
- * @brief 存储文本渲染所需的所有原始数据。
- */
 struct TextRenderData
 {
     SkTypeface* typeface = nullptr;
@@ -49,10 +36,6 @@ struct TextRenderData
     ECS::Color color;
     int alignment;
 };
-
-/**
- * @brief 存储按钮组件渲染所需的所有原始数据。
- */
 struct RawButtonRenderData
 {
     ECS::RectF rect;
@@ -61,10 +44,6 @@ struct RawButtonRenderData
     sk_sp<SkImage> backgroundImage;
     float roundness;
 };
-
-/**
- * @brief 存储输入框组件渲染所需的所有原始数据。
- */
 struct RawInputTextRenderData
 {
     ECS::RectF rect;
@@ -77,7 +56,6 @@ struct RawInputTextRenderData
     sk_sp<SkImage> backgroundImage;
     std::string inputBuffer;
 };
-
 struct RawToggleButtonRenderData
 {
     ECS::RectF rect;
@@ -89,7 +67,6 @@ struct RawToggleButtonRenderData
     sk_sp<SkImage> backgroundImage;
     float roundness;
 };
-
 struct RawRadioButtonRenderData
 {
     ECS::RectF rect;
@@ -101,7 +78,6 @@ struct RawRadioButtonRenderData
     sk_sp<SkImage> selectionImage;
     float roundness;
 };
-
 struct RawCheckBoxRenderData
 {
     ECS::RectF rect;
@@ -114,7 +90,6 @@ struct RawCheckBoxRenderData
     sk_sp<SkImage> checkmarkImage;
     float roundness;
 };
-
 struct RawSliderRenderData
 {
     ECS::RectF rect;
@@ -127,7 +102,6 @@ struct RawSliderRenderData
     sk_sp<SkImage> fillImage;
     sk_sp<SkImage> thumbImage;
 };
-
 struct RawComboBoxRenderData
 {
     ECS::RectF rect;
@@ -143,7 +117,6 @@ struct RawComboBoxRenderData
     sk_sp<SkImage> dropdownIcon;
     float roundness;
 };
-
 struct RawExpanderRenderData
 {
     ECS::RectF rect;
@@ -153,7 +126,6 @@ struct RawExpanderRenderData
     sk_sp<SkImage> backgroundImage;
     float roundness;
 };
-
 struct RawProgressBarRenderData
 {
     ECS::RectF rect;
@@ -167,7 +139,6 @@ struct RawProgressBarRenderData
     sk_sp<SkImage> backgroundImage;
     sk_sp<SkImage> fillImage;
 };
-
 struct RawTabControlRenderData
 {
     ECS::RectF rect;
@@ -180,7 +151,6 @@ struct RawTabControlRenderData
     sk_sp<SkImage> backgroundImage;
     sk_sp<SkImage> tabBackgroundImage;
 };
-
 struct RawListBoxRenderData
 {
     ECS::RectF rect;
@@ -206,17 +176,12 @@ struct RawListBoxRenderData
     ECS::Color scrollbarTrackColor, scrollbarThumbColor;
     sk_sp<SkImage> backgroundImage;
 };
-
-/**
- * @brief 代表一个可渲染单元，包含所有必要数据以便在渲染线程中进行插值和批处理。
- */
 struct Renderable
 {
     entt::entity entityId;
     int zIndex = 0;
     uint64_t sortKey = 0;
     ECS::TransformComponent transform;
-
     std::variant<
         SpriteRenderData,
         TextRenderData,

@@ -1,6 +1,5 @@
 #include "../Utils/PCH.h"
 #include "SceneViewPanel.h"
-
 #include "ImGuiRenderer.h"
 #include "../Resources/AssetManager.h"
 #include "../Components/IDComponent.h"
@@ -16,13 +15,10 @@
 #include "../Resources/RuntimeAsset/RuntimePrefab.h"
 #include "../SceneManager.h"
 #include "../Utils/Logger.h"
-
 #include <imgui.h>
 #include <imgui_internal.h>
-
 #include <entt/entt.hpp>
 #include <ranges>
-
 #include "ColliderComponent.h"
 #include "RelationshipComponent.h"
 #include "RenderableManager.h"
@@ -33,23 +29,17 @@
 #include "include/core/SkFont.h"
 #include "include/core/SkFontMetrics.h"
 #include "include/core/SkFontTypes.h"
-
 #ifndef PIXELS_PER_METER
 #define PIXELS_PER_METER 32.0f;
 #endif
-
 namespace
 {
     inline ECS::Vector2f ComputeAnchoredCenter(const ECS::TransformComponent& transform, float width, float height)
     {
         float offsetX = (0.5f - transform.anchor.x) * width;
         float offsetY = (0.5f - transform.anchor.y) * height;
-
-
         offsetX *= transform.scale.x;
         offsetY *= transform.scale.y;
-
-
         if (std::abs(transform.rotation) > 0.0001f)
         {
             const float sinR = sinf(transform.rotation);
@@ -58,11 +48,9 @@ namespace
             offsetX = offsetX * cosR - offsetY * sinR;
             offsetY = tempX * sinR + offsetY * cosR;
         }
-
         return ECS::Vector2f(transform.position.x + offsetX, transform.position.y + offsetY);
     }
 }
-
 static bool IsPointInSprite(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
                             const ECS::SpriteComponent& sprite)
 {
@@ -73,20 +61,11 @@ static bool IsPointInSprite(const ECS::Vector2f& worldPoint, const ECS::Transfor
             ? sprite.sourceRect.Height()
             : sprite.image->getImage()->height()) *
         0.5f;
-
     if (halfWidth <= 0 || halfHeight <= 0) return false;
-
-
     const float width = halfWidth * 2.0f;
     const float height = halfHeight * 2.0f;
-
-
     const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
-
-
     ECS::Vector2f localPoint = worldPoint - anchoredCenter;
-
-
     if (std::abs(transform.rotation) > 0.001f)
     {
         const float sinR = sinf(-transform.rotation);
@@ -95,17 +74,11 @@ static bool IsPointInSprite(const ECS::Vector2f& worldPoint, const ECS::Transfor
         localPoint.x = localPoint.x * cosR - localPoint.y * sinR;
         localPoint.y = tempX * sinR + localPoint.y * cosR;
     }
-
-
     localPoint.x /= transform.scale.x;
     localPoint.y /= transform.scale.y;
-
-
     return (localPoint.x >= -halfWidth && localPoint.x <= halfWidth &&
         localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
 }
-
-
 static std::vector<std::string> splitTextByNewlines(const std::string& str)
 {
     std::vector<std::string> lines;
@@ -114,7 +87,6 @@ static std::vector<std::string> splitTextByNewlines(const std::string& str)
         lines.emplace_back("");
         return lines;
     }
-
     std::string line;
     std::istringstream stream(str);
     while (std::getline(stream, line))
@@ -123,38 +95,28 @@ static std::vector<std::string> splitTextByNewlines(const std::string& str)
     }
     return lines;
 }
-
-
 static SkRect GetLocalTextBounds(const ECS::TextComponent& textComp, float padding = 0.0f)
 {
     if (!textComp.typeface)
     {
         return SkRect::MakeEmpty();
     }
-
     SkFont font(textComp.typeface, textComp.fontSize);
     auto lines = splitTextByNewlines(textComp.text);
-
     SkFontMetrics metrics;
     font.getMetrics(&metrics);
     const float lineHeight = font.getSpacing();
-
     float maxWidth = 0.0f;
     for (const auto& line : lines)
     {
         maxWidth = std::max(maxWidth, font.measureText(line.c_str(), line.length(), SkTextEncoding::kUTF8));
     }
-
-
     const float inkTop = metrics.fAscent;
     const float inkBottom = (lines.size() - 1) * lineHeight + metrics.fDescent;
     const float inkWidth = maxWidth;
     const float inkHeight = inkBottom - inkTop;
-
-
     float offsetX = 0.0f;
     float offsetY = 0.0f;
-
     switch (textComp.alignment)
     {
     case TextAlignment::TopLeft:
@@ -173,7 +135,6 @@ static SkRect GetLocalTextBounds(const ECS::TextComponent& textComp, float paddi
         offsetX = -inkWidth;
         break;
     }
-
     switch (textComp.alignment)
     {
     case TextAlignment::TopLeft:
@@ -192,16 +153,11 @@ static SkRect GetLocalTextBounds(const ECS::TextComponent& textComp, float paddi
         offsetY = -inkTop - inkHeight;
         break;
     }
-
-
     SkRect localBounds = SkRect::MakeWH(inkWidth, inkHeight);
     localBounds.offset(offsetX, offsetY + inkTop);
     localBounds.outset(padding, padding);
-
     return localBounds;
 }
-
-
 static bool isPointInText(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
                           const ECS::TextComponent& textComp)
 {
@@ -209,15 +165,12 @@ static bool isPointInText(const ECS::Vector2f& worldPoint, const ECS::TransformC
     {
         return false;
     }
-
     const SkRect localBounds = GetLocalTextBounds(textComp);
     if (localBounds.isEmpty())
     {
         return false;
     }
-
     ECS::Vector2f localPoint = worldPoint - transform.position;
-
     if (std::abs(transform.rotation) > 0.001f)
     {
         const float sinR = sinf(-transform.rotation);
@@ -226,33 +179,22 @@ static bool isPointInText(const ECS::Vector2f& worldPoint, const ECS::TransformC
         localPoint.x = localPoint.x * cosR - localPoint.y * sinR;
         localPoint.y = tempX * sinR + localPoint.y * cosR;
     }
-
     const SkRect scaledBounds = SkRect::MakeLTRB(
         localBounds.fLeft * transform.scale.x,
         localBounds.fTop * transform.scale.y,
         localBounds.fRight * transform.scale.x,
         localBounds.fBottom * transform.scale.y
     );
-
     return scaledBounds.contains(localPoint.x, localPoint.y);
 }
-
-
 static bool isPointInButton(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform,
                             const ECS::ButtonComponent& button)
 {
     const float width = button.rect.Width();
     const float height = button.rect.Height();
-
     if (width <= 0 || height <= 0) return false;
-
-
     const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
-
-
     ECS::Vector2f localPoint = worldPoint - anchoredCenter;
-
-
     if (std::abs(transform.rotation) > 0.001f)
     {
         const float sinR = sinf(-transform.rotation);
@@ -261,20 +203,13 @@ static bool isPointInButton(const ECS::Vector2f& worldPoint, const ECS::Transfor
         localPoint.x = localPoint.x * cosR - localPoint.y * sinR;
         localPoint.y = tempX * sinR + localPoint.y * cosR;
     }
-
-
     localPoint.x /= transform.scale.x;
     localPoint.y /= transform.scale.y;
-
-
     const float halfWidth = width * 0.5f;
     const float halfHeight = height * 0.5f;
-
     return (localPoint.x >= -halfWidth && localPoint.x <= halfWidth &&
         localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
 }
-
-
 static bool isPointInUIRect(const ECS::Vector2f& worldPoint,
                             const ECS::TransformComponent& transform,
                             float width, float height)
@@ -282,7 +217,6 @@ static bool isPointInUIRect(const ECS::Vector2f& worldPoint,
     const float halfWidth = width * 0.5f;
     const float halfHeight = height * 0.5f;
     if (halfWidth <= 0 || halfHeight <= 0) return false;
-
     ECS::Vector2f localPoint = worldPoint - transform.position;
     if (transform.rotation != 0.0f)
     {
@@ -294,47 +228,35 @@ static bool isPointInUIRect(const ECS::Vector2f& worldPoint,
     }
     if (std::abs(transform.scale.x) > 1e-5f) localPoint.x /= transform.scale.x;
     if (std::abs(transform.scale.y) > 1e-5f) localPoint.y /= transform.scale.y;
-
     return (localPoint.x >= -halfWidth && localPoint.x <= halfWidth &&
         localPoint.y >= -halfHeight && localPoint.y <= halfHeight);
 }
-
 entt::entity SceneViewPanel::findEntityByTransform(const ECS::TransformComponent& targetTransform)
 {
     auto& registry = m_context->activeScene->GetRegistry();
     auto view = registry.view<ECS::TransformComponent>();
-
     for (auto entity : view)
     {
         const auto& transform = view.get<ECS::TransformComponent>(entity);
-
         if (&transform == &targetTransform)
         {
             return entity;
         }
     }
-
     return entt::null;
 }
-
 bool SceneViewPanel::isPointInEmptyObject(const ECS::Vector2f& worldPoint, const ECS::TransformComponent& transform)
 {
     ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, transform.position);
     ImVec2 worldMouseScreen = worldToScreenWith(m_editorCameraProperties, worldPoint);
-
-
     const float crossSize = 8.0f;
     bool inCrossArea = (std::abs(worldMouseScreen.x - screenPos.x) <= crossSize &&
         std::abs(worldMouseScreen.y - screenPos.y) <= crossSize);
-
     if (inCrossArea)
         return true;
-
-
     auto& registry = m_context->activeScene->GetRegistry();
     auto* idComponent = registry.try_get<ECS::IDComponent>(
         findEntityByTransform(transform));
-
     if (idComponent)
     {
         RuntimeGameObject gameObject = m_context->activeScene->FindGameObjectByGuid(idComponent->guid);
@@ -342,24 +264,17 @@ bool SceneViewPanel::isPointInEmptyObject(const ECS::Vector2f& worldPoint, const
         {
             std::string objectName = gameObject.GetName();
             ImVec2 textSize = ImGui::CalcTextSize(objectName.c_str());
-
-
             ImVec2 labelPos = ImVec2(screenPos.x - textSize.x * 0.5f, screenPos.y + crossSize + 5.0f);
             ImVec2 labelSize = ImVec2(textSize.x + 8.0f, textSize.y + 4.0f);
-
-
             bool inLabelArea = (worldMouseScreen.x >= labelPos.x - 4.0f &&
                 worldMouseScreen.x <= labelPos.x + labelSize.x - 4.0f &&
                 worldMouseScreen.y >= labelPos.y - 2.0f &&
                 worldMouseScreen.y <= labelPos.y + labelSize.y - 2.0f);
-
             return inLabelArea;
         }
     }
-
     return false;
 }
-
 void SceneViewPanel::Initialize(EditorContext* context)
 {
     m_context = context;
@@ -368,8 +283,8 @@ void SceneViewPanel::Initialize(EditorContext* context)
     m_isEditingCollider = false;
     m_activeColliderHandle.Reset();
     m_draggedObjects.clear();
+    m_particleRenderer = std::make_unique<Particles::ParticleRenderer>();
 }
-
 void SceneViewPanel::Shutdown()
 {
     m_sceneViewTarget.reset();
@@ -378,29 +293,29 @@ void SceneViewPanel::Shutdown()
     m_isEditingCollider = false;
     m_activeColliderHandle.Reset();
     m_draggedObjects.clear();
+    if (m_particleRenderer)
+    {
+        m_particleRenderer->Shutdown();
+        m_particleRenderer.reset();
+    }
 }
-
-void SceneViewPanel::Update(float)
+void SceneViewPanel::Update(float deltaTime)
 {
+    updateParticlePreview(deltaTime);
 }
-
 void SceneViewPanel::Draw()
 {
     PROFILE_FUNCTION();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::Begin(GetPanelName(), &m_isVisible);
     m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-
     const ImVec2 viewportScreenPos = ImGui::GetCursorScreenPos();
     const ImVec2 viewportSize = ImGui::GetContentRegionAvail();
-
-
     if (m_context->editorState == EditorState::Editing)
     {
         m_context->engineContext->sceneViewRect = ECS::RectF(viewportScreenPos.x, viewportScreenPos.y, viewportSize.x,
                                                              viewportSize.y);
     }
-
     if (viewportSize.x > 0 && viewportSize.y > 0)
     {
         m_sceneViewTarget = m_context->graphicsBackend->CreateOrGetRenderTarget(
@@ -417,7 +332,6 @@ void SceneViewPanel::Draw()
                 m_editorCameraProperties = m_context->activeScene->GetCameraProperties();
                 m_editorCameraInitialized = true;
             }
-
             if (viewportSize.x <= 1 || viewportSize.y <= 1)
             {
                 ImGui::End();
@@ -428,12 +342,9 @@ void SceneViewPanel::Draw()
                 viewportScreenPos.x, viewportScreenPos.y,
                 viewportSize.x, viewportSize.y
             );
-
-
             Camera& cam = Camera::GetInstance();
             const Camera::CamProperties prevCamProps = cam.m_properties;
             cam.SetProperties(m_editorCameraProperties);
-
             m_context->graphicsBackend->SetActiveRenderTarget(m_sceneViewTarget);
             for (const auto& packet : m_context->renderQueue)
             {
@@ -441,52 +352,35 @@ void SceneViewPanel::Draw()
             }
             m_context->engineContext->renderSystem->Flush();
             m_context->graphicsBackend->Submit();
-
-
             ImTextureID textureId = m_context->imguiRenderer->GetOrCreateTextureIdFor(m_sceneViewTarget->GetTexture());
             ImGui::Image(textureId, viewportSize, ImVec2(0, 0), ImVec2(1, 1));
-
-
             ImGui::SetCursorScreenPos(viewportScreenPos);
             ImGui::InvisibleButton(
                 "##scene_interactive_layer",
                 viewportSize,
                 ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight
             );
-
-
             drawEditorGizmos(viewportScreenPos, viewportSize);
             drawCameraGizmo(ImGui::GetWindowDrawList());
             drawDesignResolutionFrame(viewportScreenPos, viewportSize);
-
             handleNavigationAndPick(viewportScreenPos, viewportSize);
-
-
             drawSelectionOutlines(viewportScreenPos, viewportSize);
-
-
+            drawParticlePreview(ImGui::GetWindowDrawList(), viewportScreenPos, viewportSize);
             handleDragDrop();
-
-
             cam.SetProperties(prevCamProps);
         }
     }
-
     ImGui::End();
     ImGui::PopStyleVar();
 }
-
 void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
 {
     if (m_context->selectionType != SelectionType::GameObject || m_context->selectionList.empty())
         return;
-
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     m_colliderHandles.clear();
     m_uiRectHandles.clear();
     auto& registry = m_context->activeScene->GetRegistry();
-
-
     const ImU32 outlineColor = IM_COL32(255, 165, 0, 255);
     const ImU32 fillColor = IM_COL32(255, 165, 0, 30);
     const ImU32 colliderColor = IM_COL32(0, 255, 0, 255);
@@ -494,17 +388,13 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
     const ImU32 labelBgColor = IM_COL32(0, 0, 0, 180);
     const ImU32 labelTextColor = IM_COL32(255, 255, 255, 255);
     const float outlineThickness = 2.0f;
-
     for (const auto& selectedGuid : m_context->selectionList)
     {
         RuntimeGameObject gameObject = m_context->activeScene->FindGameObjectByGuid(selectedGuid);
         if (!gameObject.IsValid() || !gameObject.HasComponent<ECS::TransformComponent>())
             continue;
-
         const auto& transform = gameObject.GetComponent<ECS::TransformComponent>();
         bool hasVisualRepresentation = false;
-
-
         if (gameObject.HasComponent<ECS::BoxColliderComponent>())
         {
             const auto& boxCollider = gameObject.GetComponent<ECS::BoxColliderComponent>();
@@ -554,7 +444,6 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
                 hasVisualRepresentation = true;
             }
         }
-
         else if (gameObject.HasComponent<ECS::ButtonComponent>())
         {
             const auto& buttonComp = gameObject.GetComponent<ECS::ButtonComponent>();
@@ -637,8 +526,6 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
             drawUIRectEditHandle(drawList, transform, comp.rect, m_uiRectHandles);
             hasVisualRepresentation = true;
         }
-
-
         if (!hasVisualRepresentation)
         {
             drawEmptyObjectSelection(drawList, transform, gameObject.GetName(), outlineColor, labelBgColor,
@@ -648,12 +535,9 @@ void SceneViewPanel::drawSelectionOutlines(const ImVec2& viewportScreenPos, cons
         {
             drawObjectNameLabel(drawList, transform, gameObject.GetName(), labelBgColor, labelTextColor);
         }
-
-
         drawColliderEditHandles(drawList, gameObject, transform);
     }
 }
-
 void SceneViewPanel::drawUIRectOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                        const ECS::RectF& rect,
                                        ImU32 outlineColor, ImU32 fillColor, float thickness)
@@ -681,7 +565,6 @@ void SceneViewPanel::drawUIRectOutline(ImDrawList* drawList, const ECS::Transfor
     drawList->AddConvexPolyFilled(screen.data(), 4, fillColor);
     drawList->AddPolyline(screen.data(), 4, outlineColor, ImDrawFlags_Closed, thickness);
 }
-
 void SceneViewPanel::drawUIRectEditHandle(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                           const ECS::RectF& rect,
                                           std::vector<UIRectHandle>& outHandles)
@@ -707,62 +590,44 @@ void SceneViewPanel::drawUIRectEditHandle(ImDrawList* drawList, const ECS::Trans
         outHandles.push_back({g, brScreen, s});
     }
 }
-
 void SceneViewPanel::drawBoxColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                             const ECS::BoxColliderComponent& boxCollider, ImU32 outlineColor,
                                             ImU32 fillColor, float thickness)
 {
     const float halfWidth = boxCollider.size.x * 0.5f;
     const float halfHeight = boxCollider.size.y * 0.5f;
-
-
     std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight},
         {halfWidth, -halfHeight},
         {halfWidth, halfHeight},
         {-halfWidth, halfHeight}
     };
-
-
     const float sinR = sinf(transform.rotation);
     const float cosR = cosf(transform.rotation);
-
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
-
     for (auto corner : localCorners)
     {
         corner += boxCollider.offset;
-
-
         corner.x *= transform.scale.x;
         corner.y *= transform.scale.y;
-
-
         if (std::abs(transform.rotation) > 0.001f)
         {
             const float tempX = corner.x;
             corner.x = corner.x * cosR - corner.y * sinR;
             corner.y = tempX * sinR + corner.y * cosR;
         }
-
-
         const ECS::Vector2f worldPos = transform.position + corner;
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
     }
-
-
     drawList->AddConvexPolyFilled(screenCorners.data(), 4, fillColor);
     drawList->AddPolyline(screenCorners.data(), 4, outlineColor, ImDrawFlags_Closed, thickness);
 }
-
 void SceneViewPanel::drawCircleColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                const ECS::CircleColliderComponent& circleCollider, ImU32 outlineColor,
                                                ImU32 fillColor, float thickness)
 {
     ECS::Vector2f offsetPos = circleCollider.offset;
-
-
     if (std::abs(transform.rotation) > 0.001f)
     {
         const float sinR = sinf(transform.rotation);
@@ -771,47 +636,31 @@ void SceneViewPanel::drawCircleColliderOutline(ImDrawList* drawList, const ECS::
         offsetPos.x = offsetPos.x * cosR - offsetPos.y * sinR;
         offsetPos.y = tempX * sinR + offsetPos.y * cosR;
     }
-
     ECS::Vector2f worldCenter = transform.position + offsetPos;
     ImVec2 screenCenter = worldToScreenWith(m_editorCameraProperties, worldCenter);
-
-
     float radius = circleCollider.radius * std::max(transform.scale.x, transform.scale.y);
     float screenRadius = radius * m_editorCameraProperties.zoom.x();
-
-
     drawList->AddCircleFilled(screenCenter, screenRadius, fillColor, 32);
-
-
     drawList->AddCircle(screenCenter, screenRadius, outlineColor, 32, thickness);
-
-
     ImVec2 directionEnd = ImVec2(
         screenCenter.x + screenRadius * cosf(transform.rotation),
         screenCenter.y + screenRadius * sinf(transform.rotation)
     );
     drawList->AddLine(screenCenter, directionEnd, outlineColor, thickness);
 }
-
 void SceneViewPanel::drawPolygonColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                 const ECS::PolygonColliderComponent& polygonCollider,
                                                 ImU32 outlineColor,
                                                 ImU32 fillColor, float thickness)
 {
     if (polygonCollider.vertices.size() < 3) return;
-
     std::vector<ImVec2> screenVertices;
     screenVertices.reserve(polygonCollider.vertices.size());
-
     for (const auto& vertex : polygonCollider.vertices)
     {
         ECS::Vector2f offsetVertex = vertex + polygonCollider.offset;
-
-
         offsetVertex.x *= transform.scale.x;
         offsetVertex.y *= transform.scale.y;
-
-
         if (std::abs(transform.rotation) > 0.001f)
         {
             const float sinR = sinf(transform.rotation);
@@ -820,42 +669,29 @@ void SceneViewPanel::drawPolygonColliderOutline(ImDrawList* drawList, const ECS:
             offsetVertex.x = offsetVertex.x * cosR - offsetVertex.y * sinR;
             offsetVertex.y = tempX * sinR + offsetVertex.y * cosR;
         }
-
-
         ECS::Vector2f worldPos = transform.position + offsetVertex;
         ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, worldPos);
         screenVertices.push_back(screenPos);
     }
-
-
     drawList->AddConvexPolyFilled(screenVertices.data(), static_cast<int>(screenVertices.size()), fillColor);
-
-
     for (size_t i = 0; i < screenVertices.size(); ++i)
     {
         size_t nextI = (i + 1) % screenVertices.size();
         drawList->AddLine(screenVertices[i], screenVertices[nextI], outlineColor, thickness);
     }
 }
-
 void SceneViewPanel::drawEdgeColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                              const ECS::EdgeColliderComponent& edgeCollider, ImU32 outlineColor,
                                              float thickness)
 {
     if (edgeCollider.vertices.size() < 2) return;
-
     std::vector<ImVec2> screenVertices;
     screenVertices.reserve(edgeCollider.vertices.size());
-
     for (const auto& vertex : edgeCollider.vertices)
     {
         ECS::Vector2f offsetVertex = vertex + edgeCollider.offset;
-
-
         offsetVertex.x *= transform.scale.x;
         offsetVertex.y *= transform.scale.y;
-
-
         if (std::abs(transform.rotation) > 0.001f)
         {
             const float sinR = sinf(transform.rotation);
@@ -864,53 +700,39 @@ void SceneViewPanel::drawEdgeColliderOutline(ImDrawList* drawList, const ECS::Tr
             offsetVertex.x = offsetVertex.x * cosR - offsetVertex.y * sinR;
             offsetVertex.y = tempX * sinR + offsetVertex.y * cosR;
         }
-
-
         ECS::Vector2f worldPos = transform.position + offsetVertex;
         ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, worldPos);
         screenVertices.push_back(screenPos);
     }
-
-
     for (size_t i = 0; i < screenVertices.size() - 1; ++i)
     {
         drawList->AddLine(screenVertices[i], screenVertices[i + 1], outlineColor, thickness);
     }
-
-
     if (edgeCollider.loop && screenVertices.size() > 2)
     {
         drawList->AddLine(screenVertices.back(), screenVertices.front(), outlineColor, thickness);
     }
-
-
     for (const auto& vertex : screenVertices)
     {
         drawList->AddCircleFilled(vertex, 3.0f, outlineColor);
     }
 }
-
 void SceneViewPanel::drawTilemapColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                 const ECS::TilemapColliderComponent& tilemapCollider,
                                                 ImU32 outlineColor,
                                                 float thickness)
 {
     if (tilemapCollider.generatedChains.empty()) return;
-
     for (const auto& chain : tilemapCollider.generatedChains)
     {
         if (chain.size() < 2) continue;
-
         std::vector<ImVec2> screenVertices;
         screenVertices.reserve(chain.size());
-
         for (const auto& v : chain)
         {
             ECS::Vector2f local = {v.x + tilemapCollider.offset.x, v.y + tilemapCollider.offset.y};
-
             local.x *= transform.scale.x;
             local.y *= transform.scale.y;
-
             if (std::abs(transform.rotation) > 0.001f)
             {
                 const float sinR = sinf(transform.rotation);
@@ -919,19 +741,16 @@ void SceneViewPanel::drawTilemapColliderOutline(ImDrawList* drawList, const ECS:
                 local.x = local.x * cosR - local.y * sinR;
                 local.y = tempX * sinR + local.y * cosR;
             }
-
             ECS::Vector2f worldPos = transform.position + local;
             ImVec2 sp = worldToScreenWith(m_editorCameraProperties, worldPos);
             screenVertices.push_back(sp);
         }
-
         for (size_t i = 0; i + 1 < screenVertices.size(); ++i)
         {
             drawList->AddLine(screenVertices[i], screenVertices[i + 1], outlineColor, thickness);
         }
     }
 }
-
 void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                 const ECS::SpriteComponent& sprite, ImU32 outlineColor,
                                                 ImU32 fillColor, float thickness)
@@ -942,31 +761,21 @@ void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS:
     float height = 100.f / sprite.image->getImportSettings().pixelPerUnit * (sprite.sourceRect.Height() > 0
                                                                                  ? sprite.sourceRect.Height()
                                                                                  : sprite.image->getImage()->height());
-
-
     const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
-
-
     const float scaledWidth = width * transform.scale.x;
     const float scaledHeight = height * transform.scale.y;
     const float halfWidth = scaledWidth * 0.5f;
     const float halfHeight = scaledHeight * 0.5f;
-
-
     std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight},
         {halfWidth, -halfHeight},
         {halfWidth, halfHeight},
         {-halfWidth, halfHeight}
     };
-
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
-
-
     const float sinR = sinf(transform.rotation);
     const float cosR = cosf(transform.rotation);
-
     for (const auto& corner : localCorners)
     {
         ECS::Vector2f rotatedCorner = corner;
@@ -976,53 +785,36 @@ void SceneViewPanel::drawSpriteSelectionOutline(ImDrawList* drawList, const ECS:
             rotatedCorner.x = corner.x * cosR - corner.y * sinR;
             rotatedCorner.y = tempX * sinR + corner.y * cosR;
         }
-
-
         ECS::Vector2f worldPos = anchoredCenter + rotatedCorner;
         ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, worldPos);
         screenCorners.push_back(screenPos);
     }
-
-
     drawList->AddConvexPolyFilled(screenCorners.data(), 4, fillColor);
-
     for (int i = 0; i < 4; ++i)
     {
         int nextI = (i + 1) % 4;
         drawList->AddLine(screenCorners[i], screenCorners[nextI], outlineColor, thickness);
     }
 }
-
-
 void SceneViewPanel::drawButtonSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                 const ECS::ButtonComponent& buttonComp, ImU32 outlineColor,
                                                 ImU32 fillColor, float thickness)
 {
     const float width = buttonComp.rect.Width();
     const float height = buttonComp.rect.Height();
-
-
     const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
-
-
     const float scaledWidth = width * transform.scale.x;
     const float scaledHeight = height * transform.scale.y;
     const float halfWidth = scaledWidth * 0.5f;
     const float halfHeight = scaledHeight * 0.5f;
-
-
     std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight}, {halfWidth, -halfHeight},
         {halfWidth, halfHeight}, {-halfWidth, halfHeight}
     };
-
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
-
-
     const float sinR = sinf(transform.rotation);
     const float cosR = cosf(transform.rotation);
-
     for (const auto& corner : localCorners)
     {
         ECS::Vector2f rotatedCorner = corner;
@@ -1032,16 +824,12 @@ void SceneViewPanel::drawButtonSelectionOutline(ImDrawList* drawList, const ECS:
             rotatedCorner.x = corner.x * cosR - corner.y * sinR;
             rotatedCorner.y = tempX * sinR + corner.y * cosR;
         }
-
-
         ECS::Vector2f worldPos = anchoredCenter + rotatedCorner;
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
     }
-
     drawList->AddConvexPolyFilled(screenCorners.data(), 4, fillColor);
     drawList->AddPolyline(screenCorners.data(), 4, outlineColor, ImDrawFlags_Closed, thickness);
 }
-
 void SceneViewPanel::drawCapsuleColliderOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                 const ECS::CapsuleColliderComponent& capsuleCollider,
                                                 ImU32 outlineColor,
@@ -1049,11 +837,8 @@ void SceneViewPanel::drawCapsuleColliderOutline(ImDrawList* drawList, const ECS:
 {
     float width = capsuleCollider.size.x * transform.scale.x;
     float height = capsuleCollider.size.y * transform.scale.y;
-
-
     float radius, length;
     bool isVertical = (capsuleCollider.direction == ECS::CapsuleDirection::Vertical);
-
     if (isVertical)
     {
         radius = width * 0.5f;
@@ -1064,14 +849,8 @@ void SceneViewPanel::drawCapsuleColliderOutline(ImDrawList* drawList, const ECS:
         radius = height * 0.5f;
         length = width - height;
     }
-
-
     if (length < 0) length = 0;
-
-
     ECS::Vector2f offsetPos = capsuleCollider.offset;
-
-
     if (std::abs(transform.rotation) > 0.001f)
     {
         const float sinR = sinf(transform.rotation);
@@ -1080,10 +859,7 @@ void SceneViewPanel::drawCapsuleColliderOutline(ImDrawList* drawList, const ECS:
         offsetPos.x = offsetPos.x * cosR - offsetPos.y * sinR;
         offsetPos.y = tempX * sinR + offsetPos.y * cosR;
     }
-
     ECS::Vector2f worldCenter = transform.position + offsetPos;
-
-
     ECS::Vector2f offset1, offset2;
     if (isVertical)
     {
@@ -1095,34 +871,24 @@ void SceneViewPanel::drawCapsuleColliderOutline(ImDrawList* drawList, const ECS:
         offset1 = {-length * 0.5f, 0};
         offset2 = {length * 0.5f, 0};
     }
-
-
     if (std::abs(transform.rotation) > 0.001f)
     {
         const float sinR = sinf(transform.rotation);
         const float cosR = cosf(transform.rotation);
-
         float tempX1 = offset1.x;
         offset1.x = offset1.x * cosR - offset1.y * sinR;
         offset1.y = tempX1 * sinR + offset1.y * cosR;
-
         float tempX2 = offset2.x;
         offset2.x = offset2.x * cosR - offset2.y * sinR;
         offset2.y = tempX2 * sinR + offset2.y * cosR;
     }
-
     ECS::Vector2f worldCenter1 = worldCenter + offset1;
     ECS::Vector2f worldCenter2 = worldCenter + offset2;
-
     ImVec2 screenCenter1 = worldToScreenWith(m_editorCameraProperties, worldCenter1);
     ImVec2 screenCenter2 = worldToScreenWith(m_editorCameraProperties, worldCenter2);
     float screenRadius = radius * m_editorCameraProperties.zoom.x();
-
-
     drawList->AddCircleFilled(screenCenter1, screenRadius, fillColor, 16);
     drawList->AddCircleFilled(screenCenter2, screenRadius, fillColor, 16);
-
-
     if (length > 0)
     {
         ECS::Vector2f rectOffset1, rectOffset2;
@@ -1136,37 +902,27 @@ void SceneViewPanel::drawCapsuleColliderOutline(ImDrawList* drawList, const ECS:
             rectOffset1 = {0, -radius};
             rectOffset2 = {0, radius};
         }
-
-
         if (std::abs(transform.rotation) > 0.001f)
         {
             const float sinR = sinf(transform.rotation);
             const float cosR = cosf(transform.rotation);
-
             float tempX1 = rectOffset1.x;
             rectOffset1.x = rectOffset1.x * cosR - rectOffset1.y * sinR;
             rectOffset1.y = tempX1 * sinR + rectOffset1.y * cosR;
-
             float tempX2 = rectOffset2.x;
             rectOffset2.x = rectOffset2.x * cosR - rectOffset2.y * sinR;
             rectOffset2.y = tempX2 * sinR + rectOffset2.y * cosR;
         }
-
         std::vector<ImVec2> rectCorners = {
             worldToScreenWith(m_editorCameraProperties, worldCenter1 + rectOffset1),
             worldToScreenWith(m_editorCameraProperties, worldCenter1 + rectOffset2),
             worldToScreenWith(m_editorCameraProperties, worldCenter2 + rectOffset2),
             worldToScreenWith(m_editorCameraProperties, worldCenter2 + rectOffset1)
         };
-
         drawList->AddConvexPolyFilled(rectCorners.data(), 4, fillColor);
     }
-
-
     drawList->AddCircle(screenCenter1, screenRadius, outlineColor, 16, thickness);
     drawList->AddCircle(screenCenter2, screenRadius, outlineColor, 16, thickness);
-
-
     if (length > 0)
     {
         ECS::Vector2f lineOffset1, lineOffset2;
@@ -1180,45 +936,32 @@ void SceneViewPanel::drawCapsuleColliderOutline(ImDrawList* drawList, const ECS:
             lineOffset1 = {0, -radius};
             lineOffset2 = {0, radius};
         }
-
-
         if (std::abs(transform.rotation) > 0.001f)
         {
             const float sinR = sinf(transform.rotation);
             const float cosR = cosf(transform.rotation);
-
             float tempX1 = lineOffset1.x;
             lineOffset1.x = lineOffset1.x * cosR - lineOffset1.y * sinR;
             lineOffset1.y = tempX1 * sinR + lineOffset1.y * cosR;
-
             float tempX2 = lineOffset2.x;
             lineOffset2.x = lineOffset2.x * cosR - lineOffset2.y * sinR;
             lineOffset2.y = tempX2 * sinR + lineOffset2.y * cosR;
         }
-
         ImVec2 line1Start = worldToScreenWith(m_editorCameraProperties, worldCenter1 + lineOffset1);
         ImVec2 line1End = worldToScreenWith(m_editorCameraProperties, worldCenter2 + lineOffset1);
         ImVec2 line2Start = worldToScreenWith(m_editorCameraProperties, worldCenter1 + lineOffset2);
         ImVec2 line2End = worldToScreenWith(m_editorCameraProperties, worldCenter2 + lineOffset2);
-
         drawList->AddLine(line1Start, line1End, outlineColor, thickness);
         drawList->AddLine(line2Start, line2End, outlineColor, thickness);
     }
 }
-
-
 void SceneViewPanel::drawColliderEditHandles(ImDrawList* drawList, RuntimeGameObject& gameObject,
                                              const ECS::TransformComponent& transform)
 {
     if (!gameObject.HasComponent<ECS::BoxColliderComponent>()) return;
-
     const auto& boxCollider = gameObject.GetComponent<ECS::BoxColliderComponent>();
-
-
     const float halfWidth = boxCollider.size.x * 0.5f;
     const float halfHeight = boxCollider.size.y * 0.5f;
-
-
     std::vector<ECS::Vector2f> localHandles = {
         {-halfWidth, -halfHeight},
         {0.0f, -halfHeight},
@@ -1229,25 +972,18 @@ void SceneViewPanel::drawColliderEditHandles(ImDrawList* drawList, RuntimeGameOb
         {-halfWidth, halfHeight},
         {-halfWidth, 0.0f}
     };
-
-
     const float sinR = sinf(transform.rotation);
     const float cosR = cosf(transform.rotation);
     const float handleSize = 6.0f;
     const ImU32 handleColor = IM_COL32(255, 255, 255, 255);
     const ImU32 handleOutlineColor = IM_COL32(0, 0, 0, 255);
-
     m_colliderHandles.clear();
-
     for (size_t i = 0; i < localHandles.size(); ++i)
     {
         ECS::Vector2f currentHandle = localHandles[i];
-
-
         currentHandle += boxCollider.offset;
         currentHandle.x *= transform.scale.x;
         currentHandle.y *= transform.scale.y;
-
         if (std::abs(transform.rotation) > 0.001f)
         {
             const float tempX = currentHandle.x;
@@ -1255,13 +991,10 @@ void SceneViewPanel::drawColliderEditHandles(ImDrawList* drawList, RuntimeGameOb
             currentHandle.x = tempX * cosR - tempY * sinR;
             currentHandle.y = tempX * sinR + tempY * cosR; 
         }
-
         const ECS::Vector2f worldPos = transform.position + currentHandle;
         const ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, worldPos);
-
         drawList->AddCircleFilled(screenPos, handleSize, handleColor);
         drawList->AddCircle(screenPos, handleSize, handleOutlineColor, 12, 2.0f);
-
         m_colliderHandles.push_back({
             gameObject.GetGuid(),
             static_cast<int>(i),
@@ -1270,26 +1003,19 @@ void SceneViewPanel::drawColliderEditHandles(ImDrawList* drawList, RuntimeGameOb
         });
     }
 }
-
-
 void SceneViewPanel::drawDashedLine(ImDrawList* drawList, const ImVec2& start, const ImVec2& end,
                                     ImU32 color, float thickness, float dashSize)
 {
     ImVec2 direction = ImVec2(end.x - start.x, end.y - start.y);
     float length = sqrtf(direction.x * direction.x + direction.y * direction.y);
-
     if (length < 0.001f) return;
-
     direction.x /= length;
     direction.y /= length;
-
     float currentDistance = 0.0f;
     bool isDash = true;
-
     while (currentDistance < length)
     {
         float segmentLength = std::min(dashSize, length - currentDistance);
-
         if (isDash)
         {
             ImVec2 segmentStart = ImVec2(start.x + direction.x * currentDistance,
@@ -1298,49 +1024,34 @@ void SceneViewPanel::drawDashedLine(ImDrawList* drawList, const ImVec2& start, c
                                        segmentStart.y + direction.y * segmentLength);
             drawList->AddLine(segmentStart, segmentEnd, color, thickness);
         }
-
         currentDistance += segmentLength;
         isDash = !isDash;
     }
 }
-
-
 void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                               const ECS::TextComponent& textComp, ImU32 outlineColor,
                                               ImU32 fillColor, float thickness)
 {
     if (!textComp.typeface) return;
-
     const SkRect localBounds = GetLocalTextBounds(textComp);
     if (localBounds.isEmpty()) return;
-
     const float width = localBounds.width();
     const float height = localBounds.height();
-
-
     const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
-
-
     const float scaledWidth = width * transform.scale.x;
     const float scaledHeight = height * transform.scale.y;
     const float halfWidth = scaledWidth * 0.5f;
     const float halfHeight = scaledHeight * 0.5f;
-
-
     std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight},
         {halfWidth, -halfHeight},
         {halfWidth, halfHeight},
         {-halfWidth, halfHeight}
     };
-
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
-
-
     const float sinR = sinf(transform.rotation);
     const float cosR = cosf(transform.rotation);
-
     for (const auto& corner : localCorners)
     {
         ECS::Vector2f rotatedCorner = corner;
@@ -1350,17 +1061,12 @@ void SceneViewPanel::drawTextSelectionOutline(ImDrawList* drawList, const ECS::T
             rotatedCorner.x = corner.x * cosR - corner.y * sinR;
             rotatedCorner.y = tempX * sinR + corner.y * cosR;
         }
-
-
         ECS::Vector2f worldPos = anchoredCenter + rotatedCorner;
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
     }
-
     drawList->AddConvexPolyFilled(screenCorners.data(), 4, fillColor);
     drawList->AddPolyline(screenCorners.data(), 4, outlineColor, ImDrawFlags_Closed, thickness);
 }
-
-
 void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                                    const ECS::InputTextComponent& inputTextComp, ImU32 outlineColor,
                                                    ImU32 fillColor, float thickness)
@@ -1368,40 +1074,27 @@ void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const E
     const ECS::TextComponent& displayTextComp = (!inputTextComp.text.text.empty() || inputTextComp.isFocused)
                                                     ? inputTextComp.text
                                                     : inputTextComp.placeholder;
-
     if (!displayTextComp.typeface) return;
-
     const float padding = 8.0f;
     const SkRect localBounds = GetLocalTextBounds(displayTextComp, padding);
     if (localBounds.isEmpty()) return;
-
     const float width = localBounds.width();
     const float height = localBounds.height();
-
-
     const ECS::Vector2f anchoredCenter = ComputeAnchoredCenter(transform, width, height);
-
-
     const float scaledWidth = width * transform.scale.x;
     const float scaledHeight = height * transform.scale.y;
     const float halfWidth = scaledWidth * 0.5f;
     const float halfHeight = scaledHeight * 0.5f;
-
-
     std::vector<ECS::Vector2f> localCorners = {
         {-halfWidth, -halfHeight},
         {halfWidth, -halfHeight},
         {halfWidth, halfHeight},
         {-halfWidth, halfHeight}
     };
-
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
-
-
     const float sinR = sinf(transform.rotation);
     const float cosR = cosf(transform.rotation);
-
     for (const auto& corner : localCorners)
     {
         ECS::Vector2f rotatedCorner = corner;
@@ -1411,43 +1104,32 @@ void SceneViewPanel::drawInputTextSelectionOutline(ImDrawList* drawList, const E
             rotatedCorner.x = corner.x * cosR - corner.y * sinR;
             rotatedCorner.y = tempX * sinR + corner.y * cosR;
         }
-
-
         ECS::Vector2f worldPos = anchoredCenter + rotatedCorner;
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldPos));
     }
-
     drawList->AddConvexPolyFilled(screenCorners.data(), 4, fillColor);
     drawList->AddPolyline(screenCorners.data(), 4, outlineColor, ImDrawFlags_Closed, thickness);
-
     if (inputTextComp.isFocused)
     {
         ImU32 focusColor = IM_COL32(100, 200, 255, 255);
         drawList->AddPolyline(screenCorners.data(), 4, focusColor, ImDrawFlags_Closed, thickness + 1.0f);
     }
 }
-
 void SceneViewPanel::drawEmptyObjectSelection(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                               const std::string& objectName, ImU32 outlineColor,
                                               ImU32 labelBgColor, ImU32 labelTextColor)
 {
     ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, transform.position);
-
-
     const float crossSize = 8.0f;
     const float crossThickness = 2.0f;
-
-
     float actualCrossSize = crossSize;
     float actualThickness = crossThickness;
     ImU32 actualOutlineColor = outlineColor;
-
     if (m_isDragging)
     {
         auto& registry = m_context->activeScene->GetRegistry();
         auto* idComponent = registry.try_get<ECS::IDComponent>(
             findEntityByTransform(transform));
-
         if (idComponent)
         {
             for (const auto& draggedObj : m_draggedObjects)
@@ -1462,62 +1144,43 @@ void SceneViewPanel::drawEmptyObjectSelection(ImDrawList* drawList, const ECS::T
             }
         }
     }
-
-
     drawList->AddLine(
         ImVec2(screenPos.x - actualCrossSize, screenPos.y),
         ImVec2(screenPos.x + actualCrossSize, screenPos.y),
         actualOutlineColor, actualThickness
     );
-
-
     drawList->AddLine(
         ImVec2(screenPos.x, screenPos.y - actualCrossSize),
         ImVec2(screenPos.x, screenPos.y + actualCrossSize),
         actualOutlineColor, actualThickness
     );
-
-
     ImVec2 textSize = ImGui::CalcTextSize(objectName.c_str());
     ImVec2 labelPos = ImVec2(screenPos.x - textSize.x * 0.5f, screenPos.y + actualCrossSize + 5.0f);
     ImVec2 labelSize = ImVec2(textSize.x + 8.0f, textSize.y + 4.0f);
-
-
     ImU32 actualLabelBgColor = m_isDragging ? IM_COL32(50, 50, 50, 200) : labelBgColor;
-
     drawList->AddRectFilled(
         ImVec2(labelPos.x - 4.0f, labelPos.y - 2.0f),
         ImVec2(labelPos.x + labelSize.x - 4.0f, labelPos.y + labelSize.y - 2.0f),
         actualLabelBgColor,
         3.0f
     );
-
-
     drawList->AddText(labelPos, labelTextColor, objectName.c_str());
 }
-
 void SceneViewPanel::drawObjectNameLabel(ImDrawList* drawList, const ECS::TransformComponent& transform,
                                          const std::string& objectName, ImU32 labelBgColor, ImU32 labelTextColor)
 {
     ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, transform.position);
-
-
     ImVec2 textSize = ImGui::CalcTextSize(objectName.c_str());
     ImVec2 labelPos = ImVec2(screenPos.x - textSize.x * 0.5f, screenPos.y - textSize.y - 15.0f);
     ImVec2 labelSize = ImVec2(textSize.x + 8.0f, textSize.y + 4.0f);
-
-
     drawList->AddRectFilled(
         ImVec2(labelPos.x - 4.0f, labelPos.y - 2.0f),
         ImVec2(labelPos.x + labelSize.x - 4.0f, labelPos.y + labelSize.y - 2.0f),
         labelBgColor,
         3.0f
     );
-
-
     drawList->AddText(labelPos, labelTextColor, objectName.c_str());
 }
-
 void SceneViewPanel::handleDragDrop()
 {
     if (ImGui::BeginDragDropTarget())
@@ -1536,21 +1199,17 @@ void SceneViewPanel::handleDragDrop()
         ImGui::EndDragDropTarget();
     }
 }
-
 void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vector2f& worldPosition)
 {
     const auto* meta = AssetManager::GetInstance().GetMetadata(handle.assetGuid);
     if (!meta) return;
-
     if (meta->type == AssetType::Prefab)
     {
         auto prefabLoader = PrefabLoader();
         sk_sp<RuntimePrefab> prefab = prefabLoader.LoadAsset(handle.assetGuid);
-
         if (prefab)
         {
             RuntimeGameObject newInstance = m_context->activeScene->Instantiate(*prefab, nullptr);
-
             if (newInstance.IsValid())
             {
                 if (newInstance.HasComponent<ECS::TransformComponent>())
@@ -1564,8 +1223,6 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
                     auto& transform = newInstance.AddComponent<ECS::TransformComponent>();
                     transform.position = worldPosition;
                 }
-
-
                 selectSingleObject(newInstance.GetGuid());
                 triggerHierarchyUpdate();
                 LogInfo("预制体实例化成功，GUID: {}", newInstance.GetGuid().ToString());
@@ -1583,22 +1240,15 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
     else if (meta->type == AssetType::Texture)
     {
         if (!m_context->activeScene) return;
-
         SceneManager::GetInstance().PushUndoState(m_context->activeScene);
-
         RuntimeGameObject newGo = m_context->activeScene->CreateGameObject("Sprite");
-
         if (newGo.IsValid())
         {
             if (newGo.HasComponent<ECS::TransformComponent>())
             {
                 newGo.GetComponent<ECS::TransformComponent>().position = worldPosition;
             }
-
-
             newGo.AddComponent<ECS::SpriteComponent>(handle.assetGuid, ECS::Colors::White);
-
-
             selectSingleObject(newGo.GetGuid());
             triggerHierarchyUpdate();
             LogInfo("纹理精灵创建成功，GUID: {}", newGo.GetGuid().ToString());
@@ -1617,14 +1267,11 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
                     auto& scriptsComp = selectedGo.HasComponent<ECS::ScriptsComponent>()
                                             ? selectedGo.GetComponent<ECS::ScriptsComponent>()
                                             : selectedGo.AddComponent<ECS::ScriptsComponent>();
-
-
                     scriptsComp.AddScript(handle, selectedGo.GetEntityHandle());
                     anyAdded = true;
                     LogInfo("脚本已添加到GameObject: {}", selectedGo.GetName());
                 }
             }
-
             if (anyAdded)
             {
                 m_context->uiCallbacks->onValueChanged.Invoke();
@@ -1634,28 +1281,20 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
                 LogWarn("没有向任何有效对象添加脚本");
             }
         }
-
         else
         {
             if (!m_context->activeScene) return;
-
             SceneManager::GetInstance().PushUndoState(m_context->activeScene);
-
             std::string scriptName = AssetManager::GetInstance().GetAssetName(handle.assetGuid);
             RuntimeGameObject newGo = m_context->activeScene->CreateGameObject(scriptName);
-
             if (newGo.IsValid())
             {
                 if (newGo.HasComponent<ECS::TransformComponent>())
                 {
                     newGo.GetComponent<ECS::TransformComponent>().position = worldPosition;
                 }
-
-
                 auto& scriptsComp = newGo.AddComponent<ECS::ScriptsComponent>();
-
                 scriptsComp.AddScript(handle, newGo.GetEntityHandle());
-
                 selectSingleObject(newGo.GetGuid());
                 triggerHierarchyUpdate();
                 LogInfo("脚本GameObject创建成功，GUID: {}", newGo.GetGuid().ToString());
@@ -1667,7 +1306,6 @@ void SceneViewPanel::processAssetDrop(const AssetHandle& handle, const ECS::Vect
         LogWarn("不支持的资产类型拖拽到场景视图: {}", static_cast<int>(meta->type));
     }
 }
-
 void SceneViewPanel::triggerHierarchyUpdate()
 {
     if (!m_context->selectionList.empty())
@@ -1675,7 +1313,6 @@ void SceneViewPanel::triggerHierarchyUpdate()
         m_context->objectToFocusInHierarchy = m_context->selectionList[0];
     }
 }
-
 void SceneViewPanel::drawEditorGizmos(const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
 {
     bool isTilemapEditingMode = false;
@@ -1690,14 +1327,11 @@ void SceneViewPanel::drawEditorGizmos(const ImVec2& viewportScreenPos, const ImV
             isTilemapEditingMode = true;
         }
     }
-
-
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     if (isTilemapEditingMode)
     {
         const auto& tilemap = selectedGo.GetComponent<ECS::TilemapComponent>();
         const auto& tilemapTransform = selectedGo.GetComponent<ECS::TransformComponent>();
-
         drawTilemapGrid(drawList, tilemapTransform, tilemap, viewportScreenPos, viewportSize);
         drawTileBrushPreview(drawList, tilemapTransform, tilemap);
     }
@@ -1705,10 +1339,8 @@ void SceneViewPanel::drawEditorGizmos(const ImVec2& viewportScreenPos, const ImV
     {
         drawEditorGrid(viewportScreenPos, viewportSize);
     }
-
     drawCameraGizmo(drawList);
 }
-
 void SceneViewPanel::drawTilemapGrid(ImDrawList* drawList, const ECS::TransformComponent& tilemapTransform,
                                      const ECS::TilemapComponent& tilemap, const ImVec2& viewportScreenPos,
                                      const ImVec2& viewportSize)
@@ -1723,23 +1355,14 @@ void SceneViewPanel::drawTilemapGrid(ImDrawList* drawList, const ECS::TransformC
     const float right = cx + halfW;
     const float top = cy - halfH;
     const float bottom = cy + halfH;
-
     const float cellWidth = tilemap.cellSize.x;
     const float cellHeight = tilemap.cellSize.y;
-
     if (cellWidth <= 0 || cellHeight <= 0) return;
-
     const ImU32 gridColor = IM_COL32(255, 255, 255, 40);
-
-
     const float offsetX = 0.5f * cellWidth;
     const float offsetY = 0.5f * cellHeight;
-
-
     const float originX = tilemapTransform.position.x + offsetX;
     const float originY = tilemapTransform.position.y + offsetY;
-
-
     const float startX = originX + std::floor((left - originX) / cellWidth) * cellWidth;
     for (float x = startX; x <= right; x += cellWidth)
     {
@@ -1749,8 +1372,6 @@ void SceneViewPanel::drawTilemapGrid(ImDrawList* drawList, const ECS::TransformC
             ImVec2(pTop.x, viewportScreenPos.y + viewportSize.y),
             gridColor);
     }
-
-
     const float startY = originY + std::floor((top - originY) / cellHeight) * cellHeight;
     for (float y = startY; y <= bottom; y += cellHeight)
     {
@@ -1761,48 +1382,35 @@ void SceneViewPanel::drawTilemapGrid(ImDrawList* drawList, const ECS::TransformC
             gridColor);
     }
 }
-
 void SceneViewPanel::drawTileBrushPreview(ImDrawList* drawList, const ECS::TransformComponent& tilemapTransform,
                                           const ECS::TilemapComponent& tilemap)
 {
     if (!m_context->activeTileBrush.Valid()) return;
-
     ECS::Vector2f worldMousePos = screenToWorldWith(m_editorCameraProperties, ImGui::GetIO().MousePos);
-
-
     ECS::Vector2f localMousePos = {
         worldMousePos.x - tilemapTransform.position.x,
         worldMousePos.y - tilemapTransform.position.y
     };
-
-
     ECS::Vector2i gridCoord = {
         static_cast<int>(std::floor(localMousePos.x / tilemap.cellSize.x + 0.5f)),
         static_cast<int>(std::floor(localMousePos.y / tilemap.cellSize.y + 0.5f))
     };
-
-
     ECS::Vector2f tileWorldPos = {
         tilemapTransform.position.x + (gridCoord.x - 0.5f) * tilemap.cellSize.x,
         tilemapTransform.position.y + (gridCoord.y - 0.5f) * tilemap.cellSize.y
     };
-
     ECS::Vector2f tileWorldPosEnd = {
         tilemapTransform.position.x + (gridCoord.x + 0.5f) * tilemap.cellSize.x,
         tilemapTransform.position.y + (gridCoord.y + 0.5f) * tilemap.cellSize.y
     };
-
     ImVec2 screenMin = worldToScreenWith(m_editorCameraProperties, tileWorldPos);
     ImVec2 screenMax = worldToScreenWith(m_editorCameraProperties, tileWorldPosEnd);
-
     ImU32 previewColor = ImGui::GetIO().KeyAlt ? IM_COL32(255, 80, 80, 100) : IM_COL32(80, 255, 80, 100);
     drawList->AddRectFilled(screenMin, screenMax, previewColor);
 }
-
 void SceneViewPanel::drawEditorGrid(const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
 {
     ImDrawList* dl = ImGui::GetWindowDrawList();
-
     const float zoomX = m_editorCameraProperties.zoom.x();
     const float zoomY = m_editorCameraProperties.zoom.y();
     const float halfW = viewportSize.x * 0.5f / zoomX;
@@ -1813,8 +1421,6 @@ void SceneViewPanel::drawEditorGrid(const ImVec2& viewportScreenPos, const ImVec
     const float right = cx + halfW;
     const float top = cy - halfH;
     const float bottom = cy + halfH;
-
-
     float baseStep = PIXELS_PER_METER;
     float step = baseStep;
     float pxPerStep = step * zoomX;
@@ -1828,8 +1434,6 @@ void SceneViewPanel::drawEditorGrid(const ImVec2& viewportScreenPos, const ImVec
         step *= 0.5f;
         pxPerStep = step * zoomX;
     }
-
-
     const ImU32 colMinor = IM_COL32(255, 255, 255, 40);
     const ImU32 colMajor = IM_COL32(255, 255, 255, 80);
     const ImU32 colAxisX = IM_COL32(240, 100, 100, 180);
@@ -1837,14 +1441,11 @@ void SceneViewPanel::drawEditorGrid(const ImVec2& viewportScreenPos, const ImVec
     const float thicknessMinor = 1.0f;
     const float thicknessMajor = 1.5f;
     const float thicknessAxis = 2.0f;
-
-
     const float startX = std::floor(left / step) * step;
     for (float x = startX; x <= right; x += step)
     {
         ImVec2 pTop = worldToScreenWith(m_editorCameraProperties, ECS::Vector2f{x, top});
         ImVec2 pBottom = worldToScreenWith(m_editorCameraProperties, ECS::Vector2f{x, bottom});
-
         bool isAxis = std::abs(x) < 1e-4f;
         bool isMajor = std::fmod(std::abs(x), step * 10.0f) < 1e-4f;
         dl->AddLine(ImVec2(pTop.x, viewportScreenPos.y),
@@ -1852,14 +1453,11 @@ void SceneViewPanel::drawEditorGrid(const ImVec2& viewportScreenPos, const ImVec
                     isAxis ? colAxisY : (isMajor ? colMajor : colMinor),
                     isAxis ? thicknessAxis : (isMajor ? thicknessMajor : thicknessMinor));
     }
-
-
     const float startY = std::floor(top / step) * step;
     for (float y = startY; y <= bottom; y += step)
     {
         ImVec2 pLeft = worldToScreenWith(m_editorCameraProperties, ECS::Vector2f{left, y});
         ImVec2 pRight = worldToScreenWith(m_editorCameraProperties, ECS::Vector2f{right, y});
-
         bool isAxis = std::abs(y) < 1e-4f;
         bool isMajor = std::fmod(std::abs(y), step * 10.0f) < 1e-4f;
         dl->AddLine(ImVec2(viewportScreenPos.x, pLeft.y),
@@ -1868,40 +1466,30 @@ void SceneViewPanel::drawEditorGrid(const ImVec2& viewportScreenPos, const ImVec
                     isAxis ? thicknessAxis : (isMajor ? thicknessMajor : thicknessMinor));
     }
 }
-
 static ImVec2 operator-(const ImVec2& a, const ImVec2& b)
 {
     return ImVec2(a.x - b.x, a.y - b.y);
 }
-
 void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
 {
     if (!tilemapGo.HasComponent<ECS::TilemapComponent>()) return;
-
     auto& tilemap = tilemapGo.GetComponent<ECS::TilemapComponent>();
     const auto& tilemapTransform = tilemapGo.GetComponent<ECS::TransformComponent>();
     const ImGuiIO& io = ImGui::GetIO();
     ECS::Vector2f worldMousePos = screenToWorldWith(m_editorCameraProperties, io.MousePos);
-
-
     ECS::Vector2f localMousePos = {
         worldMousePos.x - tilemapTransform.position.x,
         worldMousePos.y - tilemapTransform.position.y
     };
-
-
     ECS::Vector2i gridCoord = {
         static_cast<int>(std::floor(localMousePos.x / tilemap.cellSize.x + 0.5f)),
         static_cast<int>(std::floor(localMousePos.y / tilemap.cellSize.y + 0.5f))
     };
-
     bool isErasing = io.KeyAlt;
-
     auto paintTile = [&](const ECS::Vector2i& coord)
     {
         if (m_paintedCoordsThisStroke.count(coord)) return;
         m_paintedCoordsThisStroke.insert(coord);
-
         if (isErasing)
         {
             tilemap.normalTiles.erase(coord);
@@ -1930,7 +1518,6 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
             }
         }
     };
-
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
     {
         m_isPainting = true;
@@ -1939,7 +1526,6 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
         SceneManager::GetInstance().PushUndoState(m_context->activeScene);
         paintTile(gridCoord);
     }
-
     if (m_isPainting && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
     {
         if (io.KeyCtrl)
@@ -1950,7 +1536,6 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
         }
         else { paintTile(gridCoord); }
     }
-
     if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
     {
         if (m_isPainting)
@@ -1993,7 +1578,6 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
                     }
                 }
             }
-
             EventBus::GetInstance().Publish(ComponentUpdatedEvent{
                 m_context->activeScene->GetRegistry(), tilemapGo.GetEntityHandle()
             });
@@ -2001,7 +1585,6 @@ void SceneViewPanel::handleTilePainting(RuntimeGameObject& tilemapGo)
         m_isPainting = false;
     }
 }
-
 void SceneViewPanel::handleNavigationAndPick(const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
 {
     const bool isHovered = ImGui::IsItemHovered(ImGuiHoveredFlags_None);
@@ -2013,11 +1596,8 @@ void SceneViewPanel::handleNavigationAndPick(const ImVec2& viewportScreenPos, co
         m_potentialDragEntity = entt::null;
         return;
     }
-
     const ImGuiIO& io = ImGui::GetIO();
     const ECS::Vector2f worldMousePos = screenToWorldWith(m_editorCameraProperties, io.MousePos);
-
-
     float wheel = io.MouseWheel;
     if (wheel != 0.0f)
     {
@@ -2040,8 +1620,6 @@ void SceneViewPanel::handleNavigationAndPick(const ImVec2& viewportScreenPos, co
             m_editorCameraProperties.position.x() - io.MouseDelta.x * invZoomX,
             m_editorCameraProperties.position.y() - io.MouseDelta.y * invZoomY);
     }
-
-
     bool isTilemapEditingMode = false;
     RuntimeGameObject selectedGo;
     if (m_context->activeTileBrush.Valid() && m_context->selectionType == SelectionType::GameObject && m_context->
@@ -2053,8 +1631,6 @@ void SceneViewPanel::handleNavigationAndPick(const ImVec2& viewportScreenPos, co
             isTilemapEditingMode = true;
         }
     }
-
-
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseDragging(ImGuiMouseButton_Left) ||
         ImGui::IsMouseReleased(ImGuiMouseButton_Left))
     {
@@ -2105,16 +1681,12 @@ void SceneViewPanel::handleNavigationAndPick(const ImVec2& viewportScreenPos, co
         }
     }
 }
-
 entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMousePos)
 {
     entt::entity foundEntity = entt::null;
     auto& registry = m_context->activeScene->GetRegistry();
     const ImVec2 currentMousePos = ImGui::GetIO().MousePos;
-
     std::vector<std::pair<entt::entity, int>> candidates;
-
-
     auto buttonView = registry.view<ECS::TransformComponent, ECS::ButtonComponent>();
     for (auto entity : buttonView)
     {
@@ -2125,7 +1697,6 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
             candidates.emplace_back(entity, 2000);
         }
     }
-
     auto inputTextView = registry.view<ECS::TransformComponent, ECS::InputTextComponent>();
     for (auto entity : inputTextView)
     {
@@ -2139,7 +1710,6 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
             candidates.emplace_back(entity, 2000);
         }
     }
-
     auto spriteView = registry.view<ECS::TransformComponent, ECS::SpriteComponent>();
     for (auto entity : spriteView)
     {
@@ -2153,8 +1723,6 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
             }
         }
     }
-
-
     auto listView = registry.view<ECS::TransformComponent, ECS::ListBoxComponent>();
     for (auto entity : listView)
     {
@@ -2165,7 +1733,6 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
             candidates.emplace_back(entity, listBox.zIndex + 1500);
         }
     }
-
     auto textView = registry.view<ECS::TransformComponent, ECS::TextComponent>();
     for (auto entity : textView)
     {
@@ -2177,7 +1744,6 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
             candidates.emplace_back(entity, textComp.zIndex + 1000);
         }
     }
-
     auto emptyView = registry.view<ECS::TransformComponent>();
     for (auto entity : emptyView)
     {
@@ -2190,7 +1756,6 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
             candidates.emplace_back(entity, 0);
         }
     }
-
     if (!candidates.empty())
     {
         std::ranges::sort(candidates, [](const auto& a, const auto& b)
@@ -2198,16 +1763,13 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
             if (a.second != b.second) return a.second > b.second;
             return a.first > b.first;
         });
-
         std::vector<entt::entity> currentPickCandidates;
         for (const auto& pair : candidates)
         {
             currentPickCandidates.push_back(pair.first);
         }
-
         const float clickTolerance = 2.0f * 2.0f;
         bool isSameLocation = ImLengthSqr(currentMousePos - m_lastPickScreenPos) < clickTolerance;
-
         if (!isSameLocation || currentPickCandidates != m_lastPickCandidates)
         {
             m_currentPickIndex = 0;
@@ -2217,19 +1779,14 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
         {
             m_currentPickIndex = (m_currentPickIndex + 1) % m_lastPickCandidates.size();
         }
-
         foundEntity = m_lastPickCandidates[m_currentPickIndex];
     }
-
     m_lastPickScreenPos = currentMousePos;
-
     bool ctrlPressed = ImGui::GetIO().KeyCtrl;
     bool shiftPressed = ImGui::GetIO().KeyShift;
-
     if (foundEntity != entt::null)
     {
         Guid clickedGuid = registry.get<ECS::IDComponent>(foundEntity).guid;
-
         if (m_currentPickIndex > 0)
         {
             selectSingleObject(clickedGuid);
@@ -2251,7 +1808,6 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
                 {
                     isAlreadySelected = true;
                 }
-
                 if (!isAlreadySelected)
                 {
                     selectSingleObject(clickedGuid);
@@ -2266,34 +1822,25 @@ entt::entity SceneViewPanel::handleObjectPicking(const ECS::Vector2f& worldMouse
             clearSelection();
         }
     }
-
     return foundEntity;
 }
-
 void SceneViewPanel::handleObjectDragging(const ECS::Vector2f& worldMousePos)
 {
     if (!m_isDragging || m_draggedObjects.empty())
         return;
-
-
     for (auto& draggedObj : m_draggedObjects)
     {
         RuntimeGameObject gameObject = m_context->activeScene->FindGameObjectByGuid(draggedObj.guid);
         if (!gameObject.IsValid()) continue;
-
         auto& transform = gameObject.GetComponent<ECS::TransformComponent>();
         ECS::Vector2f newWorldPosition = worldMousePos + draggedObj.dragOffset;
-
         if (gameObject.HasComponent<ECS::ParentComponent>())
         {
             auto& parentComponent = gameObject.GetComponent<ECS::ParentComponent>();
             RuntimeGameObject parentGO = m_context->activeScene->FindGameObjectByEntity(parentComponent.parent);
-
             if (parentGO.IsValid())
             {
                 auto& parentTransform = parentGO.GetComponent<ECS::TransformComponent>();
-
-
                 transform.localPosition = {
                     newWorldPosition.x - parentTransform.position.x,
                     newWorldPosition.y - parentTransform.position.y
@@ -2306,69 +1853,54 @@ void SceneViewPanel::handleObjectDragging(const ECS::Vector2f& worldMousePos)
         }
     }
 }
-
 void SceneViewPanel::initiateDragging(const ECS::Vector2f& worldMousePos)
 {
     m_isDragging = true;
     m_draggedObjects.clear();
-
-
     for (const auto& selectedGuid : m_context->selectionList)
     {
         RuntimeGameObject gameObject = m_context->activeScene->FindGameObjectByGuid(selectedGuid);
         if (gameObject.IsValid() && gameObject.HasComponent<ECS::TransformComponent>())
         {
             const auto& transform = gameObject.GetComponent<ECS::TransformComponent>();
-
             DraggedObject draggedObj;
             draggedObj.guid = selectedGuid;
             draggedObj.dragOffset = transform.position - worldMousePos;
-
             m_draggedObjects.push_back(draggedObj);
         }
     }
 }
-
 bool SceneViewPanel::handleColliderHandlePicking(const ECS::Vector2f& worldMousePos)
 {
     const ImVec2 mousePos = ImGui::GetIO().MousePos;
-
     for (const auto& handle : std::ranges::reverse_view(m_colliderHandles))
     {
         const float distSq = ImLengthSqr(ImVec2(mousePos.x - handle.screenPosition.x,
                                                 mousePos.y - handle.screenPosition.y));
         const float radiusSq = handle.radius * handle.radius * 2.25f;
-
         if (distSq <= radiusSq)
         {
             m_isEditingCollider = true;
             m_activeColliderHandle.entityGuid = handle.entityGuid;
             m_activeColliderHandle.handleIndex = handle.handleIndex;
-
             RuntimeGameObject go = m_context->activeScene->FindGameObjectByGuid(handle.entityGuid);
             if (go.IsValid() && go.HasComponent<ECS::BoxColliderComponent>())
             {
                 const auto& transform = go.GetComponent<ECS::TransformComponent>();
                 const auto& boxCollider = go.GetComponent<ECS::BoxColliderComponent>();
-
-
                 const float halfWidth = boxCollider.size.x * 0.5f;
                 const float halfHeight = boxCollider.size.y * 0.5f;
                 std::vector<ECS::Vector2f> localHandles = {
                     {-halfWidth, -halfHeight}, {0, -halfHeight}, {halfWidth, -halfHeight}, {halfWidth, 0},
                     {halfWidth, halfHeight}, {0, halfHeight}, {-halfWidth, halfHeight}, {-halfWidth, 0}
                 };
-
-
                 const int clickedIndex = handle.handleIndex;
                 const int oppositeIndex = (clickedIndex + 4) % 8;
-
                 auto calculateWorldPos = [&](const ECS::Vector2f& localPos) -> ECS::Vector2f
                 {
                     ECS::Vector2f finalPos = localPos + boxCollider.offset;
                     finalPos.x *= transform.scale.x;
                     finalPos.y *= transform.scale.y;
-
                     if (std::abs(transform.rotation) > 0.001f)
                     {
                         const float sinR = sinf(transform.rotation);
@@ -2379,49 +1911,35 @@ bool SceneViewPanel::handleColliderHandlePicking(const ECS::Vector2f& worldMouse
                     }
                     return transform.position + finalPos;
                 };
-
                 ECS::Vector2f clickedHandleWorldPos = calculateWorldPos(localHandles[clickedIndex]);
                 m_activeColliderHandle.fixedPointWorldPos = calculateWorldPos(localHandles[oppositeIndex]);
                 m_activeColliderHandle.dragOffset = clickedHandleWorldPos - worldMousePos;
             }
-
             return true;
         }
     }
-
     return false;
 }
-
 void SceneViewPanel::handleColliderHandleDragging(const ECS::Vector2f& worldMousePos)
 {
     if (!m_activeColliderHandle.IsValid()) return;
-
     RuntimeGameObject go = m_context->activeScene->FindGameObjectByGuid(m_activeColliderHandle.entityGuid);
     if (!go.IsValid() || !go.HasComponent<ECS::BoxColliderComponent>()) return;
-
     auto& transform = go.GetComponent<ECS::TransformComponent>();
     auto& boxCollider = go.GetComponent<ECS::BoxColliderComponent>();
     auto& handle = m_activeColliderHandle;
-
     const ECS::Vector2f effectiveHandlePos = worldMousePos + handle.dragOffset;
     const float rot = transform.rotation;
     const float cosR = cosf(rot);
     const float sinR = sinf(rot);
-
     ECS::Vector2f newWorldCenter;
-
-
     if (handle.handleIndex % 2 == 0)
     {
         const ECS::Vector2f& fixedCorner = handle.fixedPointWorldPos;
         newWorldCenter = (effectiveHandlePos + fixedCorner) * 0.5f;
         ECS::Vector2f diagVecWorld = effectiveHandlePos - fixedCorner;
-
-
         const float worldWidth = std::abs(diagVecWorld.x * cosR + diagVecWorld.y * sinR);
         const float worldHeight = std::abs(diagVecWorld.x * -sinR + diagVecWorld.y * cosR);
-
-
         if (std::abs(transform.scale.x) > 1e-5f) boxCollider.size.x = worldWidth / std::abs(transform.scale.x);
         if (std::abs(transform.scale.y) > 1e-5f) boxCollider.size.y = worldHeight / std::abs(transform.scale.y);
     }
@@ -2430,17 +1948,13 @@ void SceneViewPanel::handleColliderHandleDragging(const ECS::Vector2f& worldMous
         const ECS::Vector2f& fixedPoint = handle.fixedPointWorldPos;
         const ECS::Vector2f localXAxis = {cosR, sinR};
         const ECS::Vector2f localYAxis = {-sinR, cosR};
-
         ECS::Vector2f delta = effectiveHandlePos - fixedPoint;
-
-
         if (handle.handleIndex == 1 || handle.handleIndex == 5)
         {
             float newWorldHeight = std::abs(delta.Dot(localYAxis));
             newWorldCenter = fixedPoint + localYAxis * (delta.Dot(localYAxis) / 2.0f);
             if (std::abs(transform.scale.y) > 1e-5f) boxCollider.size.y = newWorldHeight / std::abs(transform.scale.y);
         }
-
         else
         {
             float newWorldWidth = std::abs(delta.Dot(localXAxis));
@@ -2448,18 +1962,12 @@ void SceneViewPanel::handleColliderHandleDragging(const ECS::Vector2f& worldMous
             if (std::abs(transform.scale.x) > 1e-5f) boxCollider.size.x = newWorldWidth / std::abs(transform.scale.x);
         }
     }
-
-
     ECS::Vector2f offsetInWorld = newWorldCenter - transform.position;
-
-
     const float invCosR = cosf(-rot);
     const float invSinR = sinf(-rot);
     ECS::Vector2f localOffsetScaled;
     localOffsetScaled.x = offsetInWorld.x * invCosR - offsetInWorld.y * invSinR;
     localOffsetScaled.y = offsetInWorld.x * invSinR + offsetInWorld.y * invCosR;
-
-
     if (std::abs(transform.scale.x) > 1e-5f)
     {
         boxCollider.offset.x = localOffsetScaled.x / transform.scale.x;
@@ -2469,7 +1977,6 @@ void SceneViewPanel::handleColliderHandleDragging(const ECS::Vector2f& worldMous
         boxCollider.offset.y = localOffsetScaled.y / transform.scale.y;
     }
 }
-
 bool SceneViewPanel::handleUIRectHandlePicking(const ECS::Vector2f& worldMousePos)
 {
     const ImVec2 mousePos = ImGui::GetIO().MousePos;
@@ -2488,14 +1995,12 @@ bool SceneViewPanel::handleUIRectHandlePicking(const ECS::Vector2f& worldMousePo
     }
     return false;
 }
-
 void SceneViewPanel::handleUIRectHandleDragging(const ECS::Vector2f& worldMousePos)
 {
     if (!m_activeUIRectEntity.Valid()) return;
     RuntimeGameObject go = m_context->activeScene->FindGameObjectByGuid(m_activeUIRectEntity);
     if (!go.IsValid() || !go.HasComponent<ECS::TransformComponent>()) return;
     auto& transform = go.GetComponent<ECS::TransformComponent>();
-
     auto applyResize = [&](auto& uiComp)
     {
         ECS::Vector2f delta = worldMousePos - transform.position;
@@ -2504,7 +2009,6 @@ void SceneViewPanel::handleUIRectHandleDragging(const ECS::Vector2f& worldMouseP
         uiComp.rect.z = newW;
         uiComp.rect.w = newH;
     };
-
     if (go.HasComponent<ECS::ListBoxComponent>()) applyResize(go.GetComponent<ECS::ListBoxComponent>());
     else if (go.HasComponent<ECS::ButtonComponent>()) applyResize(go.GetComponent<ECS::ButtonComponent>());
     else if (go.HasComponent<ECS::InputTextComponent>()) applyResize(go.GetComponent<ECS::InputTextComponent>());
@@ -2517,7 +2021,6 @@ void SceneViewPanel::handleUIRectHandleDragging(const ECS::Vector2f& worldMouseP
     else if (go.HasComponent<ECS::ProgressBarComponent>()) applyResize(go.GetComponent<ECS::ProgressBarComponent>());
     else if (go.HasComponent<ECS::TabControlComponent>()) applyResize(go.GetComponent<ECS::TabControlComponent>());
 }
-
 void SceneViewPanel::selectSingleObject(const Guid& objectGuid)
 {
     m_context->selectionType = SelectionType::GameObject;
@@ -2525,7 +2028,6 @@ void SceneViewPanel::selectSingleObject(const Guid& objectGuid)
     m_context->selectionList.push_back(objectGuid);
     m_context->selectionAnchor = objectGuid;
 }
-
 void SceneViewPanel::toggleObjectSelection(const Guid& objectGuid)
 {
     auto it = std::find(m_context->selectionList.begin(), m_context->selectionList.end(), objectGuid);
@@ -2548,98 +2050,72 @@ void SceneViewPanel::toggleObjectSelection(const Guid& objectGuid)
         }
     }
 }
-
 void SceneViewPanel::clearSelection()
 {
     m_context->selectionType = SelectionType::NA;
     m_context->selectionList.clear();
     m_context->selectionAnchor = Guid();
-
-
     m_lastPickCandidates.clear();
     m_currentPickIndex = -1;
 }
-
 ECS::Vector2f SceneViewPanel::screenToWorldWith(const Camera::CamProperties& props, const ImVec2& screenPos) const
 {
     const float localX = screenPos.x - props.viewport.x();
     const float localY = screenPos.y - props.viewport.y();
-
     const float worldX = (localX - props.viewport.width() * 0.5f) / props.zoom.x() + props.position.x();
     const float worldY = (localY - props.viewport.height() * 0.5f) / props.zoom.y() + props.position.y();
     return {worldX, worldY};
 }
-
 ImVec2 SceneViewPanel::worldToScreenWith(const Camera::CamProperties& props, const ECS::Vector2f& worldPos) const
 {
     const float localX = (worldPos.x - props.position.x()) * props.zoom.x() + props.viewport.width() * 0.5f;
     const float localY = (worldPos.y - props.position.y()) * props.zoom.y() + props.viewport.height() * 0.5f;
-
-
     const float screenX = localX + props.viewport.x();
     const float screenY = localY + props.viewport.y();
     return ImVec2(screenX, screenY);
 }
-
-
 void SceneViewPanel::drawCameraGizmo(ImDrawList* drawList)
 {
     if (!m_context->activeScene)
     {
         return;
     }
-
-
     const auto& gameCamProps = m_context->activeScene->GetCameraProperties();
-
-
     SkPoint effectiveZoom = gameCamProps.GetEffectiveZoom();
     if (effectiveZoom.x() <= 0.0f || effectiveZoom.y() <= 0.0f) return;
     const float worldViewWidth = m_context->engineContext->sceneViewRect.Width() / effectiveZoom.x();
     const float worldViewHeight = m_context->engineContext->sceneViewRect.Height() / effectiveZoom.y();
     const float halfWorldW = worldViewWidth * 0.5f;
     const float halfWorldH = worldViewHeight * 0.5f;
-
-
     std::vector<ECS::Vector2f> localCorners = {
         {-halfWorldW, -halfWorldH},
         {halfWorldW, -halfWorldH},
         {halfWorldW, halfWorldH},
         {-halfWorldW, halfWorldH}
     };
-
-
     std::vector<ECS::Vector2f> worldCorners;
     worldCorners.reserve(4);
     const float sinR = sinf(gameCamProps.rotation);
     const float cosR = cosf(gameCamProps.rotation);
-
     for (const auto& corner : localCorners)
     {
         const float rotatedX = corner.x * cosR - corner.y * sinR;
         const float rotatedY = corner.x * sinR + corner.y * cosR;
-
-
         worldCorners.emplace_back(
             gameCamProps.position.x() + rotatedX,
             gameCamProps.position.y() + rotatedY
         );
     }
-
-
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
     for (const auto& worldCorner : worldCorners)
     {
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldCorner));
     }
-
-
     const ImU32 gizmoColor = IM_COL32(255, 255, 255, 150);
     const float thickness = 2.0f;
     drawList->AddPolyline(screenCorners.data(), 4, gizmoColor, ImDrawFlags_Closed, thickness);
 }
-
 void SceneViewPanel::drawDesignResolutionFrame(const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
 {
     auto scaleMode = ProjectSettings::GetInstance().GetViewportScaleMode();
@@ -2647,57 +2123,39 @@ void SceneViewPanel::drawDesignResolutionFrame(const ImVec2& viewportScreenPos, 
     {
         return; 
     }
-
     float designWidth = static_cast<float>(ProjectSettings::GetInstance().GetDesignWidth());
     float designHeight = static_cast<float>(ProjectSettings::GetInstance().GetDesignHeight());
-
     if (designWidth <= 0 || designHeight <= 0)
     {
         return;
     }
-
-    
     float halfDesignW = designWidth * 0.5f;
     float halfDesignH = designHeight * 0.5f;
-
-    
     if (!m_context->activeScene) return;
     const auto& gameCamProps = m_context->activeScene->GetCameraProperties();
-
-    
     std::vector<ECS::Vector2f> worldCorners = {
         {gameCamProps.position.x() - halfDesignW, gameCamProps.position.y() - halfDesignH},
         {gameCamProps.position.x() + halfDesignW, gameCamProps.position.y() - halfDesignH},
         {gameCamProps.position.x() + halfDesignW, gameCamProps.position.y() + halfDesignH},
         {gameCamProps.position.x() - halfDesignW, gameCamProps.position.y() + halfDesignH}
     };
-
-    
     std::vector<ImVec2> screenCorners;
     screenCorners.reserve(4);
     for (const auto& worldCorner : worldCorners)
     {
         screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldCorner));
     }
-
-    
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const ImU32 frameColor = IM_COL32(100, 200, 255, 180);
     const ImU32 fillColor = IM_COL32(100, 200, 255, 15);
     const float thickness = 2.0f;
-
-    
     drawList->AddConvexPolyFilled(screenCorners.data(), 4, fillColor);
-    
     drawList->AddPolyline(screenCorners.data(), 4, frameColor, ImDrawFlags_Closed, thickness);
-
-    
     char label[64];
     snprintf(label, sizeof(label), "%dx%d", (int)designWidth, (int)designHeight);
     ImVec2 labelPos = screenCorners[0];
     labelPos.x += 5.0f;
     labelPos.y += 5.0f;
-
     const ImU32 labelBgColor = IM_COL32(0, 0, 0, 180);
     const ImU32 labelTextColor = IM_COL32(100, 200, 255, 255);
     ImVec2 labelSize = ImGui::CalcTextSize(label);
@@ -2707,4 +2165,309 @@ void SceneViewPanel::drawDesignResolutionFrame(const ImVec2& viewportScreenPos, 
         labelBgColor, 2.0f
     );
     drawList->AddText(labelPos, labelTextColor, label);
+}
+void SceneViewPanel::updateParticlePreview(float deltaTime)
+{
+    if (!m_context || !m_context->activeScene)
+        return;
+    bool isInPlayMode = m_context->engineContext && 
+                        m_context->engineContext->appMode != ApplicationMode::Editor;
+    auto& registry = m_context->activeScene->GetRegistry();
+    if (isInPlayMode)
+    {
+        for (const auto& guid : m_lastParticleSelection)
+        {
+            auto gameObject = m_context->activeScene->FindGameObjectByGuid(guid);
+            if (gameObject.IsValid() && gameObject.HasComponent<ECS::ParticleSystemComponent>())
+            {
+                auto& ps = gameObject.GetComponent<ECS::ParticleSystemComponent>();
+                if (ps.editorPreviewActive)
+                {
+                    ps.editorPreviewActive = false;
+                    ps.Stop(true);
+                }
+            }
+        }
+        m_lastParticleSelection.clear();
+        return; 
+    }
+    std::vector<Guid> currentParticleSelection;
+    if (m_context->selectionType == SelectionType::GameObject)
+    {
+        for (const auto& guid : m_context->selectionList)
+        {
+            auto gameObject = m_context->activeScene->FindGameObjectByGuid(guid);
+            if (gameObject.IsValid() && gameObject.HasComponent<ECS::ParticleSystemComponent>())
+            {
+                currentParticleSelection.push_back(guid);
+            }
+        }
+    }
+    for (const auto& oldGuid : m_lastParticleSelection)
+    {
+        bool stillSelected = std::find(currentParticleSelection.begin(), 
+                                       currentParticleSelection.end(), 
+                                       oldGuid) != currentParticleSelection.end();
+        if (!stillSelected)
+        {
+            auto gameObject = m_context->activeScene->FindGameObjectByGuid(oldGuid);
+            if (gameObject.IsValid() && gameObject.HasComponent<ECS::ParticleSystemComponent>())
+            {
+                auto& ps = gameObject.GetComponent<ECS::ParticleSystemComponent>();
+                if (ps.editorPreviewActive)
+                {
+                    ps.Stop(true);
+                    ps.editorPreviewActive = false;
+                }
+            }
+        }
+    }
+    for (const auto& guid : currentParticleSelection)
+    {
+        auto gameObject = m_context->activeScene->FindGameObjectByGuid(guid);
+        if (gameObject.IsValid() && gameObject.HasComponent<ECS::ParticleSystemComponent>())
+        {
+            auto& ps = gameObject.GetComponent<ECS::ParticleSystemComponent>();
+            auto& transform = gameObject.GetComponent<ECS::TransformComponent>();
+            if (!ps.editorPreviewActive)
+            {
+                ps.editorPreviewActive = true;
+                ps.Play();
+            }
+            if (ps.configDirty && ps.emitter)
+            {
+                ps.emitter->SetConfig(ps.emitterConfig);
+                ps.RebuildAffectors(); 
+                ps.configDirty = false;
+            }
+            if (ps.playState == ECS::ParticlePlayState::Playing && ps.pool && ps.emitter)
+            {
+                glm::vec3 worldPos(transform.position.x, transform.position.y, 0.0f);
+                glm::vec2 worldScale = transform.scale;
+                glm::vec3 velocity = (worldPos - ps.lastPosition) / std::max(deltaTime, 0.001f);
+                ps.emitter->SetConfig(ps.emitterConfig);
+                ps.emitter->Update(*ps.pool, deltaTime, worldPos, velocity * ps.emitterConfig.inheritVelocityMultiplier, worldScale);
+                ps.affectors.UpdateBatch(ps.pool->GetParticles(), deltaTime);
+                if (ps.collisionEnabled)
+                {
+                    for (auto& particle : ps.pool->GetParticles())
+                    {
+                        float distance = glm::dot(particle.position - ps.collisionPlanePoint, ps.collisionPlaneNormal);
+                        if (distance < 0.0f)
+                        {
+                            if (ps.collisionKillOnHit)
+                            {
+                                particle.age = particle.lifetime;
+                            }
+                            else
+                            {
+                                particle.position -= ps.collisionPlaneNormal * distance;
+                                float normalVelocity = glm::dot(particle.velocity, ps.collisionPlaneNormal);
+                                if (normalVelocity < 0.0f)
+                                {
+                                    glm::vec3 normalComponent = ps.collisionPlaneNormal * normalVelocity;
+                                    glm::vec3 tangentComponent = particle.velocity - normalComponent;
+                                    particle.velocity = tangentComponent * (1.0f - ps.collisionFriction) - 
+                                                        normalComponent * ps.collisionBounciness;
+                                }
+                            }
+                        }
+                    }
+                }
+                ps.pool->RemoveDeadParticles();
+                ps.pool->SyncToGPU();
+                ps.lastPosition = worldPos;
+                ps.currentVelocity = velocity;
+                ps.systemTime += deltaTime;
+                if (!ps.loop && ps.systemTime >= ps.duration && ps.pool->Empty())
+                {
+                    ps.playState = ECS::ParticlePlayState::Stopped;
+                }
+            }
+        }
+    }
+    m_lastParticleSelection = currentParticleSelection;
+    m_particlePreviewTime += deltaTime;
+}
+void SceneViewPanel::drawParticlePreview(ImDrawList* drawList, const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
+{
+    if (!m_context || !m_context->activeScene || m_lastParticleSelection.empty())
+        return;
+    auto& registry = m_context->activeScene->GetRegistry();
+    for (const auto& guid : m_lastParticleSelection)
+    {
+        auto gameObject = m_context->activeScene->FindGameObjectByGuid(guid);
+        if (!gameObject.IsValid() || !gameObject.HasComponent<ECS::ParticleSystemComponent>())
+            continue;
+        auto& ps = gameObject.GetComponent<ECS::ParticleSystemComponent>();
+        auto& transform = gameObject.GetComponent<ECS::TransformComponent>();
+        if (!ps.pool || ps.pool->Empty())
+            continue;
+        const auto& gpuData = ps.pool->GetGPUData();
+        const float zoomScale = m_editorCameraProperties.GetEffectiveZoom().x();
+        for (const auto& particle : gpuData)
+        {
+            glm::vec2 worldPos(particle.positionAndRotation.x, particle.positionAndRotation.y);
+            ImVec2 screenPos = worldToScreenWith(m_editorCameraProperties, ECS::Vector2f(worldPos.x, worldPos.y));
+            float maxSize = std::max(particle.sizeAndUV.x, particle.sizeAndUV.y) * zoomScale;
+            if (screenPos.x < viewportScreenPos.x - maxSize || screenPos.x > viewportScreenPos.x + viewportSize.x + maxSize ||
+                screenPos.y < viewportScreenPos.y - maxSize || screenPos.y > viewportScreenPos.y + viewportSize.y + maxSize)
+                continue;
+            float halfWidth = particle.sizeAndUV.x * zoomScale * 0.5f;
+            float halfHeight = particle.sizeAndUV.y * zoomScale * 0.5f;
+            halfWidth = std::max(halfWidth, 1.0f);
+            halfHeight = std::max(halfHeight, 1.0f);
+            float rotation = particle.positionAndRotation.w; 
+            float cosR = std::cos(rotation);
+            float sinR = std::sin(rotation);
+            ImU32 color = IM_COL32(
+                static_cast<int>(particle.color.r * 255),
+                static_cast<int>(particle.color.g * 255),
+                static_cast<int>(particle.color.b * 255),
+                static_cast<int>(particle.color.a * 255)
+            );
+            ImVec2 corners[4];
+            float localX[4] = {-halfWidth, halfWidth, halfWidth, -halfWidth};
+            float localY[4] = {-halfHeight, -halfHeight, halfHeight, halfHeight};
+            for (int i = 0; i < 4; ++i)
+            {
+                float rotX = localX[i] * cosR - localY[i] * sinR;
+                float rotY = localX[i] * sinR + localY[i] * cosR;
+                corners[i] = ImVec2(screenPos.x + rotX, screenPos.y + rotY);
+            }
+            drawList->AddConvexPolyFilled(corners, 4, color);
+        }
+        ImVec2 emitterPos = worldToScreenWith(m_editorCameraProperties, transform.position);
+        ImU32 emitterColor = IM_COL32(255, 200, 50, 200);
+        ImU32 shapeColor = IM_COL32(255, 200, 50, 80);
+        const auto& config = ps.emitterConfig;
+        float minVisibleSize = 8.0f;
+        switch (config.shape)
+        {
+            case Particles::EmitterShape::Point:
+            {
+                drawList->AddCircle(emitterPos, 8.0f, emitterColor, 12, 2.0f);
+                break;
+            }
+            case Particles::EmitterShape::Circle:
+            {
+                float radius = std::max(config.shapeSize.x * zoomScale, minVisibleSize);
+                drawList->AddCircle(emitterPos, radius, emitterColor, 32, 2.0f);
+                if (!config.emitFromEdge)
+                {
+                    drawList->AddCircleFilled(emitterPos, radius, shapeColor);
+                }
+                break;
+            }
+            case Particles::EmitterShape::Box:
+            {
+                float halfW = std::max(config.shapeSize.x * zoomScale * 0.5f, minVisibleSize);
+                float halfH = std::max(config.shapeSize.y * zoomScale * 0.5f, minVisibleSize);
+                ImVec2 topLeft(emitterPos.x - halfW, emitterPos.y - halfH);
+                ImVec2 bottomRight(emitterPos.x + halfW, emitterPos.y + halfH);
+                drawList->AddRect(topLeft, bottomRight, emitterColor, 0.0f, 0, 2.0f);
+                if (!config.emitFromEdge)
+                {
+                    drawList->AddRectFilled(topLeft, bottomRight, shapeColor);
+                }
+                break;
+            }
+            case Particles::EmitterShape::Cone:
+            {
+                float coneAngleRad = glm::radians(config.coneAngle);
+                float baseRadius = std::max(config.coneRadius * zoomScale, minVisibleSize * 0.5f);
+                float length = std::max(config.coneLength * zoomScale, minVisibleSize * 2);
+                float endRadius = baseRadius + length * std::tan(coneAngleRad);
+                ImVec2 coneTop = emitterPos;
+                ImVec2 coneBottom(emitterPos.x, emitterPos.y + length);
+                drawList->AddLine(ImVec2(coneTop.x - baseRadius, coneTop.y), 
+                                 ImVec2(coneBottom.x - endRadius, coneBottom.y), emitterColor, 2.0f);
+                drawList->AddLine(ImVec2(coneTop.x + baseRadius, coneTop.y), 
+                                 ImVec2(coneBottom.x + endRadius, coneBottom.y), emitterColor, 2.0f);
+                drawList->AddEllipse(coneTop, ImVec2(baseRadius, baseRadius * 0.3f), emitterColor, 0.0f, 16, 2.0f);
+                drawList->AddEllipse(coneBottom, ImVec2(endRadius, endRadius * 0.3f), emitterColor, 0.0f, 16, 2.0f);
+                if (config.emitFrom == Particles::ShapeEmitFrom::Volume)
+                {
+                    drawList->AddCircleFilled(emitterPos, baseRadius, shapeColor);
+                }
+                break;
+            }
+            case Particles::EmitterShape::Edge:
+            {
+                float halfLen = std::max(config.shapeSize.x * zoomScale * 0.5f, minVisibleSize * 2);
+                ImVec2 p1(emitterPos.x - halfLen, emitterPos.y);
+                ImVec2 p2(emitterPos.x + halfLen, emitterPos.y);
+                drawList->AddLine(p1, p2, emitterColor, 3.0f);
+                break;
+            }
+            case Particles::EmitterShape::Hemisphere:
+            {
+                float radius = std::max(config.shapeSize.x * zoomScale, minVisibleSize);
+                int segments = 16;
+                for (int i = 0; i < segments; ++i)
+                {
+                    float a1 = glm::pi<float>() * i / segments;
+                    float a2 = glm::pi<float>() * (i + 1) / segments;
+                    ImVec2 arcP1(emitterPos.x + radius * std::cos(a1), emitterPos.y - radius * std::sin(a1));
+                    ImVec2 arcP2(emitterPos.x + radius * std::cos(a2), emitterPos.y - radius * std::sin(a2));
+                    drawList->AddLine(arcP1, arcP2, emitterColor, 2.0f);
+                }
+                drawList->AddLine(ImVec2(emitterPos.x - radius, emitterPos.y), 
+                                 ImVec2(emitterPos.x + radius, emitterPos.y), emitterColor, 2.0f);
+                if (config.emitFrom == Particles::ShapeEmitFrom::Volume)
+                {
+                    drawList->AddCircleFilled(emitterPos, radius * 0.3f, shapeColor);
+                }
+                break;
+            }
+            case Particles::EmitterShape::Rectangle:
+            {
+                float halfW = std::max(config.shapeSize.x * zoomScale * 0.5f, minVisibleSize);
+                float halfH = std::max(config.shapeSize.y * zoomScale * 0.5f, minVisibleSize);
+                ImVec2 topLeft(emitterPos.x - halfW, emitterPos.y - halfH);
+                ImVec2 bottomRight(emitterPos.x + halfW, emitterPos.y + halfH);
+                drawList->AddRect(topLeft, bottomRight, emitterColor, 0.0f, 0, 2.0f);
+                if (config.emitFrom == Particles::ShapeEmitFrom::Volume)
+                {
+                    drawList->AddRectFilled(topLeft, bottomRight, shapeColor);
+                }
+                break;
+            }
+            case Particles::EmitterShape::Sphere:
+            {
+                float radius = std::max(config.shapeSize.x * zoomScale, minVisibleSize);
+                drawList->AddCircle(emitterPos, radius, emitterColor, 32, 2.0f);
+                drawList->AddEllipse(emitterPos, ImVec2(radius, radius * 0.3f), emitterColor, 0.0f, 16, 1.5f);
+                if (config.emitFrom == Particles::ShapeEmitFrom::Volume)
+                {
+                    drawList->AddCircleFilled(emitterPos, radius, shapeColor);
+                }
+                break;
+            }
+            default:
+                drawList->AddCircle(emitterPos, 8.0f, emitterColor, 12, 2.0f);
+                break;
+        }
+        drawList->AddLine(ImVec2(emitterPos.x - 10, emitterPos.y), ImVec2(emitterPos.x + 10, emitterPos.y), emitterColor, 2.0f);
+        drawList->AddLine(ImVec2(emitterPos.x, emitterPos.y - 10), ImVec2(emitterPos.x, emitterPos.y + 10), emitterColor, 2.0f);
+        glm::vec3 dir = glm::normalize(config.direction);
+        float arrowLen = 40.0f;
+        ImVec2 arrowEnd(emitterPos.x + dir.x * arrowLen, emitterPos.y + dir.y * arrowLen);
+        ImU32 arrowColor = IM_COL32(100, 255, 100, 220);
+        drawList->AddLine(emitterPos, arrowEnd, arrowColor, 2.0f);
+        float headLen = 10.0f;
+        float headAngle = 0.5f; 
+        glm::vec2 dirNorm(dir.x, dir.y);
+        if (glm::length(dirNorm) > 0.001f)
+        {
+            dirNorm = glm::normalize(dirNorm);
+            glm::vec2 perpendicular(-dirNorm.y, dirNorm.x);
+            ImVec2 head1(arrowEnd.x - dirNorm.x * headLen + perpendicular.x * headLen * headAngle,
+                        arrowEnd.y - dirNorm.y * headLen + perpendicular.y * headLen * headAngle);
+            ImVec2 head2(arrowEnd.x - dirNorm.x * headLen - perpendicular.x * headLen * headAngle,
+                        arrowEnd.y - dirNorm.y * headLen - perpendicular.y * headLen * headAngle);
+            drawList->AddLine(arrowEnd, head1, arrowColor, 2.0f);
+            drawList->AddLine(arrowEnd, head2, arrowColor, 2.0f);
+        }
+    }
 }

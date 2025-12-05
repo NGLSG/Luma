@@ -50,6 +50,7 @@ struct ComponentRegistration
     std::function<YAML::Node(const entt::registry&, entt::entity)> serialize; ///< 将组件序列化为YAML节点的函数。
     std::function<void*(entt::registry&, entt::entity)> get_raw_ptr; ///< 获取组件原始指针的函数。
     std::function<void(const entt::registry&, entt::entity, entt::registry&, entt::entity)> clone; ///< 克隆组件的函数。
+    std::function<bool(entt::registry&, entt::entity, const UIDrawData&)> custom_draw_ui; ///< 自定义UI绘制函数（如果设置，将替代属性绘制）。
     std::vector<PropertyRegistration> properties; ///< 该组件的所有属性注册信息。
     size_t size = 0; ///< 组件的内存大小。
     bool isExposedInEditor = true; ///< 指示该组件是否在编辑器中暴露。
@@ -347,11 +348,24 @@ public:
         return *this;
     }
 
+    /**
+     * @brief 设置自定义UI绘制函数（使用WidgetDrawer<T>::Draw方法）。
+     * @return 对当前Registry_对象的引用，支持链式调用。
+     */
+    Registry_& SetCustomDrawUI()
+    {
+        m_registration.custom_draw_ui = [](entt::registry& reg, entt::entity e, const UIDrawData& callbacks) -> bool
+        {
+            auto& component = reg.get<T>(e);
+            return CustomDrawing::WidgetDrawer<T>::Draw("", component, callbacks);
+        };
+        return *this;
+    }
+
 private:
     std::string m_name; ///< 组件的名称。
     ComponentRegistration m_registration; ///< 组件的注册信息。
 };
-
 /**
  * @brief 用于生成匿名变量名的宏。
  * @param str 变量名前缀。

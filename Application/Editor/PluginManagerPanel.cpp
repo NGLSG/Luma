@@ -14,9 +14,7 @@
 #include <format>
 #include <chrono>
 #include <thread>
-
 static PluginManagerPanel* s_currentPanel = nullptr;
-
 static void SDLCALL OnImportFileDialogCallback(void* userdata, const char* const* filelist, int filter)
 {
     if (filelist && filelist[0] && s_currentPanel)
@@ -24,7 +22,6 @@ static void SDLCALL OnImportFileDialogCallback(void* userdata, const char* const
         s_currentPanel->OnImportFileSelected(std::filesystem::path(filelist[0]));
     }
 }
-
 static void SDLCALL OnPublishDirDialogCallback(void* userdata, const char* const* filelist, int filter)
 {
     if (filelist && filelist[0] && s_currentPanel)
@@ -32,7 +29,6 @@ static void SDLCALL OnPublishDirDialogCallback(void* userdata, const char* const
         s_currentPanel->OnPublishDirSelected(std::filesystem::path(filelist[0]));
     }
 }
-
 static void SDLCALL OnPluginProjectDirDialogCallback(void* userdata, const char* const* filelist, int filter)
 {
     if (filelist && filelist[0] && s_currentPanel)
@@ -40,13 +36,11 @@ static void SDLCALL OnPluginProjectDirDialogCallback(void* userdata, const char*
         s_currentPanel->OnPluginProjectDirSelected(std::filesystem::path(filelist[0]));
     }
 }
-
 void PluginManagerPanel::Initialize(EditorContext* context)
 {
     m_context = context;
     s_currentPanel = this;
     m_isVisible = false; 
-
     PopupManager::GetInstance().Register("ImportPluginPopup", [this]()
     {
         ImGui::Text("导入插件");
@@ -71,7 +65,6 @@ void PluginManagerPanel::Initialize(EditorContext* context)
             }
         }
         ImGui::Separator();
-
         if (ImGui::Button("导入", ImVec2(120, 0)))
         {
             if (strlen(m_importPathBuffer) > 0)
@@ -79,7 +72,6 @@ void PluginManagerPanel::Initialize(EditorContext* context)
                 std::filesystem::path path(m_importPathBuffer);
                 if (std::filesystem::is_directory(path))
                 {
-                    
                     std::filesystem::path destPath = PluginManager::GetInstance().GetPluginsRoot() / path.filename();
                     try
                     {
@@ -106,13 +98,10 @@ void PluginManagerPanel::Initialize(EditorContext* context)
             PopupManager::GetInstance().Close("ImportPluginPopup");
         }
     }, true, ImGuiWindowFlags_AlwaysAutoResize);
-
-    
     PopupManager::GetInstance().Register("PublishPluginPopup", [this]()
     {
         drawPublishPopup();
     }, true, ImGuiWindowFlags_AlwaysAutoResize);
-
     PopupManager::GetInstance().Register("ConfirmRemovePlugin", [this]()
     {
         const auto& plugins = PluginManager::GetInstance().GetAllPlugins();
@@ -122,7 +111,6 @@ void PluginManagerPanel::Initialize(EditorContext* context)
             ImGui::Text("确定要删除插件 \"%s\" 吗？", plugin.name.c_str());
             ImGui::Text("此操作将删除插件目录及所有相关文件。");
             ImGui::Separator();
-
             if (ImGui::Button("删除", ImVec2(120, 0)))
             {
                 PluginManager::GetInstance().RemovePlugin(plugin.id);
@@ -145,19 +133,13 @@ void PluginManagerPanel::Initialize(EditorContext* context)
         }
     }, true, ImGuiWindowFlags_AlwaysAutoResize);
 }
-
 void PluginManagerPanel::Update(float deltaTime)
 {
-    
 }
-
 void PluginManagerPanel::Draw()
 {
     if (!m_isVisible) return;
-
     ImGui::Begin(GetPanelName(), &m_isVisible);
-
-    
     if (ImGui::Button("扫描插件"))
     {
         PluginManager::GetInstance().ScanPlugins();
@@ -170,7 +152,6 @@ void PluginManagerPanel::Draw()
     ImGui::SameLine();
     if (ImGui::Button("发布插件"))
     {
-        
         memset(m_publishPluginDir, 0, sizeof(m_publishPluginDir));
         memset(m_publishOutputDir, 0, sizeof(m_publishOutputDir));
         m_publishPluginId.clear();
@@ -185,51 +166,34 @@ void PluginManagerPanel::Draw()
     {
         PluginManager::GetInstance().ScanPlugins();
     }
-
     ImGui::Separator();
-
-    
     float availWidth = ImGui::GetContentRegionAvail().x;
     float listWidth = availWidth * 0.4f;
-
-    
     ImGui::BeginChild("PluginList", ImVec2(listWidth, 0), true);
     drawPluginList();
     ImGui::EndChild();
-
     ImGui::SameLine();
-
-    
     ImGui::BeginChild("PluginDetails", ImVec2(0, 0), true);
     drawPluginDetails(m_selectedPluginIndex);
     ImGui::EndChild();
-
     ImGui::End();
 }
-
 void PluginManagerPanel::Shutdown()
 {
-    
 }
-
 void PluginManagerPanel::drawPluginList()
 {
     const auto& plugins = PluginManager::GetInstance().GetAllPlugins();
-
     if (plugins.empty())
     {
         ImGui::TextDisabled("没有发现插件");
         ImGui::TextDisabled("将插件放入 Plugins 目录");
         return;
     }
-
     for (int i = 0; i < static_cast<int>(plugins.size()); ++i)
     {
         const auto& plugin = plugins[i];
-
         ImGui::PushID(i);
-
-        
         if (plugin.loaded)
         {
             ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "●");
@@ -243,50 +207,36 @@ void PluginManagerPanel::drawPluginList()
             ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "●");
         }
         ImGui::SameLine();
-
-        
         bool isSelected = (m_selectedPluginIndex == i);
         if (ImGui::Selectable(plugin.name.c_str(), isSelected))
         {
             m_selectedPluginIndex = i;
         }
-
         ImGui::PopID();
     }
 }
-
 void PluginManagerPanel::drawPluginDetails(int selectedIndex)
 {
     const auto& plugins = PluginManager::GetInstance().GetAllPlugins();
-
     if (selectedIndex < 0 || selectedIndex >= static_cast<int>(plugins.size()))
     {
         ImGui::TextDisabled("选择一个插件查看详情");
         return;
     }
-
     const auto& plugin = plugins[selectedIndex];
-
-    
     ImGui::Text("插件名称: %s", plugin.name.c_str());
     ImGui::Text("插件 ID: %s", plugin.id.c_str());
     ImGui::Text("版本: %s", plugin.version.c_str());
     ImGui::Text("作者: %s", plugin.author.c_str());
-
     ImGui::Separator();
-
     if (!plugin.description.empty())
     {
         ImGui::TextWrapped("描述: %s", plugin.description.c_str());
         ImGui::Separator();
     }
-
     ImGui::Text("DLL 路径: %s", plugin.dllPath.string().c_str());
     ImGui::Text("插件目录: %s", plugin.pluginRoot.string().c_str());
-
     ImGui::Separator();
-
-    
     ImGui::Text("状态: ");
     ImGui::SameLine();
     if (plugin.loaded)
@@ -301,18 +251,13 @@ void PluginManagerPanel::drawPluginDetails(int selectedIndex)
     {
         ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "已禁用");
     }
-
     ImGui::Separator();
-
-    
     bool enabled = plugin.enabled;
     if (ImGui::Checkbox("启用", &enabled))
     {
         PluginManager::GetInstance().SetPluginEnabled(plugin.id, enabled);
     }
-
     ImGui::Spacing();
-
     if (plugin.enabled && !plugin.loaded)
     {
         if (ImGui::Button("加载插件", ImVec2(120, 0)))
@@ -327,32 +272,24 @@ void PluginManagerPanel::drawPluginDetails(int selectedIndex)
             PluginManager::GetInstance().UnloadPlugin(plugin.id);
         }
     }
-
     ImGui::Spacing();
-
     if (ImGui::Button("删除插件", ImVec2(120, 0)))
     {
         PopupManager::GetInstance().Open("ConfirmRemovePlugin");
     }
-
     if (ImGui::IsItemHovered())
     {
         ImGui::SetTooltip("删除此插件及其所有文件");
     }
 }
-
 void PluginManagerPanel::drawImportSection()
 {
-    
 }
-
 void PluginManagerPanel::drawPublishPopup()
 {
     ImGui::Text("发布插件");
     ImGui::TextDisabled("选择插件项目目录，打包为 .lplug 文件");
     ImGui::Separator();
-
-    
     ImGui::Text("插件项目目录:");
     ImGui::InputText("##PluginDir", m_publishPluginDir, sizeof(m_publishPluginDir));
     ImGui::SameLine();
@@ -363,18 +300,13 @@ void PluginManagerPanel::drawPublishPopup()
             SDL_ShowOpenFolderDialog(OnPluginProjectDirDialogCallback, this, window, nullptr, false);
         }
     }
-
-    
     std::filesystem::path pluginDir(m_publishPluginDir);
     bool hasValidManifest = false;
     std::string pluginId, pluginName, pluginVersion;
-
     if (strlen(m_publishPluginDir) > 0 && std::filesystem::exists(pluginDir))
     {
-        
         std::filesystem::path yamlPath = pluginDir / "plugin.yaml";
         std::filesystem::path jsonPath = pluginDir / "plugin.json";
-
         if (std::filesystem::exists(yamlPath))
         {
             try
@@ -389,13 +321,10 @@ void PluginManagerPanel::drawPublishPopup()
         }
         else if (std::filesystem::exists(jsonPath))
         {
-            
             hasValidManifest = false; 
         }
     }
-
     ImGui::Separator();
-
     if (hasValidManifest)
     {
         ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "✓ 找到有效的插件清单");
@@ -411,10 +340,7 @@ void PluginManagerPanel::drawPublishPopup()
     {
         ImGui::TextDisabled("请选择插件项目目录");
     }
-
     ImGui::Separator();
-
-    
     ImGui::Text("输出目录:");
     ImGui::InputText("##OutputDir", m_publishOutputDir, sizeof(m_publishOutputDir));
     ImGui::SameLine();
@@ -425,22 +351,15 @@ void PluginManagerPanel::drawPublishPopup()
             SDL_ShowOpenFolderDialog(OnPublishDirDialogCallback, this, window, nullptr, false);
         }
     }
-
     ImGui::Separator();
-
-    
     if (m_isPublishing)
     {
-        
         static float spinner = 0.0f;
         spinner += ImGui::GetIO().DeltaTime * 5.0f;
         const char* spinChars = "|/-\\";
         char spinChar = spinChars[static_cast<int>(spinner) % 4];
-        
         ImGui::Text("正在打包插件... %c", spinChar);
         ImGui::TextDisabled("%s", m_publishStatusMessage.c_str());
-        
-        
         if (m_publishFuture.valid() && 
             m_publishFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready)
         {
@@ -458,61 +377,46 @@ void PluginManagerPanel::drawPublishPopup()
         }
         return;
     }
-
-    
     bool canPublish = hasValidManifest && strlen(m_publishOutputDir) > 0;
     if (!canPublish) ImGui::BeginDisabled();
-
     if (ImGui::Button("打包发布", ImVec2(120, 0)))
     {
         std::filesystem::path outputDir(m_publishOutputDir);
         std::string outputFileName = pluginId + ".lplug";
         std::filesystem::path outputFile = outputDir / outputFileName;
-        
-        
         doPublishAsync(pluginDir, outputFile);
     }
-
     if (!canPublish) ImGui::EndDisabled();
-
     ImGui::SameLine();
     if (ImGui::Button("取消", ImVec2(120, 0)))
     {
         PopupManager::GetInstance().Close("PublishPluginPopup");
     }
 }
-
 void PluginManagerPanel::OnImportFileSelected(const std::filesystem::path& path)
 {
     strncpy(m_importPathBuffer, path.string().c_str(), sizeof(m_importPathBuffer) - 1);
 }
-
 void PluginManagerPanel::OnPublishDirSelected(const std::filesystem::path& path)
 {
     strncpy(m_publishOutputDir, path.string().c_str(), sizeof(m_publishOutputDir) - 1);
 }
-
 void PluginManagerPanel::OnPluginProjectDirSelected(const std::filesystem::path& path)
 {
     strncpy(m_publishPluginDir, path.string().c_str(), sizeof(m_publishPluginDir) - 1);
-    
     if (strlen(m_publishOutputDir) == 0)
     {
         std::filesystem::path publishDir = path / "Publish";
         strncpy(m_publishOutputDir, publishDir.string().c_str(), sizeof(m_publishOutputDir) - 1);
     }
 }
-
 void PluginManagerPanel::doPublishAsync(const std::filesystem::path& pluginDir, const std::filesystem::path& outputFile)
 {
     m_isPublishing = true;
     m_publishStatusMessage = "正在编译插件...";
-
     m_publishFuture = std::async(std::launch::async, [this, pluginDir, outputFile]() -> bool
     {
         std::filesystem::path outputDir = outputFile.parent_path();
-        
-        
         if (!std::filesystem::exists(outputDir))
         {
             try
@@ -525,9 +429,6 @@ void PluginManagerPanel::doPublishAsync(const std::filesystem::path& pluginDir, 
                 return false;
             }
         }
-
-        
-        
         std::filesystem::path csprojPath;
         for (const auto& entry : std::filesystem::directory_iterator(pluginDir))
         {
@@ -537,39 +438,30 @@ void PluginManagerPanel::doPublishAsync(const std::filesystem::path& pluginDir, 
                 break;
             }
         }
-
         if (csprojPath.empty())
         {
             m_publishStatusMessage = "未找到 .csproj 文件";
             return false;
         }
-
-        
         std::filesystem::path buildOutputDir = pluginDir / "bin" / "Release" / "net9.0" / "publish";
-        
 #ifdef _WIN32
         std::string dotnetRid = "win-x64";
 #else
         std::string dotnetRid = "linux-x64";
 #endif
-
         m_publishStatusMessage = "正在编译: " + csprojPath.filename().string();
-        
         std::string publishCmd = std::format(
             "dotnet publish \"{}\" -c Release -r {} --self-contained false -o \"{}\"",
             csprojPath.string(),
             dotnetRid,
             buildOutputDir.string()
         );
-
         int buildResult = std::system(publishCmd.c_str());
         if (buildResult != 0)
         {
             m_publishStatusMessage = "编译失败，错误码: " + std::to_string(buildResult);
             return false;
         }
-
-        
         try
         {
             for (const auto& entry : std::filesystem::directory_iterator(buildOutputDir))
@@ -581,8 +473,6 @@ void PluginManagerPanel::doPublishAsync(const std::filesystem::path& pluginDir, 
             }
         }
         catch (...) {}
-
-        
         std::filesystem::path manifestSrc = pluginDir / "plugin.yaml";
         std::filesystem::path manifestDst = buildOutputDir / "plugin.yaml";
         if (std::filesystem::exists(manifestSrc))
@@ -594,8 +484,6 @@ void PluginManagerPanel::doPublishAsync(const std::filesystem::path& pluginDir, 
             }
             catch (...) {}
         }
-
-        
         const std::vector<std::string> sdkFilesToRemove = {
             "Luma.SDK.dll",
             "Luma.SDK.deps.json",
@@ -611,14 +499,9 @@ void PluginManagerPanel::doPublishAsync(const std::filesystem::path& pluginDir, 
                 try { std::filesystem::remove(filePath); } catch (...) {}
             }
         }
-
         m_publishStatusMessage = "正在打包...";
-
-        
 #ifdef _WIN32
         std::filesystem::path tempZipFile = outputDir / (outputFile.stem().string() + ".zip");
-        
-        
         try
         {
             if (std::filesystem::exists(tempZipFile))
@@ -627,7 +510,6 @@ void PluginManagerPanel::doPublishAsync(const std::filesystem::path& pluginDir, 
                 std::filesystem::remove(outputFile);
         }
         catch (...) {}
-        
         std::string cmd = std::format(
             "powershell -Command \"Compress-Archive -Path '{}\\*' -DestinationPath '{}' -Force; Move-Item -Path '{}' -Destination '{}' -Force\"",
             buildOutputDir.string(),
@@ -643,7 +525,6 @@ void PluginManagerPanel::doPublishAsync(const std::filesystem::path& pluginDir, 
         );
 #endif
         int result = std::system(cmd.c_str());
-        
         if (result == 0)
         {
             m_publishStatusMessage = "发布成功: " + outputFile.string();
@@ -656,7 +537,6 @@ void PluginManagerPanel::doPublishAsync(const std::filesystem::path& pluginDir, 
         }
     });
 }
-
 SDL_Window* PluginManagerPanel::getSDLWindow() const
 {
     if (!m_context || !m_context->editor)

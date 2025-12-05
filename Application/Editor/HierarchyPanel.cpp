@@ -9,13 +9,11 @@
 #include "../Resources/RuntimeAsset/RuntimePrefab.h"
 #include "../Utils/Profiler.h"
 #include <algorithm>
-
 #include "PopupManager.h"
 #include "RelationshipComponent.h"
 #include "JobSystem.h"
 #include <cctype>
 #include <memory>
-
 void HierarchyPanel::Initialize(EditorContext* context)
 {
     m_context = context;
@@ -30,7 +28,6 @@ void HierarchyPanel::Initialize(EditorContext* context)
             this->needsRebuildCache = true;
         });
 }
-
 void HierarchyPanel::Update(float deltaTime)
 {PROFILE_FUNCTION();
     if (!m_context->gameObjectsToDelete.empty() && m_context->activeScene)
@@ -46,9 +43,7 @@ void HierarchyPanel::Update(float deltaTime)
                 {
                     m_context->selectionList.erase(it);
                 }
-
                 bool hasParent = objToDel.HasComponent<ECS::ParentComponent>();
-
                 if (hasParent)
                 {
                     objToDel.SetRoot();
@@ -56,59 +51,41 @@ void HierarchyPanel::Update(float deltaTime)
                 m_context->activeScene->DestroyGameObject(objToDel);
             }
         }
-
-
         if (m_context->selectionList.empty())
         {
             clearSelection();
         }
-
         m_context->gameObjectsToDelete.clear();
         needsRebuildCache = true;
     }
-
-
     if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !m_context->selectionList.empty() && m_isFocused)
     {
         m_context->gameObjectsToDelete = m_context->selectionList;
     }
-
     PopupManager::GetInstance().Register("HierarchyContextMenu", [this]()
                                          {
                                              this->drawContextMenu();
                                          },
                                          false, ImGuiWindowFlags_AlwaysAutoResize);
-
     if (needsRebuildCache)
     {
         buildHierarchyCache();
         needsRebuildCache = false;
     }
 }
-
 void HierarchyPanel::Draw()
 {
     PROFILE_FUNCTION();
-
-
     if (m_context->objectToFocusInHierarchy.Valid())
     {
         needsRebuildCache = true;
         buildHierarchyCache();
-
-
         expandPathToObject(m_context->objectToFocusInHierarchy);
-
-
         m_context->objectToFocusInHierarchy = Guid();
-
-
         needsRebuildCache = true;
     }
-
     ImGui::Begin(GetPanelName(), &m_isVisible);
     m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-
     if (m_context->editingMode == EditingMode::Prefab)
     {
         if (ImGui::Button("< 返回场景"))
@@ -118,40 +95,31 @@ void HierarchyPanel::Draw()
                 ImGui::End();
                 return;
             }
-
             if (!m_context || !m_context->engineContext)
             {
                 LogError("无法退出Prefab编辑模式：EditorContext 未初始化。");
                 ImGui::End();
                 return;
             }
-
             auto restoreSceneCommand = [this, ctx = m_context]()
             {
                 ctx->editingMode = EditingMode::Scene;
                 ctx->editingPrefabGuid = Guid();
-
                 ctx->activeScene.reset();
                 ctx->activeScene = ctx->sceneBeforePrefabEdit;
-
                 if (!ctx->activeScene)
                 {
                     LogWarn("返回场景时，原场景数据为空。");
                 }
-
                 SceneManager::GetInstance().SetCurrentScene(ctx->activeScene);
                 ctx->sceneBeforePrefabEdit.reset();
-
                 this->clearSelection();
             };
-
             m_context->engineContext->commandsForSim.Push(restoreSceneCommand);
             needsRebuildCache = true;
         }
         ImGui::Separator();
     }
-
-
 #ifdef _DEBUG
     if (ImGui::CollapsingHeader("层级性能信息"))
     {
@@ -162,29 +130,18 @@ void HierarchyPanel::Draw()
         ImGui::Separator();
     }
 #endif
-
-    
     ImGui::InputTextWithHint("##HierarchySearch", "搜索名称…", m_searchBuffer, sizeof(m_searchBuffer));
     ImGui::Separator();
-
     drawSceneCamera();
-
     drawVirtualizedGameObjects();
-
-
     handlePanelInteraction();
-
-
     handleDragDrop();
-
     if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
     {
         PopupManager::GetInstance().Open("HierarchyContextMenu");
     }
-
     ImGui::End();
 }
-
 void HierarchyPanel::Shutdown()
 {
     hierarchyCache.clear();
@@ -192,7 +149,6 @@ void HierarchyPanel::Shutdown()
     expandedStates.clear();
     EventBus::GetInstance().Unsubscribe(m_sceneChangeListener);
 }
-
 void HierarchyPanel::drawSceneCamera()
 {
     ImGuiTreeNodeFlags cameraFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth |
@@ -201,21 +157,16 @@ void HierarchyPanel::drawSceneCamera()
     {
         cameraFlags |= ImGuiTreeNodeFlags_Selected;
     }
-
     ImGui::TreeNodeEx("场景相机", cameraFlags);
     if (ImGui::IsItemClicked())
     {
         selectSceneCamera();
     }
 }
-
 void HierarchyPanel::drawVirtualizedGameObjects()
 {
     PROFILE_FUNCTION();
-
     if (!m_context->activeScene) return;
-
-
     visibleNodeIndices.clear();
     for (int i = 0; i < static_cast<int>(hierarchyCache.size()); ++i)
     {
@@ -225,18 +176,12 @@ void HierarchyPanel::drawVirtualizedGameObjects()
         }
     }
     visibleNodeCount = static_cast<int>(visibleNodeIndices.size());
-
     ImGui::BeginChild("HierarchyScrollRegion", ImVec2(0, 0), false, ImGuiWindowFlags_None);
-
-
-    
     if (m_searchBuffer[0] != '\0')
     {
-        
         std::string q = m_searchBuffer;
         auto tolower_ascii = [](unsigned char c){ return static_cast<char>(std::tolower(c)); };
         std::string qlower = q; std::transform(qlower.begin(), qlower.end(), qlower.begin(), tolower_ascii);
-
         std::vector<int> matches;
         matches.reserve(128);
         for (int i = 0; i < static_cast<int>(hierarchyCache.size()); ++i)
@@ -248,10 +193,8 @@ void HierarchyPanel::drawVirtualizedGameObjects()
                 matches.push_back(i);
             }
         }
-
         int total = static_cast<int>(matches.size());
         int drawCount = std::min(total, MAX_VISIBLE_NODES);
-
         if (total == 0)
         {
             ImGui::TextDisabled("未找到匹配项");
@@ -276,8 +219,6 @@ void HierarchyPanel::drawVirtualizedGameObjects()
         ImGui::EndChild();
         return;
     }
-
-    
     if (visibleNodeCount == 0)
     {
         drawDropSeparator(0);
@@ -287,14 +228,12 @@ void HierarchyPanel::drawVirtualizedGameObjects()
         int cappedCount = std::min(visibleNodeCount, MAX_VISIBLE_NODES);
         ImGuiListClipper clipper;
         clipper.Begin(cappedCount, itemHeight);
-
         while (clipper.Step())
         {
             if (clipper.DisplayStart == 0)
             {
                 drawDropSeparator(0);
             }
-
             for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
             {
                 int nodeIndex = visibleNodeIndices[i];
@@ -306,18 +245,14 @@ void HierarchyPanel::drawVirtualizedGameObjects()
             }
         }
     }
-
     ImGui::EndChild();
 }
-
 void HierarchyPanel::drawDropSeparator(int index)
 {
     if (!m_context->activeScene) return;
     ImGui::PushID(std::string("Separator##" + std::to_string(index)).c_str());
-
     float width = ImGui::GetContentRegionAvail().x;
     ImGui::InvisibleButton("##drop_target", ImVec2(width, 4.0f));
-
     if (ImGui::BeginDragDropTarget())
     {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DRAG_DROP_GAMEOBJECT_GUIDS"))
@@ -330,11 +265,9 @@ void HierarchyPanel::drawDropSeparator(int index)
                 ImGui::PopID();
                 return;
             }
-
             const Guid* guidArray = static_cast<const Guid*>(payload->Data);
             std::vector<Guid> draggedGuids;
             draggedGuids.reserve(guidCount);
-
             for (size_t i = 0; i < guidCount; ++i)
             {
                 if (guidArray[i].Valid())
@@ -342,7 +275,6 @@ void HierarchyPanel::drawDropSeparator(int index)
                     draggedGuids.push_back(guidArray[i]);
                 }
             }
-
             if (draggedGuids.empty())
             {
                 LogWarn("没有有效的拖拽对象");
@@ -350,13 +282,9 @@ void HierarchyPanel::drawDropSeparator(int index)
                 ImGui::PopID();
                 return;
             }
-
-
             RuntimeGameObject targetParent(entt::null, nullptr);
             int targetIndex = 0;
             bool validDrop = false;
-
-
             if (index < 0 || index > visibleNodeCount)
             {
                 LogError("分隔符索引超出范围: {} (可见节点数: {})", index, visibleNodeCount);
@@ -364,7 +292,6 @@ void HierarchyPanel::drawDropSeparator(int index)
                 ImGui::PopID();
                 return;
             }
-
             if (index < visibleNodeCount && index < static_cast<int>(visibleNodeIndices.size()))
             {
                 int nodeIndex = visibleNodeIndices[index];
@@ -372,11 +299,9 @@ void HierarchyPanel::drawDropSeparator(int index)
                 {
                     const auto& nextNode = hierarchyCache[nodeIndex];
                     RuntimeGameObject nextObject = m_context->activeScene->FindGameObjectByGuid(nextNode.objectGuid);
-
                     if (nextObject.IsValid())
                     {
                         targetParent = nextObject.GetParent();
-
                         if (targetParent.IsValid())
                         {
                             targetIndex = nextObject.GetSiblingIndex();
@@ -396,11 +321,9 @@ void HierarchyPanel::drawDropSeparator(int index)
                 {
                     const auto& lastNode = hierarchyCache[lastVisibleIndex];
                     RuntimeGameObject lastObject = m_context->activeScene->FindGameObjectByGuid(lastNode.objectGuid);
-
                     if (lastObject.IsValid())
                     {
                         targetParent = lastObject.GetParent();
-
                         if (targetParent.IsValid())
                         {
                             auto children = targetParent.GetChildren();
@@ -420,7 +343,6 @@ void HierarchyPanel::drawDropSeparator(int index)
                 targetIndex = 0;
                 validDrop = true;
             }
-
             if (!validDrop)
             {
                 LogError("无法确定有效的拖放目标位置");
@@ -428,13 +350,9 @@ void HierarchyPanel::drawDropSeparator(int index)
                 ImGui::PopID();
                 return;
             }
-
-
             SceneManager::GetInstance().PushUndoState(m_context->activeScene);
-
             bool anyMoved = false;
             int currentTargetIndex = targetIndex;
-
             for (const auto& draggedGuid : draggedGuids)
             {
                 RuntimeGameObject draggedObject = m_context->activeScene->FindGameObjectByGuid(draggedGuid);
@@ -443,28 +361,22 @@ void HierarchyPanel::drawDropSeparator(int index)
                     LogWarn("找不到拖拽的对象: {}", draggedGuid.ToString());
                     continue;
                 }
-
-
                 if (draggedObject.GetParent() == targetParent)
                 {
                     int currentIndex = targetParent.IsValid()
                                            ? draggedObject.GetSiblingIndex()
                                            : m_context->activeScene->GetRootSiblingIndex(draggedObject);
-
                     if (currentIndex == currentTargetIndex)
                     {
                         continue;
                     }
                 }
-
-
                 if (targetParent.IsValid() && targetParent.IsDescendantOf(draggedObject))
                 {
                     LogWarn("跳过循环依赖的移动: {} -> {}",
                             draggedObject.GetName(), targetParent.GetName());
                     continue;
                 }
-
                 try
                 {
                     if (targetParent.IsValid())
@@ -477,10 +389,8 @@ void HierarchyPanel::drawDropSeparator(int index)
                         draggedObject.SetRoot();
                         m_context->activeScene->SetRootSiblingIndex(draggedObject, currentTargetIndex);
                     }
-
                     anyMoved = true;
                     currentTargetIndex++;
-
                     LogInfo("成功移动对象: {} 到位置 {}",
                             draggedObject.GetName(), currentTargetIndex - 1);
                 }
@@ -490,7 +400,6 @@ void HierarchyPanel::drawDropSeparator(int index)
                              draggedObject.GetName(), e.what());
                 }
             }
-
             if (anyMoved)
             {
                 m_context->uiCallbacks->onValueChanged.Invoke();
@@ -501,8 +410,6 @@ void HierarchyPanel::drawDropSeparator(int index)
         }
         ImGui::EndDragDropTarget();
     }
-
-
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly) && ImGui::IsMouseDragging(0))
     {
         ImGui::GetWindowDrawList()->AddRectFilled(
@@ -510,38 +417,25 @@ void HierarchyPanel::drawDropSeparator(int index)
             ImGui::GetColorU32(ImGuiCol_DragDropTarget)
         );
     }
-
     ImGui::PopID();
 }
-
 void HierarchyPanel::drawVirtualizedNode(const HierarchyNode& node, int virtualIndex)
 {
     PROFILE_FUNCTION();
     if (!m_context->activeScene) return;
     RuntimeGameObject gameObject = m_context->activeScene->FindGameObjectByGuid(node.objectGuid);
     if (!gameObject.IsValid()) return;
-
     ImGui::PushID(virtualIndex);
-
-
     float indentWidth = node.depth * 20.0f;
-
-
     ImVec2 originalCursorPos = ImGui::GetCursorPos();
     ImGui::SetCursorPosX(originalCursorPos.x + indentWidth);
-
-
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth;
-
-
     bool isSelected = std::find(m_context->selectionList.begin(), m_context->selectionList.end(), node.objectGuid) !=
         m_context->selectionList.end();
     if (isSelected)
     {
         flags |= ImGuiTreeNodeFlags_Selected;
     }
-
-
     if (!node.hasChildren)
     {
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
@@ -554,20 +448,14 @@ void HierarchyPanel::drawVirtualizedNode(const HierarchyNode& node, int virtualI
             flags |= ImGuiTreeNodeFlags_DefaultOpen;
         }
     }
-
-
     bool nodeOpen = false;
     if (node.hasChildren)
     {
         nodeOpen = ImGui::TreeNodeEx(node.displayName.c_str(), flags);
-
-
         if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
         {
             ImVec2 itemMin = ImGui::GetItemRectMin();
             ImVec2 mousePos = ImGui::GetMousePos();
-
-
             if (mousePos.x >= itemMin.x && mousePos.x <= itemMin.x + 20.0f)
             {
                 bool currentExpanded = isNodeExpanded(node.objectGuid);
@@ -583,25 +471,18 @@ void HierarchyPanel::drawVirtualizedNode(const HierarchyNode& node, int virtualI
     else
     {
         ImGui::TreeNodeEx(node.displayName.c_str(), flags);
-
-
         if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
         {
             handleNodeSelection(node.objectGuid);
         }
     }
-
-
     handleNodeDragDrop(node);
-
-
     if (ImGui::BeginPopupContextItem())
     {
         if (!isSelected)
         {
             selectSingleGameObject(node.objectGuid);
         }
-
         if (ImGui::MenuItem("创建空子对象"))
         {
             if (!m_context->selectionList.empty())
@@ -614,10 +495,8 @@ void HierarchyPanel::drawVirtualizedNode(const HierarchyNode& node, int virtualI
                 }
             }
         }
-
         if (ImGui::MenuItem("复制"))
         {
-            
             CopyGameObjects(std::vector<Guid>{node.objectGuid});
         }
         if (m_context->selectionList.size() > 1)
@@ -627,33 +506,26 @@ void HierarchyPanel::drawVirtualizedNode(const HierarchyNode& node, int virtualI
                 CopySelectedGameObjects();
             }
         }
-
         if (ImGui::MenuItem("删除"))
         {
             m_context->gameObjectsToDelete = m_context->selectionList;
         }
-
         if (ImGui::MenuItem("粘贴为子对象", nullptr, false, m_context->gameObjectClipboard.has_value()))
         {
             PasteGameObjects(&gameObject);
         }
         ImGui::EndPopup();
     }
-
-
     if (nodeOpen)
     {
         ImGui::TreePop();
     }
-
     ImGui::PopID();
 }
-
 void HierarchyPanel::handleNodeSelection(const Guid& objectGuid)
 {
     bool ctrlPressed = ImGui::GetIO().KeyCtrl;
     bool shiftPressed = ImGui::GetIO().KeyShift;
-
     if (shiftPressed && m_context->selectionAnchor.Valid())
     {
         handleRangeSelection(objectGuid);
@@ -667,7 +539,6 @@ void HierarchyPanel::handleNodeSelection(const Guid& objectGuid)
         selectSingleGameObject(objectGuid);
     }
 }
-
 void HierarchyPanel::handleRangeSelection(const Guid& endGuid)
 {
     if (!m_context->selectionAnchor.Valid())
@@ -675,16 +546,12 @@ void HierarchyPanel::handleRangeSelection(const Guid& endGuid)
         selectSingleGameObject(endGuid);
         return;
     }
-
-
     int anchorIndex = -1;
     int endIndex = -1;
-
     for (int i = 0; i < visibleNodeCount; ++i)
     {
         int nodeIndex = visibleNodeIndices[i];
         const Guid& nodeGuid = hierarchyCache[nodeIndex].objectGuid;
-
         if (nodeGuid == m_context->selectionAnchor)
         {
             anchorIndex = i;
@@ -694,24 +561,19 @@ void HierarchyPanel::handleRangeSelection(const Guid& endGuid)
             endIndex = i;
         }
     }
-
     if (anchorIndex != -1 && endIndex != -1)
     {
         int startIndex = std::min(anchorIndex, endIndex);
         int endIndexRange = std::max(anchorIndex, endIndex);
-
-
         m_context->selectionList.clear();
         for (int i = startIndex; i <= endIndexRange; ++i)
         {
             int nodeIndex = visibleNodeIndices[i];
             m_context->selectionList.push_back(hierarchyCache[nodeIndex].objectGuid);
         }
-
         m_context->selectionType = SelectionType::GameObject;
     }
 }
-
 void HierarchyPanel::toggleGameObjectSelection(const Guid& objectGuid)
 {
     auto it = std::find(m_context->selectionList.begin(), m_context->selectionList.end(), objectGuid);
@@ -729,7 +591,6 @@ void HierarchyPanel::toggleGameObjectSelection(const Guid& objectGuid)
         m_context->selectionType = SelectionType::GameObject;
     }
 }
-
 void HierarchyPanel::selectSingleGameObject(const Guid& objectGuid)
 {
     m_context->selectionType = SelectionType::GameObject;
@@ -737,19 +598,13 @@ void HierarchyPanel::selectSingleGameObject(const Guid& objectGuid)
     m_context->selectionList.push_back(objectGuid);
     m_context->selectionAnchor = objectGuid;
 }
-
 void HierarchyPanel::buildHierarchyCache()
 {
     PROFILE_FUNCTION();
-
     auto startTime = std::chrono::steady_clock::now();
-
     hierarchyCache.clear();
     totalNodeCount = 0;
-
     if (!m_context->activeScene) return;
-
-    
     std::vector<Guid> rootGuids;
     {
         auto& roots = m_context->activeScene->GetRootGameObjects();
@@ -759,8 +614,6 @@ void HierarchyPanel::buildHierarchyCache()
             if (go.IsValid()) rootGuids.push_back(go.GetGuid());
         }
     }
-
-    
     struct BuildJob : public IJob
     {
         EditorContext* ctx;
@@ -769,7 +622,6 @@ void HierarchyPanel::buildHierarchyCache()
         std::vector<HierarchyPanel::HierarchyNode>* out;
         int startDepth = 0;
         bool startVisible = true;
-
         static void BuildRec(EditorContext* ctx,
                              const std::unordered_map<Guid, bool>* expandedStates,
                              RuntimeGameObject& go,
@@ -778,21 +630,17 @@ void HierarchyPanel::buildHierarchyCache()
                              std::vector<HierarchyPanel::HierarchyNode>& out)
         {
             if (!go.IsValid()) return;
-
             auto children = go.GetChildren();
             bool hasChildren = !children.empty();
-
             HierarchyPanel::HierarchyNode node(go.GetGuid(), go.GetName(), depth, hasChildren);
             node.isVisible = parentVisible;
             out.push_back(std::move(node));
-
             bool isExpanded = true;
             if (expandedStates)
             {
                 auto it = expandedStates->find(go.GetGuid());
                 if (it != expandedStates->end()) isExpanded = it->second;
             }
-
             if (hasChildren && isExpanded)
             {
                 bool childrenVisible = parentVisible && isExpanded;
@@ -805,7 +653,6 @@ void HierarchyPanel::buildHierarchyCache()
                 }
             }
         }
-
         void Execute() override
         {
             if (!ctx || !ctx->activeScene || !out) return;
@@ -816,18 +663,13 @@ void HierarchyPanel::buildHierarchyCache()
             BuildRec(ctx, expandedStates, root, startDepth, startVisible, *out);
         }
     };
-
     size_t rootCount = rootGuids.size();
     std::vector<std::vector<HierarchyPanel::HierarchyNode>> partialResults(rootCount);
-
     auto& jobSystem = JobSystem::GetInstance();
     std::vector<JobHandle> handles;
     handles.reserve(rootCount);
-
-    
     int threadCount = std::max(1, jobSystem.GetThreadCount());
     bool useParallel = (rootCount > 1) && (threadCount > 1);
-
     if (useParallel)
     {
         std::vector<std::unique_ptr<BuildJob>> jobs;
@@ -848,7 +690,6 @@ void HierarchyPanel::buildHierarchyCache()
     }
     else
     {
-        
         if (rootCount == 1 && threadCount > 1)
         {
             RuntimeGameObject root = m_context->activeScene->FindGameObjectByGuid(rootGuids[0]);
@@ -856,31 +697,24 @@ void HierarchyPanel::buildHierarchyCache()
             {
                 auto children = root.GetChildren();
                 bool hasChildren = !children.empty();
-
-                
                 std::vector<HierarchyPanel::HierarchyNode> childResults;
                 partialResults[0].clear();
                 partialResults[0].reserve(64);
                 HierarchyPanel::HierarchyNode rootNode(root.GetGuid(), root.GetName(), 0, hasChildren);
                 rootNode.isVisible = true;
                 partialResults[0].push_back(std::move(rootNode));
-
                 bool isExpanded = true;
                 auto it = expandedStates.find(root.GetGuid());
                 if (it != expandedStates.end()) isExpanded = it->second;
-
                 if (hasChildren && isExpanded)
                 {
-                    
                     std::vector<Guid> childGuids;
                     childGuids.reserve(children.size());
                     for (auto& c : children) if (c.IsValid()) childGuids.push_back(c.GetGuid());
-
                     std::vector<std::unique_ptr<BuildJob>> childJobs;
                     std::vector<JobHandle> childHandles;
                     childJobs.reserve(childGuids.size());
                     childHandles.reserve(childGuids.size());
-
                     std::vector<std::vector<HierarchyPanel::HierarchyNode>> perChild(childGuids.size());
                     for (size_t ci = 0; ci < childGuids.size(); ++ci)
                     {
@@ -895,8 +729,6 @@ void HierarchyPanel::buildHierarchyCache()
                         childJobs.push_back(std::move(job));
                     }
                     JobSystem::CompleteAll(childHandles);
-
-                    
                     size_t totalPerChild = 0; for (auto& v : perChild) totalPerChild += v.size();
                     partialResults[0].reserve(partialResults[0].size() + totalPerChild);
                     for (auto& v : perChild)
@@ -912,7 +744,6 @@ void HierarchyPanel::buildHierarchyCache()
         }
         else
         {
-            
             for (size_t i = 0; i < rootCount; ++i)
             {
                 RuntimeGameObject root = m_context->activeScene->FindGameObjectByGuid(rootGuids[i]);
@@ -923,8 +754,6 @@ void HierarchyPanel::buildHierarchyCache()
             }
         }
     }
-
-    
     size_t totalNodes = 0;
     for (auto& vec : partialResults) totalNodes += vec.size();
     hierarchyCache.reserve(totalNodes);
@@ -936,30 +765,20 @@ void HierarchyPanel::buildHierarchyCache()
                                   std::make_move_iterator(vec.end()));
         }
     }
-
     totalNodeCount = static_cast<int>(hierarchyCache.size());
     updateNodeVisibility();
-
     auto endTime = std::chrono::steady_clock::now();
     lastBuildTime = std::chrono::duration<float, std::milli>(endTime - startTime).count();
-
-    
 }
-
 void HierarchyPanel::buildNodeRecursive(RuntimeGameObject& gameObject, int depth, bool parentVisible)
 {
     if (!gameObject.IsValid()) return;
-
     auto children = gameObject.GetChildren();
     bool hasChildren = !children.empty();
-
-
     HierarchyNode node(gameObject.GetGuid(), gameObject.GetName(), depth, hasChildren);
     node.isVisible = parentVisible;
     hierarchyCache.push_back(node);
     totalNodeCount++;
-
-
     if (hasChildren && isNodeExpanded(gameObject.GetGuid()))
     {
         bool childrenVisible = parentVisible && isNodeExpanded(gameObject.GetGuid());
@@ -972,13 +791,11 @@ void HierarchyPanel::buildNodeRecursive(RuntimeGameObject& gameObject, int depth
         }
     }
 }
-
 void HierarchyPanel::updateNodeVisibility()
 {
     for (size_t i = 0; i < hierarchyCache.size(); ++i)
     {
         HierarchyNode& node = hierarchyCache[i];
-
         if (node.depth == 0)
         {
             node.isVisible = true;
@@ -986,15 +803,11 @@ void HierarchyPanel::updateNodeVisibility()
         else
         {
             node.isVisible = false;
-
-
             bool allAncestorsExpanded = true;
             int currentDepth = node.depth;
-
             for (int j = static_cast<int>(i) - 1; j >= 0 && currentDepth > 0; --j)
             {
                 const HierarchyNode& ancestorNode = hierarchyCache[j];
-
                 if (ancestorNode.depth == currentDepth - 1)
                 {
                     if (!isNodeExpanded(ancestorNode.objectGuid))
@@ -1005,19 +818,15 @@ void HierarchyPanel::updateNodeVisibility()
                     currentDepth--;
                 }
             }
-
             node.isVisible = allAncestorsExpanded;
         }
     }
 }
-
 void HierarchyPanel::handleNodeDragDrop(const HierarchyNode& node)
 {
     if (!m_context->activeScene) return;
     RuntimeGameObject gameObject = m_context->activeScene->FindGameObjectByGuid(node.objectGuid);
     if (!gameObject.IsValid()) return;
-
-
     if (ImGui::BeginDragDropSource())
     {
         bool isCurrentSelected = std::find(m_context->selectionList.begin(), m_context->selectionList.end(),
@@ -1026,10 +835,7 @@ void HierarchyPanel::handleNodeDragDrop(const HierarchyNode& node)
         {
             selectSingleGameObject(node.objectGuid);
         }
-
-
         std::vector<Guid> selectedGuids = m_context->selectionList;
-
         if (!selectedGuids.empty())
         {
             bool allGuidsValid = true;
@@ -1042,14 +848,11 @@ void HierarchyPanel::handleNodeDragDrop(const HierarchyNode& node)
                     break;
                 }
             }
-
             if (allGuidsValid)
             {
                 ImGui::SetDragDropPayload("DRAG_DROP_GAMEOBJECT_GUIDS",
                                           selectedGuids.data(),
                                           selectedGuids.size() * sizeof(Guid));
-
-
                 if (selectedGuids.size() == 1)
                 {
                     ImGui::Text("%s", node.displayName.c_str());
@@ -1068,11 +871,8 @@ void HierarchyPanel::handleNodeDragDrop(const HierarchyNode& node)
         {
             LogError("选择列表为空，无法开始拖拽");
         }
-
         ImGui::EndDragDropSource();
     }
-
-
     if (ImGui::BeginDragDropTarget())
     {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DRAG_DROP_ASSET_HANDLE"))
@@ -1080,44 +880,34 @@ void HierarchyPanel::handleNodeDragDrop(const HierarchyNode& node)
             AssetHandle handle = *static_cast<const AssetHandle*>(payload->Data);
             handlePrefabDrop(handle, &gameObject);
         }
-
-
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DRAG_DROP_GAMEOBJECT_GUIDS"))
         {
             size_t guidCount = payload->DataSize / sizeof(Guid);
             const Guid* guidArray = static_cast<const Guid*>(payload->Data);
-
             std::vector<Guid> draggedGuids;
             draggedGuids.reserve(guidCount);
-
             for (size_t i = 0; i < guidCount; ++i)
             {
                 draggedGuids.push_back(guidArray[i]);
             }
-
             LogInfo("接收到 {} 个GameObject的拖拽", draggedGuids.size());
             handleGameObjectsDrop(draggedGuids, &gameObject);
         }
-
         ImGui::EndDragDropTarget();
     }
 }
-
 void HierarchyPanel::handlePrefabDrop(const AssetHandle& handle, RuntimeGameObject* targetParent)
 {
     if (!m_context->activeScene) return;
     const auto* meta = AssetManager::GetInstance().GetMetadata(handle.assetGuid);
     if (!meta || meta->type != AssetType::Prefab || !targetParent || !targetParent->IsValid())
         return;
-
     auto prefabLoader = PrefabLoader();
     sk_sp<RuntimePrefab> prefab = prefabLoader.LoadAsset(handle.assetGuid);
-
     if (prefab)
     {
         SceneManager::GetInstance().PushUndoState(m_context->activeScene);
         RuntimeGameObject newInstance = m_context->activeScene->Instantiate(*prefab, targetParent);
-
         if (newInstance.IsValid())
         {
             selectSingleGameObject(newInstance.GetGuid());
@@ -1130,7 +920,6 @@ void HierarchyPanel::handlePrefabDrop(const AssetHandle& handle, RuntimeGameObje
         LogError("加载Prefab失败，GUID: {}", handle.assetGuid.ToString());
     }
 }
-
 void HierarchyPanel::handleGameObjectsDrop(const std::vector<Guid>& draggedGuids, RuntimeGameObject* targetParent)
 {
     if (!m_context->activeScene) return;
@@ -1139,18 +928,14 @@ void HierarchyPanel::handleGameObjectsDrop(const std::vector<Guid>& draggedGuids
         LogError("目标父对象无效");
         return;
     }
-
     if (draggedGuids.empty())
     {
         LogWarn("拖拽的对象列表为空");
         return;
     }
-
     bool anyMoved = false;
     std::vector<std::string> errorMessages;
-
     SceneManager::GetInstance().PushUndoState(m_context->activeScene);
-
     for (const auto& draggedGuid : draggedGuids)
     {
         if (!draggedGuid.Valid())
@@ -1158,29 +943,23 @@ void HierarchyPanel::handleGameObjectsDrop(const std::vector<Guid>& draggedGuids
             errorMessages.push_back(std::format("无效的GUID: {}", draggedGuid.ToString()));
             continue;
         }
-
         RuntimeGameObject draggedObject = m_context->activeScene->FindGameObjectByGuid(draggedGuid);
         if (!draggedObject.IsValid())
         {
             errorMessages.push_back(std::format("找不到GUID对应的对象: {}", draggedGuid.ToString()));
             continue;
         }
-
-
         if (draggedObject == *targetParent)
         {
             errorMessages.push_back("不能将对象拖拽到自己身上");
             continue;
         }
-
         if (targetParent->IsDescendantOf(draggedObject))
         {
             errorMessages.push_back(std::format("不能将对象 '{}' 拖拽到自己的子对象上，这会造成循环依赖",
                                                 draggedObject.GetName()));
             continue;
         }
-
-
         try
         {
             draggedObject.SetParent(*targetParent);
@@ -1193,7 +972,6 @@ void HierarchyPanel::handleGameObjectsDrop(const std::vector<Guid>& draggedGuids
                                                 draggedObject.GetName(), e.what()));
         }
     }
-
     if (anyMoved)
     {
         m_context->uiCallbacks->onValueChanged.Invoke();
@@ -1201,14 +979,11 @@ void HierarchyPanel::handleGameObjectsDrop(const std::vector<Guid>& draggedGuids
         LogInfo("拖拽操作完成，已移动 {} 个对象",
                 static_cast<int>(draggedGuids.size() - errorMessages.size()));
     }
-
-
     for (const auto& error : errorMessages)
     {
         LogWarn("拖拽错误: {}", error);
     }
 }
-
 void HierarchyPanel::handlePanelInteraction()
 {
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered())
@@ -1216,7 +991,6 @@ void HierarchyPanel::handlePanelInteraction()
         clearSelection();
     }
 }
-
 void HierarchyPanel::handleDragDrop()
 {
     if (!m_context->activeScene) return;
@@ -1227,21 +1001,16 @@ void HierarchyPanel::handleDragDrop()
             AssetHandle handle = *static_cast<const AssetHandle*>(payload->Data);
             handlePrefabDrop(handle, nullptr);
         }
-
-
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DRAG_DROP_GAMEOBJECT_GUIDS"))
         {
             size_t guidCount = payload->DataSize / sizeof(Guid);
             const Guid* guidArray = static_cast<const Guid*>(payload->Data);
-
             std::vector<Guid> draggedGuids;
             draggedGuids.reserve(guidCount);
-
             for (size_t i = 0; i < guidCount; ++i)
             {
                 draggedGuids.push_back(guidArray[i]);
             }
-
             LogInfo("在根目录处理 {} 个GameObject的拖拽", draggedGuids.size());
             SceneManager::GetInstance().PushUndoState(m_context->activeScene);
             bool anyMoved = false;
@@ -1255,7 +1024,6 @@ void HierarchyPanel::handleDragDrop()
                     LogInfo("GameObject设置为根对象: {}", draggedObject.GetName());
                 }
             }
-
             if (anyMoved)
             {
                 m_context->uiCallbacks->onValueChanged.Invoke();
@@ -1265,7 +1033,6 @@ void HierarchyPanel::handleDragDrop()
         ImGui::EndDragDropTarget();
     }
 }
-
 void HierarchyPanel::drawContextMenu()
 {
     if (ImGui::MenuItem("创建空对象"))
@@ -1279,46 +1046,36 @@ void HierarchyPanel::drawContextMenu()
         PopupManager::GetInstance().Close("HierarchyContextMenu");
     }
 }
-
 void HierarchyPanel::CreateEmptyGameObject()
 {
     if (!m_context->activeScene) return;
-
     SceneManager::GetInstance().PushUndoState(m_context->activeScene);
-
     RuntimeGameObject newGo = m_context->activeScene->CreateGameObject("GameObject");
     selectSingleGameObject(newGo.GetGuid());
     needsRebuildCache = true;
 }
-
 void HierarchyPanel::CreateEmptyGameObjectAsChild(RuntimeGameObject& parent)
 {
     if (!parent.IsValid()) return;
     if (!m_context->activeScene) return;
     SceneManager::GetInstance().PushUndoState(m_context->activeScene);
-
     RuntimeGameObject newGo = m_context->activeScene->CreateGameObject("GameObject");
     newGo.SetParent(parent);
     selectSingleGameObject(newGo.GetGuid());
     needsRebuildCache = true;
 }
-
 void HierarchyPanel::CopySelectedGameObjects()
 {
     if (!m_context->activeScene) return;
     if (m_context->selectionList.empty()) return;
-
     CopyGameObjects(m_context->selectionList);
 }
-
 void HierarchyPanel::CopyGameObjects(const std::vector<Guid>& guids)
 {
     if (!m_context->activeScene) return;
     if (guids.empty()) return;
-
     std::vector<Data::PrefabNode> clipboardData;
     clipboardData.reserve(guids.size());
-
     for (const auto& guid : guids)
     {
         RuntimeGameObject go = m_context->activeScene->FindGameObjectByGuid(guid);
@@ -1327,22 +1084,17 @@ void HierarchyPanel::CopyGameObjects(const std::vector<Guid>& guids)
             clipboardData.push_back(go.SerializeToPrefabData());
         }
     }
-
     if (!clipboardData.empty())
     {
         m_context->gameObjectClipboard = clipboardData;
         LogInfo("已复制 {} 个GameObject到剪贴板。", clipboardData.size());
     }
 }
-
 void HierarchyPanel::PasteGameObjects(RuntimeGameObject* parent)
 {
     if (!m_context->activeScene || !m_context->gameObjectClipboard.has_value()) return;
-
     SceneManager::GetInstance().PushUndoState(m_context->activeScene);
-
     std::vector<Guid> newObjects;
-
     for (const auto& nodeToPaste : m_context->gameObjectClipboard.value())
     {
         RuntimeGameObject pastedObject = m_context->activeScene->CreateHierarchyFromNode(nodeToPaste, parent);
@@ -1352,60 +1104,45 @@ void HierarchyPanel::PasteGameObjects(RuntimeGameObject* parent)
             LogInfo("从 {} 粘贴GameObject '{}' 成功。", nodeToPaste.localGuid.ToString(), pastedObject.GetGuid().ToString());
         }
     }
-
-
     if (!newObjects.empty())
     {
         m_context->selectionType = SelectionType::GameObject;
         m_context->selectionList = newObjects;
         m_context->selectionAnchor = newObjects[0];
     }
-
     needsRebuildCache = true;
 }
-
 void HierarchyPanel::selectSceneCamera()
 {
     m_context->selectionType = SelectionType::SceneCamera;
     m_context->selectionList.clear();
     m_context->selectionAnchor = Guid();
 }
-
 void HierarchyPanel::clearSelection()
 {
     m_context->selectionType = SelectionType::NA;
     m_context->selectionList.clear();
     m_context->selectionAnchor = Guid();
 }
-
 bool HierarchyPanel::isNodeExpanded(const Guid& objectGuid) const
 {
     auto it = expandedStates.find(objectGuid);
     return it != expandedStates.end() ? it->second : true;
 }
-
 void HierarchyPanel::setNodeExpanded(const Guid& objectGuid, bool expanded)
 {
     expandedStates[objectGuid] = expanded;
 }
-
 void HierarchyPanel::expandPathToObject(const Guid& targetGuid)
 {
     if (!m_context->activeScene) return;
-
-
     RuntimeGameObject targetObject = m_context->activeScene->FindGameObjectByGuid(targetGuid);
     if (!targetObject.IsValid()) return;
-
-
     std::vector<Guid> pathGuids;
     RuntimeGameObject currentObject = targetObject;
-
     while (currentObject.IsValid())
     {
         pathGuids.push_back(currentObject.GetGuid());
-
-
         if (currentObject.HasComponent<ECS::ParentComponent>())
         {
             auto& parentComp = currentObject.GetComponent<ECS::ParentComponent>();
@@ -1416,15 +1153,10 @@ void HierarchyPanel::expandPathToObject(const Guid& targetGuid)
             break;
         }
     }
-
-
     std::reverse(pathGuids.begin(), pathGuids.end());
-
-
     for (size_t i = 0; i < pathGuids.size() - 1; ++i)
     {
         setNodeExpanded(pathGuids[i], true);
     }
-
     LogInfo("展开对象路径，目标: {}", targetGuid.ToString());
 }

@@ -5,11 +5,8 @@
 #include <sstream>
 #include <algorithm>
 #include <yaml-cpp/yaml.h>
-
 #include "ApplicationBase.h"
 #include "EngineCrypto.h"
-
-
 namespace
 {
     std::string OrientationToString(AndroidScreenOrientation orientation)
@@ -21,14 +18,12 @@ namespace
         default: return "Portrait";
         }
     }
-
     AndroidScreenOrientation StringToOrientation(const std::string& value)
     {
         if (value == "LandscapeLeft") return AndroidScreenOrientation::LandscapeLeft;
         if (value == "LandscapeRight") return AndroidScreenOrientation::LandscapeRight;
         return AndroidScreenOrientation::Portrait;
     }
-
     std::string ViewportScaleModeToString(ViewportScaleMode mode)
     {
         switch (mode)
@@ -40,7 +35,6 @@ namespace
         default: return "None";
         }
     }
-
     ViewportScaleMode StringToViewportScaleMode(const std::string& value)
     {
         if (value == "FixedAspect") return ViewportScaleMode::FixedAspect;
@@ -49,7 +43,6 @@ namespace
         if (value == "Expand") return ViewportScaleMode::Expand;
         return ViewportScaleMode::None;
     }
-
     std::string OrientationToManifestValue(AndroidScreenOrientation orientation)
     {
         switch (orientation)
@@ -59,7 +52,6 @@ namespace
         default: return "portrait";
         }
     }
-
     std::string OrientationToMetaValue(AndroidScreenOrientation orientation)
     {
         switch (orientation)
@@ -69,19 +61,16 @@ namespace
         default: return "portrait";
         }
     }
-
     std::string BuildAndroidManifestTemplate(const ProjectSettings& settings)
     {
         std::ostringstream oss;
         const std::string orientationValue = OrientationToManifestValue(settings.GetAndroidScreenOrientation());
         const std::string orientationMeta = OrientationToMetaValue(settings.GetAndroidScreenOrientation());
-
         oss << R"(<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     android:versionCode="1"
     android:versionName="1.0"
     android:installLocation="auto">
-
     <uses-feature android:glEsVersion="0x00020000" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
@@ -89,7 +78,6 @@ namespace
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-feature android:name="android.hardware.type.pc" android:required="false" />
 )";
-
         if (settings.GetAndroidPermissions().empty())
         {
             oss << R"(    <uses-permission android:name="android.permission.VIBRATE" />
@@ -102,7 +90,6 @@ namespace
                 oss << "    <uses-permission android:name=\"" << permission << "\" />\n";
             }
         }
-
         oss << R"(
     <application
         android:label="@string/app_name"
@@ -110,7 +97,6 @@ namespace
         android:allowBackup="true"
         android:theme="@style/AppTheme"
         android:hardwareAccelerated="true">
-
         <activity
             android:name="com.lumaengine.lumaandroid.LumaSDLActivity"
             android:label="@string/app_name"
@@ -120,29 +106,23 @@ namespace
             android:preferMinimalPostProcessing="true"
             android:exported="true"
             android:screenOrientation=")" << orientationValue << R"(">
-
             <meta-data
                 android:name="com.lumaengine.orientation"
                 android:value=")" << orientationMeta << R"(" />
-
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
-
         </activity>
     </application>
-
 </manifest>
 )";
         return oss.str();
     }
 }
-
 namespace YAML
 {
     template <>
@@ -155,7 +135,6 @@ namespace YAML
             node["StartScene"] = rhs.GetStartScene().ToString();
             node["AppIconPath"] = rhs.GetAppIconPath().string();
             node["IsFullscreen"] = rhs.IsFullscreen();
-
             node["TargetWidth"] = rhs.GetTargetWidth();
             node["TargetHeight"] = rhs.GetTargetHeight();
             node["ViewportScaleMode"] = ViewportScaleModeToString(rhs.GetViewportScaleMode());
@@ -163,8 +142,6 @@ namespace YAML
             node["DesignHeight"] = rhs.GetDesignHeight();
             node["IsBorderless"] = rhs.IsBorderless();
             node["EnableConsole"] = rhs.IsConsoleEnabled();
-
-            
             {
                 Node dbg;
                 dbg["Enabled"] = rhs.GetScriptDebugEnabled();
@@ -173,7 +150,6 @@ namespace YAML
                 dbg["Port"] = rhs.GetScriptDebugPort();
                 node["ScriptDebug"] = dbg;
             }
-            
             if (!rhs.GetTags().empty())
             {
                 Node tagsNode;
@@ -197,7 +173,6 @@ namespace YAML
             androidNode["UseCustomManifest"] = rhs.IsCustomAndroidManifestEnabled();
             androidNode["UseCustomGradleProperties"] = rhs.IsCustomGradlePropertiesEnabled();
             androidNode["ApkName"] = rhs.GetAndroidApkName();
-
             if (!rhs.GetAndroidIconMap().empty())
             {
                 Node iconNode;
@@ -226,23 +201,18 @@ namespace YAML
                 androidNode["AliasEntries"] = aliasArray;
             }
             node["Android"] = androidNode;
-
             return node;
         }
-
-
         static bool decode(const Node& node, ProjectSettings& rhs)
         {
             if (!node.IsMap())
             {
                 return false;
             }
-
             rhs.SetAppName(node["AppName"].as<std::string>("Luma Game"));
             rhs.SetStartScene(Guid::FromString(node["StartScene"].as<std::string>("")));
             rhs.SetAppIconPath(node["AppIconPath"].as<std::string>(""));
             rhs.SetFullscreen(node["IsFullscreen"].as<bool>(false));
-
             rhs.SetTargetWidth(node["TargetWidth"].as<int>(1280));
             rhs.SetTargetHeight(node["TargetHeight"].as<int>(720));
             rhs.SetViewportScaleMode(StringToViewportScaleMode(node["ViewportScaleMode"].as<std::string>("None")));
@@ -250,16 +220,12 @@ namespace YAML
             rhs.SetDesignHeight(node["DesignHeight"].as<int>(1080));
             rhs.SetBorderless(node["IsBorderless"].as<bool>(false));
             rhs.SetConsoleEnabled(node["EnableConsole"].as<bool>(false));
-
-            
             std::vector<std::string> tags;
             if (node["Tags"] && node["Tags"].IsSequence())
             {
                 tags = node["Tags"].as<std::vector<std::string>>();
             }
             rhs.SetTags(tags);
-
-            
             if (node["ScriptDebug"]) {
                 const Node& dbg = node["ScriptDebug"];
                 rhs.SetScriptDebugEnabled(dbg["Enabled"].as<bool>(false));
@@ -272,7 +238,6 @@ namespace YAML
                 rhs.SetScriptDebugAddress("127.0.0.1");
                 rhs.SetScriptDebugPort(56000);
             }
-
             if (node["Android"])
             {
                 const Node& android = node["Android"];
@@ -287,7 +252,6 @@ namespace YAML
                 if (android["VersionCode"]) rhs.SetAndroidVersionCode(android["VersionCode"].as<int>(rhs.GetAndroidVersionCode()));
                 if (android["VersionName"]) rhs.SetAndroidVersionName(android["VersionName"].as<std::string>(rhs.GetAndroidVersionName()));
                 if (android["ApkName"]) rhs.SetAndroidApkName(android["ApkName"].as<std::string>(rhs.GetAndroidApkName()));
-
                 if (android["KeystorePath"])
                     rhs.SetAndroidKeystorePath(android["KeystorePath"].as<std::string>());
                 if (android["Aliases"])
@@ -323,12 +287,10 @@ namespace YAML
                 rhs.SetAndroidKeystorePassword(android["KeystorePassword"].as<std::string>(""));
                 rhs.SetAndroidKeyAlias(android["KeyAlias"].as<std::string>(rhs.GetAndroidKeyAlias()));
                 rhs.SetAndroidKeyPassword(android["KeyPassword"].as<std::string>(""));
-
                 if (android["UseCustomManifest"])
                 {
                     rhs.SetCustomAndroidManifestEnabled(android["UseCustomManifest"].as<bool>(false), false);
                 }
-
                 if (android["Icons"])
                 {
                     for (auto it = android["Icons"].begin(); it != android["Icons"].end(); ++it)
@@ -344,7 +306,6 @@ namespace YAML
                         }
                     }
                 }
-
                 if (android["Permissions"])
                 {
                     std::vector<std::string> perms;
@@ -359,12 +320,10 @@ namespace YAML
                     rhs.SetCustomGradlePropertiesEnabled(android["UseCustomGradleProperties"].as<bool>(false));
                 }
             }
-
             return true;
         }
     };
 }
-
 void ProjectSettings::Load()
 {
     {
@@ -374,7 +333,6 @@ void ProjectSettings::Load()
         }
     }
 }
-
 void ProjectSettings::Save()
 {
     if (IsProjectLoaded())
@@ -382,22 +340,18 @@ void ProjectSettings::Save()
         Save(m_projectFilePath);
     }
 }
-
 void ProjectSettings::LoadInRuntime()
 {
     LoadWithCrypto("ProjectSettings.lproj");
     EnsureDefaultTags();
 }
-
 void ProjectSettings::Load(const std::filesystem::path& filePath)
 {
     if (!std::filesystem::exists(filePath))
     {
         return;
     }
-
     m_projectFilePath = filePath;
-
     try
     {
         YAML::Node data = YAML::LoadFile(filePath.string());
@@ -409,20 +363,16 @@ void ProjectSettings::Load(const std::filesystem::path& filePath)
         LogError("加载项目设置失败 '{}': {}", filePath.string(), e.what());
     }
 }
-
 void ProjectSettings::Save(const std::filesystem::path& filePath)
 {
     m_projectFilePath = filePath;
-
     YAML::Emitter emitter;
     emitter.SetIndent(2);
     emitter << YAML::convert<ProjectSettings>::encode(*this);
-
     std::ofstream fout(filePath);
     fout << emitter.c_str();
     fout.close();
 }
-
 void ProjectSettings::AddTag(const std::string& tag)
 {
     if (tag.empty()) return;
@@ -431,12 +381,10 @@ void ProjectSettings::AddTag(const std::string& tag)
         m_tags.push_back(tag);
     }
 }
-
 void ProjectSettings::RemoveTag(const std::string& tag)
 {
     std::erase(m_tags, tag);
 }
-
 void ProjectSettings::EnsureDefaultTags()
 {
     auto ensure = [&](const char* t)
@@ -450,7 +398,6 @@ void ProjectSettings::EnsureDefaultTags()
     ensure("Player");
     ensure("Ground");
 }
-
 const std::filesystem::path& ProjectSettings::GetAndroidIconPath(int size) const
 {
     auto it = m_androidIconPaths.find(size);
@@ -461,7 +408,6 @@ const std::filesystem::path& ProjectSettings::GetAndroidIconPath(int size) const
     static const std::filesystem::path emptyPath;
     return emptyPath;
 }
-
 void ProjectSettings::SetAndroidIconPath(int size, const std::filesystem::path& path)
 {
     if (path.empty())
@@ -473,12 +419,10 @@ void ProjectSettings::SetAndroidIconPath(int size, const std::filesystem::path& 
         m_androidIconPaths[size] = path;
     }
 }
-
 void ProjectSettings::ClearAndroidIconPath(int size)
 {
     m_androidIconPaths.erase(size);
 }
-
 void ProjectSettings::SetAndroidPermissions(const std::vector<std::string>& permissions)
 {
     m_androidPermissions.clear();
@@ -487,7 +431,6 @@ void ProjectSettings::SetAndroidPermissions(const std::vector<std::string>& perm
         AddAndroidPermission(perm);
     }
 }
-
 void ProjectSettings::AddAndroidPermission(const std::string& permission)
 {
     if (permission.empty()) return;
@@ -496,24 +439,20 @@ void ProjectSettings::AddAndroidPermission(const std::string& permission)
         m_androidPermissions.push_back(permission);
     }
 }
-
 void ProjectSettings::RemoveAndroidPermission(const std::string& permission)
 {
     if (permission.empty()) return;
     m_androidPermissions.erase(std::remove(m_androidPermissions.begin(), m_androidPermissions.end(), permission),
                                m_androidPermissions.end());
 }
-
 bool ProjectSettings::HasAndroidPermission(const std::string& permission) const
 {
     return std::find(m_androidPermissions.begin(), m_androidPermissions.end(), permission) != m_androidPermissions.end();
 }
-
 std::string ProjectSettings::GenerateAndroidManifest() const
 {
     return BuildAndroidManifestTemplate(*this);
 }
-
 void ProjectSettings::SetAndroidKeyAlias(const std::string& alias)
 {
     m_androidKeyAlias = alias;
@@ -522,7 +461,6 @@ void ProjectSettings::SetAndroidKeyAlias(const std::string& alias)
         m_activeAndroidAliasIndex = -1;
         return;
     }
-
     for (size_t i = 0; i < m_androidAliasEntries.size(); ++i)
     {
         if (m_androidAliasEntries[i].alias == alias)
@@ -533,7 +471,6 @@ void ProjectSettings::SetAndroidKeyAlias(const std::string& alias)
     }
     m_activeAndroidAliasIndex = -1;
 }
-
 void ProjectSettings::SetAndroidKeyPassword(const std::string& password)
 {
     m_androidKeyPassword = password;
@@ -554,7 +491,6 @@ void ProjectSettings::SetAndroidKeyPassword(const std::string& password)
         }
     }
 }
-
 void ProjectSettings::SetAndroidAliasEntries(const std::vector<AndroidAliasEntry>& entries)
 {
     m_androidAliasEntries = entries;
@@ -566,20 +502,17 @@ void ProjectSettings::SetAndroidAliasEntries(const std::vector<AndroidAliasEntry
     {
         m_activeAndroidAliasIndex = -1;
     }
-
     if (!m_androidKeyAlias.empty())
     {
         SetAndroidKeyAlias(m_androidKeyAlias);
     }
 }
-
 void ProjectSettings::AddAndroidAliasEntry(const std::string& alias, const std::string& password)
 {
     if (alias.empty())
     {
         return;
     }
-
     auto it = std::find_if(m_androidAliasEntries.begin(), m_androidAliasEntries.end(),
                            [&](const AndroidAliasEntry& entry) { return entry.alias == alias; });
     if (it == m_androidAliasEntries.end())
@@ -592,20 +525,16 @@ void ProjectSettings::AddAndroidAliasEntry(const std::string& alias, const std::
         it->password = password;
         m_activeAndroidAliasIndex = static_cast<int>(std::distance(m_androidAliasEntries.begin(), it));
     }
-
     m_androidKeyAlias = alias;
     m_androidKeyPassword = password;
 }
-
 void ProjectSettings::RemoveAndroidAliasEntry(size_t index)
 {
     if (index >= m_androidAliasEntries.size())
     {
         return;
     }
-
     m_androidAliasEntries.erase(m_androidAliasEntries.begin() + static_cast<long long>(index));
-
     if (m_androidAliasEntries.empty())
     {
         m_activeAndroidAliasIndex = -1;
@@ -613,7 +542,6 @@ void ProjectSettings::RemoveAndroidAliasEntry(size_t index)
         m_androidKeyPassword.clear();
         return;
     }
-
     if (m_activeAndroidAliasIndex == static_cast<int>(index))
     {
         m_activeAndroidAliasIndex = 0;
@@ -628,7 +556,6 @@ void ProjectSettings::RemoveAndroidAliasEntry(size_t index)
         m_androidKeyPassword = entry.password;
     }
 }
-
 void ProjectSettings::SetActiveAndroidAliasIndex(int index)
 {
     if (index < 0 || index >= static_cast<int>(m_androidAliasEntries.size()))
@@ -636,13 +563,11 @@ void ProjectSettings::SetActiveAndroidAliasIndex(int index)
         m_activeAndroidAliasIndex = -1;
         return;
     }
-
     m_activeAndroidAliasIndex = index;
     const auto& entry = m_androidAliasEntries[static_cast<size_t>(index)];
     m_androidKeyAlias = entry.alias;
     m_androidKeyPassword = entry.password;
 }
-
 std::filesystem::path ProjectSettings::GetProjectAndroidDirectory() const
 {
     if (m_projectFilePath.empty())
@@ -651,7 +576,6 @@ std::filesystem::path ProjectSettings::GetProjectAndroidDirectory() const
     }
     return m_projectFilePath.parent_path() / "Android";
 }
-
 std::filesystem::path ProjectSettings::GetCustomAndroidManifestPath() const
 {
     auto dir = GetProjectAndroidDirectory();
@@ -661,7 +585,6 @@ std::filesystem::path ProjectSettings::GetCustomAndroidManifestPath() const
     }
     return dir / "AndroidManifest.xml";
 }
-
 void ProjectSettings::SetCustomAndroidManifestEnabled(bool enabled, bool ensureTemplate)
 {
     if (m_useCustomAndroidManifest == enabled)
@@ -679,7 +602,6 @@ void ProjectSettings::SetCustomAndroidManifestEnabled(bool enabled, bool ensureT
         }
         return;
     }
-
     m_useCustomAndroidManifest = enabled;
     if (enabled && ensureTemplate)
     {
@@ -697,7 +619,6 @@ void ProjectSettings::SetCustomAndroidManifestEnabled(bool enabled, bool ensureT
         }
     }
 }
-
 std::filesystem::path ProjectSettings::GetCustomGradlePropertiesPath() const
 {
     auto dir = GetProjectAndroidDirectory();
@@ -707,7 +628,6 @@ std::filesystem::path ProjectSettings::GetCustomGradlePropertiesPath() const
     }
     return dir / "gradle.properties";
 }
-
 void ProjectSettings::SetCustomGradlePropertiesEnabled(bool enabled)
 {
     if (m_useCustomGradleProperties == enabled)
@@ -744,7 +664,6 @@ void ProjectSettings::SetCustomGradlePropertiesEnabled(bool enabled)
         }
     }
 }
-
 void ProjectSettings::SetAndroidApkName(const std::string& value)
 {
     if (value.empty())
@@ -756,7 +675,6 @@ void ProjectSettings::SetAndroidApkName(const std::string& value)
         m_androidApkName = value;
     }
 }
-
 std::filesystem::path ProjectSettings::GetProjectRoot() const
 {
     if (m_projectFilePath.empty())
@@ -765,7 +683,6 @@ std::filesystem::path ProjectSettings::GetProjectRoot() const
     }
     return m_projectFilePath.parent_path();
 }
-
 std::filesystem::path ProjectSettings::GetAssetsDirectory() const
 {
     if (!IsProjectLoaded())
@@ -774,7 +691,6 @@ std::filesystem::path ProjectSettings::GetAssetsDirectory() const
     }
     return GetProjectRoot() / "Assets";
 }
-
 TargetPlatform ProjectSettings::GetCurrentHostPlatform()
 {
 #ifdef _WIN32
@@ -787,7 +703,6 @@ TargetPlatform ProjectSettings::GetCurrentHostPlatform()
     return TargetPlatform::Unknown;
 #endif
 }
-
 std::string ProjectSettings::PlatformToString(TargetPlatform platform)
 {
     switch (platform)
@@ -802,7 +717,6 @@ std::string ProjectSettings::PlatformToString(TargetPlatform platform)
         return "Unknown";
     }
 }
-
 TargetPlatform ProjectSettings::StringToPlatform(const std::string& platformStr)
 {
     if (platformStr == "Windows")
@@ -814,7 +728,6 @@ TargetPlatform ProjectSettings::StringToPlatform(const std::string& platformStr)
     else
         return TargetPlatform::Unknown;
 }
-
 void ProjectSettings::LoadWithCrypto(const std::filesystem::path& filePath)
 {
     std::vector<unsigned char> encryptedData;

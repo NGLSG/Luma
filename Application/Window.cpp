@@ -4,23 +4,19 @@
 #include "stb_image.h"
 #include "Event/EventBus.h"
 #include "Event/Events.h"
-
 #if defined(SDL_PLATFORM_WINDOWS)
 #include <windows.h>
 #include <shellapi.h>
 #endif
-
 #if defined(SDL_PLATFORM_ANDROID)
 static void* g_androidNativeWindow = nullptr;
 #endif
-
 PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
 {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
         throw std::runtime_error("Failed to initialize SDL: " + std::string(SDL_GetError()));
     }
-
 #if defined(SDL_PLATFORM_ANDROID)
     if (g_androidNativeWindow)
     {
@@ -51,17 +47,14 @@ PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
         SDL_WINDOW_RESIZABLE
     );
 #endif
-
     if (!sdlWindow)
     {
         SDL_Quit();
         throw std::runtime_error("Failed to create window: " + std::string(SDL_GetError()));
     }
-
     SDL_SetEventEnabled(SDL_EVENT_DROP_BEGIN, true);
     SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, true);
     SDL_SetEventEnabled(SDL_EVENT_DROP_COMPLETE, true);
-
 #if defined(SDL_PLATFORM_WINDOWS)
     {
         BOOL elevated = FALSE;
@@ -80,7 +73,6 @@ PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
                         "Process is running elevated (Administrator). Windows will block file drag-and-drop from a non-elevated Explorer.");
         }
     }
-
     {
         SDL_PropertiesID props = SDL_GetWindowProperties(sdlWindow);
         void* hwndPtr = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
@@ -89,14 +81,12 @@ PlatformWindow::PlatformWindow(const std::string& title, int width, int height)
     }
 #endif
 }
-
 #if defined(SDL_PLATFORM_ANDROID)
 void PlatformWindow::SetAndroidNativeWindow(void* nativeWindow)
 {
     g_androidNativeWindow = nativeWindow;
 }
 #endif
-
 PlatformWindow::~PlatformWindow()
 {
     if (sdlWindow)
@@ -106,22 +96,18 @@ PlatformWindow::~PlatformWindow()
     }
     SDL_Quit();
 }
-
 InputState PlatformWindow::GetInputState() const
 {
     return inputState;
 }
-
 std::unique_ptr<PlatformWindow> PlatformWindow::Create(const std::string& title, int width, int height)
 {
     return std::make_unique<PlatformWindow>(title, width, height);
 }
-
 void PlatformWindow::FullScreen(bool fullscreen)
 {
     SDL_SetWindowFullscreen(sdlWindow, fullscreen);
 }
-
 void PlatformWindow::BroaderLess(bool broaderLess)
 {
     if (broaderLess)
@@ -135,18 +121,15 @@ void PlatformWindow::BroaderLess(bool broaderLess)
         SDL_SetWindowResizable(sdlWindow, true);
     }
 }
-
 void PlatformWindow::SetIcon(const std::string& iconPath)
 {
     int width, height, channels;
     unsigned char* pixels = stbi_load(iconPath.c_str(), &width, &height, &channels, 4);
-
     if (!pixels)
     {
         LogError("使用 stb_image 加载图标失败 '{}': {}", iconPath, stbi_failure_reason());
         return;
     }
-
     SDL_Surface* iconSurface = SDL_CreateSurfaceFrom(
         width,
         height,
@@ -154,19 +137,16 @@ void PlatformWindow::SetIcon(const std::string& iconPath)
         pixels,
         width * 4
     );
-
     if (!iconSurface)
     {
         LogError("从像素数据创建 SDL_Surface 失败: {}", SDL_GetError());
         stbi_image_free(pixels);
         return;
     }
-
     SDL_SetWindowIcon(sdlWindow, iconSurface);
     SDL_DestroySurface(iconSurface);
     stbi_image_free(pixels);
 }
-
 void PlatformWindow::PollEvents()
 {
     SDL_Event event;
@@ -175,78 +155,63 @@ void PlatformWindow::PollEvents()
         handleEvent(event);
     }
 }
-
 void PlatformWindow::handleEvent(const SDL_Event& event)
 {
     OnAnyEvent.Invoke(event);
-
     static bool s_dropInProgress = false;
     static std::vector<std::string> s_dropBatchPaths;
-
     switch (event.type)
     {
     case SDL_EVENT_QUIT:
         shouldCloseFlag = true;
         OnCloseRequest.Invoke();
         break;
-
     case SDL_EVENT_WINDOW_RESIZED:
         OnResize.Invoke(event.window.data1, event.window.data2);
         break;
-
     case SDL_EVENT_MOUSE_MOTION:
         inputState.mousePosition = {event.motion.x, event.motion.y};
         OnMouseMove.Invoke(event.motion.x, event.motion.y);
         break;
-
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
         if (event.button.button == SDL_BUTTON_LEFT) inputState.isLeftMouseDown = true;
         else if (event.button.button == SDL_BUTTON_RIGHT) inputState.isRightMouseDown = true;
         OnMouseButtonDown.Invoke(event.button.button, event.button.x, event.button.y);
         break;
-
     case SDL_EVENT_MOUSE_BUTTON_UP:
         if (event.button.button == SDL_BUTTON_LEFT) inputState.isLeftMouseDown = false;
         else if (event.button.button == SDL_BUTTON_RIGHT) inputState.isRightMouseDown = false;
         OnMouseButtonUp.Invoke(event.button.button, event.button.x, event.button.y);
         break;
-
     case SDL_EVENT_MOUSE_WHEEL:
         OnMouseWheel.Invoke(event.wheel.x, event.wheel.y);
         break;
-
     case SDL_EVENT_KEY_DOWN:
         OnKeyPress.Invoke(event.key.key, event.key.scancode, event.key.repeat != 0);
         break;
-
     case SDL_EVENT_KEY_UP:
         OnKeyRelease.Invoke(event.key.key, event.key.scancode, false);
         break;
-
     case SDL_EVENT_TEXT_INPUT:
         OnTextInput.Invoke(event.text.text);
         break;
-
     case SDL_EVENT_DROP_BEGIN:
         s_dropInProgress = true;
         s_dropBatchPaths.clear();
         SDL_Log("DROP_BEGIN");
         break;
-
     case SDL_EVENT_DROP_FILE:
         if (event.drop.data)
         {
             s_dropBatchPaths.emplace_back(event.drop.data);
         }
         SDL_Log("DROP_FILE (count=%d)", (int)s_dropBatchPaths.size());
-
         if (!s_dropInProgress && !s_dropBatchPaths.empty())
         {
             EventBus::GetInstance().Publish(DragDorpFileEvent{s_dropBatchPaths});
             s_dropBatchPaths.clear();
         }
         break;
-
     case SDL_EVENT_DROP_COMPLETE:
         SDL_Log("DROP_COMPLETE (count=%d)", (int)s_dropBatchPaths.size());
         if (!s_dropBatchPaths.empty())
@@ -256,24 +221,20 @@ void PlatformWindow::handleEvent(const SDL_Event& event)
         }
         s_dropInProgress = false;
         break;
-
     case SDL_EVENT_FINGER_DOWN:
     case SDL_EVENT_FINGER_UP:
     case SDL_EVENT_FINGER_MOTION:
         handleTouchEvent(event);
         break;
-
     default:
         break;
     }
 }
-
 void PlatformWindow::handleTouchEvent(const SDL_Event& event)
 {
 #if defined(SDL_PLATFORM_ANDROID)
     int windowWidth, windowHeight;
     SDL_GetWindowSizeInPixels(sdlWindow, &windowWidth, &windowHeight);
-
     switch (event.type)
     {
     case SDL_EVENT_FINGER_DOWN:
@@ -284,11 +245,7 @@ void PlatformWindow::handleTouchEvent(const SDL_Event& event)
             touch.y = event.tfinger.y;
             touch.pressure = event.tfinger.pressure;
             activeTouches[touch.fingerId] = touch;
-
-            
             OnTouchDown.Invoke(touch.fingerId, touch.x, touch.y, touch.pressure);
-
-            
             if (activeTouches.size() == 1)
             {
                 int pixelX = static_cast<int>(touch.x * windowWidth);
@@ -297,28 +254,21 @@ void PlatformWindow::handleTouchEvent(const SDL_Event& event)
                 inputState.isLeftMouseDown = true;
                 OnMouseButtonDown.Invoke(SDL_BUTTON_LEFT, pixelX, pixelY);
             }
-
             SDL_Log("FINGER_DOWN: ID=%lld, x=%.3f, y=%.3f, pressure=%.3f, total=%zu",
                     (long long)touch.fingerId, touch.x, touch.y, touch.pressure, activeTouches.size());
             break;
         }
-
     case SDL_EVENT_FINGER_UP:
         {
             SDL_FingerID fingerId = event.tfinger.fingerID;
             float x = event.tfinger.x;
             float y = event.tfinger.y;
-
             auto it = activeTouches.find(fingerId);
             if (it != activeTouches.end())
             {
                 activeTouches.erase(it);
             }
-
-            
             OnTouchUp.Invoke(fingerId, x, y);
-
-            
             if (activeTouches.empty())
             {
                 int pixelX = static_cast<int>(x * windowWidth);
@@ -327,12 +277,10 @@ void PlatformWindow::handleTouchEvent(const SDL_Event& event)
                 inputState.isLeftMouseDown = false;
                 OnMouseButtonUp.Invoke(SDL_BUTTON_LEFT, pixelX, pixelY);
             }
-
             SDL_Log("FINGER_UP: ID=%lld, x=%.3f, y=%.3f, remaining=%zu",
                     (long long)fingerId, x, y, activeTouches.size());
             break;
         }
-
     case SDL_EVENT_FINGER_MOTION:
         {
             SDL_FingerID fingerId = event.tfinger.fingerID;
@@ -341,7 +289,6 @@ void PlatformWindow::handleTouchEvent(const SDL_Event& event)
             float dx = event.tfinger.dx;
             float dy = event.tfinger.dy;
             float pressure = event.tfinger.pressure;
-
             auto it = activeTouches.find(fingerId);
             if (it != activeTouches.end())
             {
@@ -349,11 +296,7 @@ void PlatformWindow::handleTouchEvent(const SDL_Event& event)
                 it->second.y = y;
                 it->second.pressure = pressure;
             }
-
-            
             OnTouchMove.Invoke(fingerId, x, y, dx, dy, pressure);
-
-            
             if (!activeTouches.empty() && activeTouches.begin()->first == fingerId)
             {
                 int pixelX = static_cast<int>(x * windowWidth);
@@ -361,58 +304,45 @@ void PlatformWindow::handleTouchEvent(const SDL_Event& event)
                 inputState.mousePosition = {pixelX, pixelY};
                 OnMouseMove.Invoke(pixelX, pixelY);
             }
-
             break;
         }
-
     default:
         break;
     }
 #endif
 }
-
 bool PlatformWindow::ShouldClose() const
 {
     return shouldCloseFlag;
 }
-
 void PlatformWindow::SetTitle(const std::string& title)
 {
     SDL_SetWindowTitle(sdlWindow, title.c_str());
 }
-
 SDL_Window* PlatformWindow::GetSdlWindow() const
 {
     return sdlWindow;
 }
-
 NativeWindowHandle PlatformWindow::GetNativeWindowHandle() const
 {
     NativeWindowHandle handle = {};
     SDL_PropertiesID props = SDL_GetWindowProperties(sdlWindow);
-
 #if defined(SDL_PLATFORM_WINDOWS)
     handle.hWnd = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
     if (handle.hWnd)
     {
         handle.hInst = reinterpret_cast<HINSTANCE>(GetWindowLongPtrW(static_cast<HWND>(handle.hWnd), GWLP_HINSTANCE));
     }
-
 #elif defined(SDL_PLATFORM_MACOS)
     handle.metalLayer = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
-
 #elif defined(SDL_PLATFORM_LINUX) && !defined(SDL_PLATFORM_ANDROID)
     handle.x11Display = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
     handle.x11Window = SDL_GetNumberProperty(props, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
-
 #elif defined(SDL_PLATFORM_ANDROID)
     handle.aNativeWindow = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, NULL);
-
 #endif
-
     return handle;
 }
-
 void PlatformWindow::GetSize(uint16_t& width, uint16_t& height) const
 {
     int w, h;
@@ -420,46 +350,38 @@ void PlatformWindow::GetSize(uint16_t& width, uint16_t& height) const
     width = static_cast<uint16_t>(w);
     height = static_cast<uint16_t>(h);
 }
-
 void PlatformWindow::GetSize(int& width, int& height) const
 {
     SDL_GetWindowSizeInPixels(sdlWindow, &width, &height);
 }
-
 float PlatformWindow::GetWidth() const
 {
     int w, h;
     SDL_GetWindowSizeInPixels(sdlWindow, &w, &h);
     return static_cast<float>(w);
 }
-
 float PlatformWindow::GetHeight() const
 {
     int w, h;
     SDL_GetWindowSizeInPixels(sdlWindow, &w, &h);
     return static_cast<float>(h);
 }
-
 void PlatformWindow::StartTextInput()
 {
     SDL_StartTextInput(sdlWindow);
 }
-
 void PlatformWindow::StopTextInput()
 {
     SDL_StopTextInput(sdlWindow);
 }
-
 void PlatformWindow::SetTextInputArea(const SDL_Rect& rect, int cursor)
 {
     SDL_SetTextInputArea(sdlWindow, &rect, cursor);
 }
-
 bool PlatformWindow::IsTextInputActive() const
 {
     return SDL_TextInputActive(sdlWindow);
 }
-
 void PlatformWindow::ShowMessageBox(NoticeLevel level, std::string_view title, std::string_view message) const
 {
     SDL_MessageBoxFlags flags = SDL_MESSAGEBOX_INFORMATION;
@@ -477,7 +399,6 @@ void PlatformWindow::ShowMessageBox(NoticeLevel level, std::string_view title, s
     }
     SDL_ShowSimpleMessageBox(flags, title.data(), message.data(), sdlWindow);
 }
-
 void PlatformWindow::Destroy()
 {
     if (sdlWindow)

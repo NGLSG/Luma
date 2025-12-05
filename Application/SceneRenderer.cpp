@@ -9,7 +9,6 @@
 #include <cmath>
 #include <functional>
 #include <unordered_map>
-
 #include "Profiler.h"
 #include "RenderableManager.h"
 #include "SceneManager.h"
@@ -18,17 +17,14 @@
 #include "include/core/SkFont.h"
 #include "include/core/SkFontMetrics.h"
 #include "include/core/SkColorFilter.h"
-
 namespace
 {
     inline SkPoint ComputeAnchoredCenter(const ECS::TransformComponent& transform, float width, float height)
     {
         float offsetX = (0.5f - transform.anchor.x) * width;
         float offsetY = (0.5f - transform.anchor.y) * height;
-
         offsetX *= transform.scale.x;
         offsetY *= transform.scale.y;
-
         if (std::abs(transform.rotation) > 0.0001f)
         {
             const float sinR = sinf(transform.rotation);
@@ -37,21 +33,15 @@ namespace
             offsetX = offsetX * cosR - offsetY * sinR;
             offsetY = tempX * sinR + offsetY * cosR;
         }
-
-
         return SkPoint::Make(transform.position.x + offsetX, transform.position.y + offsetY);
     }
-
-
     inline SkSize EstimateTextSize(const std::string& text, float fontSize)
     {
         const float charWidth = fontSize * 0.55f;
         const float lineHeight = fontSize * 1.15f;
-
         float maxWidth = 0.0f;
         float currentLineWidth = 0.0f;
         size_t lineCount = 1;
-
         for (char c : text)
         {
             if (c == '\n')
@@ -65,13 +55,10 @@ namespace
                 currentLineWidth += charWidth;
             }
         }
-
         maxWidth = std::max(maxWidth, currentLineWidth);
         float totalHeight = lineCount * lineHeight;
-
         return SkSize::Make(maxWidth, totalHeight);
     }
-
     void BuildHierarchyDrawOrder(const sk_sp<RuntimeScene>& scene,
                                  std::unordered_map<entt::entity, uint64_t>& outOrder)
     {
@@ -79,15 +66,12 @@ namespace
         {
             return;
         }
-
         RuntimeScene* scenePtr = scene.get();
         uint64_t orderCounter = 0;
-
         std::function<void(RuntimeGameObject&)> traverse = [&](RuntimeGameObject& go)
         {
             if (!go.IsValid()) return;
             outOrder[go.GetEntityHandle()] = orderCounter++;
-
             if (go.HasComponent<ECS::ChildrenComponent>())
             {
                 const auto& children = go.GetComponent<ECS::ChildrenComponent>().children;
@@ -98,7 +82,6 @@ namespace
                 }
             }
         };
-
         auto& roots = scene->GetRootGameObjects();
         for (auto& go : roots)
         {
@@ -109,27 +92,20 @@ namespace
         }
     }
 }
-
 void SceneRenderer::Extract(entt::registry& registry, std::vector<RenderPacket>& outQueue)
 {
     PROFILE_SCOPE("SceneRenderer::Extract - From Manager");
-
-
     RenderableManager::GetInstance().SetExternalAlpha(1.0f);
     const auto& packets = RenderableManager::GetInstance().GetInterpolationData();
-
-
     if (outQueue.capacity() < packets.size())
     {
         outQueue.reserve(packets.size());
     }
     outQueue = packets;
 }
-
 void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
 {
     PROFILE_SCOPE("SceneRenderer::ExtractToRenderableManager - Total");
-
     sk_sp<RuntimeScene> currentScene = SceneManager::GetInstance().GetCurrentScene();
     std::unordered_map<entt::entity, uint64_t> hierarchyOrder;
     BuildHierarchyDrawOrder(currentScene, hierarchyOrder);
@@ -142,9 +118,7 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         }
         return fallbackOrder++;
     };
-
     std::vector<Renderable> renderables;
-
     PROFILE_SCOPE("SceneRenderer::ExtractToRenderableManager - Sprite Processing");
     {
         auto view = registry.view<const ECS::TransformComponent, const ECS::SpriteComponent>();
@@ -152,15 +126,11 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive())
                 continue;
-
             const auto& transform = view.get<const ECS::TransformComponent>(entity);
             const auto& sprite = view.get<const ECS::SpriteComponent>(entity);
-
             if (!sprite.image || !sprite.image->getImage()) continue;
-
             const int pPU = sprite.image->getImportSettings().pixelPerUnit;
             ECS::TransformComponent adjustedTransform = transform;
-
             const float sourceWidth = sprite.sourceRect.Width() > 0.0f
                                           ? sprite.sourceRect.Width()
                                           : static_cast<float>(sprite.image->getImage()->width());
@@ -170,10 +140,8 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             const float ppuScaleFactor = (pPU > 0) ? 100.0f / static_cast<float>(pPU) : 1.0f;
             const float worldWidth = sourceWidth * ppuScaleFactor;
             const float worldHeight = sourceHeight * ppuScaleFactor;
-
             const SkPoint anchoredPos = ComputeAnchoredCenter(transform, worldWidth, worldHeight);
             adjustedTransform.position = ECS::Vector2f(anchoredPos.x(), anchoredPos.y());
-
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = sprite.zIndex,
@@ -194,7 +162,6 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             });
         }
     }
-
     PROFILE_SCOPE("SceneRenderer::ExtractToRenderableManager - Tilemap Processing");
     {
         auto view = registry.view<const ECS::TransformComponent, const ECS::TilemapComponent, const
@@ -203,11 +170,9 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive())
                 continue;
-
             const auto& tilemapTransform = view.get<const ECS::TransformComponent>(entity);
             const auto& tilemap = view.get<const ECS::TilemapComponent>(entity);
             const auto& renderer = view.get<const ECS::TilemapRendererComponent>(entity);
-
             std::vector<ECS::Vector2i> coords;
             coords.reserve(tilemap.runtimeTileCache.size());
             for (const auto& kv : tilemap.runtimeTileCache)
@@ -219,7 +184,6 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 if (a.x != b.x) return a.x < b.x;
                 return a.y < b.y;
             });
-
             for (const auto& coord : coords)
             {
                 const auto& resolvedTile = tilemap.runtimeTileCache.at(coord);
@@ -230,14 +194,11 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                     {
                         const auto& hydratedTile = renderer.hydratedSpriteTiles.at(tileAssetGuid);
                         if (!hydratedTile.image) continue;
-
                         ECS::TransformComponent tileTransform = tilemapTransform;
                         tileTransform.position.x += coord.x * tilemap.cellSize.x;
                         tileTransform.position.y += coord.y * tilemap.cellSize.y;
-
                         const int pPU = hydratedTile.image->getImportSettings().pixelPerUnit;
                         const float ppuScaleFactor = (pPU > 0) ? 100.0f / static_cast<float>(pPU) : 1.0f;
-
                         const float sourceWidth = hydratedTile.sourceRect.width() > 0.0f
                                                       ? hydratedTile.sourceRect.width()
                                                       : static_cast<float>(hydratedTile.image->getImage()->width());
@@ -246,10 +207,8 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                                                        : static_cast<float>(hydratedTile.image->getImage()->height());
                         const float worldWidth = sourceWidth * ppuScaleFactor;
                         const float worldHeight = sourceHeight * ppuScaleFactor;
-
                         const SkPoint anchoredPos = ComputeAnchoredCenter(tileTransform, worldWidth, worldHeight);
                         tileTransform.position = ECS::Vector2f(anchoredPos.x(), anchoredPos.y());
-
                         renderables.emplace_back(Renderable{
                             .entityId = entity,
                             .zIndex = renderer.zIndex,
@@ -273,24 +232,19 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             }
         }
     }
-
     PROFILE_SCOPE("SceneRenderer::ExtractToRenderableManager - Text Processing");
     {
         auto processTextView = [&](auto& view, auto getTextComponent, auto entity)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive())
                 return;
-
             const auto& transform = view.template get<const ECS::TransformComponent>(entity);
             const auto& textData = getTextComponent(view, entity);
-
             if (!textData.typeface || textData.text.empty()) return;
-
             ECS::TransformComponent adjustedTransform = transform;
             const SkSize textSize = EstimateTextSize(textData.text, textData.fontSize);
             const SkPoint anchoredPos = ComputeAnchoredCenter(transform, textSize.width(), textSize.height());
             adjustedTransform.position = ECS::Vector2f(anchoredPos.x(), anchoredPos.y());
-
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = textData.zIndex,
@@ -305,7 +259,6 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 }
             });
         };
-
         auto textView = registry.view<const ECS::TransformComponent, const ECS::TextComponent>();
         for (auto entity : textView)
         {
@@ -315,7 +268,6 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             }, entity);
         }
     }
-
     PROFILE_SCOPE("SceneRenderer::ExtractToRenderableManager - Raw Draw UI Processing");
     {
         auto buttonView = registry.view<const ECS::TransformComponent, const ECS::ButtonComponent>();
@@ -323,16 +275,12 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive())
                 continue;
-
             const auto& transform = buttonView.get<const ECS::TransformComponent>(entity);
             const auto& button = buttonView.get<const ECS::ButtonComponent>(entity);
-
             if (!button.isVisible) continue;
-
             sk_sp<SkImage> bgImage = (button.backgroundImageTexture && button.backgroundImageTexture->getImage())
                                          ? button.backgroundImageTexture->getImage()
                                          : nullptr;
-
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = button.zIndex,
@@ -350,24 +298,19 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 }
             });
         }
-
         auto inputTextView = registry.view<const ECS::TransformComponent, const ECS::InputTextComponent>();
         for (auto entity : inputTextView)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
-
             const auto& transform = inputTextView.get<const ECS::TransformComponent>(entity);
             const auto& inputText = inputTextView.get<const ECS::InputTextComponent>(entity);
-
             if (!inputText.text.typeface || !inputText.placeholder.typeface || !inputText.isVisible)
             {
                 continue;
             }
-
             sk_sp<SkImage> bgImage = (inputText.backgroundImageTexture && inputText.backgroundImageTexture->getImage())
                                          ? inputText.backgroundImageTexture->getImage()
                                          : nullptr;
-
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = inputText.zIndex,
@@ -392,20 +335,16 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 }
             });
         }
-
         auto toggleView = registry.view<const ECS::TransformComponent, const ECS::ToggleButtonComponent>();
         for (auto entity : toggleView)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
-
             const auto& transform = toggleView.get<const ECS::TransformComponent>(entity);
             const auto& toggle = toggleView.get<const ECS::ToggleButtonComponent>(entity);
             if (!toggle.isVisible) continue;
-
             sk_sp<SkImage> bgImage = (toggle.backgroundImageTexture && toggle.backgroundImageTexture->getImage())
                                          ? toggle.backgroundImageTexture->getImage()
                                          : nullptr;
-
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = toggle.zIndex,
@@ -427,25 +366,20 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 }
             });
         }
-
         auto radioView = registry.view<const ECS::TransformComponent, const ECS::RadioButtonComponent>();
         for (auto entity : radioView)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
-
             const auto& transform = radioView.get<const ECS::TransformComponent>(entity);
             const auto& radio = radioView.get<const ECS::RadioButtonComponent>(entity);
             if (!radio.isVisible) continue;
-
             if (!radio.label.typeface) continue;
-
             sk_sp<SkImage> bgImage = (radio.backgroundImageTexture && radio.backgroundImageTexture->getImage())
                                          ? radio.backgroundImageTexture->getImage()
                                          : nullptr;
             sk_sp<SkImage> selectionImage = (radio.selectionImageTexture && radio.selectionImageTexture->getImage())
                                                 ? radio.selectionImageTexture->getImage()
                                                 : nullptr;
-
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = radio.zIndex,
@@ -467,18 +401,14 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 }
             });
         }
-
         auto checkBoxView = registry.view<const ECS::TransformComponent, const ECS::CheckBoxComponent>();
         for (auto entity : checkBoxView)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
-
             const auto& transform = checkBoxView.get<const ECS::TransformComponent>(entity);
             const auto& checkBox = checkBoxView.get<const ECS::CheckBoxComponent>(entity);
             if (!checkBox.isVisible) continue;
-
             if (!checkBox.label.typeface) continue;
-
             sk_sp<SkImage> bgImage = (checkBox.backgroundImageTexture && checkBox.backgroundImageTexture->getImage())
                                          ? checkBox.backgroundImageTexture->getImage()
                                          : nullptr;
@@ -486,7 +416,6 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                                                 getImage())
                                                 ? checkBox.checkmarkImageTexture->getImage()
                                                 : nullptr;
-
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = checkBox.zIndex,
@@ -510,16 +439,13 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 }
             });
         }
-
         auto sliderView = registry.view<const ECS::TransformComponent, const ECS::SliderComponent>();
         for (auto entity : sliderView)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
-
             const auto& transform = sliderView.get<const ECS::TransformComponent>(entity);
             const auto& slider = sliderView.get<const ECS::SliderComponent>(entity);
             if (!slider.isVisible) continue;
-
             sk_sp<SkImage> trackImage = (slider.trackImageTexture && slider.trackImageTexture->getImage())
                                             ? slider.trackImageTexture->getImage()
                                             : nullptr;
@@ -529,7 +455,6 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             sk_sp<SkImage> thumbImage = (slider.thumbImageTexture && slider.thumbImageTexture->getImage())
                                             ? slider.thumbImageTexture->getImage()
                                             : nullptr;
-
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = slider.zIndex,
@@ -551,24 +476,20 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 }
             });
         }
-
         auto comboView = registry.view<const ECS::TransformComponent, const ECS::ComboBoxComponent>();
         for (auto entity : comboView)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
-
             const auto& transform = comboView.get<const ECS::TransformComponent>(entity);
             const auto& combo = comboView.get<const ECS::ComboBoxComponent>(entity);
             if (!combo.isVisible) continue;
             if (!combo.displayText.typeface) continue;
-
             sk_sp<SkImage> bgImage = (combo.backgroundImageTexture && combo.backgroundImageTexture->getImage())
                                          ? combo.backgroundImageTexture->getImage()
                                          : nullptr;
             sk_sp<SkImage> iconImage = (combo.dropdownIconTexture && combo.dropdownIconTexture->getImage())
                                            ? combo.dropdownIconTexture->getImage()
                                            : nullptr;
-
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = combo.zIndex,
@@ -593,21 +514,17 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 }
             });
         }
-
         auto expanderView = registry.view<const ECS::TransformComponent, const ECS::ExpanderComponent>();
         for (auto entity : expanderView)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
-
             const auto& transform = expanderView.get<const ECS::TransformComponent>(entity);
             const auto& expander = expanderView.get<const ECS::ExpanderComponent>(entity);
             if (!expander.isVisible) continue;
             if (!expander.header.typeface) continue;
-
             sk_sp<SkImage> bgImage = (expander.backgroundImageTexture && expander.backgroundImageTexture->getImage())
                                          ? expander.backgroundImageTexture->getImage()
                                          : nullptr;
-
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = expander.zIndex,
@@ -626,23 +543,19 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 }
             });
         }
-
         auto progressView = registry.view<const ECS::TransformComponent, const ECS::ProgressBarComponent>();
         for (auto entity : progressView)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
-
             const auto& transform = progressView.get<const ECS::TransformComponent>(entity);
             const auto& progress = progressView.get<const ECS::ProgressBarComponent>(entity);
             if (!progress.isVisible) continue;
-
             sk_sp<SkImage> bgImage = (progress.backgroundImageTexture && progress.backgroundImageTexture->getImage())
                                          ? progress.backgroundImageTexture->getImage()
                                          : nullptr;
             sk_sp<SkImage> fillImage = (progress.fillImageTexture && progress.fillImageTexture->getImage())
                                            ? progress.fillImageTexture->getImage()
                                            : nullptr;
-
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = progress.zIndex,
@@ -664,16 +577,13 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 }
             });
         }
-
         auto tabView = registry.view<const ECS::TransformComponent, const ECS::TabControlComponent>();
         for (auto entity : tabView)
         {
             if (currentScene && !currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
-
             const auto& transform = tabView.get<const ECS::TransformComponent>(entity);
             const auto& tabControl = tabView.get<const ECS::TabControlComponent>(entity);
             if (!tabControl.isVisible) continue;
-
             sk_sp<SkImage> bgImage = (tabControl.backgroundImageTexture && tabControl.backgroundImageTexture->
                                          getImage())
                                          ? tabControl.backgroundImageTexture->getImage()
@@ -682,7 +592,6 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                                             getImage())
                                             ? tabControl.tabBackgroundImageTexture->getImage()
                                             : nullptr;
-
             renderables.emplace_back(Renderable{
                 .entityId = entity,
                 .zIndex = tabControl.zIndex,
@@ -705,18 +614,15 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 }
             });
         }
-
         if (currentScene)
         {
             auto listBoxView = registry.view<const ECS::TransformComponent, const ECS::ListBoxComponent>();
             for (auto entity : listBoxView)
             {
                 if (!currentScene->FindGameObjectByEntity(entity).IsActive()) continue;
-
                 const auto& transform = listBoxView.get<const ECS::TransformComponent>(entity);
                 const auto& listBox = listBoxView.get<const ECS::ListBoxComponent>(entity);
                 if (!listBox.isVisible) continue;
-
                 bool useContainer = listBox.itemsContainerGuid.Valid();
                 int itemCount = static_cast<int>(listBox.items.size());
                 if (useContainer)
@@ -742,11 +648,9 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                 {
                     if (!listBox.itemTemplate.typeface) continue;
                 }
-
                 sk_sp<SkImage> bgImage = (listBox.backgroundImageTexture && listBox.backgroundImageTexture->getImage())
                                              ? listBox.backgroundImageTexture->getImage()
                                              : nullptr;
-
                 renderables.emplace_back(Renderable{
                     .entityId = entity,
                     .zIndex = listBox.zIndex,
@@ -785,7 +689,6 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             }
         }
     }
-
     if (!renderables.empty())
     {
         std::ranges::stable_sort(renderables, [](const Renderable& a, const Renderable& b)
@@ -793,6 +696,5 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
             return static_cast<uint32_t>(a.entityId) < static_cast<uint32_t>(b.entityId);
         });
     }
-
     RenderableManager::GetInstance().SubmitFrame(std::move(renderables));
 }

@@ -462,6 +462,9 @@ namespace Nut
             mix(reinterpret_cast<size_t>(e.buffer.Get()));
             mix(reinterpret_cast<size_t>(e.textureView.Get()));
             mix(reinterpret_cast<size_t>(e.sampler.Get()));
+            // 包含 offset 和 size 以区分不同的 buffer 绑定
+            mix(static_cast<size_t>(e.offset));
+            mix(static_cast<size_t>(e.size));
         }
 
         return hasResource ? hash : 0;

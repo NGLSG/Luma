@@ -12,29 +12,20 @@
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
-
 #include "GraphicsBackend.h"
-
 ShaderEditorPanel::ShaderEditorPanel()
 {
     m_textEditor.SetLanguageDefinition(TextEditor::LanguageDefinition::WGSL());
     m_textEditor.SetShowWhitespaces(false);
     m_textEditor.SetImGuiChildIgnored(true);
     m_textEditor.SetTabSize(4);
-
-
     m_customPalette = TextEditor::GetDarkPalette();
-
-
     LoadFontSize();
     LoadColorSettings();
     LoadCustomKeywords();
-
-
     ApplyColorSettings();
     ApplyCustomKeywords();
 }
-
 void ShaderEditorPanel::Initialize(EditorContext* context)
 {
     m_context = context;
@@ -43,24 +34,16 @@ void ShaderEditorPanel::Initialize(EditorContext* context)
         LogError("ShaderEditorPanel::Initialize - Invalid EditorContext provided.");
     }
 }
-
 void ShaderEditorPanel::Update(float deltaTime)
 {
 }
-
-
 void ShaderEditorPanel::Draw()
 {
     if (!m_isVisible || !m_isOpen) return;
-
     ImGui::SetNextWindowSize(ImVec2(1200, 800), ImGuiCond_FirstUseEver);
-
-
     if (ImGui::Begin(GetPanelName(), &m_isOpen, ImGuiWindowFlags_MenuBar))
     {
         RenderToolbar();
-
-
         ImGui::BeginChild("##shader_editor_split", ImVec2(0, -200), false);
         {
             ImGui::BeginChild("##code_editor", ImVec2(ImGui::GetContentRegionAvail().x * 0.7f, 0), true);
@@ -68,10 +51,7 @@ void ShaderEditorPanel::Draw()
                 RenderCodeEditor();
             }
             ImGui::EndChild();
-
             ImGui::SameLine();
-
-
             ImGui::BeginChild("##bindings_panel", ImVec2(0, 0), true);
             {
                 RenderBindingsPanel();
@@ -79,8 +59,6 @@ void ShaderEditorPanel::Draw()
             ImGui::EndChild();
         }
         ImGui::EndChild();
-
-
         ImGui::BeginChild("##compile_output", ImVec2(0, 0), true);
         {
             RenderCompileOutput();
@@ -88,45 +66,31 @@ void ShaderEditorPanel::Draw()
         ImGui::EndChild();
     }
     ImGui::End();
-
-
     if (m_showSettingsPanel)
     {
         RenderSettingsPanel();
     }
-
-
     RenderAutoCompletePopup();
 }
-
-
 void ShaderEditorPanel::HandleAutoComplete()
 {
     if (!m_textEditor.IsHandleKeyboardInputsEnabled())
     {
         m_textEditor.SetHandleKeyboardInputs(true);
     }
-
     ImGuiIO& io = ImGui::GetIO();
     bool isCtrl = io.KeyCtrl;
     bool isAlt = io.KeyAlt;
-
-
     if (m_isAutoCompleteOpen)
     {
         std::string prefix = GetWordUnderCursor();
-
-
         m_popupPos = m_textEditor.GetCursorScreenPosition();
         m_popupPos.y += 20;
-
-
         if (isCtrl && ImGui::IsKeyPressed(ImGuiKey_S))
         {
             m_autoCompleteSelectedIndex++;
             if (m_autoCompleteSelectedIndex >= static_cast<int>(m_autoCompleteCandidates.size()))
                 m_autoCompleteSelectedIndex = 0;
-
             m_textEditor.SetHandleKeyboardInputs(false);
             return;
         }
@@ -135,7 +99,6 @@ void ShaderEditorPanel::HandleAutoComplete()
             m_autoCompleteSelectedIndex--;
             if (m_autoCompleteSelectedIndex < 0)
                 m_autoCompleteSelectedIndex = static_cast<int>(m_autoCompleteCandidates.size()) - 1;
-
             m_textEditor.SetHandleKeyboardInputs(false);
             return;
         }
@@ -151,7 +114,6 @@ void ShaderEditorPanel::HandleAutoComplete()
                     m_textEditor.InsertText(toInsert.substr(prefix.length()));
                 }
             }
-
             m_isAutoCompleteOpen = false;
             m_autoCompleteCandidates.clear();
             m_currentWordPrefix.clear();
@@ -164,32 +126,24 @@ void ShaderEditorPanel::HandleAutoComplete()
             m_currentWordPrefix.clear();
             return;
         }
-
-
         if (!prefix.empty())
         {
             if (prefix != m_currentWordPrefix)
             {
                 m_currentWordPrefix = prefix;
                 m_autoCompleteCandidates.clear();
-
                 const auto& langDef = m_textEditor.GetLanguageDefinition();
-
                 std::string lowerPrefix = prefix;
                 std::transform(lowerPrefix.begin(), lowerPrefix.end(), lowerPrefix.begin(), ::tolower);
-
                 auto AddCandidate = [&](const std::string& candidate, CandidateType type)
                 {
                     std::string lowerCandidate = candidate;
                     std::transform(lowerCandidate.begin(), lowerCandidate.end(), lowerCandidate.begin(), ::tolower);
-
                     if (lowerCandidate.find(lowerPrefix) == 0 && candidate != prefix)
                     {
                         m_autoCompleteCandidates.push_back({candidate, type});
                     }
                 };
-
-
                 for (const auto& kw : langDef.mKeywords)
                 {
                     if (kw.find("vec") == 0 || kw.find("mat") == 0 || kw == "f32" || kw == "i32" || kw == "u32" ||
@@ -202,42 +156,31 @@ void ShaderEditorPanel::HandleAutoComplete()
                         AddCandidate(kw, CandidateType::Keyword);
                     }
                 }
-
-
                 for (const auto& ident : langDef.mIdentifiers)
                 {
                     AddCandidate(ident.first, CandidateType::Function);
                 }
-
-
                 for (const auto& kw : m_customKeywords)
                 {
                     AddCandidate(kw, CandidateType::Keyword);
                 }
-
-
                 auto& registry = Nut::ShaderModuleRegistry::GetInstance();
                 auto allModules = registry.GetAllModuleNames();
                 for (const auto& moduleName : allModules)
                 {
                     AddCandidate(moduleName, CandidateType::Module);
                 }
-
-
                 auto localVars = ExtractLocalVariables();
                 for (const auto& varName : localVars)
                 {
                     AddCandidate(varName, CandidateType::Variable);
                 }
-
-
                 std::sort(m_autoCompleteCandidates.begin(), m_autoCompleteCandidates.end(),
                           [](const AutoCompleteCandidate& a, const AutoCompleteCandidate& b)
                           {
                               if (a.type != b.type) return static_cast<int>(a.type) < static_cast<int>(b.type);
                               return a.text < b.text;
                           });
-
                 if (m_autoCompleteCandidates.empty())
                 {
                     m_isAutoCompleteOpen = false;
@@ -254,14 +197,9 @@ void ShaderEditorPanel::HandleAutoComplete()
             m_isAutoCompleteOpen = false;
             m_currentWordPrefix.clear();
         }
-
         return;
     }
-
-
     std::string prefix = GetWordUnderCursor();
-
-
     if (prefix.empty())
     {
         if (m_currentWordPrefix != "")
@@ -272,31 +210,24 @@ void ShaderEditorPanel::HandleAutoComplete()
     }
     bool prefixChanged = (prefix != m_currentWordPrefix);
     bool shouldUpdate = !isCtrl && !isAlt && prefixChanged;
-
     if (shouldUpdate)
     {
         if (prefix.length() >= 1)
         {
             m_currentWordPrefix = prefix;
             m_autoCompleteCandidates.clear();
-
             const auto& langDef = m_textEditor.GetLanguageDefinition();
-
             std::string lowerPrefix = prefix;
             std::transform(lowerPrefix.begin(), lowerPrefix.end(), lowerPrefix.begin(), ::tolower);
-
             auto AddCandidate = [&](const std::string& candidate, CandidateType type)
             {
                 std::string lowerCandidate = candidate;
                 std::transform(lowerCandidate.begin(), lowerCandidate.end(), lowerCandidate.begin(), ::tolower);
-
                 if (lowerCandidate.find(lowerPrefix) == 0 && candidate != prefix)
                 {
                     m_autoCompleteCandidates.push_back({candidate, type});
                 }
             };
-
-
             for (const auto& kw : langDef.mKeywords)
             {
                 if (kw.find("vec") == 0 || kw.find("mat") == 0 || kw == "f32" || kw == "i32" || kw == "u32" ||
@@ -309,49 +240,35 @@ void ShaderEditorPanel::HandleAutoComplete()
                     AddCandidate(kw, CandidateType::Keyword);
                 }
             }
-
-
             for (const auto& ident : langDef.mIdentifiers)
             {
                 AddCandidate(ident.first, CandidateType::Function);
             }
-
-
             for (const auto& kw : m_customKeywords)
             {
                 AddCandidate(kw, CandidateType::Keyword);
             }
-
-
             auto& registry = Nut::ShaderModuleRegistry::GetInstance();
             auto allModules = registry.GetAllModuleNames();
             for (const auto& moduleName : allModules)
             {
                 AddCandidate(moduleName, CandidateType::Module);
             }
-
-
             auto localVars = ExtractLocalVariables();
             for (const auto& varName : localVars)
             {
                 AddCandidate(varName, CandidateType::Variable);
             }
-
-
             std::sort(m_autoCompleteCandidates.begin(), m_autoCompleteCandidates.end(),
                       [](const AutoCompleteCandidate& a, const AutoCompleteCandidate& b)
                       {
                           if (a.type != b.type) return static_cast<int>(a.type) < static_cast<int>(b.type);
                           return a.text < b.text;
                       });
-
-
             if (!m_autoCompleteCandidates.empty())
             {
                 m_isAutoCompleteOpen = true;
                 m_autoCompleteSelectedIndex = 0;
-
-
                 m_popupPos = m_textEditor.GetCursorScreenPosition();
                 m_popupPos.y += 20;
             }
@@ -368,16 +285,11 @@ void ShaderEditorPanel::HandleAutoComplete()
         }
     }
 }
-
 void ShaderEditorPanel::RenderAutoCompletePopup()
 {
     if (!m_isAutoCompleteOpen || m_autoCompleteCandidates.empty()) return;
-
-
     ImGui::SetNextWindowPos(m_popupPos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(220, 0), ImGuiCond_Always);
-
-
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove |
@@ -389,36 +301,26 @@ void ShaderEditorPanel::RenderAutoCompletePopup()
         ImGuiWindowFlags_NoScrollbar |
         ImGuiWindowFlags_NoScrollWithMouse |
         ImGuiWindowFlags_Tooltip;
-
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 4.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6, 6));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-
-
     bool windowVisible = ImGui::Begin("ShaderAutoComplete", nullptr, flags);
-
-
     if (windowVisible)
     {
         ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Auto Complete (%d)", (int)m_autoCompleteCandidates.size());
         ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Ctrl+W/S: 选择 | Tab/Enter: 确认 | Esc: 取消");
         ImGui::Separator();
-
-
         for (int i = 0; i < static_cast<int>(m_autoCompleteCandidates.size()); ++i)
         {
             const auto& candidate = m_autoCompleteCandidates[i];
             bool isSelected = (i == m_autoCompleteSelectedIndex);
-
             if (isSelected)
             {
                 ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.3f, 0.5f, 0.8f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.4f, 0.6f, 0.9f, 1.0f));
             }
-
-
             const char* typeIcon = "";
             ImVec4 typeColor;
             switch (candidate.type)
@@ -444,12 +346,8 @@ void ShaderEditorPanel::RenderAutoCompletePopup()
                 typeColor = ImVec4(1.0f, 0.7f, 0.4f, 1.0f);
                 break;
             }
-
-
             ImGui::TextColored(typeColor, "[%s]", typeIcon);
             ImGui::SameLine();
-
-
             if (ImGui::Selectable(candidate.text.c_str(), isSelected))
             {
                 std::string prefix = GetWordUnderCursor();
@@ -458,12 +356,10 @@ void ShaderEditorPanel::RenderAutoCompletePopup()
                 {
                     m_textEditor.InsertText(toInsert.substr(prefix.length()));
                 }
-
                 m_isAutoCompleteOpen = false;
                 m_currentWordPrefix.clear();
                 m_autoCompleteCandidates.clear();
             }
-
             if (isSelected)
             {
                 ImGui::PopStyleColor(2);
@@ -471,28 +367,19 @@ void ShaderEditorPanel::RenderAutoCompletePopup()
         }
     }
     ImGui::End();
-
     ImGui::PopStyleColor(2);
     ImGui::PopStyleVar(3);
 }
-
 std::string ShaderEditorPanel::GetWordUnderCursor() const
 {
     auto pos = m_textEditor.GetCursorPosition();
     std::string line = m_textEditor.GetCurrentLineText();
-
     if (pos.mColumn == 0 || pos.mColumn > static_cast<int>(line.length())) return "";
-
-
     char leftChar = line[pos.mColumn - 1];
-
-
     if (!isalnum(leftChar) && leftChar != '_')
     {
         return "";
     }
-
-
     int start = pos.mColumn - 1;
     while (start >= 0)
     {
@@ -500,21 +387,15 @@ std::string ShaderEditorPanel::GetWordUnderCursor() const
         if (!isalnum(c) && c != '_') break;
         start--;
     }
-
     return line.substr(start + 1, pos.mColumn - (start + 1));
 }
-
 std::vector<std::string> ShaderEditorPanel::ExtractLocalVariables() const
 {
     std::vector<std::string> variables;
     std::set<std::string> uniqueVars;
-
     std::string text = m_textEditor.GetText();
-
-
     std::regex varPattern(R"(\b(?:var|let|const)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*[:=])");
     std::smatch match;
-
     auto searchStart = text.cbegin();
     while (std::regex_search(searchStart, text.cend(), match, varPattern))
     {
@@ -525,10 +406,8 @@ std::vector<std::string> ShaderEditorPanel::ExtractLocalVariables() const
         }
         searchStart = match.suffix().first;
     }
-
     return variables;
 }
-
 void ShaderEditorPanel::RenderCodeEditor()
 {
     ImGui::Text("代码视图:");
@@ -541,11 +420,8 @@ void ShaderEditorPanel::RenderCodeEditor()
             ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "(SkSL - [Obsolete])");
     }
     ImGui::Separator();
-
     auto cpos = m_textEditor.GetCursorPosition();
     ImGui::Text("Ln: %d | Col: %d | Lines: %d", cpos.mLine + 1, cpos.mColumn + 1, m_textEditor.GetTotalLines());
-
-
     ImGui::BeginChild("##code_editor_content", ImVec2(0, 0), true,
                       ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar |
                       ImGuiWindowFlags_NoMove);
@@ -553,22 +429,14 @@ void ShaderEditorPanel::RenderCodeEditor()
         HandleFontZoom();
         float scale = m_fontSize / 16.0f;
         ImGui::SetWindowFontScale(scale);
-
-
         HandleAutoComplete();
-
-
         m_textEditor.Render("##shader_code_editor");
-
-
         if (!m_textEditor.IsHandleKeyboardInputsEnabled())
         {
             m_textEditor.SetHandleKeyboardInputs(true);
         }
     }
     ImGui::EndChild();
-
-
     if (m_textEditor.IsTextChanged())
     {
         m_shaderCodeBuffer = m_textEditor.GetText();
@@ -577,39 +445,32 @@ void ShaderEditorPanel::RenderCodeEditor()
         m_bindingsDirty = true;
     }
 }
-
-
 void ShaderEditorPanel::CompileShader()
 {
     m_compileOutput.clear();
     m_compileSuccess = false;
     m_shaderBindings.clear();
-
     if (m_shaderCodeBuffer.empty())
     {
         m_compileOutput = "错误: 代码为空。";
         return;
     }
-
     bool isWGSL = false;
     if (m_currentShaderHandle.Valid())
     {
         isWGSL = (m_shaderData.language == Data::ShaderLanguage::WGSL);
     }
-
     if (!isWGSL)
     {
         m_compileOutput = "警告: 仅支持 WGSL 的实时编译验证。SkSL 已弃用。";
         return;
     }
-
     if (!m_context)
     {
         LogError("ShaderEditorPanel::CompileShader - Context is null");
         m_compileOutput = "系统错误: 无法访问引擎上下文。";
         return;
     }
-
     try
     {
         auto nutCtx = m_context->engineContext->graphicsBackend->GetNutContext();
@@ -617,27 +478,22 @@ void ShaderEditorPanel::CompileShader()
         {
             throw std::runtime_error("NutContext 获取失败，图形后端未就绪。");
         }
-
         LogInfo("ShaderEditorPanel: Compiling WGSL shader...");
         Nut::ShaderModule& module = Nut::ShaderManager::GetFromString(m_shaderCodeBuffer, nutCtx);
-
         if (module)
         {
             m_compileSuccess = true;
             m_compileOutput = "编译成功 (Validation Passed)";
-
             module.ForeachBinding([this](const Nut::ShaderBindingInfo& info)
             {
                 m_shaderBindings.push_back(info);
             });
-
             std::sort(m_shaderBindings.begin(), m_shaderBindings.end(),
                       [](const Nut::ShaderBindingInfo& a, const Nut::ShaderBindingInfo& b)
                       {
                           if (a.groupIndex != b.groupIndex) return a.groupIndex < b.groupIndex;
                           return a.location < b.location;
                       });
-
             LogInfo("ShaderEditorPanel: Compilation successful. Found {} bindings.", m_shaderBindings.size());
         }
         else
@@ -653,26 +509,21 @@ void ShaderEditorPanel::CompileShader()
         LogError("ShaderEditorPanel::CompileShader - Exception: {}", e.what());
     }
 }
-
 void ShaderEditorPanel::RenderBindingsPanel()
 {
     ImGui::Text("资源绑定 (Reflection)");
     ImGui::Separator();
-
     if (!m_compileSuccess && m_shaderBindings.empty())
     {
         ImGui::TextDisabled("请先编译着色器以查看绑定信息。");
         return;
     }
-
     if (m_shaderBindings.empty())
     {
         ImGui::TextDisabled("无绑定资源。");
         return;
     }
-
     int currentGroup = -1;
-
     for (const auto& binding : m_shaderBindings)
     {
         if (static_cast<int>(binding.groupIndex) != currentGroup)
@@ -681,20 +532,14 @@ void ShaderEditorPanel::RenderBindingsPanel()
             ImGui::Separator();
             ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1.0f), "@group(%d)", currentGroup);
         }
-
         ImGui::PushID((std::to_string(binding.groupIndex * 1000 + binding.location) + binding.name).c_str());
-
         std::string label = std::format("@binding({}) {}", binding.location, binding.name);
-
         bool nodeOpen = ImGui::TreeNodeEx(label.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Leaf);
-
         if (nodeOpen)
         {
             ImGui::Indent();
-
             const char* typeStr = "Unknown";
             ImVec4 typeColor = ImVec4(1, 1, 1, 1);
-
             switch (binding.type)
             {
             case Nut::BindingType::UniformBuffer:
@@ -714,19 +559,15 @@ void ShaderEditorPanel::RenderBindingsPanel()
                 typeColor = ImVec4(0.4f, 1.0f, 0.6f, 1.0f);
                 break;
             }
-
             ImGui::Text("类型:");
             ImGui::SameLine();
             ImGui::TextColored(typeColor, "%s", typeStr);
-
             ImGui::Unindent();
             ImGui::TreePop();
         }
         ImGui::PopID();
     }
 }
-
-
 void ShaderEditorPanel::OpenShader(const AssetHandle& shaderHandle)
 {
     if (!shaderHandle.Valid())
@@ -734,32 +575,24 @@ void ShaderEditorPanel::OpenShader(const AssetHandle& shaderHandle)
         LogError("ShaderEditorPanel::OpenShader - Invalid shader handle");
         return;
     }
-
     auto metadata = AssetManager::GetInstance().GetMetadata(shaderHandle.assetGuid);
     if (!metadata || metadata->type != AssetType::Shader)
     {
         LogError("ShaderEditorPanel::OpenShader - Failed to load shader metadata");
         return;
     }
-
     m_currentShaderHandle = shaderHandle;
     m_shaderData = metadata->importerSettings.as<Data::ShaderData>();
     m_shaderCodeBuffer = m_shaderData.source;
-
     m_textEditor.SetText(m_shaderCodeBuffer);
-
     UpdateTextEditorLanguage();
-
     m_isOpen = true;
     m_isVisible = true;
     m_hasUnsavedChanges = false;
     m_codeChanged = false;
-
     CompileShader();
-
     LogInfo("ShaderEditorPanel::OpenShader - Opened: {}", metadata->assetPath.string());
 }
-
 void ShaderEditorPanel::SaveShader()
 {
     if (!m_currentShaderHandle.Valid())
@@ -767,47 +600,35 @@ void ShaderEditorPanel::SaveShader()
         LogError("ShaderEditorPanel::SaveShader - No shader open");
         return;
     }
-
     auto metadata = AssetManager::GetInstance().GetMetadata(m_currentShaderHandle.assetGuid);
     if (!metadata) return;
-
     m_shaderCodeBuffer = m_textEditor.GetText();
     m_shaderData.source = m_shaderCodeBuffer;
-
     YAML::Node node;
     node = m_shaderData;
-
     std::ofstream file(AssetManager::GetInstance().GetAssetsRootPath() / metadata->assetPath);
     if (!file.is_open())
     {
         LogError("ShaderEditorPanel::SaveShader - Failed to write file: {}", metadata->assetPath.string());
         return;
     }
-
     file << node;
     file.close();
-
     AssetMetadata updatedMeta = *metadata;
     updatedMeta.importerSettings = node;
     AssetManager::GetInstance().ReImport(updatedMeta);
-
     m_hasUnsavedChanges = false;
     m_codeChanged = false;
-
     LogInfo("ShaderEditorPanel::SaveShader - Saved: {}", metadata->assetPath.string());
 }
-
 void ShaderEditorPanel::OpenMaterial(const AssetHandle& materialHandle)
 {
     LogWarn("ShaderEditorPanel::OpenMaterial is deprecated. Please edit Shader assets directly.");
 }
-
 void ShaderEditorPanel::SaveMaterial()
 {
     LogWarn("ShaderEditorPanel::SaveMaterial is deprecated.");
 }
-
-
 void ShaderEditorPanel::UpdateTextEditorLanguage()
 {
     if (m_currentShaderHandle.Valid() && m_shaderData.language == Data::ShaderLanguage::WGSL)
@@ -819,7 +640,6 @@ void ShaderEditorPanel::UpdateTextEditorLanguage()
         m_textEditor.SetLanguageDefinition(TextEditor::LanguageDefinition::GLSL());
     }
 }
-
 void ShaderEditorPanel::RenderToolbar()
 {
     if (ImGui::BeginMenuBar())
@@ -843,25 +663,21 @@ void ShaderEditorPanel::RenderToolbar()
         }
         ImGui::EndMenuBar();
     }
-
     if (ImGui::Button("保存")) SaveShader();
     ImGui::SameLine();
     if (ImGui::Button("编译 (F5)")) CompileShader();
     ImGui::SameLine();
     if (ImGui::Button("设置")) m_showSettingsPanel = !m_showSettingsPanel;
-
     ImGui::SameLine();
     if (m_hasUnsavedChanges)
         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.0f, 1.0f), "  * 未保存");
     else
         ImGui::TextColored(ImVec4(0.4f, 0.8f, 0.4f, 1.0f), "  已保存");
 }
-
 void ShaderEditorPanel::RenderCompileOutput()
 {
     ImGui::Text("输出日志:");
     ImGui::Separator();
-
     if (!m_compileOutput.empty())
     {
         if (m_compileSuccess)
@@ -870,7 +686,6 @@ void ShaderEditorPanel::RenderCompileOutput()
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "[Error] %s", m_compileOutput.c_str());
     }
 }
-
 void ShaderEditorPanel::Shutdown()
 {
     m_isOpen = false;
@@ -878,8 +693,6 @@ void ShaderEditorPanel::Shutdown()
     m_shaderBindings.clear();
     m_context = nullptr;
 }
-
-
 void ShaderEditorPanel::HandleFontZoom()
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -887,19 +700,15 @@ void ShaderEditorPanel::HandleFontZoom()
     {
         float delta = io.MouseWheel * 2.0f;
         m_fontSize += delta;
-
         if (m_fontSize < m_fontSizeMin) m_fontSize = m_fontSizeMin;
         if (m_fontSize > m_fontSizeMax) m_fontSize = m_fontSizeMax;
-
         SaveFontSize();
         LogInfo("ShaderEditorPanel: Font size changed to {} (scale: {})", m_fontSize, m_fontSize / 16.0f);
     }
 }
-
 void ShaderEditorPanel::RenderSettingsPanel()
 {
     ImGui::SetNextWindowSize(ImVec2(600, 700), ImGuiCond_FirstUseEver);
-
     if (ImGui::Begin("着色器编辑器设置", &m_showSettingsPanel))
     {
         if (ImGui::BeginTabBar("##settings_tabs"))
@@ -907,19 +716,16 @@ void ShaderEditorPanel::RenderSettingsPanel()
             if (ImGui::BeginTabItem("颜色"))
             {
                 ImGui::Checkbox("使用自定义颜色", &m_useCustomColors);
-
                 if (m_useCustomColors)
                 {
                     ImGui::Separator();
                     ImGui::Text("编辑器配色方案：");
-
                     const char* colorNames[] = {
                         "默认", "关键字", "数字", "字符串", "字符字面量",
                         "标点符号", "预处理", "标识符", "已知标识符", "预处理标识符",
                         "单行注释", "多行注释", "背景", "光标", "选择",
                         "错误标记", "断点", "行号", "当前行填充", "当前行填充(非活动)", "当前行边缘"
                     };
-
                     for (int i = 0; i < (int)TextEditor::PaletteIndex::Max; ++i)
                     {
                         ImGui::PushID(i);
@@ -931,7 +737,6 @@ void ShaderEditorPanel::RenderSettingsPanel()
                         }
                         ImGui::PopID();
                     }
-
                     ImGui::Separator();
                     if (ImGui::Button("应用"))
                     {
@@ -957,12 +762,10 @@ void ShaderEditorPanel::RenderSettingsPanel()
                 }
                 ImGui::EndTabItem();
             }
-
             if (ImGui::BeginTabItem("关键字"))
             {
                 ImGui::Text("自定义关键字列表：");
                 ImGui::Separator();
-
                 ImGui::BeginChild("##keywords_list", ImVec2(0, -60), true);
                 {
                     for (size_t i = 0; i < m_customKeywords.size(); ++i)
@@ -981,7 +784,6 @@ void ShaderEditorPanel::RenderSettingsPanel()
                     }
                 }
                 ImGui::EndChild();
-
                 ImGui::Separator();
                 ImGui::InputText("新关键字", &m_newKeywordBuffer);
                 ImGui::SameLine();
@@ -1021,7 +823,6 @@ void ShaderEditorPanel::RenderSettingsPanel()
     }
     ImGui::End();
 }
-
 void ShaderEditorPanel::LoadFontSize()
 {
     std::ifstream file("editor_config.txt");
@@ -1048,13 +849,11 @@ void ShaderEditorPanel::LoadFontSize()
         file.close();
     }
 }
-
 void ShaderEditorPanel::SaveFontSize()
 {
     std::vector<std::string> lines;
     std::ifstream inFile("editor_config.txt");
     bool found = false;
-
     if (inFile.is_open())
     {
         std::string line;
@@ -1070,7 +869,6 @@ void ShaderEditorPanel::SaveFontSize()
         inFile.close();
     }
     if (!found) lines.push_back("shader_editor_font_size=" + std::to_string(m_fontSize));
-
     std::ofstream outFile("editor_config.txt");
     if (outFile.is_open())
     {
@@ -1078,7 +876,6 @@ void ShaderEditorPanel::SaveFontSize()
         outFile.close();
     }
 }
-
 void ShaderEditorPanel::LoadColorSettings()
 {
     std::ifstream file("editor_config.txt");
@@ -1113,7 +910,6 @@ void ShaderEditorPanel::LoadColorSettings()
         file.close();
     }
 }
-
 void ShaderEditorPanel::SaveColorSettings()
 {
     std::vector<std::string> lines;
@@ -1128,7 +924,6 @@ void ShaderEditorPanel::SaveColorSettings()
         }
         inFile.close();
     }
-
     lines.push_back("use_custom_colors=" + std::string(m_useCustomColors ? "true" : "false"));
     for (int i = 0; i < (int)TextEditor::PaletteIndex::Max; ++i)
     {
@@ -1136,7 +931,6 @@ void ShaderEditorPanel::SaveColorSettings()
         snprintf(buffer, sizeof(buffer), "palette_%d=0x%08x", i, m_customPalette[i]);
         lines.push_back(buffer);
     }
-
     std::ofstream outFile("editor_config.txt");
     if (outFile.is_open())
     {
@@ -1144,13 +938,11 @@ void ShaderEditorPanel::SaveColorSettings()
         outFile.close();
     }
 }
-
 void ShaderEditorPanel::ApplyColorSettings()
 {
     if (m_useCustomColors) m_textEditor.SetPalette(m_customPalette);
     else m_textEditor.SetPalette(TextEditor::GetDarkPalette());
 }
-
 void ShaderEditorPanel::LoadCustomKeywords()
 {
     std::ifstream file("editor_config.txt");
@@ -1168,7 +960,6 @@ void ShaderEditorPanel::LoadCustomKeywords()
         file.close();
     }
 }
-
 void ShaderEditorPanel::SaveCustomKeywords()
 {
     std::vector<std::string> lines;
@@ -1183,9 +974,7 @@ void ShaderEditorPanel::SaveCustomKeywords()
         }
         inFile.close();
     }
-
     for (const auto& kw : m_customKeywords) lines.push_back("custom_keyword=" + kw);
-
     std::ofstream outFile("editor_config.txt");
     if (outFile.is_open())
     {
@@ -1193,7 +982,6 @@ void ShaderEditorPanel::SaveCustomKeywords()
         outFile.close();
     }
 }
-
 void ShaderEditorPanel::ApplyCustomKeywords()
 {
     if (m_customKeywords.empty()) return;
@@ -1201,16 +989,12 @@ void ShaderEditorPanel::ApplyCustomKeywords()
     for (const auto& kw : m_customKeywords) langDef.mKeywords.insert(kw);
     m_textEditor.SetLanguageDefinition(langDef);
 }
-
-
 void ShaderEditorPanel::RenderUniformEditor()
 {
 }
-
 void ShaderEditorPanel::AddUniform()
 {
 }
-
 void ShaderEditorPanel::RemoveUniform(size_t index)
 {
 }
