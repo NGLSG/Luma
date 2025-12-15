@@ -284,6 +284,7 @@ void SceneViewPanel::Initialize(EditorContext* context)
     m_activeColliderHandle.Reset();
     m_draggedObjects.clear();
     m_particleRenderer = std::make_unique<Particles::ParticleRenderer>();
+    setupTouchGestureCallbacks();
 }
 void SceneViewPanel::Shutdown()
 {
@@ -302,6 +303,7 @@ void SceneViewPanel::Shutdown()
 void SceneViewPanel::Update(float deltaTime)
 {
     updateParticlePreview(deltaTime);
+    m_touchGesture.Update(deltaTime);
 }
 void SceneViewPanel::Draw()
 {
@@ -363,6 +365,7 @@ void SceneViewPanel::Draw()
             drawEditorGizmos(viewportScreenPos, viewportSize);
             drawCameraGizmo(ImGui::GetWindowDrawList());
             drawDesignResolutionFrame(viewportScreenPos, viewportSize);
+            handleTouchNavigation(viewportScreenPos, viewportSize);
             handleNavigationAndPick(viewportScreenPos, viewportSize);
             drawSelectionOutlines(viewportScreenPos, viewportSize);
             drawParticlePreview(ImGui::GetWindowDrawList(), viewportScreenPos, viewportSize);
@@ -2470,4 +2473,71 @@ void SceneViewPanel::drawParticlePreview(ImDrawList* drawList, const ImVec2& vie
             drawList->AddLine(arrowEnd, head2, arrowColor, 2.0f);
         }
     }
+}
+
+void SceneViewPanel::setupTouchGestureCallbacks()
+{
+    m_touchGesture.SetPanCallback([this](float dx, float dy) {
+        if (!m_context->engineContext->isSceneViewFocused) return;
+        const float invZoomX = 1.0f / m_editorCameraProperties.zoom.x();
+        const float invZoomY = 1.0f / m_editorCameraProperties.zoom.y();
+        m_editorCameraProperties.position = SkPoint::Make(
+            m_editorCameraProperties.position.x() - dx * invZoomX,
+            m_editorCameraProperties.position.y() - dy * invZoomY);
+    });
+
+    m_touchGesture.SetZoomCallback([this](float scale, float centerX, float centerY) {
+        if (!m_context->engineContext->isSceneViewFocused) return;
+        const ImVec2 screenCenter(centerX, centerY);
+        const ECS::Vector2f worldBeforeZoom = screenToWorldWith(m_editorCameraProperties, screenCenter);
+        float newZoom = m_editorCameraProperties.zoom.x() * scale;
+        newZoom = std::clamp(newZoom, 0.02f, 50.0f);
+        m_editorCameraProperties.zoom = {newZoom, newZoom};
+        const ECS::Vector2f worldAfterZoom = screenToWorldWith(m_editorCameraProperties, screenCenter);
+        const float dx = worldBeforeZoom.x - worldAfterZoom.x;
+        const float dy = worldBeforeZoom.y - worldAfterZoom.y;
+        m_editorCameraProperties.position = SkPoint::Make(
+            m_editorCameraProperties.position.x() + dx,
+            m_editorCameraProperties.position.y() + dy);
+    });
+    
+    m_touchGestureInitialized = true;
+}
+
+void SceneViewPanel::handleTouchNavigation(const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
+{
+#if defined(SDL_PLATFORM_ANDROID) || defined(__ANDROID__)
+    if (!m_context || !m_context->engineContext || !m_context->engineContext->window) return;
+
+    m_touchGesture.SetScreenSize(viewportSize.x, viewportSize.y);
+
+    auto* window = m_context->engineContext->window;
+
+    static bool touchEventsRegistered = false;
+    if (!touchEventsRegistered)
+    {
+        window->OnTouchDown += [this](SDL_FingerID fingerId, float x, float y, float pressure) {
+            if (m_context && m_context->engineContext && m_context->engineContext->isSceneViewFocused)
+            {
+                m_touchGesture.OnTouchDown(fingerId, x, y, pressure);
+            }
+        };
+        
+        window->OnTouchMove += [this](SDL_FingerID fingerId, float x, float y, float dx, float dy, float pressure) {
+            if (m_context && m_context->engineContext && m_context->engineContext->isSceneViewFocused)
+            {
+                m_touchGesture.OnTouchMove(fingerId, x, y, dx, dy, pressure);
+            }
+        };
+        
+        window->OnTouchUp += [this](SDL_FingerID fingerId, float x, float y) {
+            m_touchGesture.OnTouchUp(fingerId, x, y);
+        };
+        
+        touchEventsRegistered = true;
+    }
+#else
+    (void)viewportScreenPos;
+    (void)viewportSize;
+#endif
 }

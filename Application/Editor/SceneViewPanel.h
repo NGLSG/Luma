@@ -12,6 +12,7 @@
 #include "../Utils/Guid.h"
 #include "Particles/ParticleRenderer.h"
 #include "../../Components/ParticleComponent.h"
+#include "TouchGestureHandler.h"
 struct AssetHandle;
 class RuntimeGameObject;
 class SceneViewPanel : public IEditorPanel
@@ -130,6 +131,8 @@ private:
     void drawDesignResolutionFrame(const ImVec2& viewportScreenPos, const ImVec2& viewportSize);
     void updateParticlePreview(float deltaTime);
     void drawParticlePreview(ImDrawList* drawList, const ImVec2& viewportScreenPos, const ImVec2& viewportSize);
+    void setupTouchGestureCallbacks();
+    void handleTouchNavigation(const ImVec2& viewportScreenPos, const ImVec2& viewportSize);
 private:
     std::vector<ColliderHandle> m_colliderHandles; 
     std::shared_ptr<RenderTarget> m_sceneViewTarget; 
@@ -152,6 +155,9 @@ private:
     std::unordered_set<ECS::Vector2i, ECS::Vector2iHash> m_paintedCoordsThisStroke; 
     std::unique_ptr<Particles::ParticleRenderer> m_particleRenderer; 
     std::vector<Guid> m_lastParticleSelection; 
-    float m_particlePreviewTime = 0.0f; 
+    float m_particlePreviewTime = 0.0f;
+    // 触摸手势支持(Android Pad)
+    TouchGestureHandler m_touchGesture;
+    bool m_touchGestureInitialized = false;
 };
 #endif

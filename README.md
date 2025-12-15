@@ -132,14 +132,14 @@ Sprites / Tilemap / Custom Mesh / Particles → Nut Renderer
 
 ### **模块导出**
 
-```glsl
+```wgsl
 export ModuleA;
 export F.C1;
 ```
 
 ### **模块导入**
 
-```glsl
+```wgsl
 import ModuleA;
 import ::C1;
 ```

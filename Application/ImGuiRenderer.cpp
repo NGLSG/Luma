@@ -172,6 +172,18 @@ void ImGuiRenderer::ProcessEvent(const SDL_Event& event)
 void ImGuiRenderer::ApplyEditorStyle()
 {
     ImGuiStyle& style = ImGui::GetStyle();
+    
+#if defined(SDL_PLATFORM_ANDROID) || defined(__ANDROID__)
+    float touchScale = 1.5f;
+    style.WindowPadding = ImVec2(12.0f * touchScale, 12.0f * touchScale);
+    style.FramePadding = ImVec2(8.0f * touchScale, 6.0f * touchScale);
+    style.CellPadding = ImVec2(6.0f * touchScale, 4.0f * touchScale);
+    style.ItemSpacing = ImVec2(8.0f * touchScale, 6.0f * touchScale);
+    style.ItemInnerSpacing = ImVec2(6.0f * touchScale, 6.0f * touchScale);
+    style.ScrollbarSize = 20.0f * touchScale;
+    style.GrabMinSize = 16.0f * touchScale;
+    style.TouchExtraPadding = ImVec2(8.0f, 8.0f); // 触摸额外边距
+#else
     style.WindowPadding = ImVec2(8.0f, 8.0f);
     style.FramePadding = ImVec2(6.0f, 4.0f);
     style.CellPadding = ImVec2(4.0f, 2.0f);
@@ -179,6 +191,7 @@ void ImGuiRenderer::ApplyEditorStyle()
     style.ItemInnerSpacing = ImVec2(4.0f, 4.0f);
     style.ScrollbarSize = 12.0f;
     style.GrabMinSize = 10.0f;
+#endif
     style.WindowBorderSize = 1.0f;
     style.ChildBorderSize = 1.0f;
     style.PopupBorderSize = 1.0f;
