@@ -7,6 +7,7 @@
 #include "../Utils/Guid.h"
 #include <string>
 #include <filesystem>
+#include <vector>
 #include <yaml-cpp/yaml.h>
 
 /**
@@ -103,10 +104,21 @@ struct AssetMetadata
     std::string fileHash; ///< 资产文件的哈希值。
     std::filesystem::path assetPath; ///< 资产在文件系统中的路径。
     AssetType type = AssetType::Unknown; ///< 资产的类型。
+    std::string addressName; ///< 资产的地址名称。
+    std::vector<std::string> groupNames; ///< 资产所属的组名称列表。
 
 
     YAML::Node importerSettings; ///< 资产导入器设置。
 };
+
+inline std::string GetAssetAddressKey(const AssetMetadata& metadata)
+{
+    if (!metadata.addressName.empty())
+    {
+        return metadata.addressName;
+    }
+    return metadata.assetPath.generic_string();
+}
 
 namespace YAML
 {
@@ -164,6 +176,9 @@ namespace YAML
 
             node["assetType"] = AssetTypeToString(metadata.type);
 
+            node["addressName"] = metadata.addressName;
+            node["groupNames"] = metadata.groupNames;
+
             if (metadata.importerSettings.IsDefined() && !metadata.importerSettings.IsNull())
             {
                 node["importerSettings"] = metadata.importerSettings;
@@ -186,7 +201,11 @@ namespace YAML
             metadata.fileHash = node["fileHash"].as<std::string>("");
             metadata.assetPath = std::filesystem::path(node["assetPath"].as<std::string>(""));
             metadata.type = StringToAssetType(node["assetType"].as<std::string>("Unknown"));
-
+            metadata.addressName = node["addressName"].as<std::string>("");
+            if (node["groupNames"] && node["groupNames"].IsSequence())
+            {
+                metadata.groupNames = node["groupNames"].as<std::vector<std::string>>();
+            }
             if (node["importerSettings"])
             {
                 metadata.importerSettings = node["importerSettings"];

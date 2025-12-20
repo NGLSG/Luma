@@ -2134,6 +2134,30 @@ LUMA_API Guid_CAPI LoadAsset(const char* assetPath)
     return Guid_CAPI{0};
 }
 
+LUMA_API Guid_CAPI AssetManager_GetGuidByAddress(const char* address)
+{
+    if (!address) return Guid_CAPI{0};
+
+    auto guid = AssetManager::GetInstance().GetGuidByAddress(address);
+    if (guid.Valid())
+    {
+        return ToGuidCAPI(guid);
+    }
+    return Guid_CAPI{0};
+}
+
+LUMA_API Guid_CAPI AssetManager_LoadAssetByAddress(const char* address)
+{
+    if (!address) return Guid_CAPI{0};
+
+    auto guid = AssetManager::GetInstance().LoadAssetByAddress(address);
+    if (guid.Valid())
+    {
+        return ToGuidCAPI(guid);
+    }
+    return Guid_CAPI{0};
+}
+
 LUMA_API const char* PathUtils_GetExecutableDir()
 {
     static std::string path = PathUtils::GetExecutableDir().string();

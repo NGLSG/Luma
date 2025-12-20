@@ -1831,6 +1831,20 @@ LUMA_API void AssetManager_GetPreloadProgress(int* outTotalCount, int* outLoaded
  */
 LUMA_API Guid_CAPI LoadAsset(const char* assetPath);
 
+/**
+ * @brief 根据 Addressable 地址获取资源 GUID。
+ * @param[in] address Addressable 地址。
+ * @return 资源的 GUID。
+ */
+LUMA_API Guid_CAPI AssetManager_GetGuidByAddress(const char* address);
+
+/**
+ * @brief 根据 Addressable 地址加载资源并返回 GUID。
+ * @param[in] address Addressable 地址。
+ * @return 资源的 GUID。
+ */
+LUMA_API Guid_CAPI AssetManager_LoadAssetByAddress(const char* address);
+
 // =============================================================================
 // 路径工具 API
 // =============================================================================

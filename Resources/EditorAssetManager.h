@@ -100,6 +100,20 @@ public:
     const std::filesystem::path& GetAssetsRootPath() const override;
 
     /**
+     * @brief 根据 Addressable 地址获取资产 GUID
+     * @param address Addressable 地址
+     * @return 资产 GUID
+     */
+    Guid GetGuidByAddress(const std::string& address) const override;
+
+    /**
+     * @brief 根据分组名获取资产 GUID 列表
+     * @param group 分组名称
+     * @return GUID 列表
+     */
+    std::vector<Guid> GetGuidsByGroup(const std::string& group) const override;
+
+    /**
      * @brief 重新导入指定的资产。
      * @param metadata 需要重新导入的资产的元数据。
      */

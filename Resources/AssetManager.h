@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <unordered_map>
 #include <memory>
+#include <vector>
 
 #include "IAssetManager.h"
 #include "../Utils/LazySingleton.h"
@@ -86,6 +87,20 @@ public:
      * @return 资产根目录路径的常量引用。
      */
     const std::filesystem::path& GetAssetsRootPath() const;
+
+    /**
+     * @brief 根据 Addressable 地址获取资产 GUID
+     * @param address Addressable 地址
+     * @return 资产 GUID
+     */
+    Guid GetGuidByAddress(const std::string& address) const;
+
+    /**
+     * @brief 根据分组名获取资产 GUID 列表
+     * @param group 分组名称
+     * @return GUID 列表
+     */
+    std::vector<Guid> GetGuidsByGroup(const std::string& group) const;
     /**
      * @brief 重新导入指定的资产。
      *
@@ -140,6 +155,13 @@ public:
      * @return 资产的GUID
      */
     Guid LoadAsset(const std::filesystem::path& assetPath);
+
+    /**
+     * @brief 根据 Addressable 地址加载资产并返回 GUID
+     * @param address Addressable 地址
+     * @return 资产 GUID
+     */
+    Guid LoadAssetByAddress(const std::string& address);
 
     /**
      * @brief 启动 shader 预热

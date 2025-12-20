@@ -611,6 +611,12 @@ internal static class Native
     [DllImport(DllName)]
     internal static extern Guid AssetManager_LoadAsset(string path);
 
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern Guid AssetManager_GetGuidByAddress(string address);
+
+    [DllImport(DllName, CharSet = CharSet.Ansi)]
+    internal static extern Guid AssetManager_LoadAssetByAddress(string address);
+
     [DllImport(DllName)]
     internal static extern IntPtr PathUtils_GetExecutableDir();
 

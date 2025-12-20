@@ -1,16 +1,109 @@
 #include "AssetInspectorPanel.h"
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "imgui_stdlib.h"
 #include "AssetImporterRegistry.h"
 #include "Resources/AssetManager.h"
 #include "Utils/Logger.h"
 #include "Profiler.h"
 #include <fstream>
 #include <any>
+#include <cctype>
+#include <algorithm>
+#include <unordered_set>
 #include "Resources/RuntimeAsset/RuntimeScene.h"
 #include "Editor.h"
 #include "TextureSlicerPanel.h"
 #include "ShaderEditorPanel.h"
+
+namespace
+{
+    std::string TrimString(const std::string& value)
+    {
+        size_t start = 0;
+        while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start])))
+        {
+            ++start;
+        }
+
+        size_t end = value.size();
+        while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1])))
+        {
+            --end;
+        }
+
+        return value.substr(start, end - start);
+    }
+
+    std::vector<std::string> ParseGroupNames(const std::string& input)
+    {
+        std::vector<std::string> groups;
+        std::unordered_set<std::string> seen;
+        std::string token;
+
+        auto flushToken = [&]()
+        {
+            std::string trimmed = TrimString(token);
+            if (!trimmed.empty() && seen.insert(trimmed).second)
+            {
+                groups.push_back(trimmed);
+            }
+            token.clear();
+        };
+
+        for (char ch : input)
+        {
+            if (ch == ',' || ch == ';' || ch == '\n')
+            {
+                flushToken();
+            }
+            else
+            {
+                token.push_back(ch);
+            }
+        }
+        flushToken();
+
+        return groups;
+    }
+
+    std::string JoinGroupNames(const std::vector<std::string>& groups)
+    {
+        std::string result;
+        bool first = true;
+        for (const auto& entry : groups)
+        {
+            std::string trimmed = TrimString(entry);
+            if (trimmed.empty())
+            {
+                continue;
+            }
+            if (!first)
+            {
+                result += ", ";
+            }
+            result += trimmed;
+            first = false;
+        }
+        return result;
+    }
+
+    std::vector<std::string> NormalizeGroupNames(const std::vector<std::string>& groups)
+    {
+        std::vector<std::string> output;
+        std::unordered_set<std::string> seen;
+        for (const auto& entry : groups)
+        {
+            std::string trimmed = TrimString(entry);
+            if (!trimmed.empty() && seen.insert(trimmed).second)
+            {
+                output.push_back(trimmed);
+            }
+        }
+        std::sort(output.begin(), output.end());
+        return output;
+    }
+}
 void AssetInspectorPanel::Initialize(EditorContext* context)
 {
     m_context = context;
@@ -49,6 +142,12 @@ void AssetInspectorPanel::Shutdown()
     m_isDeserialized = false;
     m_mixedValueProperties.clear();
     m_dirtyProperties.clear();
+    m_addressName.clear();
+    m_groupNamesInput.clear();
+    m_addressMixed = false;
+    m_groupMixed = false;
+    m_addressDirty = false;
+    m_groupDirty = false;
 }
 void AssetInspectorPanel::resetStateFromSelection()
 {
@@ -58,6 +157,12 @@ void AssetInspectorPanel::resetStateFromSelection()
     m_isDeserialized = false;
     m_mixedValueProperties.clear();
     m_dirtyProperties.clear();
+    m_addressName.clear();
+    m_groupNamesInput.clear();
+    m_addressMixed = false;
+    m_groupMixed = false;
+    m_addressDirty = false;
+    m_groupDirty = false;
     m_editingAssetType = AssetType::Unknown;
     if (m_currentEditingPaths.empty()) return;
     const AssetMetadata* firstMetadata = nullptr;
@@ -71,6 +176,9 @@ void AssetInspectorPanel::resetStateFromSelection()
         return;
     }
     m_editingAssetType = firstMetadata->type;
+    m_addressName = firstMetadata->addressName;
+    m_groupNamesInput = JoinGroupNames(firstMetadata->groupNames);
+    const auto normalizedFirstGroups = NormalizeGroupNames(firstMetadata->groupNames);
     {
         PROFILE_SCOPE("AssetInspectorPanel::ValidateMultiSelection");
         for (size_t i = 1; i < m_currentEditingPaths.size(); ++i)
@@ -82,6 +190,14 @@ void AssetInspectorPanel::resetStateFromSelection()
                 m_deserializedSettings.reset();
                 m_isDeserialized = false;
                 return;
+            }
+            if (metadata->addressName != m_addressName)
+            {
+                m_addressMixed = true;
+            }
+            if (NormalizeGroupNames(metadata->groupNames) != normalizedFirstGroups)
+            {
+                m_groupMixed = true;
             }
         }
     }
@@ -155,29 +271,72 @@ void AssetInspectorPanel::drawInspectorUI()
         }
         ImGui::Separator();
     }
+
+    {
+        PROFILE_SCOPE("AssetInspectorPanel::DrawAddressables");
+        ImGui::Text("Addressable");
+        ImGui::Separator();
+
+        ImGui::PushItemWidth(-1);
+        if (m_addressMixed)
+        {
+            ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, true);
+        }
+        ImGui::Text("地址");
+        if (ImGui::InputTextWithHint("##AssetAddress", "默认使用资产路径", &m_addressName))
+        {
+            m_addressDirty = true;
+            m_addressMixed = false;
+        }
+        if (m_addressMixed)
+        {
+            ImGui::PopItemFlag();
+        }
+
+        if (m_groupMixed)
+        {
+            ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, true);
+        }
+        ImGui::Text("分组");
+        if (ImGui::InputTextWithHint("##AssetGroups", "用逗号分隔多个分组", &m_groupNamesInput))
+        {
+            m_groupDirty = true;
+            m_groupMixed = false;
+        }
+        if (m_groupMixed)
+        {
+            ImGui::PopItemFlag();
+        }
+        ImGui::PopItemWidth();
+        ImGui::Spacing();
+    }
     const auto* registration = AssetImporterRegistry::GetInstance().Get(m_editingAssetType);
-    if (!registration || !m_isDeserialized || !registration->GetDataPointer)
+    const bool canEditImporterSettings = registration && m_isDeserialized && registration->GetDataPointer;
+    void* dataPtr = nullptr;
+    if (!canEditImporterSettings)
     {
         ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "无法编辑的资产 (未注册或反序列化失败)");
-        return;
     }
-    void* dataPtr = nullptr;
-    try
+    else
     {
-        dataPtr = registration->GetDataPointer(m_deserializedSettings);
+        try
+        {
+            dataPtr = registration->GetDataPointer(m_deserializedSettings);
+        }
+        catch (const std::exception& e)
+        {
+            LogError("获取数据指针失败: {}", e.what());
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "获取数据指针失败 (std::any_cast 异常)");
+            dataPtr = nullptr;
+        }
+
+        if (!dataPtr)
+        {
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "内部错误: 数据指针为空。");
+        }
     }
-    catch (const std::exception& e)
-    {
-        LogError("获取数据指针失败: {}", e.what());
-        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "获取数据指针失败 (std::any_cast 异常)");
-        return;
-    }
-    if (!dataPtr)
-    {
-        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "内部错误: 数据指针为空。");
-        return;
-    }
-    bool any_property_changed = false;
+
+    if (dataPtr)
     {
         PROFILE_SCOPE("AssetInspectorPanel::DrawProperties");
         for (const auto& [name, prop] : registration->properties)
@@ -202,7 +361,6 @@ void AssetInspectorPanel::drawInspectorUI()
                 }
                 if (changed)
                 {
-                    any_property_changed = true;
                     m_dirtyProperties.insert(name);
                     if (isMixed)
                     {
@@ -236,7 +394,7 @@ void AssetInspectorPanel::drawInspectorUI()
     }
     {
         PROFILE_SCOPE("AssetInspectorPanel::DrawActionButtons");
-        if (!m_dirtyProperties.empty())
+        if (!m_dirtyProperties.empty() || m_addressDirty || m_groupDirty)
         {
             if (ImGui::Button("应用"))
             {
@@ -253,25 +411,43 @@ void AssetInspectorPanel::drawInspectorUI()
 void AssetInspectorPanel::applyChanges()
 {
     PROFILE_FUNCTION();
-    if (m_currentEditingPaths.empty() || m_dirtyProperties.empty()) return;
+    if (m_currentEditingPaths.empty()) return;
+
+    const bool hasImporterChanges = !m_dirtyProperties.empty();
+    const bool hasAddressChanges = m_addressDirty || m_groupDirty;
+    if (!hasImporterChanges && !hasAddressChanges) return;
+
     const auto* registration = AssetImporterRegistry::GetInstance().Get(m_editingAssetType);
-    if (!registration || !m_isDeserialized || !registration->Serialize)
+    if (hasImporterChanges && (!registration || !m_isDeserialized || !registration->Serialize))
     {
         LogError("应用更改失败：找不到注册或序列化函数。");
         return;
     }
+
     YAML::Node newSettingsBase;
-    try
+    if (hasImporterChanges)
     {
-        PROFILE_SCOPE("AssetInspectorPanel::SerializeSettings");
-        newSettingsBase = registration->Serialize(m_deserializedSettings);
+        try
+        {
+            PROFILE_SCOPE("AssetInspectorPanel::SerializeSettings");
+            newSettingsBase = registration->Serialize(m_deserializedSettings);
+        }
+        catch (const std::exception& e)
+        {
+            LogError("序列化资产设置失败: {}", e.what());
+            return;
+        }
     }
-    catch (const std::exception& e)
-    {
-        LogError("序列化资产设置失败: {}", e.what());
-        return;
-    }
-    LogInfo("正在为 %zu 个资产应用 %zu 项设置更改...", m_currentEditingPaths.size(), m_dirtyProperties.size());
+
+    const std::string resolvedAddress = m_addressDirty ? TrimString(m_addressName) : std::string{};
+    const std::vector<std::string> resolvedGroups = m_groupDirty ? ParseGroupNames(m_groupNamesInput)
+                                                                  : std::vector<std::string>{};
+
+    LogInfo("正在为 %zu 个资产应用 %zu 项设置更改...",
+            m_currentEditingPaths.size(),
+            m_dirtyProperties.size()
+            + (m_addressDirty ? 1 : 0)
+            + (m_groupDirty ? 1 : 0));
     for (const auto& assetPath : m_currentEditingPaths)
     {
         PROFILE_SCOPE("AssetInspectorPanel::ApplySingleAsset");
@@ -281,32 +457,63 @@ void AssetInspectorPanel::applyChanges()
             LogWarn("找不到资产 {} 的元数据，跳过保存。", assetPath.string());
             continue;
         }
-        YAML::Node finalSettings = originalMetadata->importerSettings;
-        for (const std::string& propName : m_dirtyProperties)
+        AssetMetadata updatedMeta = *originalMetadata;
+        if (m_addressDirty)
         {
-            if (newSettingsBase[propName])
+            updatedMeta.addressName = resolvedAddress;
+        }
+        if (m_groupDirty)
+        {
+            updatedMeta.groupNames = resolvedGroups;
+        }
+
+        YAML::Node finalSettings = originalMetadata->importerSettings;
+        if (hasImporterChanges)
+        {
+            for (const std::string& propName : m_dirtyProperties)
             {
-                finalSettings[propName] = newSettingsBase[propName];
+                if (newSettingsBase[propName])
+                {
+                    finalSettings[propName] = newSettingsBase[propName];
+                }
             }
         }
-        saveMetadataToFile(*originalMetadata, finalSettings);
-        EventBus::GetInstance().Publish(AssetUpdatedEvent{originalMetadata->type, originalMetadata->guid});
+
+        saveMetadataToFile(updatedMeta, finalSettings, hasImporterChanges);
+        EventBus::GetInstance().Publish(AssetUpdatedEvent{updatedMeta.type, updatedMeta.guid});
     }
     m_dirtyProperties.clear();
+    if (m_addressDirty)
+    {
+        m_addressName = TrimString(m_addressName);
+    }
+    if (m_groupDirty)
+    {
+        m_groupNamesInput = JoinGroupNames(ParseGroupNames(m_groupNamesInput));
+    }
+    m_addressDirty = false;
+    m_groupDirty = false;
+    m_addressMixed = false;
+    m_groupMixed = false;
 }
-void AssetInspectorPanel::saveMetadataToFile(const AssetMetadata& originalMetadata, const YAML::Node& newSettings)
+void AssetInspectorPanel::saveMetadataToFile(const AssetMetadata& updatedMetadata, const YAML::Node& newSettings,
+                                             bool writeAssetFile)
 {
     PROFILE_FUNCTION();
-    AssetMetadata updatedMeta = originalMetadata;
+    AssetMetadata updatedMeta = updatedMetadata;
     updatedMeta.importerSettings = newSettings;
-    std::fstream file(AssetManager::GetInstance().GetAssetsRootPath() / updatedMeta.assetPath, std::ios::out);
-    if (!file.is_open())
+
+    if (writeAssetFile)
     {
-        LogError("无法保存资产元数据到文件: {}", updatedMeta.assetPath.string());
-        return;
+        std::fstream file(AssetManager::GetInstance().GetAssetsRootPath() / updatedMeta.assetPath, std::ios::out);
+        if (!file.is_open())
+        {
+            LogError("无法保存资产元数据到文件: {}", updatedMeta.assetPath.string());
+            return;
+        }
+        file << YAML::Dump(newSettings);
+        file.close();
     }
-    file<< YAML::Dump(newSettings);
-    file.close();
     AssetManager::GetInstance().ReImport(updatedMeta);
 }
 void AssetInspectorPanel::openTextureSlicer()

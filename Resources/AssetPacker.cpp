@@ -11,6 +11,61 @@
 #include <vector>
 #include <nlohmann/json.hpp>
 #include <mutex>
+#include <algorithm>
+#include <unordered_set>
+
+namespace
+{
+    constexpr const char* kAddressablesIndexFileName = "package.addressables";
+
+    std::string NormalizeAddress(const std::string& address)
+    {
+        std::string normalized = address;
+        std::replace(normalized.begin(), normalized.end(), '\\', '/');
+        return normalized;
+    }
+
+    AddressablesIndex BuildAddressablesIndex(const std::unordered_map<std::string, AssetMetadata>& assetDatabase)
+    {
+        AddressablesIndex index;
+        for (const auto& [guidStr, metadata] : assetDatabase)
+        {
+            std::string addressKey = NormalizeAddress(GetAssetAddressKey(metadata));
+            if (addressKey.empty())
+            {
+                continue;
+            }
+
+            Guid guid = metadata.guid.Valid() ? metadata.guid : Guid::FromString(guidStr);
+            auto [it, inserted] = index.addressToGuid.emplace(addressKey, guid);
+            if (!inserted && it->second != guid)
+            {
+                LogWarn("AssetPacker: Addressable冲突 '{}' => {} (已存在: {})",
+                        addressKey, guid.ToString(), it->second.ToString());
+            }
+
+            if (!metadata.groupNames.empty())
+            {
+                std::unordered_set<std::string> uniqueGroups(metadata.groupNames.begin(),
+                                                             metadata.groupNames.end());
+                for (const auto& groupName : uniqueGroups)
+                {
+                    if (groupName.empty())
+                    {
+                        continue;
+                    }
+
+                    auto& list = index.groupToGuids[groupName];
+                    if (std::find(list.begin(), list.end(), guid) == list.end())
+                    {
+                        list.push_back(guid);
+                    }
+                }
+            }
+        }
+        return index;
+    }
+}
 
 void to_json(nlohmann::json& j, const AssetMetadata& meta)
 {
@@ -18,7 +73,9 @@ void to_json(nlohmann::json& j, const AssetMetadata& meta)
         {"guid", meta.guid.ToString()},
         {"fileHash", meta.fileHash},
         {"assetPath", meta.assetPath.string()},
-        {"type", static_cast<int>(meta.type)}
+        {"type", static_cast<int>(meta.type)},
+        {"addressName", meta.addressName},
+        {"groupNames", meta.groupNames}
     };
 
     
@@ -55,6 +112,14 @@ void from_json(const nlohmann::json& j, AssetMetadata& meta)
     meta.fileHash = j.at("fileHash").get<std::string>();
     meta.assetPath = j.at("assetPath").get<std::string>();
     meta.type = static_cast<AssetType>(j.at("type").get<int>());
+    if (j.contains("addressName") && j.at("addressName").is_string())
+    {
+        meta.addressName = j.at("addressName").get<std::string>();
+    }
+    if (j.contains("groupNames") && j.at("groupNames").is_array())
+    {
+        meta.groupNames = j.at("groupNames").get<std::vector<std::string>>();
+    }
 
     
     if (j.contains("importerSettings"))
@@ -209,12 +274,61 @@ bool AssetPacker::Pack(const std::unordered_map<std::string, AssetMetadata>& ass
             manifestFile << name << std::endl;
         }
 
+        if (!SaveAddressablesIndex(assetDatabase, outputPath))
+        {
+            LogWarn("AssetPacker: Addressables 索引写入失败");
+        }
+
         LogInfo("AssetPacker: 打包完成,已创建 {} 个数据块", chunkFileNames.size());
         return true;
     }
     catch (const std::exception& e)
     {
         LogError("AssetPacker: 打包失败,原因: {}", e.what());
+        return false;
+    }
+}
+
+bool AssetPacker::SaveAddressablesIndex(const std::unordered_map<std::string, AssetMetadata>& assetDatabase,
+                                        const std::filesystem::path& outputPath)
+{
+    try
+    {
+        auto index = BuildAddressablesIndex(assetDatabase);
+
+        nlohmann::json rootJson = nlohmann::json::object();
+        rootJson["addresses"] = nlohmann::json::object();
+        rootJson["groups"] = nlohmann::json::object();
+
+        for (const auto& [address, guid] : index.addressToGuid)
+        {
+            rootJson["addresses"][address] = guid.ToString();
+        }
+
+        for (const auto& [group, guidList] : index.groupToGuids)
+        {
+            std::vector<std::string> guidStrings;
+            guidStrings.reserve(guidList.size());
+            for (const auto& guid : guidList)
+            {
+                guidStrings.push_back(guid.ToString());
+            }
+            rootJson["groups"][group] = std::move(guidStrings);
+        }
+
+        std::vector<uint8_t> indexData = nlohmann::json::to_msgpack(rootJson);
+        std::vector<unsigned char> packageData(indexData.begin(), indexData.end());
+        auto encryptedIndex = EngineCrypto::GetInstance().Encrypt(packageData);
+
+        Path::WriteAllBytes((outputPath / kAddressablesIndexFileName).string(), encryptedIndex);
+
+        LogInfo("AssetPacker: Addressables 索引写入完成, 地址数量: {}, 分组数量: {}",
+                index.addressToGuid.size(), index.groupToGuids.size());
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        LogError("AssetPacker: 写入 Addressables 索引失败: {}", e.what());
         return false;
     }
 }
@@ -331,6 +445,88 @@ std::unordered_map<std::string, AssetIndexEntry> AssetPacker::LoadIndex(const st
     {
         LogError("AssetPacker: 索引加载失败: {}", e.what());
         throw;
+    }
+}
+
+bool AssetPacker::TryLoadAddressablesIndex(const std::filesystem::path& packageManifestPath, AddressablesIndex& outIndex)
+{
+    try
+    {
+        const std::filesystem::path parentPath = packageManifestPath.parent_path();
+        const std::filesystem::path indexPath = parentPath / kAddressablesIndexFileName;
+        if (!std::filesystem::exists(indexPath))
+        {
+            return false;
+        }
+
+        auto encryptedIndex = Path::ReadAllBytes(Path::GetFullPath(indexPath.string()));
+        auto decryptedIndex = EngineCrypto::GetInstance().Decrypt(encryptedIndex);
+        std::vector<uint8_t> indexData(decryptedIndex.begin(), decryptedIndex.end());
+        nlohmann::json rootJson = nlohmann::json::from_msgpack(indexData);
+
+        if (!rootJson.is_object())
+        {
+            LogWarn("AssetPacker: Addressables 索引格式无效");
+            return false;
+        }
+
+        outIndex.addressToGuid.clear();
+        outIndex.groupToGuids.clear();
+
+        if (rootJson.contains("addresses") && rootJson["addresses"].is_object())
+        {
+            for (auto it = rootJson["addresses"].begin(); it != rootJson["addresses"].end(); ++it)
+            {
+                if (!it.value().is_string())
+                {
+                    continue;
+                }
+                std::string guidStr = it.value().get<std::string>();
+                if (guidStr.empty())
+                {
+                    continue;
+                }
+                outIndex.addressToGuid[NormalizeAddress(it.key())] = Guid::FromString(guidStr);
+            }
+        }
+
+        if (rootJson.contains("groups") && rootJson["groups"].is_object())
+        {
+            for (auto it = rootJson["groups"].begin(); it != rootJson["groups"].end(); ++it)
+            {
+                if (!it.value().is_array())
+                {
+                    continue;
+                }
+                std::vector<Guid> guids;
+                for (const auto& entry : it.value())
+                {
+                    if (!entry.is_string())
+                    {
+                        continue;
+                    }
+                    std::string guidStr = entry.get<std::string>();
+                    if (guidStr.empty())
+                    {
+                        continue;
+                    }
+                    guids.push_back(Guid::FromString(guidStr));
+                }
+                if (!guids.empty())
+                {
+                    outIndex.groupToGuids[it.key()] = std::move(guids);
+                }
+            }
+        }
+
+        LogInfo("AssetPacker: Addressables 索引加载完成, 地址数量: {}, 分组数量: {}",
+                outIndex.addressToGuid.size(), outIndex.groupToGuids.size());
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        LogError("AssetPacker: Addressables 索引加载失败: {}", e.what());
+        return false;
     }
 }
 

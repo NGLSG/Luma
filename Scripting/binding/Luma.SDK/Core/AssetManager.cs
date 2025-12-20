@@ -44,4 +44,14 @@ public static class AssetManager
     {
         return Native.AssetManager_LoadAsset(path);
     }
+
+    public static Guid GetGuidByAddress(string address)
+    {
+        return Native.AssetManager_GetGuidByAddress(address);
+    }
+
+    public static Guid LoadAssetByAddress(string address)
+    {
+        return Native.AssetManager_LoadAssetByAddress(address);
+    }
 }

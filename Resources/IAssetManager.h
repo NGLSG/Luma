@@ -13,6 +13,7 @@
 #include <optional>
 #include <future>
 #include <functional>
+#include <vector>
 
 /**
  * @brief 资产管理器接口。
@@ -61,6 +62,20 @@ public:
      * @return 资产根目录路径的常量引用。
      */
     virtual const std::filesystem::path& GetAssetsRootPath() const = 0;
+
+    /**
+     * @brief 根据 Addressable 地址获取资产的 GUID
+     * @param address Addressable 地址
+     * @return 资产的 GUID，如果未找到则为无效 GUID
+     */
+    virtual Guid GetGuidByAddress(const std::string& address) const = 0;
+
+    /**
+     * @brief 根据分组名获取资产 GUID 列表
+     * @param group 分组名称
+     * @return GUID 列表
+     */
+    virtual std::vector<Guid> GetGuidsByGroup(const std::string& group) const = 0;
 
     /**
      * @brief 更新资产管理器的内部状态。
@@ -169,5 +184,15 @@ public:
     }
 
     virtual Guid LoadAsset(const std::filesystem::path& assetPath) =0;
+
+    /**
+     * @brief 根据 Addressable 地址加载资产并返回 GUID
+     * @param address Addressable 地址
+     * @return 资产的 GUID
+     */
+    virtual Guid LoadAssetByAddress(const std::string& address)
+    {
+        return GetGuidByAddress(address);
+    }
 };
 #endif

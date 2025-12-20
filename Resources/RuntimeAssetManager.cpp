@@ -23,6 +23,16 @@
 #include "Importers/RuleTileImporter.h"
 #include "Importers/ShaderImporter.h"
 
+namespace
+{
+    std::string NormalizeAddress(const std::string& address)
+    {
+        std::string normalized = address;
+        std::replace(normalized.begin(), normalized.end(), '\\', '/');
+        return normalized;
+    }
+}
+
 RuntimeAssetManager::RuntimeAssetManager(const std::filesystem::path& packageManifestPath)
     : m_packageManifestPath(packageManifestPath)
       , m_preloadRunning(false)
@@ -50,6 +60,18 @@ RuntimeAssetManager::RuntimeAssetManager(const std::filesystem::path& packageMan
         }
 
         LogInfo("RuntimeAssetManager: 已加载 {} 个资产的索引", m_assetIndex.size());
+
+        AddressablesIndex addressables{};
+        if (AssetPacker::TryLoadAddressablesIndex(packageManifestPath, addressables))
+        {
+            m_addressToGuid = std::move(addressables.addressToGuid);
+            m_groupToGuids = std::move(addressables.groupToGuids);
+            m_hasAddressables = true;
+        }
+        else
+        {
+            LogWarn("RuntimeAssetManager: 未找到 Addressables 索引");
+        }
     }
     catch (const std::exception& e)
     {
@@ -150,6 +172,37 @@ const std::unordered_map<std::string, AssetMetadata>& RuntimeAssetManager::GetAs
 const std::filesystem::path& RuntimeAssetManager::GetAssetsRootPath() const
 {
     return m_dummyPath;
+}
+
+Guid RuntimeAssetManager::GetGuidByAddress(const std::string& address) const
+{
+    if (!m_hasAddressables || address.empty())
+    {
+        return Guid::Invalid();
+    }
+
+    std::string key = NormalizeAddress(address);
+    auto it = m_addressToGuid.find(key);
+    if (it != m_addressToGuid.end())
+    {
+        return it->second;
+    }
+    return Guid::Invalid();
+}
+
+std::vector<Guid> RuntimeAssetManager::GetGuidsByGroup(const std::string& group) const
+{
+    if (!m_hasAddressables || group.empty())
+    {
+        return {};
+    }
+
+    auto it = m_groupToGuids.find(group);
+    if (it != m_groupToGuids.end())
+    {
+        return it->second;
+    }
+    return {};
 }
 
 bool RuntimeAssetManager::StartPreload()
@@ -286,6 +339,16 @@ Guid RuntimeAssetManager::LoadAsset(const std::filesystem::path& assetPath)
         LogError("RuntimeAssetManager: 加载资产失败 {}: {}", assetPath.string(), e.what());
         return Guid::Invalid();
     }
+}
+
+Guid RuntimeAssetManager::LoadAssetByAddress(const std::string& address)
+{
+    Guid guid = GetGuidByAddress(address);
+    if (guid.Valid())
+    {
+        GetMetadata(guid);
+    }
+    return guid;
 }
 
 const AssetMetadata* RuntimeAssetManager::lazyLoadMetadata(const std::string& guid) const

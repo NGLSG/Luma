@@ -55,6 +55,24 @@ const std::filesystem::path& AssetManager::GetAssetsRootPath() const
     return emptyPath;
 }
 
+Guid AssetManager::GetGuidByAddress(const std::string& address) const
+{
+    if (m_implementation)
+    {
+        return m_implementation->GetGuidByAddress(address);
+    }
+    return Guid::Invalid();
+}
+
+std::vector<Guid> AssetManager::GetGuidsByGroup(const std::string& group) const
+{
+    if (m_implementation)
+    {
+        return m_implementation->GetGuidsByGroup(group);
+    }
+    return {};
+}
+
 const void AssetManager::ReImport(const AssetMetadata& metadata)
 {
     if (m_implementation) m_implementation->ReImport(metadata);
@@ -129,6 +147,15 @@ Guid AssetManager::LoadAsset(const std::filesystem::path& assetPath)
     if (m_implementation)
     {
         return m_implementation->LoadAsset(assetPath);
+    }
+    return Guid::Invalid();
+}
+
+Guid AssetManager::LoadAssetByAddress(const std::string& address)
+{
+    if (m_implementation)
+    {
+        return m_implementation->LoadAssetByAddress(address);
     }
     return Guid::Invalid();
 }

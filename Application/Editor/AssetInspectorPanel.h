@@ -22,7 +22,7 @@ private:
     void resetStateFromSelection();
     void drawInspectorUI();
     void applyChanges();
-    void saveMetadataToFile(const AssetMetadata& originalMetadata, const YAML::Node& newSettings);
+    void saveMetadataToFile(const AssetMetadata& updatedMetadata, const YAML::Node& newSettings, bool writeAssetFile);
     void openTextureSlicer();
     void openShaderEditor();
 private:
@@ -32,4 +32,10 @@ private:
     bool m_isDeserialized = false;
     std::set<std::string> m_mixedValueProperties;
     std::set<std::string> m_dirtyProperties;
+    std::string m_addressName;
+    std::string m_groupNamesInput;
+    bool m_addressMixed = false;
+    bool m_groupMixed = false;
+    bool m_addressDirty = false;
+    bool m_groupDirty = false;
 };

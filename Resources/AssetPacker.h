@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include "../Utils/Guid.h"
 #include "../Resources/AssetMetadata.h"
 
 /**
@@ -14,6 +15,15 @@ struct AssetIndexEntry
     std::string guid;           ///< 资产的全局唯一标识符
     size_t offset;              ///< 资产数据在文件中的偏移量
     size_t size;                ///< 资产数据的大小(字节)
+};
+
+/**
+ * @brief Addressables 索引,用于按地址或分组快速查找资产
+ */
+struct AddressablesIndex
+{
+    std::unordered_map<std::string, Guid> addressToGuid;
+    std::unordered_map<std::string, std::vector<Guid>> groupToGuids;
 };
 
 /**
@@ -63,7 +73,18 @@ public:
     static AssetMetadata LoadSingleAsset(const std::filesystem::path& packageManifestPath,
                                         const AssetIndexEntry& indexEntry);
 
+    /**
+     * @brief 读取 Addressables 索引
+     *
+     * @param packageManifestPath 包清单文件的路径
+     * @param outIndex 输出 Addressables 索引
+     * @return 如果索引存在且读取成功返回 true,否则返回 false
+     */
+    static bool TryLoadAddressablesIndex(const std::filesystem::path& packageManifestPath, AddressablesIndex& outIndex);
+
 private:
+    static bool SaveAddressablesIndex(const std::unordered_map<std::string, AssetMetadata>& assetDatabase,
+                                      const std::filesystem::path& outputPath);
     static std::vector<unsigned char> ReadChunkFile(const std::filesystem::path& chunkPath);
     static std::vector<unsigned char> LoadPackageData(const std::filesystem::path& packageManifestPath);
 };

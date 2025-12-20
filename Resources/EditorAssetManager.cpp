@@ -24,6 +24,16 @@
 #include "Importers/ShaderImporter.h"
 #include "../Renderer/Nut/ShaderRegistry.h"
 
+namespace
+{
+    std::string NormalizeAddress(const std::string& address)
+    {
+        std::string normalized = address;
+        std::replace(normalized.begin(), normalized.end(), '\\', '/');
+        return normalized;
+    }
+}
+
 EditorAssetManager::EditorAssetManager(const std::filesystem::path& projectRootPath)
 {
     RegisterImporters();
@@ -460,6 +470,54 @@ const std::unordered_map<std::string, AssetMetadata>& EditorAssetManager::GetAss
 const std::filesystem::path& EditorAssetManager::GetAssetsRootPath() const
 {
     return m_assetsRoot;
+}
+
+Guid EditorAssetManager::GetGuidByAddress(const std::string& address) const
+{
+    if (address.empty())
+    {
+        return Guid::Invalid();
+    }
+
+    std::string target = NormalizeAddress(address);
+    std::lock_guard<std::mutex> lock(m_dbMutex);
+    for (const auto& [guidStr, metadata] : m_guidToMeta)
+    {
+        std::string key = NormalizeAddress(GetAssetAddressKey(metadata));
+        if (key == target)
+        {
+            return metadata.guid.Valid() ? metadata.guid : Guid::FromString(guidStr);
+        }
+    }
+    return Guid::Invalid();
+}
+
+std::vector<Guid> EditorAssetManager::GetGuidsByGroup(const std::string& group) const
+{
+    std::vector<Guid> result;
+    if (group.empty())
+    {
+        return result;
+    }
+
+    std::lock_guard<std::mutex> lock(m_dbMutex);
+    for (const auto& [guidStr, metadata] : m_guidToMeta)
+    {
+        if (metadata.groupNames.empty())
+        {
+            continue;
+        }
+
+        if (std::find(metadata.groupNames.begin(), metadata.groupNames.end(), group) != metadata.groupNames.end())
+        {
+            Guid guid = metadata.guid.Valid() ? metadata.guid : Guid::FromString(guidStr);
+            if (guid.Valid())
+            {
+                result.push_back(guid);
+            }
+        }
+    }
+    return result;
 }
 
 void EditorAssetManager::ReImport(const AssetMetadata& metadata)

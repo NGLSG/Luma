@@ -67,6 +67,20 @@ public:
     const std::filesystem::path& GetAssetsRootPath() const override;
 
     /**
+     * @brief 根据 Addressable 地址获取资产 GUID
+     * @param address Addressable 地址
+     * @return 资产 GUID
+     */
+    Guid GetGuidByAddress(const std::string& address) const override;
+
+    /**
+     * @brief 根据分组名获取资产 GUID 列表
+     * @param group 分组名称
+     * @return GUID 列表
+     */
+    std::vector<Guid> GetGuidsByGroup(const std::string& group) const override;
+
+    /**
      * @brief 手动启动后台预加载
      * @return 如果成功启动返回 true，如果已在运行或已完成返回 false
      */
@@ -101,6 +115,13 @@ public:
      * @return 资产的GUID
      */
     Guid LoadAsset(const std::filesystem::path& assetPath) override;
+
+    /**
+     * @brief 根据 Addressable 地址加载资产并返回 GUID
+     * @param address Addressable 地址
+     * @return 资产 GUID
+     */
+    Guid LoadAssetByAddress(const std::string& address) override;
 
     /**
      * @brief 启动 shader 预热
@@ -180,6 +201,10 @@ private:
     std::atomic<int> m_preloadedCount; ///< 已预加载的资产数量
 
     std::vector<std::pair<std::string, AssetIndexEntry>> m_indexEntries; ///< 索引条目列表，用于分配任务
+
+    std::unordered_map<std::string, Guid> m_addressToGuid; ///< Addressable 地址映射
+    std::unordered_map<std::string, std::vector<Guid>> m_groupToGuids; ///< 分组映射
+    bool m_hasAddressables = false; ///< 是否加载了 Addressables 索引
 
     std::vector<std::unique_ptr<IAssetImporter>> m_importers; ///< 注册的资产导入器列表
 
