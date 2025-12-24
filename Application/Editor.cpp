@@ -80,6 +80,7 @@ static std::string ExecuteAndCapture(const std::string& command)
     }
     return result;
 }
+
 static void RecordLastEditingProject(const std::filesystem::path& projectPath)
 {
     std::fstream file("LastProject", std::ios::out);
@@ -93,6 +94,7 @@ static void RecordLastEditingProject(const std::filesystem::path& projectPath)
         LogWarn("无法记录最后编辑的项目路径。");
     }
 }
+
 static std::string GetLastEditingProject()
 {
     std::ifstream file("LastProject");
@@ -105,6 +107,7 @@ static std::string GetLastEditingProject()
     }
     return "";
 }
+
 static void SDLCALL OnProjectFileSelected(void* userdata, const char* const* filelist, int filter)
 {
     if (filelist && filelist[0])
@@ -113,6 +116,7 @@ static void SDLCALL OnProjectFileSelected(void* userdata, const char* const* fil
         editor->LoadProject(std::filesystem::path(filelist[0]));
     }
 }
+
 static void SDLCALL OnNewProjectFolderSelected(void* userdata, const char* const* filelist, int filter)
 {
     if (filelist && filelist[0])
@@ -121,6 +125,7 @@ static void SDLCALL OnNewProjectFolderSelected(void* userdata, const char* const
         editor->CreateNewProjectAtPath(std::filesystem::path(filelist[0]));
     }
 }
+
 static void SDLCALL OnNewPluginProjectFolderSelected(void* userdata, const char* const* filelist, int filter)
 {
     if (filelist && filelist[0])
@@ -129,6 +134,7 @@ static void SDLCALL OnNewPluginProjectFolderSelected(void* userdata, const char*
         editor->CreatePluginProjectAtPath(std::filesystem::path(filelist[0]));
     }
 }
+
 Editor::Editor(ApplicationConfig config) : ApplicationBase(config)
 {
     if (s_instance)
@@ -156,6 +162,7 @@ Editor::Editor(ApplicationConfig config) : ApplicationBase(config)
             SceneManager::GetInstance().PushUndoState(m_editorContext.activeScene);
     });
 }
+
 bool Editor::checkDotNetEnvironment()
 {
     LogInfo("正在检查 .NET 环境...");
@@ -184,7 +191,9 @@ bool Editor::checkDotNetEnvironment()
     LogInfo("已检测到.NET 9 SDK。环境检查通过。");
     return true;
 }
+
 Editor::~Editor() = default;
+
 void Editor::InitializeDerived()
 {
     initializeEditorContext();
@@ -227,15 +236,18 @@ void Editor::InitializeDerived()
     m_editorContext.lastFpsUpdateTime = std::chrono::steady_clock::now();
     m_editorContext.lastUpsUpdateTime = std::chrono::steady_clock::now();
 }
+
 void Editor::initializeEditorContext()
 {
     m_editorContext.engineContext = &m_context;
     m_editorContext.engineContext->graphicsBackend = m_graphicsBackend.get();
     m_editorContext.engineContext->renderSystem = m_renderSystem.get();
-    m_editorContext.engineContext->appMode = ApplicationMode::Editor;
+    CURRENT_MODE = ApplicationMode::Editor;
+    m_editorContext.engineContext->appMode = &CURRENT_MODE;
     m_editorContext.uiCallbacks = m_uiCallbacks.get();
     m_editorContext.editor = this;
 }
+
 void Editor::initializePanels()
 {
     m_panels.push_back(std::make_unique<ToolbarPanel>());
@@ -260,6 +272,7 @@ void Editor::initializePanels()
         panel->Initialize(&m_editorContext);
     }
 }
+
 void Editor::registerPopups()
 {
     auto& popupManager = PopupManager::GetInstance();
@@ -272,6 +285,7 @@ void Editor::registerPopups()
         this->drawFileConflictPopupContent();
     }, true, ImGuiWindowFlags_AlwaysAutoResize);
 }
+
 void Editor::loadStartupScene()
 {
     auto& settings = ProjectSettings::GetInstance();
@@ -311,6 +325,7 @@ void Editor::loadStartupScene()
         m_editorContext.selectionList = std::vector<Guid>();
     }
 }
+
 void Editor::Update(float fixedDeltaTime)
 {
     PROFILE_FUNCTION();
@@ -347,6 +362,7 @@ void Editor::Update(float fixedDeltaTime)
         SceneRenderer::ExtractToRenderableManager(m_editorContext.activeScene->GetRegistry());
     }
 }
+
 void Editor::Render()
 {
     PROFILE_FUNCTION();
@@ -411,6 +427,7 @@ void Editor::Render()
     }
     updateFps();
 }
+
 void Editor::ShutdownDerived()
 {
     PluginManager::GetInstance().Shutdown();
@@ -439,6 +456,7 @@ void Editor::ShutdownDerived()
     m_sceneRenderer.reset();
     m_uiCallbacks.reset();
 }
+
 void Editor::CreateNewProject()
 {
     if (m_editorContext.editorState != EditorState::Editing)
@@ -448,10 +466,12 @@ void Editor::CreateNewProject()
     }
     SDL_ShowOpenFolderDialog(OnNewProjectFolderSelected, this, m_window->GetSdlWindow(), nullptr, false);
 }
+
 void Editor::CreateNewPluginProject()
 {
     SDL_ShowOpenFolderDialog(OnNewPluginProjectFolderSelected, this, m_window->GetSdlWindow(), nullptr, false);
 }
+
 void Editor::OpenProject()
 {
     if (m_editorContext.editorState != EditorState::Editing)
@@ -464,6 +484,7 @@ void Editor::OpenProject()
     };
     SDL_ShowOpenFileDialog(OnProjectFileSelected, this, m_window->GetSdlWindow(), filters, 1, nullptr, false);
 }
+
 void Editor::LoadProject(const std::filesystem::path& projectPath)
 {
     if (m_editorContext.editorState != EditorState::Editing)
@@ -501,6 +522,7 @@ void Editor::LoadProject(const std::filesystem::path& projectPath)
     RecordLastEditingProject(projectPath);
     loadStartupScene();
 }
+
 void Editor::CreateNewProjectAtPath(const std::filesystem::path& projectPath)
 {
     if (m_editorContext.editorState != EditorState::Editing)
@@ -561,6 +583,7 @@ void Editor::CreateNewProjectAtPath(const std::filesystem::path& projectPath)
     LogInfo("成功创建新项目: {}", projectName);
     LoadProject(projectFilePath);
 }
+
 void Editor::CreatePluginProjectAtPath(const std::filesystem::path& projectPath)
 {
     std::string pluginName = projectPath.filename().string();
@@ -720,6 +743,7 @@ void Editor::CreatePluginProjectAtPath(const std::filesystem::path& projectPath)
         LogError("创建插件项目失败: {}", e.what());
     }
 }
+
 IEditorPanel* Editor::GetPanelByName(const std::string& name)
 {
     for (auto& panel : m_panels)
@@ -731,10 +755,12 @@ IEditorPanel* Editor::GetPanelByName(const std::string& name)
     }
     return nullptr;
 }
+
 PlatformWindow* Editor::GetPlatWindow()
 {
     return m_window.get();
 }
+
 void Editor::drawAddComponentPopupContent()
 {
     static char searchBuffer[256] = {0};
@@ -810,6 +836,7 @@ void Editor::drawAddComponentPopupContent()
         }
     }
 }
+
 void Editor::drawFileConflictPopupContent()
 {
     std::filesystem::path file(m_editorContext.conflictDestPath);
@@ -857,6 +884,7 @@ void Editor::drawFileConflictPopupContent()
         PopupManager::GetInstance().Close("File Exists");
     }
 }
+
 void Editor::updateUps()
 {
     m_editorContext.updateCount++;
@@ -874,6 +902,7 @@ void Editor::updateUps()
         m_editorContext.lastUpsUpdateTime = currentTime;
     }
 }
+
 void Editor::updateFps()
 {
     m_editorContext.frameCount++;
@@ -891,10 +920,12 @@ void Editor::updateFps()
         m_editorContext.lastFpsUpdateTime = currentTime;
     }
 }
+
 void Editor::RequestFocusInHierarchy(const Guid& guid)
 {
     m_editorContext.objectToFocusInHierarchy = guid;
 }
+
 void Editor::RequestFocusInBrowser(const Guid& guid)
 {
     m_editorContext.assetToFocusInBrowser = guid;

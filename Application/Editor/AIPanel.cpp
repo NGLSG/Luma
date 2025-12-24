@@ -1814,16 +1814,13 @@ Tool Manifest
 C# Scripting Example
 {{C_SHARP_EXAMPLE}}
 )";
-    // 根据配置动态调整：思考/工具结果/总结标题，以及最大思考轮数与“先发散后收敛”指令
     StringReplace(promptTemplate, "## Thinking", std::string("## ") + m_config.headingThinking);
     StringReplace(promptTemplate, "## Tool Results", std::string("## ") + m_config.headingToolResults);
     StringReplace(promptTemplate, "## Summary", std::string("## ") + m_config.headingSummary);
-    // 放宽迭代规则：从固定2轮改为由配置驱动，并显式强调“先发散后收敛”
     StringReplace(promptTemplate,
         "at most 2 additional plan-and-call cycles per user request.",
         std::string("up to ") + std::to_string(std::max(0, m_config.maxReasoningRounds)) +
         " plan-and-call cycles as needed; first DIVERGE then CONVERGE.");
-    //注册“ModifyComponent”,用于修改游戏对象组件属性
     {
         AITool modifyComponentTool;
         modifyComponentTool.name = "ModifyComponent";
@@ -1956,7 +1953,6 @@ C# Scripting Example
         };
         registry.RegisterTool(createScriptTool);
     }
-    // ===== 文件系统工具 =====
     {
         AITool listFilesTool;
         listFilesTool.name = "ListProjectFiles";
@@ -2312,7 +2308,7 @@ C# Scripting Example
                 {
                     if (c->editorState == EditorState::Playing) return;
                     c->editorState = EditorState::Playing;
-                    c->engineContext->appMode = ApplicationMode::PIE;
+                    *c->engineContext->appMode = ApplicationMode::PIE;
                     c->editingScene = c->activeScene;
                     sk_sp<RuntimeScene> playScene = c->editingScene->CreatePlayModeCopy();
                     playScene->AddEssentialSystem<Systems::HydrateResources>();
@@ -2355,7 +2351,7 @@ C# Scripting Example
                 {
                     if (c->editorState == EditorState::Playing) { c->editorState = EditorState::Paused; }
                     c->editorState = EditorState::Editing;
-                    c->engineContext->appMode = ApplicationMode::Editor;
+                    *c->engineContext->appMode = ApplicationMode::Editor;
                     c->activeScene.reset();
                     c->activeScene = c->editingScene;
                     SceneManager::GetInstance().SetCurrentScene(c->activeScene);
@@ -2630,7 +2626,6 @@ void AIPanel::submitMessage()
     m_messages.push_back({"assistant", "", 0});
     m_streamBuffer.clear();
     auto& bot = m_bots.at(m_currentBotKey);
-    // 使用用户选择的参数（未启用则不上传）
     float temperature = m_enableTemperature ? m_paramTemperature : -1.0f;
     float topP = m_enableTopP ? m_paramTopP : -1.0f;
     uint32_t topK = m_enableTopK ? static_cast<uint32_t>(m_paramTopK) : 0u;
@@ -2666,7 +2661,6 @@ void AIPanel::initializeBots()
     m_currentBotKey = "";
     m_selectedModelIndex = -1;
     const auto& cfg = m_config;
-    // 同步全局参数到 ChatBot 静态字段，供各实现拼装请求时使用
     ChatBot::GlobalParams = m_config.globalParams;
     if (isProviderConfigValid(cfg.openAi))
     {
@@ -2970,7 +2964,6 @@ std::string AIPanel::filterUnintendTags(const std::string& rawText)
 }
 void AIPanel::drawRightOptionsPanel()
 {
-    // 目标对象
     ImGui::Text("目标对象");
     ImGui::Separator();
     if (m_targetedGuid.Valid())
@@ -3014,7 +3007,6 @@ void AIPanel::drawRightOptionsPanel()
     ImGui::Dummy(ImVec2(0, 6));
     ImGui::Text("全局参数");
     ImGui::Separator();
-    // 使用已有的变量编辑器复用 UI 逻辑
     drawVariablesEditor(m_config.globalParams, "global_params_editor");
     if (ImGui::SmallButton("保存全局参数"))
     {

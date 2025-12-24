@@ -8,6 +8,7 @@
 #include "../Utils/PopupManager.h"
 #include "../Resources/Loaders/PrefabLoader.h"
 #include "../Utils/Logger.h"
+#include "../Renderer/Camera.h"
 #include "InspectorUI.h"
 #include "Profiler.h"
 #include "RelationshipComponent.h"
@@ -351,24 +352,129 @@ void InspectorPanel::drawSceneCameraInspector()
 {
     if (m_context->activeScene)
     {
-        if (ImGui::CollapsingHeader("场景相机", ImGuiTreeNodeFlags_DefaultOpen))
+        if (ImGui::CollapsingHeader("相机管理器", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            auto camProps = m_context->activeScene->GetCameraProperties();
-            bool changed = false;
-            if (ImGui::IsItemActivated()) { m_context->uiCallbacks->onValueChanged.Invoke(); }
-            changed |= CustomDrawing::WidgetDrawer<SkPoint>::Draw("位置", camProps.position, *m_context->uiCallbacks);
-            if (ImGui::IsItemActivated()) { m_context->uiCallbacks->onValueChanged.Invoke(); }
-            changed |= CustomDrawing::WidgetDrawer<SkPoint>::Draw("缩放", camProps.zoom, *m_context->uiCallbacks);
-            if (ImGui::IsItemActivated()) { m_context->uiCallbacks->onValueChanged.Invoke(); }
-            changed |= CustomDrawing::WidgetDrawer<float>::Draw("旋转", camProps.rotation, *m_context->uiCallbacks);
-            if (ImGui::IsItemActivated()) { m_context->uiCallbacks->onValueChanged.Invoke(); }
-            changed |= CustomDrawing::WidgetDrawer<SkColor4f>::Draw("清除颜色", camProps.clearColor,
-                                                                    *m_context->uiCallbacks);
-            camProps.zoom.fX = std::max(0.f, camProps.zoom.x());
-            camProps.zoom.fY = std::max(0.f, camProps.zoom.y());
-            if (changed)
+            auto& camManager = CameraManager::GetInstance();
+            std::vector<std::string> cameraIds = camManager.GetAllCameraIds();
+            const std::string& activeCameraId = camManager.GetActiveCameraId();
+
+            static char newCameraIdBuf[64] = "Camera1";
+            ImGui::SetNextItemWidth(150);
+            ImGui::InputText("新相机ID", newCameraIdBuf, sizeof(newCameraIdBuf));
+            ImGui::SameLine();
+            if (ImGui::Button("创建相机"))
             {
-                m_context->activeScene->SetCameraProperties(camProps);
+                std::string newId = newCameraIdBuf;
+                if (!newId.empty() && camManager.CreateCamera(newId))
+                {
+                    LogInfo("创建相机 {} 成功", newId);
+                }
+                else
+                {
+                    LogWarn("创建相机 {} 失败，ID可能已存在或为空", newId);
+                }
+            }
+
+            ImGui::Separator();
+
+            for (const std::string& id : cameraIds)
+            {
+                ImGui::PushID(id.c_str());
+
+                bool isActive = (id == activeCameraId);
+                bool isDefaultCamera = (id == DEFAULT_CAMERA_ID || id == UI_CAMERA_ID);
+                std::string headerLabel = id;
+                if (isActive)
+                {
+                    headerLabel += " [激活]";
+                }
+
+                ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
+                if (isActive)
+                {
+                    flags |= ImGuiTreeNodeFlags_DefaultOpen;
+                }
+
+                bool headerOpen = ImGui::CollapsingHeader(headerLabel.c_str(), flags);
+
+                if (ImGui::BeginPopupContextItem())
+                {
+                    if (!isActive && ImGui::MenuItem("激活此相机"))
+                    {
+                        camManager.SetActiveCamera(id);
+                        m_context->activeScene->SetCameraProperties(camManager.GetActiveCamera().GetProperties());
+                    }
+                    if (!isDefaultCamera && !isActive && ImGui::MenuItem("删除此相机"))
+                    {
+                        camManager.DestroyCamera(id);
+                        ImGui::EndPopup();
+                        ImGui::PopID();
+                        continue;
+                    }
+                    ImGui::EndPopup();
+                }
+
+                if (headerOpen)
+                {
+                    ImGui::Indent();
+
+                    if (!isActive)
+                    {
+                        if (ImGui::Button("激活此相机"))
+                        {
+                            camManager.SetActiveCamera(id);
+                            m_context->activeScene->SetCameraProperties(camManager.GetActiveCamera().GetProperties());
+                        }
+                        ImGui::SameLine();
+                    }
+
+                    if (!isDefaultCamera && !isActive)
+                    {
+                        if (ImGui::Button("删除"))
+                        {
+                            camManager.DestroyCamera(id);
+                            ImGui::Unindent();
+                            ImGui::PopID();
+                            continue;
+                        }
+                    }
+
+                    Camera* camera = camManager.GetCamera(id);
+                    if (camera)
+                    {
+                        CameraProperties camProps = camera->GetProperties();
+                        bool changed = false;
+
+                        changed |= CustomDrawing::WidgetDrawer<SkPoint>::Draw("位置", camProps.position,
+                                                                              *m_context->uiCallbacks);
+                        changed |= CustomDrawing::WidgetDrawer<SkPoint>::Draw("缩放", camProps.zoom,
+                                                                              *m_context->uiCallbacks);
+                        changed |= CustomDrawing::WidgetDrawer<float>::Draw("旋转", camProps.rotation,
+                                                                            *m_context->uiCallbacks);
+                        changed |= CustomDrawing::WidgetDrawer<SkColor4f>::Draw("清除颜色", camProps.clearColor,
+                                                                                *m_context->uiCallbacks);
+
+                        camProps.zoom.fX = std::max(0.01f, camProps.zoom.x());
+                        camProps.zoom.fY = std::max(0.01f, camProps.zoom.y());
+
+                        if (changed)
+                        {
+                            camera->SetProperties(camProps);
+                            if (isActive)
+                            {
+                                m_context->activeScene->SetCameraProperties(camProps);
+                            }
+                            else if (id == UI_CAMERA_ID)
+                            {
+                                m_context->activeScene->SetUICameraProperties(camProps);
+                            }
+                        }
+                    }
+
+                    ImGui::Unindent();
+                }
+
+                ImGui::PopID();
             }
         }
     }

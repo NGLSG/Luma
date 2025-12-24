@@ -294,6 +294,18 @@ public:
     Camera::CamProperties& GetCameraProperties();
 
     /**
+     * @brief 设置场景的UI摄像机属性。
+     * @param properties 要设置的UI摄像机属性。
+     */
+    void SetUICameraProperties(const Camera::CamProperties& properties);
+
+    /**
+     * @brief 获取场景的UI摄像机属性。
+     * @return UI摄像机属性的引用。
+     */
+    Camera::CamProperties& GetUICameraProperties();
+
+    /**
      * @brief 销毁一个游戏对象及其所有子对象。
      * @param gameObject 要销毁的游戏对象。
      */
@@ -379,7 +391,8 @@ private:
     SystemsManager m_systemsManager; ///< 系统管理器，负责管理所有系统。
     std::unordered_map<Guid, entt::entity> m_guidToEntityMap; ///< GUID到实体句柄的映射。
     std::string m_name = "Untitled Scene"; ///< 场景的名称。
-    Camera::CamProperties m_cameraProperties; ///< 场景的摄像机属性。
+    Camera::CamProperties m_cameraProperties; ///< 场景的主摄像机属性。
+    Camera::CamProperties m_uiCameraProperties; ///< 场景的UI摄像机属性。
     mutable bool m_isDirty = false; ///< 指示场景数据是否已被修改。
 };
 

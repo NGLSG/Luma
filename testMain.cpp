@@ -67,13 +67,13 @@ int main(int argc, char* argv[])
         texture = CreateFallbackTexture(nutContext, 255, 255, 255);
     }
 
-    Camera::CamProperties camProps;
+    CameraProperties camProps;
     camProps.position = {0.0f, 0.0f};
     camProps.viewport = SkRect::MakeXYWH(0, 0, (float)WIDTH, (float)HEIGHT);
     camProps.zoom = {1.0f,1.0f};
     camProps.rotation = 0.0f;
     camProps.clearColor = {0.15f, 0.15f, 0.15f, 1.0f};
-    Camera::GetInstance().SetProperties(camProps);
+    CameraManager::GetInstance().GetActiveCamera().SetProperties(camProps);
 
     std::vector<RenderableTransform> transforms;
     const int COUNT = 1;

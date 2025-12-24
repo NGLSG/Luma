@@ -1221,7 +1221,10 @@ LUMA_API bool Engine_InitWithANativeWindow(void* aNativeWindow, int width, int h
         }
         g_fbWidth = width;
         g_fbHeight = height;
-        Camera::GetInstance().GetProperties().viewport = {0, 0, static_cast<float>(width), static_cast<float>(height)};
+        auto& activeCamera = CameraManager::GetInstance().GetActiveCamera();
+        auto props = activeCamera.GetProperties();
+        props.viewport = {0, 0, static_cast<float>(width), static_cast<float>(height)};
+        activeCamera.SetProperties(props);
         return true;
     }
     catch (...)
@@ -2427,64 +2430,95 @@ LUMA_API bool GpuBuffer_Write(GpuBufferHandle buffer, const void* data, uint32_t
     return buf->WriteBuffer(data, size, offset);
 }
 
+LUMA_API bool CameraManager_CreateCamera(const char* id)
+{
+    if (!id) return false;
+    return CameraManager::GetInstance().CreateCamera(id);
+}
+
+LUMA_API bool CameraManager_DestroyCamera(const char* id)
+{
+    if (!id) return false;
+    return CameraManager::GetInstance().DestroyCamera(id);
+}
+
+LUMA_API bool CameraManager_SetActiveCamera(const char* id)
+{
+    if (!id) return false;
+    return CameraManager::GetInstance().SetActiveCamera(id);
+}
+
+LUMA_API const char* CameraManager_GetActiveCameraId()
+{
+    return CameraManager::GetInstance().GetActiveCameraId().c_str();
+}
+
+LUMA_API bool CameraManager_HasCamera(const char* id)
+{
+    if (!id) return false;
+    return CameraManager::GetInstance().HasCamera(id);
+}
 
 LUMA_API float Camera_GetPositionX()
 {
-    auto props = Camera::GetInstance().GetProperties();
+    auto props = CameraManager::GetInstance().GetActiveCamera().GetProperties();
     return props.position.x();
 }
 
 LUMA_API float Camera_GetPositionY()
 {
-    auto props = Camera::GetInstance().GetProperties();
+    auto props = CameraManager::GetInstance().GetActiveCamera().GetProperties();
     return props.position.y();
 }
 
 LUMA_API void Camera_SetPosition(float x, float y)
 {
-    auto props = Camera::GetInstance().GetProperties();
+    auto& camera = CameraManager::GetInstance().GetActiveCamera();
+    auto props = camera.GetProperties();
     props.position = SkPoint::Make(x, y);
-    Camera::GetInstance().SetProperties(props);
+    camera.SetProperties(props);
 }
 
 LUMA_API float Camera_GetZoom()
 {
-    return Camera::GetInstance().GetProperties().zoom.x();
+    return CameraManager::GetInstance().GetActiveCamera().GetProperties().zoom.x();
 }
 
 LUMA_API void Camera_SetZoom(float zoom)
 {
-    auto props = Camera::GetInstance().GetProperties();
+    auto& camera = CameraManager::GetInstance().GetActiveCamera();
+    auto props = camera.GetProperties();
     props.zoom = {zoom, zoom};
-    Camera::GetInstance().SetProperties(props);
+    camera.SetProperties(props);
 }
 
 LUMA_API float Camera_GetRotation()
 {
-    return Camera::GetInstance().GetProperties().rotation;
+    return CameraManager::GetInstance().GetActiveCamera().GetProperties().rotation;
 }
 
 LUMA_API void Camera_SetRotation(float rotation)
 {
-    auto props = Camera::GetInstance().GetProperties();
+    auto& camera = CameraManager::GetInstance().GetActiveCamera();
+    auto props = camera.GetProperties();
     props.rotation = rotation;
-    Camera::GetInstance().SetProperties(props);
+    camera.SetProperties(props);
 }
 
 LUMA_API float Camera_GetViewportWidth()
 {
-    return Camera::GetInstance().GetProperties().viewport.width();
+    return CameraManager::GetInstance().GetActiveCamera().GetProperties().viewport.width();
 }
 
 LUMA_API float Camera_GetViewportHeight()
 {
-    return Camera::GetInstance().GetProperties().viewport.height();
+    return CameraManager::GetInstance().GetActiveCamera().GetProperties().viewport.height();
 }
 
 LUMA_API void Camera_GetClearColor(float* r, float* g, float* b, float* a)
 {
     if (!r || !g || !b || !a) return;
-    auto props = Camera::GetInstance().GetProperties();
+    auto props = CameraManager::GetInstance().GetActiveCamera().GetProperties();
     *r = props.clearColor.fR;
     *g = props.clearColor.fG;
     *b = props.clearColor.fB;
@@ -2493,15 +2527,16 @@ LUMA_API void Camera_GetClearColor(float* r, float* g, float* b, float* a)
 
 LUMA_API void Camera_SetClearColor(float r, float g, float b, float a)
 {
-    auto props = Camera::GetInstance().GetProperties();
+    auto& camera = CameraManager::GetInstance().GetActiveCamera();
+    auto props = camera.GetProperties();
     props.clearColor = SkColor4f{r, g, b, a};
-    Camera::GetInstance().SetProperties(props);
+    camera.SetProperties(props);
 }
 
 LUMA_API void Camera_ScreenToWorld(float screenX, float screenY, float* worldX, float* worldY)
 {
     if (!worldX || !worldY) return;
-    SkPoint result = Camera::GetInstance().ScreenToWorld(SkPoint::Make(screenX, screenY));
+    SkPoint result = CameraManager::GetInstance().GetActiveCamera().ScreenToWorld(SkPoint::Make(screenX, screenY));
     *worldX = result.x();
     *worldY = result.y();
 }
@@ -2509,9 +2544,71 @@ LUMA_API void Camera_ScreenToWorld(float screenX, float screenY, float* worldX, 
 LUMA_API void Camera_WorldToScreen(float worldX, float worldY, float* screenX, float* screenY)
 {
     if (!screenX || !screenY) return;
-    SkPoint result = Camera::GetInstance().WorldToScreen(SkPoint::Make(worldX, worldY));
+    SkPoint result = CameraManager::GetInstance().GetActiveCamera().WorldToScreen(SkPoint::Make(worldX, worldY));
     *screenX = result.x();
     *screenY = result.y();
+}
+
+LUMA_API float CameraById_GetPositionX(const char* id)
+{
+    if (!id) return 0.0f;
+    Camera* camera = CameraManager::GetInstance().GetCamera(id);
+    if (!camera) return 0.0f;
+    return camera->GetProperties().position.x();
+}
+
+LUMA_API float CameraById_GetPositionY(const char* id)
+{
+    if (!id) return 0.0f;
+    Camera* camera = CameraManager::GetInstance().GetCamera(id);
+    if (!camera) return 0.0f;
+    return camera->GetProperties().position.y();
+}
+
+LUMA_API void CameraById_SetPosition(const char* id, float x, float y)
+{
+    if (!id) return;
+    Camera* camera = CameraManager::GetInstance().GetCamera(id);
+    if (!camera) return;
+    auto props = camera->GetProperties();
+    props.position = SkPoint::Make(x, y);
+    camera->SetProperties(props);
+}
+
+LUMA_API float CameraById_GetZoom(const char* id)
+{
+    if (!id) return 1.0f;
+    Camera* camera = CameraManager::GetInstance().GetCamera(id);
+    if (!camera) return 1.0f;
+    return camera->GetProperties().zoom.x();
+}
+
+LUMA_API void CameraById_SetZoom(const char* id, float zoom)
+{
+    if (!id) return;
+    Camera* camera = CameraManager::GetInstance().GetCamera(id);
+    if (!camera) return;
+    auto props = camera->GetProperties();
+    props.zoom = {zoom, zoom};
+    camera->SetProperties(props);
+}
+
+LUMA_API float CameraById_GetRotation(const char* id)
+{
+    if (!id) return 0.0f;
+    Camera* camera = CameraManager::GetInstance().GetCamera(id);
+    if (!camera) return 0.0f;
+    return camera->GetProperties().rotation;
+}
+
+LUMA_API void CameraById_SetRotation(const char* id, float rotation)
+{
+    if (!id) return;
+    Camera* camera = CameraManager::GetInstance().GetCamera(id);
+    if (!camera) return;
+    auto props = camera->GetProperties();
+    props.rotation = rotation;
+    camera->SetProperties(props);
 }
 
 

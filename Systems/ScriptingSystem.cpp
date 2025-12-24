@@ -17,7 +17,7 @@ namespace Systems
             [this](const PhysicsContactEvent& event) { handlePhysicsContactEvent(event); }
         );
         m_currentScene = scene;
-        m_isEditorMode = (context.appMode != ApplicationMode::Runtime);
+        m_isEditorMode = (*context.appMode != ApplicationMode::Runtime);
 
         m_loadedAssemblyPath = m_isEditorMode
                                    ? (ProjectSettings::GetInstance().GetProjectRoot() / "Library/GameScripts.dll").

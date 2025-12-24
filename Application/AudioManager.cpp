@@ -130,7 +130,7 @@ void AudioManager::SDLAudioCallback(void* userdata, SDL_AudioStream* stream, int
 }
 void AudioManager::GetListener(float& lx, float& ly, float& lz, float& rx, float& ry, float& rz) const
 {
-    const auto props = Camera::GetInstance().GetProperties();
+    const auto props = CameraManager::GetInstance().GetActiveCamera().GetProperties();
     lx = props.position.x();
     ly = props.position.y();
     lz = 0.0f;

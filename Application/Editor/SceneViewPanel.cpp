@@ -344,9 +344,14 @@ void SceneViewPanel::Draw()
                 viewportScreenPos.x, viewportScreenPos.y,
                 viewportSize.x, viewportSize.y
             );
-            Camera& cam = Camera::GetInstance();
-            const Camera::CamProperties prevCamProps = cam.m_properties;
+            Camera& cam = CameraManager::GetInstance().GetActiveCamera();
+            const CameraProperties prevCamProps = cam.m_properties;
             cam.SetProperties(m_editorCameraProperties);
+
+            Camera& uiCam = CameraManager::GetInstance().GetUICamera();
+            const CameraProperties prevUICamProps = uiCam.m_properties;
+            uiCam.SetProperties(m_editorCameraProperties);
+
             m_context->graphicsBackend->SetActiveRenderTarget(m_sceneViewTarget);
             for (const auto& packet : m_context->renderQueue)
             {
@@ -370,6 +375,8 @@ void SceneViewPanel::Draw()
             drawSelectionOutlines(viewportScreenPos, viewportSize);
             drawParticlePreview(ImGui::GetWindowDrawList(), viewportScreenPos, viewportSize);
             handleDragDrop();
+
+            uiCam.SetProperties(prevUICamProps);
             cam.SetProperties(prevCamProps);
         }
     }
@@ -2083,41 +2090,153 @@ void SceneViewPanel::drawCameraGizmo(ImDrawList* drawList)
     {
         return;
     }
-    const auto& gameCamProps = m_context->activeScene->GetCameraProperties();
-    SkPoint effectiveZoom = gameCamProps.GetEffectiveZoom();
-    if (effectiveZoom.x() <= 0.0f || effectiveZoom.y() <= 0.0f) return;
-    const float worldViewWidth = m_context->engineContext->sceneViewRect.Width() / effectiveZoom.x();
-    const float worldViewHeight = m_context->engineContext->sceneViewRect.Height() / effectiveZoom.y();
-    const float halfWorldW = worldViewWidth * 0.5f;
-    const float halfWorldH = worldViewHeight * 0.5f;
-    std::vector<ECS::Vector2f> localCorners = {
-        {-halfWorldW, -halfWorldH},
-        {halfWorldW, -halfWorldH},
-        {halfWorldW, halfWorldH},
-        {-halfWorldW, halfWorldH}
+
+    auto& camManager = CameraManager::GetInstance();
+    std::vector<std::string> cameraIds = camManager.GetAllCameraIds();
+    const std::string& activeCameraId = camManager.GetActiveCameraId();
+
+    const ImU32 cameraColors[] = {
+        IM_COL32(255, 255, 255, 180), // 白色 - 默认相机Main
+        IM_COL32(255, 100, 100, 180), // 红色
+        IM_COL32(100, 255, 100, 180), // 绿色
+        IM_COL32(100, 100, 255, 180), // 蓝色
+        IM_COL32(255, 255, 100, 180), // 黄色
+        IM_COL32(255, 100, 255, 180), // 品红
+        IM_COL32(100, 255, 255, 180), // 青色
+        IM_COL32(255, 180, 100, 180), // 橙色
     };
-    std::vector<ECS::Vector2f> worldCorners;
-    worldCorners.reserve(4);
-    const float sinR = sinf(gameCamProps.rotation);
-    const float cosR = cosf(gameCamProps.rotation);
-    for (const auto& corner : localCorners)
+    const int numColors = sizeof(cameraColors) / sizeof(cameraColors[0]);
+
+    int colorIndex = 0;
+    for (const std::string& id : cameraIds)
     {
-        const float rotatedX = corner.x * cosR - corner.y * sinR;
-        const float rotatedY = corner.x * sinR + corner.y * cosR;
-        worldCorners.emplace_back(
-            gameCamProps.position.x() + rotatedX,
-            gameCamProps.position.y() + rotatedY
+        Camera* camera = camManager.GetCamera(id);
+        if (!camera) continue;
+
+        CameraProperties camProps;
+        if (id == activeCameraId)
+        {
+            camProps = m_context->activeScene->GetCameraProperties();
+        }
+        else if (id == UI_CAMERA_ID)
+        {
+            camProps = m_context->activeScene->GetUICameraProperties();
+        }
+        else
+        {
+            camProps = camera->GetProperties();
+        }
+
+        SkPoint effectiveZoom = camProps.GetEffectiveZoom();
+        if (effectiveZoom.x() <= 0.0f) effectiveZoom.fX = 1.0f;
+        if (effectiveZoom.y() <= 0.0f) effectiveZoom.fY = 1.0f;
+
+        float viewportWidth = camProps.viewport.width();
+        float viewportHeight = camProps.viewport.height();
+        if (viewportWidth < 10.0f || viewportHeight < 10.0f)
+        {
+            viewportWidth = m_context->engineContext->sceneViewRect.Width();
+            viewportHeight = m_context->engineContext->sceneViewRect.Height();
+        }
+
+        const float worldViewWidth = viewportWidth / effectiveZoom.x();
+        const float worldViewHeight = viewportHeight / effectiveZoom.y();
+        const float halfWorldW = worldViewWidth * 0.5f;
+        const float halfWorldH = worldViewHeight * 0.5f;
+
+        std::vector<ECS::Vector2f> localCorners = {
+            {-halfWorldW, -halfWorldH},
+            {halfWorldW, -halfWorldH},
+            {halfWorldW, halfWorldH},
+            {-halfWorldW, halfWorldH}
+        };
+
+        std::vector<ECS::Vector2f> worldCorners;
+        worldCorners.reserve(4);
+        const float sinR = sinf(camProps.rotation);
+        const float cosR = cosf(camProps.rotation);
+
+        for (const auto& corner : localCorners)
+        {
+            const float rotatedX = corner.x * cosR - corner.y * sinR;
+            const float rotatedY = corner.x * sinR + corner.y * cosR;
+            worldCorners.emplace_back(
+                camProps.position.x() + rotatedX,
+                camProps.position.y() + rotatedY
+            );
+        }
+
+        std::vector<ImVec2> screenCorners;
+        screenCorners.reserve(4);
+        for (const auto& worldCorner : worldCorners)
+        {
+            screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldCorner));
+        }
+
+        bool isActive = (id == activeCameraId);
+        ImU32 gizmoColor = cameraColors[colorIndex % numColors];
+        float thickness = isActive ? 3.0f : 1.5f;
+
+        drawList->AddPolyline(screenCorners.data(), 4, gizmoColor, ImDrawFlags_Closed, thickness);
+
+        ImVec2 centerScreen = worldToScreenWith(m_editorCameraProperties,
+                                                 ECS::Vector2f(camProps.position.x(), camProps.position.y()));
+        float centerRadius = isActive ? 6.0f : 4.0f;
+        drawList->AddCircleFilled(centerScreen, centerRadius, gizmoColor);
+
+        char label[64];
+        if (isActive)
+        {
+            snprintf(label, sizeof(label), "Cam %s [Active]", id.c_str());
+        }
+        else
+        {
+            snprintf(label, sizeof(label), "Cam %s", id.c_str());
+        }
+
+        ImVec2 labelPos = screenCorners[0];
+        labelPos.x += 5.0f;
+        labelPos.y += 5.0f;
+
+        const ImU32 labelBgColor = IM_COL32(0, 0, 0, 200);
+        ImVec2 labelSize = ImGui::CalcTextSize(label);
+        drawList->AddRectFilled(
+            ImVec2(labelPos.x - 2, labelPos.y - 2),
+            ImVec2(labelPos.x + labelSize.x + 2, labelPos.y + labelSize.y + 2),
+            labelBgColor, 2.0f
         );
+        drawList->AddText(labelPos, gizmoColor, label);
+
+        colorIndex++;
+
+        if (isActive)
+        {
+            float dirLength = 30.0f / m_editorCameraProperties.zoom.x();
+            ECS::Vector2f dirWorld(
+                camProps.position.x() - dirLength * sinR,
+                camProps.position.y() - dirLength * cosR
+            );
+            ImVec2 dirScreen = worldToScreenWith(m_editorCameraProperties, dirWorld);
+
+            drawList->AddLine(centerScreen, dirScreen, gizmoColor, 2.0f);
+
+            float arrowSize = 8.0f;
+            ImVec2 dir = ImVec2(dirScreen.x - centerScreen.x, dirScreen.y - centerScreen.y);
+            float len = sqrtf(dir.x * dir.x + dir.y * dir.y);
+            if (len > 0.001f)
+            {
+                dir.x /= len;
+                dir.y /= len;
+                ImVec2 perp(-dir.y, dir.x);
+                ImVec2 arrowTip = dirScreen;
+                ImVec2 arrowLeft(dirScreen.x - dir.x * arrowSize + perp.x * arrowSize * 0.5f,
+                                 dirScreen.y - dir.y * arrowSize + perp.y * arrowSize * 0.5f);
+                ImVec2 arrowRight(dirScreen.x - dir.x * arrowSize - perp.x * arrowSize * 0.5f,
+                                  dirScreen.y - dir.y * arrowSize - perp.y * arrowSize * 0.5f);
+                drawList->AddTriangleFilled(arrowTip, arrowLeft, arrowRight, gizmoColor);
+            }
+        }
     }
-    std::vector<ImVec2> screenCorners;
-    screenCorners.reserve(4);
-    for (const auto& worldCorner : worldCorners)
-    {
-        screenCorners.push_back(worldToScreenWith(m_editorCameraProperties, worldCorner));
-    }
-    const ImU32 gizmoColor = IM_COL32(255, 255, 255, 150);
-    const float thickness = 2.0f;
-    drawList->AddPolyline(screenCorners.data(), 4, gizmoColor, ImDrawFlags_Closed, thickness);
 }
 void SceneViewPanel::drawDesignResolutionFrame(const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
 {
@@ -2174,7 +2293,7 @@ void SceneViewPanel::updateParticlePreview(float deltaTime)
     if (!m_context || !m_context->activeScene)
         return;
     bool isInPlayMode = m_context->engineContext && 
-                        m_context->engineContext->appMode != ApplicationMode::Editor;
+                        *m_context->engineContext->appMode != ApplicationMode::Editor;
     auto& registry = m_context->activeScene->GetRegistry();
     if (isInPlayMode)
     {

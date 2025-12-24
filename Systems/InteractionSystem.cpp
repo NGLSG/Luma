@@ -118,7 +118,7 @@ namespace Systems
         registry.clear<PointerEnterEvent, PointerExitEvent, PointerDownEvent, PointerUpEvent, PointerClickEvent>();
 
         
-        if (context.appMode == ApplicationMode::Editor)
+        if (*context.appMode == ApplicationMode::Editor)
         {
             return;
         }
@@ -137,7 +137,7 @@ namespace Systems
         ECS::RectF viewportRect;
 
         
-        if (context.appMode == ApplicationMode::PIE)
+        if (*context.appMode == ApplicationMode::PIE)
         {
             viewportRect = context.sceneViewRect;
             

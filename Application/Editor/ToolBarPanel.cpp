@@ -1545,7 +1545,7 @@ void ToolbarPanel::play()
             return;
         }
         ctx->editorState = EditorState::Playing;
-        ctx->engineContext->appMode = ApplicationMode::PIE;
+        *ctx->engineContext->appMode = ApplicationMode::PIE;
         ctx->editingScene = ctx->activeScene;
         sk_sp<RuntimeScene> playScene = ctx->editingScene->CreatePlayModeCopy();
         playScene->AddEssentialSystem<Systems::HydrateResources>();
@@ -1596,7 +1596,7 @@ void ToolbarPanel::stop()
             ctx->activeScene->Deactivate();
         }
         ctx->editorState = EditorState::Editing;
-        ctx->engineContext->appMode = ApplicationMode::Editor;
+        *ctx->engineContext->appMode = ApplicationMode::Editor;
         ctx->activeScene.reset();
         ctx->activeScene = ctx->editingScene;
         SceneManager::GetInstance().SetCurrentScene(ctx->activeScene);

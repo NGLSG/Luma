@@ -79,6 +79,8 @@ public:
     {
         BatchType type;
         size_t index;
+        RenderSpace renderSpace = RenderSpace::World;
+        std::string cameraId;
     };
 
     std::vector<QueuedBatch> orderedBatches;
@@ -224,42 +226,42 @@ void RenderSystem::Submit(const SpriteBatch& batch)
 {
     if (batch.count <= 0) return;
     pImpl->spriteBatches.push_back(batch);
-    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Sprite, pImpl->spriteBatches.size() - 1});
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Sprite, pImpl->spriteBatches.size() - 1, batch.renderSpace, batch.cameraId});
 }
 
 void RenderSystem::Submit(const TextBatch& batch)
 {
     if (batch.count <= 0) return;
     pImpl->textBatches.push_back(batch);
-    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Text, pImpl->textBatches.size() - 1});
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Text, pImpl->textBatches.size() - 1, batch.renderSpace, batch.cameraId});
 }
 
 void RenderSystem::Submit(const InstanceBatch& batch)
 {
     if (batch.count <= 0) return;
     pImpl->instanceBatches.push_back(batch);
-    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Instance, pImpl->instanceBatches.size() - 1});
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Instance, pImpl->instanceBatches.size() - 1, batch.renderSpace, batch.cameraId});
 }
 
 void RenderSystem::Submit(const RectBatch& batch)
 {
     if (batch.count <= 0) return;
     pImpl->rectBatches.push_back(batch);
-    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Rect, pImpl->rectBatches.size() - 1});
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Rect, pImpl->rectBatches.size() - 1, batch.renderSpace, batch.cameraId});
 }
 
 void RenderSystem::Submit(const CircleBatch& batch)
 {
     if (batch.count <= 0) return;
     pImpl->circleBatches.push_back(batch);
-    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Circle, pImpl->circleBatches.size() - 1});
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Circle, pImpl->circleBatches.size() - 1, batch.renderSpace, batch.cameraId});
 }
 
 void RenderSystem::Submit(const LineBatch& batch)
 {
     if (batch.pointCount < 2) return;
     pImpl->lineBatches.push_back(batch);
-    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Line, pImpl->lineBatches.size() - 1});
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Line, pImpl->lineBatches.size() - 1, batch.renderSpace, batch.cameraId});
 }
 
 void RenderSystem::Submit(const ShaderBatch& batch)
@@ -267,7 +269,7 @@ void RenderSystem::Submit(const ShaderBatch& batch)
     if (batch.material && batch.material->effect)
     {
         pImpl->shaderBatches.push_back(batch);
-        pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Shader, pImpl->shaderBatches.size() - 1});
+        pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::Shader, pImpl->shaderBatches.size() - 1, batch.renderSpace, batch.cameraId});
     }
 }
 
@@ -276,7 +278,7 @@ void RenderSystem::Submit(const RawDrawBatch& batch)
     if (batch.drawFunc)
     {
         pImpl->rawDrawBatches.push_back(batch);
-        pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::RawDraw, pImpl->rawDrawBatches.size() - 1});
+        pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::RawDraw, pImpl->rawDrawBatches.size() - 1, batch.renderSpace, batch.cameraId});
     }
 }
 
@@ -284,7 +286,7 @@ void RenderSystem::Submit(const WGPUSpriteBatch& batch)
 {
     if (batch.count <= 0) return;
     pImpl->wgpuSpriteBatches.push_back(batch);
-    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::WGPUSprite, pImpl->wgpuSpriteBatches.size() - 1});
+    pImpl->orderedBatches.push_back({RenderSystemImpl::BatchType::WGPUSprite, pImpl->wgpuSpriteBatches.size() - 1, batch.renderSpace, batch.cameraId});
 }
 
 void RenderSystem::DrawCursor(const SkPoint& position, float height, const SkColor4f& color)
@@ -335,6 +337,8 @@ void RenderSystem::Flush()
 
     bool hasClip = pImpl->clipRect.has_value();
 
+    // 当前相机状态跟踪
+    std::string currentCameraId = DEFAULT_CAMERA_ID;
 
     auto SetupCanvasState = [&](SkCanvas* cvs)
     {
@@ -346,15 +350,52 @@ void RenderSystem::Flush()
             cvs->translate(viewport.fLeft, viewport.fTop);
         }
         cvs->save();
-
     };
 
+    // 应用指定相机变换
+    auto ApplyCamera = [&](SkCanvas* cvs, const std::string& cameraId)
+    {
+        Camera* camera = CameraManager::GetInstance().GetCamera(cameraId);
+        if (camera)
+        {
+            camera->ApplyTo(cvs);
+        }
+        else
+        {
+            // 如果相机不存在，使用激活的相机
+            CameraManager::GetInstance().GetActiveCamera().ApplyTo(cvs);
+        }
+    };
 
+    // 切换相机
+    auto SwitchCamera = [&](RenderSpace renderSpace, const std::string& cameraId)
+    {
+        std::string targetCameraId;
+        if (renderSpace == RenderSpace::World)
+        {
+            targetCameraId = CameraManager::GetInstance().GetActiveCameraId();
+        }
+        else
+        {
+            targetCameraId = cameraId.empty() ? UI_CAMERA_ID : cameraId;
+        }
 
-    canvas->clear(Camera::GetInstance().GetProperties().clearColor);
+        if (currentCameraId == targetCameraId) return;
+        
+        // 恢复之前的相机变换
+        canvas->restore();
+        canvas->save();
+        
+        // 应用新的相机变换
+        ApplyCamera(canvas, targetCameraId);
+        
+        currentCameraId = targetCameraId;
+    };
+
+    canvas->clear(CameraManager::GetInstance().GetActiveCamera().GetProperties().clearColor);
 
     SetupCanvasState(canvas);
-    Camera::GetInstance().ApplyTo(canvas);
+    ApplyCamera(canvas, CameraManager::GetInstance().GetActiveCameraId());
 
     for (const auto& entry : pImpl->orderedBatches)
     {
@@ -368,9 +409,7 @@ void RenderSystem::Flush()
             surface.reset();
             canvas = nullptr;
 
-
             pImpl->DrawWGPUSpriteBatch(pImpl->wgpuSpriteBatches[entry.index], pImpl->backend.GetNutContext());
-
 
             surface = pImpl->backend.GetSurface();
             if (!surface)
@@ -380,12 +419,13 @@ void RenderSystem::Flush()
             }
             canvas = surface->getCanvas();
 
-
             SetupCanvasState(canvas);
-            Camera::GetInstance().ApplyTo(canvas);
+            ApplyCamera(canvas, currentCameraId);
         }
         else
         {
+            // 根据批次的渲染空间切换相机
+            SwitchCamera(entry.renderSpace, entry.cameraId);
 
             switch (entry.type)
             {
@@ -418,9 +458,7 @@ void RenderSystem::Flush()
         }
     }
 
-
     pImpl->DrawAllCursorBatches(canvas);
-
 
     if (canvas)
     {
@@ -1123,7 +1161,7 @@ void RenderSystem::RenderSystemImpl::DrawWGPUSpriteBatch(const WGPUSpriteBatch& 
     }
 
     EngineData engineData{};
-    Camera::GetInstance().FillEngineData(engineData);
+    CameraManager::GetInstance().GetActiveCamera().FillEngineData(engineData);
 
 
 

@@ -25,7 +25,8 @@ namespace Data
     {
         friend class IData<SceneData>;
         std::string name; ///< 场景的名称。
-        Camera::CamProperties cameraProperties; ///< 场景的摄像机属性。
+        Camera::CamProperties cameraProperties; ///< 场景的主摄像机属性。
+        Camera::CamProperties uiCameraProperties; ///< 场景的UI摄像机属性。
         std::vector<PrefabNode> entities; ///< 场景中包含的实体列表。
 
     private:
@@ -171,6 +172,7 @@ namespace YAML
             Node node;
             node["name"] = rhs.name;
             node["camp"] = rhs.cameraProperties;
+            node["uiCamp"] = rhs.uiCameraProperties;
             node["entities"] = rhs.entities;
             return node;
         }
@@ -188,6 +190,10 @@ namespace YAML
             if (node["camp"])
             {
                 rhs.cameraProperties = node["camp"].as<Camera::CamProperties>();
+            }
+            if (node["uiCamp"])
+            {
+                rhs.uiCameraProperties = node["uiCamp"].as<Camera::CamProperties>();
             }
             if (node["entities"])
             {

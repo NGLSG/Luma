@@ -202,7 +202,7 @@ namespace Systems
     {
         auto& registry = scene->GetRegistry();
 
-        const bool isRuntime = context.appMode != ApplicationMode::Editor;
+        const bool isRuntime = *context.appMode != ApplicationMode::Editor;
         const Vector2f globalMousePos = {
             static_cast<float>((context.window ? context.window->GetInputState().mousePosition.x : context.inputState.mousePosition.x)),
             static_cast<float>((context.window ? context.window->GetInputState().mousePosition.y : context.inputState.mousePosition.y))
@@ -210,7 +210,7 @@ namespace Systems
 
         auto cameraProps = scene->GetCameraProperties();
         RectF viewportRect;
-        if (context.appMode == ApplicationMode::PIE)
+        if (*context.appMode == ApplicationMode::PIE)
         {
             viewportRect = context.sceneViewRect;
         }

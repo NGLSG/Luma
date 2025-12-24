@@ -5,6 +5,8 @@
 #include "JobSystem.h"
 #include "RenderComponent.h"
 #include "Profiler.h"
+#include "Renderer/Camera.h"
+#include "ApplicationBase.h"
 #include "SIMDWrapper.h"
 #include "include/core/SkColorFilter.h"
 #include "include/core/SkFont.h"
@@ -168,14 +170,15 @@ namespace
         const Renderable* currFrameEnd;
         float alpha;
         bool shouldInterpolate;
+        bool isRuntimeMode;
         ThreadLocalBatchResult* result;
         InterpolationAndBatchJob() = default;
         InterpolationAndBatchJob(const Renderable* pStart, const Renderable* pEnd,
                                  const Renderable* cStart, const Renderable* cEnd,
-                                 float a, bool interpolate, ThreadLocalBatchResult* res)
+                                 float a, bool interpolate, bool runtime, ThreadLocalBatchResult* res)
             : prevFrameStart(pStart), prevFrameEnd(pEnd),
               currFrameStart(cStart), currFrameEnd(cEnd),
-              alpha(a), shouldInterpolate(interpolate), result(res)
+              alpha(a), shouldInterpolate(interpolate), isRuntimeMode(runtime), result(res)
         {
         }
         void Execute() override
@@ -303,6 +306,15 @@ namespace
         {
             RawDrawBatch batch;
             batch.zIndex = currIt->zIndex;
+            if (isRuntimeMode)
+            {
+                batch.renderSpace = RenderSpace::Camera;
+                batch.cameraId = UI_CAMERA_ID;
+            }
+            else
+            {
+                batch.renderSpace = RenderSpace::World;
+            }
             batch.drawFunc.AddListener(
                 [
                     trans = transform,
@@ -363,6 +375,15 @@ namespace
         {
             RawDrawBatch batch;
             batch.zIndex = currIt->zIndex;
+            if (isRuntimeMode)
+            {
+                batch.renderSpace = RenderSpace::Camera;
+                batch.cameraId = UI_CAMERA_ID;
+            }
+            else
+            {
+                batch.renderSpace = RenderSpace::World;
+            }
             batch.drawFunc.AddListener(
                 [
                     trans = transform,
@@ -450,6 +471,15 @@ namespace
         {
             RawDrawBatch batch;
             batch.zIndex = currIt->zIndex;
+            if (isRuntimeMode)
+            {
+                batch.renderSpace = RenderSpace::Camera;
+                batch.cameraId = UI_CAMERA_ID;
+            }
+            else
+            {
+                batch.renderSpace = RenderSpace::World;
+            }
             batch.drawFunc.AddListener(
                 [
                     trans = transform,
@@ -523,6 +553,15 @@ namespace
         {
             RawDrawBatch batch;
             batch.zIndex = currIt->zIndex;
+            if (isRuntimeMode)
+            {
+                batch.renderSpace = RenderSpace::Camera;
+                batch.cameraId = UI_CAMERA_ID;
+            }
+            else
+            {
+                batch.renderSpace = RenderSpace::World;
+            }
             batch.drawFunc.AddListener(
                 [
                     trans = transform,
@@ -616,6 +655,15 @@ namespace
         {
             RawDrawBatch batch;
             batch.zIndex = currIt->zIndex;
+            if (isRuntimeMode)
+            {
+                batch.renderSpace = RenderSpace::Camera;
+                batch.cameraId = UI_CAMERA_ID;
+            }
+            else
+            {
+                batch.renderSpace = RenderSpace::World;
+            }
             batch.drawFunc.AddListener(
                 [
                     trans = transform,
@@ -725,6 +773,15 @@ namespace
         {
             RawDrawBatch batch;
             batch.zIndex = currIt->zIndex;
+            if (isRuntimeMode)
+            {
+                batch.renderSpace = RenderSpace::Camera;
+                batch.cameraId = UI_CAMERA_ID;
+            }
+            else
+            {
+                batch.renderSpace = RenderSpace::World;
+            }
             batch.drawFunc.AddListener(
                 [
                     trans = transform,
@@ -866,6 +923,15 @@ namespace
         {
             RawDrawBatch batch;
             batch.zIndex = currIt->zIndex;
+            if (isRuntimeMode)
+            {
+                batch.renderSpace = RenderSpace::Camera;
+                batch.cameraId = UI_CAMERA_ID;
+            }
+            else
+            {
+                batch.renderSpace = RenderSpace::World;
+            }
             batch.drawFunc.AddListener(
                 [
                     trans = transform,
@@ -1021,6 +1087,15 @@ namespace
         {
             RawDrawBatch batch;
             batch.zIndex = currIt->zIndex;
+            if (isRuntimeMode)
+            {
+                batch.renderSpace = RenderSpace::Camera;
+                batch.cameraId = UI_CAMERA_ID;
+            }
+            else
+            {
+                batch.renderSpace = RenderSpace::World;
+            }
             batch.drawFunc.AddListener(
                 [
                     trans = transform,
@@ -1125,6 +1200,15 @@ namespace
         {
             RawDrawBatch batch;
             batch.zIndex = currIt->zIndex;
+            if (isRuntimeMode)
+            {
+                batch.renderSpace = RenderSpace::Camera;
+                batch.cameraId = UI_CAMERA_ID;
+            }
+            else
+            {
+                batch.renderSpace = RenderSpace::World;
+            }
             batch.drawFunc.AddListener(
                 [
                     trans = transform,
@@ -1232,6 +1316,15 @@ namespace
         {
             RawDrawBatch batch;
             batch.zIndex = currIt->zIndex;
+            if (isRuntimeMode)
+            {
+                batch.renderSpace = RenderSpace::Camera;
+                batch.cameraId = UI_CAMERA_ID;
+            }
+            else
+            {
+                batch.renderSpace = RenderSpace::World;
+            }
             batch.drawFunc.AddListener(
                 [
                     trans = transform,
@@ -1335,6 +1428,15 @@ namespace
         {
             RawDrawBatch batch;
             batch.zIndex = currIt->zIndex;
+            if (isRuntimeMode)
+            {
+                batch.renderSpace = RenderSpace::Camera;
+                batch.cameraId = UI_CAMERA_ID;
+            }
+            else
+            {
+                batch.renderSpace = RenderSpace::World;
+            }
             batch.drawFunc.AddListener(
                 [
                     trans = transform,
@@ -2009,7 +2111,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         tr.textBatchGroups.reserve(std::max<size_t>(4, chunkItems / 8));
         jobs.emplace_back(
             prevStart, prevEnd, currStart, currEnd,
-            alpha, shouldInterpolate,
+            alpha, shouldInterpolate, (ApplicationBase::CURRENT_MODE != ApplicationMode::Editor),
             &tr
         );
         jobHandles.push_back(jobSystem.Schedule(&jobs.back()));

@@ -2122,7 +2122,45 @@ LUMA_API uint32_t GpuBuffer_GetSize(GpuBufferHandle buffer);
 LUMA_API bool GpuBuffer_Write(GpuBufferHandle buffer, const void* data, uint32_t size, uint32_t offset);
 
 // =============================================================================
-// 相机 API
+// 相机管理器 API - 管理多个相机实例
+// =============================================================================
+
+/**
+ * @brief 创建一个新的相机。
+ * @param[in] id 相机的唯一字符串标识符。
+ * @return 如果创建成功返回true，如果ID已存在返回false。
+ */
+LUMA_API bool CameraManager_CreateCamera(const char* id);
+
+/**
+ * @brief 删除指定ID的相机。
+ * @param[in] id 要删除的相机ID。
+ * @return 如果删除成功返回true。不能删除当前激活的相机。
+ */
+LUMA_API bool CameraManager_DestroyCamera(const char* id);
+
+/**
+ * @brief 切换当前激活的相机。
+ * @param[in] id 要激活的相机ID。
+ * @return 如果切换成功返回true，如果ID不存在返回false。
+ */
+LUMA_API bool CameraManager_SetActiveCamera(const char* id);
+
+/**
+ * @brief 获取当前激活的相机ID。
+ * @return 当前激活的相机ID字符串。
+ */
+LUMA_API const char* CameraManager_GetActiveCameraId();
+
+/**
+ * @brief 检查指定ID的相机是否存在。
+ * @param[in] id 相机ID。
+ * @return 如果存在返回true。
+ */
+LUMA_API bool CameraManager_HasCamera(const char* id);
+
+// =============================================================================
+// 相机 API - 操作当前激活的相机
 // =============================================================================
 
 /**
@@ -2215,6 +2253,60 @@ LUMA_API void Camera_ScreenToWorld(float screenX, float screenY, float* worldX, 
  * @param[out] screenY 输出的屏幕 Y 坐标。
  */
 LUMA_API void Camera_WorldToScreen(float worldX, float worldY, float* screenX, float* screenY);
+
+// =============================================================================
+// 相机 By ID API - 操作指定ID的相机
+// =============================================================================
+
+/**
+ * @brief 获取指定ID相机的位置 X 坐标。
+ * @param[in] id 相机ID字符串。
+ * @return 相机 X 坐标，如果相机不存在返回0。
+ */
+LUMA_API float CameraById_GetPositionX(const char* id);
+
+/**
+ * @brief 获取指定ID相机的位置 Y 坐标。
+ * @param[in] id 相机ID字符串。
+ * @return 相机 Y 坐标，如果相机不存在返回0。
+ */
+LUMA_API float CameraById_GetPositionY(const char* id);
+
+/**
+ * @brief 设置指定ID相机的位置。
+ * @param[in] id 相机ID字符串。
+ * @param[in] x X 坐标。
+ * @param[in] y Y 坐标。
+ */
+LUMA_API void CameraById_SetPosition(const char* id, float x, float y);
+
+/**
+ * @brief 获取指定ID相机的缩放级别。
+ * @param[in] id 相机ID字符串。
+ * @return 缩放级别，如果相机不存在返回1.0。
+ */
+LUMA_API float CameraById_GetZoom(const char* id);
+
+/**
+ * @brief 设置指定ID相机的缩放级别。
+ * @param[in] id 相机ID字符串。
+ * @param[in] zoom 缩放级别。
+ */
+LUMA_API void CameraById_SetZoom(const char* id, float zoom);
+
+/**
+ * @brief 获取指定ID相机的旋转角度（弧度）。
+ * @param[in] id 相机ID字符串。
+ * @return 旋转角度（弧度），如果相机不存在返回0。
+ */
+LUMA_API float CameraById_GetRotation(const char* id);
+
+/**
+ * @brief 设置指定ID相机的旋转角度（弧度）。
+ * @param[in] id 相机ID字符串。
+ * @param[in] rotation 旋转角度（弧度）。
+ */
+LUMA_API void CameraById_SetRotation(const char* id, float rotation);
 
 // =============================================================================
 // 着色器预热 API

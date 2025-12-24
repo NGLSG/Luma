@@ -2,7 +2,11 @@
 
 #include "Cursor.h"
 #include "include/core/SkCanvas.h"
-#include "fstream"
+
+Camera::Camera()
+{
+    m_properties = CameraProperties{};
+}
 
 SkPoint Camera::ScreenToWorld(const SkPoint& screenPoint) const
 {
@@ -30,10 +34,10 @@ SkPoint Camera::WorldToScreen(const SkPoint& worldPoint) const
     return {screenX, screenY};
 }
 
-void Camera::SetProperties(const CamProperties& cam_properties)
+void Camera::SetProperties(const CameraProperties& properties)
 {
     std::unique_lock<std::shared_mutex> lock(m_mutex);
-    m_properties = cam_properties;
+    m_properties = properties;
 
     if (!std::isfinite(m_properties.position.fX) || !std::isfinite(m_properties.position.fY))
     {
@@ -61,7 +65,13 @@ void Camera::SetProperties(const CamProperties& cam_properties)
     }
 }
 
-SkM44 Camera::BuildViewMatrix()
+CameraProperties Camera::GetProperties() const
+{
+    std::shared_lock<std::shared_mutex> lock(m_mutex);
+    return m_properties;
+}
+
+SkM44 Camera::BuildViewMatrix() const
 {
     std::shared_lock<std::shared_mutex> lock(m_mutex);
     const auto props = m_properties;
@@ -86,13 +96,7 @@ void Camera::ApplyTo(SkCanvas* canvas) const
     canvas->translate(-props.position.x(), -props.position.y());
 }
 
-Camera::CamProperties Camera::GetProperties() const
-{
-    std::shared_lock<std::shared_mutex> lock(m_mutex);
-    return m_properties;
-}
-
-SkM44 Camera::GetViewProjectionMatrix()
+SkM44 Camera::GetViewProjectionMatrix() const
 {
     std::shared_lock<std::shared_mutex> lock(m_mutex);
     const auto props = m_properties;
@@ -106,6 +110,7 @@ SkM44 Camera::GetViewProjectionMatrix()
 
 void Camera::FillEngineData(EngineData& data) const
 {
+    std::shared_lock<std::shared_mutex> lock(m_mutex);
     SkPoint effectiveZoom = m_properties.GetEffectiveZoom();
     data.CameraPosition = {m_properties.position.x(), m_properties.position.y()};
     data.CameraScaleX = effectiveZoom.x();
@@ -113,5 +118,119 @@ void Camera::FillEngineData(EngineData& data) const
     data.CameraSinR = sin(m_properties.rotation);
     data.CameraCosR = cos(m_properties.rotation);
     data.ViewportSize = {m_properties.viewport.width(), m_properties.viewport.height()};
-    data.MousePosition = {(float)LumaCursor::GetInstance().GetPosition().x, (float)LumaCursor::GetInstance().GetPosition().y};
+    data.MousePosition = {
+        (float)LumaCursor::GetInstance().GetPosition().x, (float)LumaCursor::GetInstance().GetPosition().y
+    };
+}
+
+CameraManager& CameraManager::GetInstance()
+{
+    static CameraManager instance;
+    return instance;
+}
+
+CameraManager::CameraManager()
+{
+    m_cameras[DEFAULT_CAMERA_ID] = std::make_unique<Camera>();
+    m_cameras[UI_CAMERA_ID] = std::make_unique<Camera>();
+    m_activeCameraId = DEFAULT_CAMERA_ID;
+}
+
+bool CameraManager::CreateCamera(const std::string& id)
+{
+    std::unique_lock<std::shared_mutex> lock(m_managerMutex);
+    if (m_cameras.find(id) != m_cameras.end())
+    {
+        return false;
+    }
+    m_cameras[id] = std::make_unique<Camera>();
+    return true;
+}
+
+bool CameraManager::DestroyCamera(const std::string& id)
+{
+    std::unique_lock<std::shared_mutex> lock(m_managerMutex);
+
+    if (id == m_activeCameraId)
+    {
+        return false;
+    }
+
+    if (id == DEFAULT_CAMERA_ID || id == UI_CAMERA_ID)
+    {
+        return false;
+    }
+
+    auto it = m_cameras.find(id);
+    if (it == m_cameras.end())
+    {
+        return false;
+    }
+
+    m_cameras.erase(it);
+    return true;
+}
+
+Camera* CameraManager::GetCamera(const std::string& id)
+{
+    std::shared_lock<std::shared_mutex> lock(m_managerMutex);
+    auto it = m_cameras.find(id);
+    if (it != m_cameras.end())
+    {
+        return it->second.get();
+    }
+    return nullptr;
+}
+
+Camera& CameraManager::GetActiveCamera()
+{
+    std::shared_lock<std::shared_mutex> lock(m_managerMutex);
+    return *m_cameras.at(m_activeCameraId);
+}
+
+const Camera& CameraManager::GetActiveCamera() const
+{
+    std::shared_lock<std::shared_mutex> lock(m_managerMutex);
+    return *m_cameras.at(m_activeCameraId);
+}
+
+bool CameraManager::SetActiveCamera(const std::string& id)
+{
+    std::unique_lock<std::shared_mutex> lock(m_managerMutex);
+    if (m_cameras.find(id) == m_cameras.end())
+    {
+        return false; // ID不存在
+    }
+    m_activeCameraId = id;
+    return true;
+}
+
+const std::string& CameraManager::GetActiveCameraId() const
+{
+    std::shared_lock<std::shared_mutex> lock(m_managerMutex);
+    return m_activeCameraId;
+}
+
+bool CameraManager::HasCamera(const std::string& id) const
+{
+    std::shared_lock<std::shared_mutex> lock(m_managerMutex);
+    return m_cameras.find(id) != m_cameras.end();
+}
+
+std::vector<std::string> CameraManager::GetAllCameraIds() const
+{
+    std::shared_lock<std::shared_mutex> lock(m_managerMutex);
+    std::vector<std::string> ids;
+    ids.reserve(m_cameras.size());
+    for (const auto& [id, _] : m_cameras)
+    {
+        ids.push_back(id);
+    }
+    return ids;
+}
+
+Camera& CameraManager::GetUICamera()
+{
+    std::shared_lock<std::shared_mutex> lock(m_managerMutex);
+    return *m_cameras.at(UI_CAMERA_ID);
 }

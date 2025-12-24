@@ -4,6 +4,7 @@
 #include "../../Components/Transform.h"
 #include "../../Components/RelationshipComponent.h"
 #include "../../Components/ComponentRegistry.h"
+#include "../../Renderer/Camera.h"
 #include "ActivityComponent.h"
 #include "TagComponent.h"
 #include "../Loaders/PrefabLoader.h"
@@ -49,6 +50,7 @@ void RuntimeScene::CloneFromScene(const RuntimeScene& sourceScene)
 
     m_name = sourceScene.m_name;
     m_cameraProperties = sourceScene.m_cameraProperties;
+    m_uiCameraProperties = sourceScene.m_uiCameraProperties;
 
     std::unordered_map<entt::entity, entt::entity> entityMapping;
 
@@ -163,6 +165,7 @@ Data::SceneData RuntimeScene::SerializeToData()
     Data::SceneData sceneData;
     sceneData.name = m_name;
     sceneData.cameraProperties = m_cameraProperties;
+    sceneData.uiCameraProperties = m_uiCameraProperties;
 
     auto rootView = m_registry.view<ECS::IDComponent>(entt::exclude<ECS::ParentComponent>);
     for (auto entity : rootView)
@@ -189,11 +192,23 @@ void RuntimeScene::RemoveFromRoot(RuntimeGameObject go)
 void RuntimeScene::SetCameraProperties(const Camera::CamProperties& properties)
 {
     m_cameraProperties = properties;
+    CameraManager::GetInstance().GetActiveCamera().SetProperties(properties);
 }
 
 Camera::CamProperties& RuntimeScene::GetCameraProperties()
 {
     return m_cameraProperties;
+}
+
+void RuntimeScene::SetUICameraProperties(const Camera::CamProperties& properties)
+{
+    m_uiCameraProperties = properties;
+    CameraManager::GetInstance().GetUICamera().SetProperties(properties);
+}
+
+Camera::CamProperties& RuntimeScene::GetUICameraProperties()
+{
+    return m_uiCameraProperties;
 }
 
 void RuntimeScene::DestroyGameObject(RuntimeGameObject& gameObject)
@@ -227,7 +242,9 @@ void RuntimeScene::LoadFromData(const Data::SceneData& sceneData)
 {
     m_name = sceneData.name;
     m_cameraProperties = sceneData.cameraProperties;
-    Camera::GetInstance().SetProperties(sceneData.cameraProperties);
+    m_uiCameraProperties = sceneData.uiCameraProperties;
+    CameraManager::GetInstance().GetActiveCamera().SetProperties(sceneData.cameraProperties);
+    CameraManager::GetInstance().GetUICamera().SetProperties(sceneData.uiCameraProperties);
     m_registry.clear();
     m_rootGameObjects.clear();
     m_guidToEntityMap.clear();

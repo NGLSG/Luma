@@ -103,7 +103,14 @@ void GameViewPanel::Draw()
                     }
                     break;
                 }
-                Camera::GetInstance().SetProperties(cameraProperties);
+                CameraManager::GetInstance().GetActiveCamera().SetProperties(cameraProperties);
+                
+                auto& uiCamera = CameraManager::GetInstance().GetUICamera();
+                CameraProperties uiCamProps = uiCamera.GetProperties();
+                uiCamProps.viewport = cameraProperties.viewport;
+                uiCamProps.zoomFactor = cameraProperties.zoomFactor;
+                uiCamera.SetProperties(uiCamProps);
+                
                 m_context->graphicsBackend->SetActiveRenderTarget(m_gameViewTarget);
                 for (const auto& packet : m_context->renderQueue)
                 {
@@ -154,7 +161,7 @@ void GameViewPanel::renderParticlesGPU()
     if (m_particleRenderer->GetTotalParticleCount() == 0)
         return;
     EngineData engineData{};
-    Camera::GetInstance().FillEngineData(engineData);
+    CameraManager::GetInstance().GetActiveCamera().FillEngineData(engineData);
     engineData.CameraScaleY *= -1.0f;
     auto targetTexture = Nut::TextureA::CreateTextureA(
         m_gameViewTarget->GetTexture(), nutContext);

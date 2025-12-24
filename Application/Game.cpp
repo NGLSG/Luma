@@ -18,10 +18,12 @@
 #include "Renderer/Nut/ShaderStruct.h"
 #include "Renderer/Nut/TextureA.h"
 #include "Renderer/Nut/RenderPass.h"
+
 Game::Game(ApplicationConfig config) : ApplicationBase(config)
 {
     CURRENT_MODE = ApplicationMode::Runtime;
 }
+
 void Game::InitializeDerived()
 {
     ProjectSettings::GetInstance().LoadInRuntime();
@@ -38,7 +40,8 @@ void Game::InitializeDerived()
     m_context.window = m_window.get();
     m_context.graphicsBackend = m_graphicsBackend.get();
     m_context.renderSystem = m_renderSystem.get();
-    m_context.appMode = ApplicationMode::Runtime;
+    CURRENT_MODE = ApplicationMode::Runtime;
+    m_context.appMode = &CURRENT_MODE;
     SceneManager::GetInstance().Initialize(&m_context);
     Guid startupSceneGuid = ProjectSettings::GetInstance().GetStartScene();
     sk_sp<RuntimeScene> scene = SceneManager::GetInstance().LoadScene(startupSceneGuid);
@@ -51,6 +54,7 @@ void Game::InitializeDerived()
         LogError("致命错误：无法加载启动场景，GUID: {}", startupSceneGuid.ToString());
     }
 }
+
 void Game::Update(float deltaTime)
 {
     AssetManager::GetInstance().Update(deltaTime);
@@ -115,10 +119,18 @@ void Game::Update(float deltaTime)
             }
             break;
         }
-        Camera::GetInstance().SetProperties(cameraProps);
+        CameraManager::GetInstance().GetActiveCamera().SetProperties(cameraProps);
+        
+        auto& uiCamera = CameraManager::GetInstance().GetUICamera();
+        CameraProperties uiCamProps = uiCamera.GetProperties();
+        uiCamProps.viewport = cameraProps.viewport;
+        uiCamProps.zoomFactor = cameraProps.zoomFactor;
+        uiCamera.SetProperties(uiCamProps);
+        
         m_sceneRenderer->ExtractToRenderableManager(activeScene->GetRegistry());
     }
 }
+
 void Game::Render()
 {
     if (!m_graphicsBackend || m_graphicsBackend->IsDeviceLost())
@@ -152,6 +164,7 @@ void Game::Render()
     }
     m_graphicsBackend->PresentFrame();
 }
+
 void Game::ShutdownDerived()
 {
     SceneManager::GetInstance().Shutdown();
@@ -166,6 +179,7 @@ void Game::ShutdownDerived()
     }
     m_sceneRenderer.reset();
 }
+
 void Game::RenderParticles()
 {
     auto activeScene = SceneManager::GetInstance().GetCurrentScene();
@@ -186,7 +200,7 @@ void Game::RenderParticles()
     if (m_particleRenderer->GetTotalParticleCount() == 0)
         return;
     EngineData engineData{};
-    Camera::GetInstance().FillEngineData(engineData);
+    CameraManager::GetInstance().GetActiveCamera().FillEngineData(engineData);
     engineData.CameraScaleY *= -1.0f;
     auto targetTexture = nutContext->AcquireSwapChainTexture();
     if (!targetTexture)
