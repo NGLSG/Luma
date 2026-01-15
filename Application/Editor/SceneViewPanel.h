@@ -1,7 +1,13 @@
 #ifndef SCENEVIEWPANEL_H
 #define SCENEVIEWPANEL_H
+#include "AmbientZoneComponent.h"
+#include "AreaLightComponent.h"
 #include "ColliderComponent.h"
+#include "DirectionalLightComponent.h"
 #include "IEditorPanel.h"
+#include "LightProbeComponent.h"
+#include "PointLightComponent.h"
+#include "SpotLightComponent.h"
 #include "Sprite.h"
 #include "TextComponent.h"
 #include "TilemapComponent.h"
@@ -133,6 +139,27 @@ private:
     void drawParticlePreview(ImDrawList* drawList, const ImVec2& viewportScreenPos, const ImVec2& viewportSize);
     void setupTouchGestureCallbacks();
     void handleTouchNavigation(const ImVec2& viewportScreenPos, const ImVec2& viewportSize);
+    
+    // 光源 Gizmo 绘制
+    void drawLightGizmos(ImDrawList* drawList, const ImVec2& viewportScreenPos, const ImVec2& viewportSize);
+    void drawPointLightGizmo(ImDrawList* drawList, const ECS::TransformComponent& transform, 
+                             const struct ECS::PointLightComponent& light, bool isSelected);
+    void drawSpotLightGizmo(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                            const struct ECS::SpotLightComponent& light, bool isSelected);
+    void drawDirectionalLightGizmo(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                   const struct ECS::DirectionalLightComponent& light, bool isSelected);
+    
+    // 增强光照组件 Gizmo 绘制 (Requirements: 13.1, 13.2, 13.3)
+    void drawAreaLightGizmo(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                            const struct ECS::AreaLightComponent& light, bool isSelected);
+    void drawAmbientZoneGizmo(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                              const struct ECS::AmbientZoneComponent& zone, bool isSelected);
+    void drawLightProbeGizmo(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                             const struct ECS::LightProbeComponent& probe, bool isSelected);
+    
+    // 光照调试视图
+    void drawLightingDebugOverlay(ImDrawList* drawList, const ImVec2& viewportScreenPos, const ImVec2& viewportSize);
+    void drawLightingDebugUI();
 private:
     std::vector<ColliderHandle> m_colliderHandles; 
     std::shared_ptr<RenderTarget> m_sceneViewTarget; 
@@ -159,5 +186,21 @@ private:
     // 触摸手势支持(Android Pad)
     TouchGestureHandler m_touchGesture;
     bool m_touchGestureInitialized = false;
+    
+    // 光照调试视图
+    enum class LightingDebugMode
+    {
+        None,           ///< 正常渲染
+        LightingOnly,   ///< 仅显示光照贡献
+        LightLayers,    ///< 显示光照层
+        // 缓冲区调试视图 (Requirements: 12.5)
+        LightBuffer,    ///< 显示光照缓冲区
+        ShadowBuffer,   ///< 显示阴影缓冲区
+        EmissionBuffer, ///< 显示自发光缓冲区
+        NormalBuffer,   ///< 显示法线缓冲区
+        GBuffer         ///< 显示 G-Buffer
+    };
+    LightingDebugMode m_lightingDebugMode = LightingDebugMode::None;
+    uint32_t m_debugLayerMask = 0xFFFFFFFF;  ///< 调试时显示的光照层掩码
 };
 #endif

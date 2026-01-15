@@ -303,6 +303,24 @@ namespace Nut
         }
     }
 
+    void Pipeline::ClearBindGroupEntries(size_t groupIdx)
+    {
+        auto it = m_groups.find(groupIdx);
+        if (it != m_groups.end())
+        {
+            it->second.ClearEntries();
+        }
+    }
+
+    void Pipeline::RemoveBindGroupEntry(size_t groupIdx, uint32_t bindingIndex)
+    {
+        auto it = m_groups.find(groupIdx);
+        if (it != m_groups.end())
+        {
+            it->second.RemoveEntry(bindingIndex);
+        }
+    }
+
     void Pipeline::SetReservedBuffers(const EngineData& engineData, std::vector<InstanceData>& instanceData,
                                       const std::shared_ptr<NutContext>& ctx)
     {

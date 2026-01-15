@@ -57,3 +57,5 @@ External/*
 !External/cmake/
 *.gz
 Android
+wiki/
+.kiro

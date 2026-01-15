@@ -8,6 +8,7 @@
 #include "Nut/ShaderCache.h"
 #include "Logger.h"
 #include "Resources/RuntimeAsset/RuntimeWGSLMaterial.h"
+#include "LightingRenderer.h"
 #include "include/gpu/graphite/Image.h"
 #include "include/core/SkCanvas.h"
 #if defined(_WIN32)
@@ -788,6 +789,107 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
     }
     return defaultMaterial.get();
+}
+
+LightingRenderer& GraphicsBackend::GetLightingRenderer()
+{
+    auto& renderer = LightingRenderer::GetInstance();
+    if (!renderer.IsInitialized() && nutContext)
+    {
+        renderer.Initialize(nutContext);
+    }
+    return renderer;
+}
+
+RuntimeWGSLMaterial* GraphicsBackend::CreateOrGetLitMaterial()
+{
+    static std::unique_ptr<RuntimeWGSLMaterial> litMaterial = nullptr;
+
+    static uint32_t cachedSampleCount = 0;
+    static std::weak_ptr<Nut::NutContext> cachedContext;
+
+    uint32_t currentSampleCount = GetSampleCount();
+
+    bool needsRebuild = !litMaterial;
+    if (litMaterial)
+    {
+        if (cachedSampleCount != currentSampleCount) needsRebuild = true;
+        if (cachedContext.lock() != nutContext) needsRebuild = true;
+    }
+
+    if (needsRebuild)
+    {
+        litMaterial = std::make_unique<RuntimeWGSLMaterial>();
+
+        // 使用 SpriteLit shader - 带光照的精灵渲染
+        // 注意：EmissionGlobalData 和 emissionGlobal 绑定已在 SpriteLitCore.wgsl 中定义
+        const std::string litShader = R"(
+// SpriteLit - 带光照的2D精灵渲染着色器
+// Feature: 2d-lighting-enhancement (Emission support)
+import Std;
+import Lighting;
+import SpriteLit;
+
+// 注意：EmissionGlobalData 和 emissionGlobal 绑定已在 SpriteLitCore.wgsl 中定义
+
+@vertex
+fn vs_main(
+    input: VertexInput,
+    @builtin(instance_index) instanceIndex: u32
+) -> SpriteLitVertexOutput {
+    return TransformSpriteLitVertex(input, instanceIndex);
+}
+
+@fragment
+fn fs_main(input: SpriteLitVertexOutput) -> @location(0) vec4<f32> {
+    // 采样主纹理
+    var texColor = textureSample(mainTexture, mainSampler, input.uv);
+    
+    // 应用实例颜色
+    var baseColor = texColor * input.color;
+    
+    // 计算光照（带阴影）
+    var totalLight = CalculateTotalLightingWithShadow(input.worldPos, input.lightLayer);
+    
+    // 应用光照到基础颜色
+    var litColor = baseColor.rgb * totalLight;
+    
+    // 计算自发光贡献（独立于场景光照）
+    // Feature: 2d-lighting-enhancement
+    var emissionContribution = vec3<f32>(0.0);
+    if (emissionGlobal.emissionEnabled != 0u) {
+        // 自发光 = 自发光颜色 × 自发光强度 × 全局自发光缩放
+        let emissionColor = input.emissionColor.rgb;
+        let emissionIntensity = input.emissionIntensity * emissionGlobal.emissionScale;
+        emissionContribution = emissionColor * emissionIntensity;
+    }
+    
+    // 最终颜色 = 光照颜色 + 自发光（加法混合，不受光照影响）
+    var finalColor = vec4<f32>(litColor + emissionContribution, baseColor.a);
+    
+    // 丢弃完全透明的像素
+    if (finalColor.a < 0.001) {
+        discard;
+    }
+    
+    return finalColor;
+}
+)";
+
+        if (litMaterial->Initialize(nutContext, litShader, GetSurfaceFormat(), currentSampleCount))
+        {
+            cachedSampleCount = currentSampleCount;
+            cachedContext = nutContext;
+            LogInfo("Lit WGSL Material initialized successfully.");
+        }
+        else
+        {
+            LogError("Failed to initialize lit material.");
+            litMaterial.reset();
+            return nullptr;
+        }
+    }
+    return litMaterial.get();
 }
 
 void GraphicsBackend::shutdown()

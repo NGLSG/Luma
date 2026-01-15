@@ -363,6 +363,12 @@ namespace Nut
 
         // 清理缓存（当资源整体变化时可调用）
         void ClearBindGroupCache() { m_bindGroupCache.clear(); }
+        
+        // 清除指定组的所有绑定条目
+        void ClearBindGroupEntries(size_t groupIdx);
+        
+        // 移除指定组的指定绑定条目
+        void RemoveBindGroupEntry(size_t groupIdx, uint32_t bindingIndex);
 
         // 设置引擎保留的缓冲区（group0/binding0,1），并清理缓存以防缓冲区重建后句柄变化。
         void SetReservedBuffers(const EngineData& engineData, std::vector<InstanceData>& instanceData,

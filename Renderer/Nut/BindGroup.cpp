@@ -164,4 +164,17 @@ namespace Nut
         m_bindGroup = cached;
         m_isBuild = true;
     }
+
+    void BindGroup::RemoveEntry(uint32_t bindingIndex)
+    {
+        auto it = std::remove_if(m_BindGroupEntries.begin(), m_BindGroupEntries.end(),
+            [bindingIndex](const wgpu::BindGroupEntry& entry) {
+                return entry.binding == bindingIndex;
+            });
+        if (it != m_BindGroupEntries.end())
+        {
+            m_BindGroupEntries.erase(it, m_BindGroupEntries.end());
+            m_isBuild = false;
+        }
+    }
 }

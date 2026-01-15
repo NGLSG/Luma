@@ -7,6 +7,7 @@
 #include <unordered_map> // Added for std::unordered_map
 
 #include "IRuntimeAsset.h"
+#include "Utils/LayerMask.h"
 
 /// @brief 组件注册信息结构体的前向声明。
 struct ComponentRegistration;
@@ -99,6 +100,38 @@ public:
      * @param active 要设置的激活状态（true为激活，false为非激活）。
      */
     void SetActive(bool active);
+
+    /**
+     * @brief 获取游戏对象的层掩码
+     * @return 层掩码
+     */
+    LayerMask GetLayers();
+    
+    /**
+     * @brief 设置游戏对象的层掩码
+     * @param layers 层掩码
+     */
+    void SetLayers(LayerMask layers);
+    
+    /**
+     * @brief 获取游戏对象的层掩码值（用于与 LayerMask 进行位运算）
+     * @return 层掩码值
+     */
+    uint32_t GetLayerMask();
+    
+    /**
+     * @brief 检查游戏对象是否在指定层
+     * @param layer 层索引（0-31）
+     * @return 是否在该层
+     */
+    bool IsInLayer(int layer);
+    
+    /**
+     * @brief 设置游戏对象是否在指定层
+     * @param layer 层索引（0-31）
+     * @param enabled 是否启用
+     */
+    void SetInLayer(int layer, bool enabled);
 
     /**
      * @brief 获取游戏对象的名称。

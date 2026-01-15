@@ -17,6 +17,7 @@ class PlatformWindow;
 class GraphicsBackend;
 class RenderSystem;
 #include "../Components/Core.h"
+#include "../Components/LightingTypes.h"
 
 /**
  * @brief 输入状态结构体，用于存储用户输入信息。
@@ -61,6 +62,16 @@ struct EngineContext
     // eventsForSim 由模拟线程在执行 'commandsForSim' 队列时更新，并在 Update 期间读取。
     std::vector<SDL_Event> eventsForSim; ///< 供模拟线程安全读取的事件列表。
     std::vector<SDL_Event> eventsWriting; ///< 供主线程（轮询）写入的事件列表。
+    
+    // 后处理效果预览开关 (Requirements: 13.4)
+    bool postProcessBloomEnabled = true;           ///< Bloom 效果开关
+    bool postProcessLightShaftsEnabled = true;     ///< 光束效果开关
+    bool postProcessFogEnabled = true;             ///< 雾效开关
+    bool postProcessToneMappingEnabled = true;     ///< 色调映射开关
+    bool postProcessColorGradingEnabled = true;    ///< 颜色分级开关
+    
+    // 质量等级快速切换 (Requirements: 13.5)
+    ECS::QualityLevel currentQualityLevel = ECS::QualityLevel::High; ///< 当前质量等级
 };
 
 #endif // ENGINECONTEXT_H

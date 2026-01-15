@@ -48,13 +48,22 @@ struct alignas(16) InstanceData
         float width, height;
     } size;
 
+    uint32_t lightLayer;  ///< 光照层掩码
+    uint32_t padding;     ///< 对齐填充
+
+    // 自发光数据 (Feature: 2d-lighting-enhancement)
     struct
     {
-        float unused1, unused2;
-    } padding;
+        float r, g, b, a;
+    } emissionColor;
+
+    float emissionIntensity;  ///< 自发光强度（支持 HDR > 1.0）
+    float emissionPadding1;   ///< 对齐填充
+    float emissionPadding2;   ///< 对齐填充
+    float emissionPadding3;   ///< 对齐填充
 };
 
-static_assert(sizeof(InstanceData) == 80, "InstanceData size must be 80 bytes to match WGSL layout.");
+static_assert(sizeof(InstanceData) == 112, "InstanceData size must be 112 bytes to match WGSL layout.");
 static_assert(sizeof(InstanceData) % 16 == 0, "InstanceData size must be multiple of 16 bytes.");
 
 struct Vertex

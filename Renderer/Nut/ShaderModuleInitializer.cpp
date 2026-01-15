@@ -101,11 +101,6 @@ namespace Nut
                     LogDebug("Registered shader module '{}' from file: {}",
                              moduleName, path.filename().string());
                 }
-                else
-                {
-                    LogWarn("Shader file '{}' does not contain a valid export statement. Skipping.",
-                            path.filename().string());
-                }
             }
         }
         catch (const std::filesystem::filesystem_error& e)

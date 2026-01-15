@@ -7,6 +7,11 @@
 #include "HydrateResources.h"
 #include "InputTextSystem.h"
 #include "InteractionSystem.h"
+#include "LightingSystem.h"
+#include "ShadowRenderer.h"
+#include "IndirectLightingSystem.h"
+#include "AmbientZoneSystem.h"
+#include "AreaLightSystem.h"
 #include "PhysicsSystem.h"
 #if !defined(LUMA_DISABLE_SCRIPTING)
 #include "ScriptingSystem.h"
@@ -222,6 +227,11 @@ void SceneManager::setupRuntimeSystems(sk_sp<RuntimeScene> scene, EngineContext*
 #endif
         scene->AddSystem<Systems::AnimationSystem>();
         scene->AddSystem<Systems::ParticleSystem>();
+        scene->AddSystemToMainThread<Systems::AmbientZoneSystem>();
+        scene->AddSystemToMainThread<Systems::AreaLightSystem>();
+        scene->AddSystemToMainThread<Systems::LightingSystem>();
+        scene->AddSystemToMainThread<Systems::ShadowRenderer>();
+        scene->AddSystemToMainThread<Systems::IndirectLightingSystem>();
         LogInfo("运行时系统已配置完成，场景: {}", scene->GetName());
     };
     if (context)

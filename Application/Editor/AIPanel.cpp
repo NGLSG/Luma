@@ -21,6 +21,11 @@
 #include "ButtonSystem.h"
 #include "CommonUIControlSystem.h"
 #include "InputTextSystem.h"
+#include "LightingSystem.h"
+#include "ShadowRenderer.h"
+#include "IndirectLightingSystem.h"
+#include "AmbientZoneSystem.h"
+#include "AreaLightSystem.h"
 #include "../Systems/HydrateResources.h"
 #include "../Systems/TransformSystem.h"
 #include "../Systems/PhysicsSystem.h"
@@ -2322,6 +2327,11 @@ C# Scripting Example
                     playScene->AddSystem<Systems::ScriptingSystem>();
                     playScene->AddSystem<Systems::AnimationSystem>();
                     playScene->AddSystem<Systems::ParticleSystem>();
+                    playScene->AddSystemToMainThread<Systems::AmbientZoneSystem>();
+                    playScene->AddSystemToMainThread<Systems::AreaLightSystem>();
+                    playScene->AddSystemToMainThread<Systems::LightingSystem>();
+                    playScene->AddSystemToMainThread<Systems::ShadowRenderer>();
+                    playScene->AddSystemToMainThread<Systems::IndirectLightingSystem>();
                     SceneManager::GetInstance().SetCurrentScene(playScene);
                     playScene->Activate(*c->engineContext);
                     c->activeScene = playScene;

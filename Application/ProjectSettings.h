@@ -148,6 +148,15 @@ public:
     void AddTag(const std::string& tag);
     void RemoveTag(const std::string& tag);
     void EnsureDefaultTags();
+    
+public:
+    // Layer 管理（类似 Unity 的 Layer 系统）
+    const std::map<int, std::string>& GetLayers() const { return m_layers; }
+    void SetLayers(const std::map<int, std::string>& layers) { m_layers = layers; EnsureDefaultLayers(); }
+    void SetLayerName(int layer, const std::string& name);
+    const std::string& GetLayerName(int layer) const;
+    void EnsureDefaultLayers();
+    
 private:
     ProjectSettings() = default;
     ~ProjectSettings() override = default;
@@ -171,6 +180,7 @@ private:
     std::string m_scriptDebugAddress = "127.0.0.1";
     int m_scriptDebugPort = 56000;
     std::vector<std::string> m_tags;
+    std::map<int, std::string> m_layers; ///< 层名称映射 (层索引 -> 层名称)
     std::string m_androidPackageName = "com.lumaengine.game";
     AndroidScreenOrientation m_androidScreenOrientation = AndroidScreenOrientation::Portrait;
     std::filesystem::path m_androidKeystorePath;

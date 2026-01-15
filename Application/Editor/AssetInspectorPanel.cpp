@@ -443,7 +443,7 @@ void AssetInspectorPanel::applyChanges()
     const std::vector<std::string> resolvedGroups = m_groupDirty ? ParseGroupNames(m_groupNamesInput)
                                                                   : std::vector<std::string>{};
 
-    LogInfo("正在为 %zu 个资产应用 %zu 项设置更改...",
+    LogInfo("正在为 {} 个资产应用 {} 项设置更改...",
             m_currentEditingPaths.size(),
             m_dirtyProperties.size()
             + (m_addressDirty ? 1 : 0)

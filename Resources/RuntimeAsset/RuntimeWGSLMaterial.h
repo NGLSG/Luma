@@ -125,6 +125,15 @@ public:
     bool IsValid();
 
     void SetSourceGuid(const Guid& guid);
+    
+    /**
+     * @brief 检查材质是否使用了 Lighting 模块
+     * @return 如果 shader 代码中包含 "import Lighting" 则返回 true
+     */
+    bool UsesLightingModule() const;
+
+private:
+    bool m_usesLightingModule = false;
 };
 
 template <typename T>

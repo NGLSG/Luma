@@ -26,7 +26,14 @@ struct InstanceData {
     color: vec4<f32>,
     uvRect: vec4<f32>,
     size: vec2<f32>,
-    padding: vec2<f32>,
+    lightLayer: u32,      // 光照层掩码
+    padding: u32,
+    // 自发光数据 (Feature: 2d-lighting-enhancement)
+    emissionColor: vec4<f32>,
+    emissionIntensity: f32,
+    emissionPadding1: f32,
+    emissionPadding2: f32,
+    emissionPadding3: f32,
 };
 
 struct VertexInput {

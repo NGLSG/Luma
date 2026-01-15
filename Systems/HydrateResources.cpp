@@ -14,6 +14,8 @@
 #include "../Components/ScriptComponent.h"
 #include "../Resources/Loaders/TextureLoader.h"
 #include "../Resources/Loaders/MaterialLoader.h"
+#include "../Resources/Loaders/ShaderLoader.h"
+#include "../Utils/BuiltinShaders.h"
 #include "Event/Events.h"
 #include "Loaders/CSharpScriptLoader.h"
 #include "Loaders/FontLoader.h"
@@ -93,7 +95,8 @@ namespace Systems
                     for (auto entity : spriteView)
                     {
                         auto& sprite = spriteView.get<ECS::SpriteComponent>(entity);
-                        if (sprite.textureHandle.assetGuid == event.guid)
+                        if (sprite.textureHandle.assetGuid == event.guid ||
+                            sprite.emissionMapHandle.assetGuid == event.guid)
                         {
                             OnSpriteUpdated(registry, entity);
                         }
@@ -269,10 +272,33 @@ namespace Systems
             materialHandle))
         {
             auto nutContext = m_context->graphicsBackend->GetNutContext();
-            auto shaderLan = AssetManager::GetInstance().GetMetadata(
-                AssetManager::GetInstance().GetMetadata(sprite.materialHandle.assetGuid)->importerSettings.
-                                            as<Data::MaterialDefinition>().shaderHandle)->importerSettings.as<
-                Data::ShaderData>().language;
+            
+            // 获取材质定义
+            auto materialMeta = AssetManager::GetInstance().GetMetadata(sprite.materialHandle.assetGuid);
+            if (!materialMeta)
+            {
+                LogError("Failed to get material metadata: {}", sprite.materialHandle.assetGuid.ToString());
+                return;
+            }
+            
+            auto materialDef = materialMeta->importerSettings.as<Data::MaterialDefinition>();
+            
+            // 获取shader语言，支持内建shader
+            Data::ShaderLanguage shaderLan = Data::ShaderLanguage::WGSL;
+            if (BuiltinShaders::IsBuiltinShaderGuid(materialDef.shaderHandle.assetGuid))
+            {
+                // 内建shader都是WGSL
+                shaderLan = Data::ShaderLanguage::WGSL;
+            }
+            else
+            {
+                auto shaderMeta = AssetManager::GetInstance().GetMetadata(materialDef.shaderHandle.assetGuid);
+                if (shaderMeta && shaderMeta->importerSettings.IsDefined())
+                {
+                    shaderLan = shaderMeta->importerSettings.as<Data::ShaderData>().language;
+                }
+            }
+            
             if (nutContext && shaderLan == Data::ShaderLanguage::WGSL)
             {
                 sprite.wgslMaterial = materialLoader.LoadWGSLMaterial(sprite.materialHandle.assetGuid, nutContext);
@@ -308,6 +334,23 @@ namespace Systems
         {
             sprite.material.reset();
             sprite.wgslMaterial.reset();
+        }
+
+        // 加载自发光贴图
+        // Feature: 2d-lighting-enhancement
+        // Requirements: 4.1
+        if (sprite.emissionMapHandle.Valid() && (!sprite.emissionMapImage || sprite.lastEmissionMapHandle != sprite.emissionMapHandle))
+        {
+            sprite.emissionMapImage = textureLoader.LoadAsset(sprite.emissionMapHandle.assetGuid);
+            if (!sprite.emissionMapImage)
+            {
+                LogError("Failed to load emission map with GUID: {}", sprite.emissionMapHandle.assetGuid.ToString());
+            }
+            sprite.lastEmissionMapHandle = sprite.emissionMapHandle;
+        }
+        else if (!sprite.emissionMapHandle.Valid())
+        {
+            sprite.emissionMapImage.reset();
         }
     }
 

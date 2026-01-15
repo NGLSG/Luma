@@ -156,6 +156,10 @@ namespace
             int filterQuality = 0;
             int wrapMode = 0;
             float ppuScaleFactor = 1.0f;
+            uint32_t lightLayer = 0xFFFFFFFF; ///< 光照层掩码
+            // 自发光数据 (Feature: 2d-lighting-enhancement)
+            ECS::Color emissionColor = ECS::Colors::White;
+            float emissionIntensity = 0.0f;
             std::vector<RenderableTransform> transforms;
         };
         std::vector<WGPUBatchGroup> wgpuBatchGroups;
@@ -1935,6 +1939,7 @@ namespace
                 batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(spriteData.filterQuality));
                 batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(spriteData.wrapMode));
                 batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(currIt->zIndex));
+                batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(spriteData.lightLayer));
                 auto keyIt = result->wgpuGroupIndices.find(batchKey);
                 size_t groupIndex;
                 bool createdNewGroup = false;
@@ -1953,6 +1958,10 @@ namespace
                     group.filterQuality = spriteData.filterQuality;
                     group.wrapMode = spriteData.wrapMode;
                     group.ppuScaleFactor = spriteData.ppuScaleFactor;
+                    group.lightLayer = spriteData.lightLayer;
+                    // 自发光数据 (Feature: 2d-lighting-enhancement)
+                    group.emissionColor = spriteData.emissionColor;
+                    group.emissionIntensity = spriteData.emissionIntensity;
                     group.transforms.reserve(32);
                     createdNewGroup = true;
                 }
@@ -2202,6 +2211,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
             batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(threadGroup.filterQuality));
             batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(threadGroup.wrapMode));
             batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(threadGroup.zIndex));
+            batchKey = hash_combine_u64(batchKey, static_cast<uint64_t>(threadGroup.lightLayer));
             auto it = wgpuGroupIndices.find(batchKey);
             if (it == wgpuGroupIndices.end())
             {
@@ -2295,7 +2305,11 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
                 .filterQuality = group.filterQuality,
                 .wrapMode = group.wrapMode,
                 .ppuScaleFactor = group.ppuScaleFactor,
-                .count = count
+                .count = count,
+                .lightLayer = group.lightLayer,
+                // 自发光数据 (Feature: 2d-lighting-enhancement)
+                .emissionColor = group.emissionColor,
+                .emissionIntensity = group.emissionIntensity
             }
         });
     }

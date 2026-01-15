@@ -1,6 +1,8 @@
 #include "InspectorUI.h"
 
 #include "PopupManager.h"
+#include "BuiltinShaders.h"
+#include "../Application/LayerManager.h"
 #include "../Resources/RuntimeAsset/RuntimeGameObject.h"
 #include "../Application/SceneManager.h"
 #include "../Resources/AssetManager.h"
@@ -26,6 +28,77 @@ bool InspectorUI::DrawString(const std::string& label, char* buffer, size_t buff
 bool InspectorUI::DrawInt(const std::string& label, int& value, float speed)
 {
     return ImGui::DragInt(label.c_str(), &value, speed);
+}
+
+bool InspectorUI::DrawUInt32(const std::string& label, uint32_t& value, float speed)
+{
+    int intValue = static_cast<int>(value);
+    if (ImGui::DragInt(label.c_str(), &intValue, speed, 0, INT_MAX))
+    {
+        value = static_cast<uint32_t>(std::max(0, intValue));
+        return true;
+    }
+    return false;
+}
+
+bool InspectorUI::DrawLayerMask(const std::string& label, LayerMask& value)
+{
+    bool changed = false;
+    
+    // 显示当前状态的简短描述
+    const char* statusText = (value.value == 0) ? "(Nothing)" : 
+                             (value.value == 0xFFFFFFFF) ? "(Everything)" : "";
+    
+    char treeLabel[128];
+    snprintf(treeLabel, sizeof(treeLabel), "%s %s", label.c_str(), statusText);
+    
+    if (ImGui::TreeNode(treeLabel))
+    {
+        // 提示信息
+        if (value.value == 0)
+        {
+            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Not affected by any lights");
+        }
+        
+        // 显示32个光照层的复选框
+        for (int i = 0; i < LayerManager::MAX_LAYERS; ++i)
+        {
+            std::string layerName = LayerManager::GetDisplayName(i);
+            
+            char layerLabel[64];
+            snprintf(layerLabel, sizeof(layerLabel), "%d: %s", i, layerName.c_str());
+            
+            bool layerEnabled = value.Contains(i);
+            if (ImGui::Checkbox(layerLabel, &layerEnabled))
+            {
+                value.Set(i, layerEnabled);
+                changed = true;
+            }
+            
+            // 每行显示2个（因为名称可能较长）
+            if ((i + 1) % 2 != 0 && i < LayerManager::MAX_LAYERS - 1)
+                ImGui::SameLine(200.0f);
+        }
+        
+        ImGui::Separator();
+        
+        // 快捷按钮
+        if (ImGui::Button("Everything"))
+        {
+            value = LayerMask::All();
+            changed = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Nothing"))
+        {
+            value = LayerMask::None();
+            changed = true;
+        }
+        
+        ImGui::TreePop();
+    }
+    
+    return changed;
 }
 
 bool InspectorUI::DrawVector2f(const std::string& label, ECS::Vector2f& value, float speed)
@@ -109,6 +182,14 @@ bool InspectorUI::DrawAssetHandle(const std::string& label, AssetHandle& handle,
     };
     addCallback();
     bool valueChanged = false;
+    
+    // 检查是否有来自popup的值变更
+    if (s_assetPickerValueChanged && s_assetPickerTarget == &handle)
+    {
+        valueChanged = true;
+        s_assetPickerValueChanged = false;
+    }
+    
     ImGui::PushID(label.c_str());
 
     
@@ -119,8 +200,17 @@ bool InspectorUI::DrawAssetHandle(const std::string& label, AssetHandle& handle,
     std::string displayName = "[None]";
     if (handle.Valid())
     {
-        displayName = AssetManager::GetInstance().GetAssetName(handle.assetGuid);
-        if (displayName.empty()) displayName = "[Missing Asset]";
+        // 首先检查是否为内建shader
+        std::string builtinName = BuiltinShaders::GetBuiltinShaderName(handle.assetGuid);
+        if (!builtinName.empty())
+        {
+            displayName = builtinName;
+        }
+        else
+        {
+            displayName = AssetManager::GetInstance().GetAssetName(handle.assetGuid);
+            if (displayName.empty()) displayName = "[Missing Asset]";
+        }
     }
 
     
@@ -198,6 +288,7 @@ void InspectorUI::DrawAssetPickerPopup(const UIDrawData& callbacks)
     if (ImGui::Selectable("[None]"))
     {
         *s_assetPickerTarget = AssetHandle();
+        s_assetPickerValueChanged = true;
         if (callbacks.onValueChanged) callbacks.onValueChanged.Invoke();
         ImGui::CloseCurrentPopup();
     }
@@ -205,6 +296,32 @@ void InspectorUI::DrawAssetPickerPopup(const UIDrawData& callbacks)
     std::string searchFilter = s_assetPickerSearchBuffer;
     std::transform(searchFilter.begin(), searchFilter.end(), searchFilter.begin(), ::tolower);
 
+    // 如果是Shader类型，显示内建shader选项
+    if (s_assetPickerFilterType == AssetType::Shader)
+    {
+        ImGui::Separator();
+        ImGui::TextDisabled("-- 内建着色器 --");
+        
+        for (const auto& builtin : BuiltinShaders::GetAllBuiltinShaders())
+        {
+            std::string lowerName = builtin.name;
+            std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+            
+            if (searchFilter.empty() || lowerName.find(searchFilter) != std::string::npos)
+            {
+                if (ImGui::Selectable(builtin.name.c_str()))
+                {
+                    s_assetPickerTarget->assetGuid = Guid::FromString(builtin.guidStr);
+                    s_assetPickerValueChanged = true;
+                    if (callbacks.onValueChanged) callbacks.onValueChanged.Invoke();
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+        }
+        
+        ImGui::Separator();
+        ImGui::TextDisabled("-- 项目着色器 --");
+    }
 
     {
         const auto& assetDb = AssetManager::GetInstance().GetAssetDatabase();
@@ -213,11 +330,15 @@ void InspectorUI::DrawAssetPickerPopup(const UIDrawData& callbacks)
             if (s_assetPickerFilterType == AssetType::Unknown || meta.type == s_assetPickerFilterType)
             {
                 std::string assetName = meta.assetPath.filename().string();
-                if (searchFilter.empty() || std::string::npos != assetName.find(searchFilter))
+                std::string lowerAssetName = assetName;
+                std::transform(lowerAssetName.begin(), lowerAssetName.end(), lowerAssetName.begin(), ::tolower);
+                
+                if (searchFilter.empty() || lowerAssetName.find(searchFilter) != std::string::npos)
                 {
                     if (ImGui::Selectable(assetName.c_str()))
                     {
                         s_assetPickerTarget->assetGuid = meta.guid;
+                        s_assetPickerValueChanged = true;
                         if (callbacks.onValueChanged) callbacks.onValueChanged.Invoke();
                         ImGui::CloseCurrentPopup();
                     }

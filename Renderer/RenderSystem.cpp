@@ -22,6 +22,7 @@
 
 #include "Profiler.h"
 #include "RuntimeAsset/RuntimeWGSLMaterial.h"
+#include "LightingRenderer.h"
 
 static SkFilterMode GetSkFilterMode(int quality)
 {
@@ -1080,7 +1081,32 @@ void RenderSystem::RenderSystemImpl::DrawWGPUSpriteBatch(const WGPUSpriteBatch& 
 {
     if (batch.count == 0) return;
 
-    auto materialToUse = batch.material ? batch.material : backend.CreateOrGetDefaultMaterial();
+    // 确定是否需要光照
+    // 只有当 LightingRenderer 有活跃的 LightingSystem 且有光源时才使用光照
+    bool needsLighting = false;
+    auto& lightingRenderer = backend.GetLightingRenderer();
+    if (lightingRenderer.IsInitialized() && lightingRenderer.GetLightCount() > 0 && batch.lightLayer != 0)
+    {
+        needsLighting = true;
+    }
+    
+    // 选择材质：
+    // 1. 如果提供了自定义材质，使用自定义材质
+    // 2. 如果需要光照且没有自定义材质，使用 lit 材质
+    // 3. 否则使用默认材质
+    RuntimeWGSLMaterial* materialToUse = batch.material;
+    if (!materialToUse)
+    {
+        if (needsLighting)
+        {
+            materialToUse = backend.CreateOrGetLitMaterial();
+        }
+        if (!materialToUse)
+        {
+            materialToUse = backend.CreateOrGetDefaultMaterial();
+        }
+    }
+    
     if (!materialToUse)
     {
         LogError("RenderSystem::RenderSystemImpl::DrawWGPUSpriteBatch: No valid material to use for WGPU sprite batch.");
@@ -1157,7 +1183,15 @@ void RenderSystem::RenderSystemImpl::DrawWGPUSpriteBatch(const WGPUSpriteBatch& 
         instanceDatas[i].color = {c.r, c.g, c.b, c.a};
         instanceDatas[i].uvRect = {uvX, uvY, uvW, uvH};
         instanceDatas[i].size = {worldW, worldH};
-        instanceDatas[i].padding = {0.0f, 0.0f};
+        instanceDatas[i].lightLayer = batch.lightLayer;
+        instanceDatas[i].padding = 0;
+        
+        // 自发光数据 (Feature: 2d-lighting-enhancement)
+        instanceDatas[i].emissionColor = {batch.emissionColor.r, batch.emissionColor.g, batch.emissionColor.b, batch.emissionColor.a};
+        instanceDatas[i].emissionIntensity = batch.emissionIntensity;
+        instanceDatas[i].emissionPadding1 = 0.0f;
+        instanceDatas[i].emissionPadding2 = 0.0f;
+        instanceDatas[i].emissionPadding3 = 0.0f;
     }
 
     EngineData engineData{};
@@ -1210,6 +1244,20 @@ void RenderSystem::RenderSystemImpl::DrawWGPUSpriteBatch(const WGPUSpriteBatch& 
     {
         LogError("RenderSystem: Failed to swap texture in material.");
         return;
+    }
+
+    // 绑定光照数据到 Group 1
+    // 如果需要光照，或者材质使用了 Lighting 模块，都需要绑定光照数据
+    // 这样即使没有活跃光源，使用 Lighting 模块的自定义材质也能正常工作
+    bool materialNeedsLighting = materialToUse && materialToUse->UsesLightingModule();
+    if (needsLighting || materialNeedsLighting)
+    {
+        auto& lightingRenderer = backend.GetLightingRenderer();
+        if (lightingRenderer.IsInitialized())
+        {
+            // 绑定光照数据到 Group 1，阴影数据到 Group 2，间接光照到 Group 3
+            lightingRenderer.BindAllLightingDataWithIndirect(pipeline, 1, 2, 3);
+        }
     }
 
     Nut::ColorAttachmentBuilder attachmentBuilder;

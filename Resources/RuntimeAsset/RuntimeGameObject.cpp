@@ -2,6 +2,7 @@
 #include "RuntimeScene.h"
 #include "../../Components/IDComponent.h"
 #include "../../Components/RelationshipComponent.h"
+#include "../../Components/LayerComponent.h"
 #include <algorithm>
 
 #include "Transform.h"
@@ -299,5 +300,50 @@ void RuntimeGameObject::SetActive(bool active)
     else
     {
         AddComponent<ECS::ActivityComponent>(active);
+    }
+}
+
+LayerMask RuntimeGameObject::GetLayers()
+{
+    if (HasComponent<ECS::LayerComponent>())
+    {
+        return GetComponent<ECS::LayerComponent>().layers;
+    }
+    return LayerMask::Only(0); // Default layer
+}
+
+void RuntimeGameObject::SetLayers(LayerMask layers)
+{
+    if (HasComponent<ECS::LayerComponent>())
+    {
+        GetComponent<ECS::LayerComponent>().layers = layers;
+    }
+    else
+    {
+        AddComponent<ECS::LayerComponent>(layers);
+    }
+}
+
+uint32_t RuntimeGameObject::GetLayerMask()
+{
+    return GetLayers().value;
+}
+
+bool RuntimeGameObject::IsInLayer(int layer)
+{
+    return GetLayers().Contains(layer);
+}
+
+void RuntimeGameObject::SetInLayer(int layer, bool enabled)
+{
+    if (HasComponent<ECS::LayerComponent>())
+    {
+        GetComponent<ECS::LayerComponent>().layers.Set(layer, enabled);
+    }
+    else
+    {
+        LayerMask mask = LayerMask::Only(0);
+        mask.Set(layer, enabled);
+        AddComponent<ECS::LayerComponent>(mask);
     }
 }

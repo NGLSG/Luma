@@ -27,6 +27,11 @@ struct SpriteRenderData
     int wrapMode;
     float ppuScaleFactor;
     bool isUISprite = false; 
+    uint32_t lightLayer = 0xFFFFFFFF; ///< 光照层掩码
+    
+    // 自发光数据 (Feature: 2d-lighting-enhancement)
+    ECS::Color emissionColor = ECS::Colors::White; ///< 自发光颜色
+    float emissionIntensity = 0.0f;                ///< 自发光强度
 };
 struct TextRenderData
 {

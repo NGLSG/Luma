@@ -119,7 +119,7 @@ namespace Nut
         std::vector<wgpu::CommandEncoder> m_computeCommandEncoders;
         std::mutex m_cmutex;
         inline static ShaderLoader* m_shaderLoader = nullptr;
-        
+
         // Surface reconfigure rate limiting
         std::chrono::steady_clock::time_point m_lastReconfigureTime{};
         static constexpr std::chrono::milliseconds kReconfigureCooldown{100};
@@ -127,6 +127,11 @@ namespace Nut
     public:
         NutContext(const NutContext&) = delete;
         NutContext& operator=(const NutContext&) = delete;
+
+        wgpu::Queue GetWGPUQueue() const
+        {
+            return m_device.GetQueue();
+        }
 
         NutContext();
 
@@ -184,7 +189,7 @@ namespace Nut
         bool ResolveTexture(const TextureAPtr& source, const TextureAPtr& resolveTarget);
 
         TextureAPtr AcquireSwapChainTexture();
-        static ShaderLoader* GetShaderLoader(){ return m_shaderLoader; }
+        static ShaderLoader* GetShaderLoader() { return m_shaderLoader; }
     };
 } // namespace Nut
 

@@ -121,6 +121,8 @@ endif ()
 # =============================================================================
 if (MSVC)
     add_compile_options(/WX)
+    # 启用扩展对齐存储支持，解决 std::aligned_storage 与 alignas(16) 的兼容性问题
+    add_compile_definitions(_ENABLE_EXTENDED_ALIGNED_STORAGE)
 else ()
     add_compile_options(-Werror)
 endif ()
@@ -325,6 +327,7 @@ target_include_directories(LumaEngine PUBLIC
 target_compile_definitions(LumaEngine PUBLIC
         LUMA_ENGINE_EXPORTS
         GLM_ENABLE_EXPERIMENTAL
+        $<$<CXX_COMPILER_ID:MSVC>:_ENABLE_EXTENDED_ALIGNED_STORAGE>
 )
 
 # 链接第三方库

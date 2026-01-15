@@ -35,6 +35,12 @@ public:
     void OverrideBindGroup(const wgpu::BindGroup& cached);
     const wgpu::BindGroup& RawBindGroup() const { return m_bindGroup; }
     const std::vector<wgpu::BindGroupEntry>& GetEntries() const { return m_BindGroupEntries; }
+    
+    /// 清除所有绑定条目
+    void ClearEntries() { m_BindGroupEntries.clear(); m_isBuild = false; }
+    
+    /// 移除指定绑定索引的条目
+    void RemoveEntry(uint32_t bindingIndex);
 };
 
 } // namespace Nut

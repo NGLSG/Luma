@@ -16,8 +16,8 @@
 #include "ScriptComponent.h"
 #include "../TagManager.h"
 #include "TagComponent.h"
-#include "../TagManager.h"
-#include "TagComponent.h"
+#include "../LayerManager.h"
+#include "LayerComponent.h"
 #include "Event/EventBus.h"
 #include "Event/Events.h"
 void InspectorPanel::Initialize(EditorContext* context)
@@ -590,6 +590,111 @@ void InspectorPanel::drawGameObjectName(RuntimeGameObject& gameObject)
                     }
                 }
                 if (selected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        
+        // Layer 下拉框（支持多选）
+        if (!registry.any_of<ECS::LayerComponent>(entity))
+        {
+            gameObject.AddComponent<ECS::LayerComponent>();
+        }
+        auto& layerComp = registry.get<ECS::LayerComponent>(entity);
+        
+        ImGui::Text("层");
+        ImGui::SameLine();
+        
+        // 生成预览文本
+        std::string layerPreview;
+        int selectedCount = 0;
+        int firstSelectedLayer = -1;
+        for (int i = 0; i < LayerManager::MAX_LAYERS; ++i)
+        {
+            if (layerComp.layers.Contains(i))
+            {
+                if (firstSelectedLayer < 0) firstSelectedLayer = i;
+                selectedCount++;
+            }
+        }
+        if (selectedCount == 0)
+        {
+            layerPreview = "(无)";
+        }
+        else if (selectedCount == 1)
+        {
+            layerPreview = std::to_string(firstSelectedLayer) + ": " + LayerManager::GetDisplayName(firstSelectedLayer);
+        }
+        else if (selectedCount == LayerManager::MAX_LAYERS)
+        {
+            layerPreview = "所有层";
+        }
+        else
+        {
+            layerPreview = std::to_string(selectedCount) + " 个层已选择";
+        }
+        
+        if (ImGui::BeginCombo("##LayerDropdown", layerPreview.c_str()))
+        {
+            // 编辑层名称的输入框
+            static int editingLayerIndex = -1;
+            static char newLayerNameBuf[64] = {0};
+            
+            ImGui::Text("编辑层名称:");
+            ImGui::SetNextItemWidth(60);
+            ImGui::InputInt("##LayerIndex", &editingLayerIndex, 0, 0);
+            if (editingLayerIndex < 0) editingLayerIndex = 0;
+            if (editingLayerIndex > 31) editingLayerIndex = 31;
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(100);
+            ImGui::InputTextWithHint("##NewLayerName", "层名称", newLayerNameBuf, sizeof(newLayerNameBuf));
+            ImGui::SameLine();
+            if (ImGui::SmallButton("设置"))
+            {
+                LayerManager::SetLayerName(editingLayerIndex, newLayerNameBuf);
+                memset(newLayerNameBuf, 0, sizeof(newLayerNameBuf));
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("清除"))
+            {
+                LayerManager::SetLayerName(editingLayerIndex, "");
+            }
+            
+            ImGui::Separator();
+            
+            // 快捷按钮
+            if (ImGui::SmallButton("全选"))
+            {
+                m_context->uiCallbacks->onValueChanged.Invoke();
+                layerComp.layers = LayerMask::All();
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("全不选"))
+            {
+                m_context->uiCallbacks->onValueChanged.Invoke();
+                layerComp.layers = LayerMask::None();
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("反选"))
+            {
+                m_context->uiCallbacks->onValueChanged.Invoke();
+                layerComp.layers.value = ~layerComp.layers.value;
+            }
+            
+            ImGui::Separator();
+            
+            // 层复选框列表
+            for (int n = 0; n < LayerManager::MAX_LAYERS; ++n)
+            {
+                std::string displayName = LayerManager::GetDisplayName(n);
+                char itemLabel[64];
+                snprintf(itemLabel, sizeof(itemLabel), "%d: %s", n, displayName.c_str());
+                
+                bool isSelected = layerComp.layers.Contains(n);
+                if (ImGui::Checkbox(itemLabel, &isSelected))
+                {
+                    m_context->uiCallbacks->onValueChanged.Invoke();
+                    layerComp.layers.Set(n, isSelected);
+                }
             }
             ImGui::EndCombo();
         }

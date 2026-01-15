@@ -16,6 +16,9 @@ bool RuntimeWGSLMaterial::Initialize(const std::shared_ptr<Nut::NutContext>& con
 
     m_cachedShaderCode = shaderCode;
     m_cachedColorFormat = colorFormat;
+    
+    // 检测是否使用了 Lighting 模块
+    m_usesLightingModule = (shaderCode.find("import Lighting") != std::string::npos);
 
     m_shaderModule = Nut::ShaderManager::GetFromString(shaderCode, context);
     if (!m_shaderModule.Get())
@@ -56,6 +59,10 @@ bool RuntimeWGSLMaterial::Initialize(const std::shared_ptr<Nut::NutContext>& con
     m_context = context;
     m_cachedShaderCode = "";
     m_cachedColorFormat = colorFormat;
+    
+    // 检测是否使用了 Lighting 模块（从 RuntimeShader 的源代码检测）
+    const std::string& sourceCode = runtimeShader->GetShaderCode();
+    m_usesLightingModule = (sourceCode.find("import Lighting") != std::string::npos);
 
     m_shaderModule = runtimeShader->GetWGPUShader();
     if (!m_shaderModule.Get())
@@ -251,4 +258,9 @@ void RuntimeWGSLMaterial::Bind(const Nut::RenderPass& renderPass)
     }
 
     UpdateUniformBuffer();
+}
+
+bool RuntimeWGSLMaterial::UsesLightingModule() const
+{
+    return m_usesLightingModule;
 }

@@ -21,7 +21,9 @@
 #include "include/gpu/graphite/dawn/DawnGraphiteTypes.h"
 #include "include/gpu/graphite/dawn/DawnUtils.h"
 #include "Nut/TextureA.h"
+
 class RuntimeWGSLMaterial;
+class LightingRenderer;
 /**
  * @brief 定义图形后端类型。
  */
@@ -269,6 +271,18 @@ public:
     uint32_t GetSampleCount() const { return m_msaaSampleCount; }
 
     RuntimeWGSLMaterial* CreateOrGetDefaultMaterial();
+
+    /**
+     * @brief 创建或获取带光照的默认材质
+     * @return 带光照的材质指针
+     */
+    RuntimeWGSLMaterial* CreateOrGetLitMaterial();
+
+    /**
+     * @brief 获取光照渲染器
+     * @return 光照渲染器引用
+     */
+    LightingRenderer& GetLightingRenderer();
 
     static GraphicsBackend* GetInstance()
     {

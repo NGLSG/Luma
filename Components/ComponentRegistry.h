@@ -367,35 +367,28 @@ private:
     ComponentRegistration m_registration; ///< 组件的注册信息。
 };
 /**
- * @brief 用于生成匿名变量名的宏。
- * @param str 变量名前缀。
+ * @brief 用于拼接标识符的辅助宏。
+ * @param a 第一个标识符部分。
+ * @param b 第二个标识符部分。
  */
-#define ANONYMOUS_VARIABLE(str) ANONYMOUS_VARIABLE_IMPL(str, __LINE__)
-/**
- * @brief ANONYMOUS_VARIABLE的内部实现宏，用于拼接行号。
- * @param str 变量名前缀。
- * @param line 当前行号。
- */
-#define ANONYMOUS_VARIABLE_IMPL(str, line) ANONYMOUS_VARIABLE_IMPL2(str, line)
-/**
- * @brief ANONYMOUS_VARIABLE_IMPL的内部实现宏，用于实际的字符串拼接。
- * @param str 变量名前缀。
- * @param line 当前行号。
- */
-#define ANONYMOUS_VARIABLE_IMPL2(str, line) str##line
+#define REGISTRY_CONCAT_IMPL(a, b) a##b
+#define REGISTRY_CONCAT(a, b) REGISTRY_CONCAT_IMPL(a, b)
 
 /**
  * @brief 用于在全局范围注册组件的宏。
  * 它创建一个静态函数和一个静态对象，确保在程序启动时自动调用注册函数。
+ * 使用 __COUNTER__ 确保不同文件中的注册器不会冲突。
+ * 通过 REGISTRY_IMPL 宏捕获 __COUNTER__ 值，确保同一个 REGISTRY 调用中使用相同的计数器值。
  */
-#define REGISTRY \
-static void ANONYMOUS_VARIABLE(LumaRegisterTypes)(); \
+#define REGISTRY REGISTRY_IMPL(__COUNTER__)
+#define REGISTRY_IMPL(counter) \
+static void REGISTRY_CONCAT(LumaRegisterTypes, counter)(); \
 namespace { \
-struct ANONYMOUS_VARIABLE(RegistryExecutor) { \
-ANONYMOUS_VARIABLE(RegistryExecutor)() { ANONYMOUS_VARIABLE(LumaRegisterTypes)(); } \
+struct REGISTRY_CONCAT(RegistryExecutor, counter) { \
+REGISTRY_CONCAT(RegistryExecutor, counter)() { REGISTRY_CONCAT(LumaRegisterTypes, counter)(); } \
 }; \
-static ANONYMOUS_VARIABLE(RegistryExecutor) ANONYMOUS_VARIABLE(executor_instance); \
+static REGISTRY_CONCAT(RegistryExecutor, counter) REGISTRY_CONCAT(executor_instance, counter); \
 } \
-static void ANONYMOUS_VARIABLE(LumaRegisterTypes)()
+static void REGISTRY_CONCAT(LumaRegisterTypes, counter)()
 
 #endif

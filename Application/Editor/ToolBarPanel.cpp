@@ -10,6 +10,11 @@
 #include "Editor.h"
 #include "EngineCrypto.h"
 #include "InputTextSystem.h"
+#include "LightingSystem.h"
+#include "ShadowRenderer.h"
+#include "IndirectLightingSystem.h"
+#include "AmbientZoneSystem.h"
+#include "AreaLightSystem.h"
 #include "PreferenceSettings.h"
 #include "Profiler.h"
 #include "ProjectSettings.h"
@@ -755,6 +760,57 @@ void ToolbarPanel::drawViewportMenu()
                 settings.Save();
             }
         }
+        
+        // 后处理效果预览开关 (Requirements: 13.4)
+        ImGui::Separator();
+        ImGui::Text("后处理效果");
+        ImGui::Separator();
+        
+        // 获取后处理系统状态
+        bool bloomEnabled = m_context->engineContext->postProcessBloomEnabled;
+        bool lightShaftsEnabled = m_context->engineContext->postProcessLightShaftsEnabled;
+        bool fogEnabled = m_context->engineContext->postProcessFogEnabled;
+        bool toneMappingEnabled = m_context->engineContext->postProcessToneMappingEnabled;
+        bool colorGradingEnabled = m_context->engineContext->postProcessColorGradingEnabled;
+        
+        if (ImGui::MenuItem("Bloom", nullptr, &bloomEnabled))
+        {
+            m_context->engineContext->postProcessBloomEnabled = bloomEnabled;
+        }
+        if (ImGui::MenuItem("光束效果", nullptr, &lightShaftsEnabled))
+        {
+            m_context->engineContext->postProcessLightShaftsEnabled = lightShaftsEnabled;
+        }
+        if (ImGui::MenuItem("雾效", nullptr, &fogEnabled))
+        {
+            m_context->engineContext->postProcessFogEnabled = fogEnabled;
+        }
+        if (ImGui::MenuItem("色调映射", nullptr, &toneMappingEnabled))
+        {
+            m_context->engineContext->postProcessToneMappingEnabled = toneMappingEnabled;
+        }
+        if (ImGui::MenuItem("颜色分级", nullptr, &colorGradingEnabled))
+        {
+            m_context->engineContext->postProcessColorGradingEnabled = colorGradingEnabled;
+        }
+        
+        // 质量等级快速切换 (Requirements: 13.5)
+        ImGui::Separator();
+        ImGui::Text("质量等级");
+        ImGui::Separator();
+        
+        const char* qualityLevelNames[] = {"低", "中", "高", "超高", "自定义"};
+        int currentQualityLevel = static_cast<int>(m_context->engineContext->currentQualityLevel);
+        
+        for (int i = 0; i < 4; ++i) // 不显示"自定义"选项
+        {
+            bool isSelected = (currentQualityLevel == i);
+            if (ImGui::MenuItem(qualityLevelNames[i], nullptr, isSelected))
+            {
+                m_context->engineContext->currentQualityLevel = static_cast<ECS::QualityLevel>(i);
+            }
+        }
+        
         if (!isProjectLoaded) ImGui::EndDisabled();
         ImGui::EndMenu();
     }
@@ -1559,6 +1615,11 @@ void ToolbarPanel::play()
         playScene->AddSystem<Systems::ScriptingSystem>();
         playScene->AddSystem<Systems::AnimationSystem>();
         playScene->AddSystem<Systems::ParticleSystem>();
+        playScene->AddSystemToMainThread<Systems::AmbientZoneSystem>();
+        playScene->AddSystemToMainThread<Systems::AreaLightSystem>();
+        playScene->AddSystemToMainThread<Systems::LightingSystem>();
+        playScene->AddSystemToMainThread<Systems::ShadowRenderer>();
+        playScene->AddSystemToMainThread<Systems::IndirectLightingSystem>();
         SceneManager::GetInstance().SetCurrentScene(playScene);
         playScene->Activate(*ctx->engineContext);
         std::cout << "原始场景地址: " << ctx->editingScene.get() << std::endl;

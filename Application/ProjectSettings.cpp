@@ -156,6 +156,15 @@ namespace YAML
                 for (const auto& t : rhs.GetTags()) tagsNode.push_back(t);
                 node["Tags"] = tagsNode;
             }
+            if (!rhs.GetLayers().empty())
+            {
+                Node layersNode;
+                for (const auto& [idx, name] : rhs.GetLayers())
+                {
+                    layersNode[std::to_string(idx)] = name;
+                }
+                node["Layers"] = layersNode;
+            }
             Node androidNode;
             androidNode["PackageName"] = rhs.GetAndroidPackageName();
             androidNode["Orientation"] = OrientationToString(rhs.GetAndroidScreenOrientation());
@@ -226,6 +235,24 @@ namespace YAML
                 tags = node["Tags"].as<std::vector<std::string>>();
             }
             rhs.SetTags(tags);
+            
+            std::map<int, std::string> layers;
+            if (node["Layers"] && node["Layers"].IsMap())
+            {
+                for (auto it = node["Layers"].begin(); it != node["Layers"].end(); ++it)
+                {
+                    try
+                    {
+                        int idx = std::stoi(it->first.as<std::string>());
+                        if (idx >= 0 && idx <= 31)
+                        {
+                            layers[idx] = it->second.as<std::string>();
+                        }
+                    }
+                    catch (...) { continue; }
+                }
+            }
+            rhs.SetLayers(layers);
             if (node["ScriptDebug"]) {
                 const Node& dbg = node["ScriptDebug"];
                 rhs.SetScriptDebugEnabled(dbg["Enabled"].as<bool>(false));
@@ -344,6 +371,7 @@ void ProjectSettings::LoadInRuntime()
 {
     LoadWithCrypto("ProjectSettings.lproj");
     EnsureDefaultTags();
+    EnsureDefaultLayers();
 }
 void ProjectSettings::Load(const std::filesystem::path& filePath)
 {
@@ -357,6 +385,7 @@ void ProjectSettings::Load(const std::filesystem::path& filePath)
         YAML::Node data = YAML::LoadFile(filePath.string());
         YAML::convert<ProjectSettings>::decode(data, *this);
         EnsureDefaultTags();
+        EnsureDefaultLayers();
     }
     catch (const YAML::Exception& e)
     {
@@ -397,6 +426,47 @@ void ProjectSettings::EnsureDefaultTags()
     ensure("Unknown");
     ensure("Player");
     ensure("Ground");
+}
+
+void ProjectSettings::SetLayerName(int layer, const std::string& name)
+{
+    if (layer < 0 || layer > 31) return;
+    if (name.empty())
+    {
+        m_layers.erase(layer);
+    }
+    else
+    {
+        m_layers[layer] = name;
+    }
+}
+
+const std::string& ProjectSettings::GetLayerName(int layer) const
+{
+    static const std::string empty;
+    auto it = m_layers.find(layer);
+    if (it != m_layers.end())
+    {
+        return it->second;
+    }
+    return empty;
+}
+
+void ProjectSettings::EnsureDefaultLayers()
+{
+    // 确保默认层存在（类似 Unity）
+    auto ensure = [&](int idx, const char* name)
+    {
+        if (m_layers.find(idx) == m_layers.end())
+        {
+            m_layers[idx] = name;
+        }
+    };
+    ensure(0, "Default");
+    ensure(1, "TransparentFX");
+    ensure(2, "IgnoreRaycast");
+    ensure(4, "Water");
+    ensure(5, "UI");
 }
 const std::filesystem::path& ProjectSettings::GetAndroidIconPath(int size) const
 {

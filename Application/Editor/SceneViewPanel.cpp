@@ -29,6 +29,15 @@
 #include "include/core/SkFont.h"
 #include "include/core/SkFontMetrics.h"
 #include "include/core/SkFontTypes.h"
+// 光源组件
+#include "../Components/PointLightComponent.h"
+#include "../Components/SpotLightComponent.h"
+#include "../Components/DirectionalLightComponent.h"
+// 增强光照组件 (Requirements: 13.1, 13.2, 13.3)
+#include "../Components/AreaLightComponent.h"
+#include "../Components/AmbientZoneComponent.h"
+#include "../Components/LightProbeComponent.h"
+#include <unordered_set>
 #ifndef PIXELS_PER_METER
 #define PIXELS_PER_METER 32.0f;
 #endif
@@ -374,12 +383,20 @@ void SceneViewPanel::Draw()
             handleNavigationAndPick(viewportScreenPos, viewportSize);
             drawSelectionOutlines(viewportScreenPos, viewportSize);
             drawParticlePreview(ImGui::GetWindowDrawList(), viewportScreenPos, viewportSize);
+            
+            // 绘制光照调试覆盖层
+            drawLightingDebugOverlay(ImGui::GetWindowDrawList(), viewportScreenPos, viewportSize);
+            
             handleDragDrop();
 
             uiCam.SetProperties(prevUICamProps);
             cam.SetProperties(prevCamProps);
         }
     }
+    
+    // 绘制光照调试 UI（在窗口内）
+    drawLightingDebugUI();
+    
     ImGui::End();
     ImGui::PopStyleVar();
 }
@@ -1350,6 +1367,9 @@ void SceneViewPanel::drawEditorGizmos(const ImVec2& viewportScreenPos, const ImV
         drawEditorGrid(viewportScreenPos, viewportSize);
     }
     drawCameraGizmo(drawList);
+    
+    // 绘制光源 Gizmo
+    drawLightGizmos(drawList, viewportScreenPos, viewportSize);
 }
 void SceneViewPanel::drawTilemapGrid(ImDrawList* drawList, const ECS::TransformComponent& tilemapTransform,
                                      const ECS::TilemapComponent& tilemap, const ImVec2& viewportScreenPos,
@@ -2659,4 +2679,1290 @@ void SceneViewPanel::handleTouchNavigation(const ImVec2& viewportScreenPos, cons
     (void)viewportScreenPos;
     (void)viewportSize;
 #endif
+}
+
+// ============================================================================
+// 光源 Gizmo 绘制
+// ============================================================================
+
+void SceneViewPanel::drawLightGizmos(ImDrawList* drawList, const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
+{
+    if (!m_context->activeScene)
+        return;
+
+    auto& registry = m_context->activeScene->GetRegistry();
+
+    // 收集选中的实体 GUID 用于判断是否高亮
+    std::unordered_set<Guid> selectedGuids;
+    if (m_context->selectionType == SelectionType::GameObject)
+    {
+        for (const auto& guid : m_context->selectionList)
+        {
+            selectedGuids.insert(guid);
+        }
+    }
+
+    // 绘制点光源 Gizmo
+    auto pointLightView = registry.view<ECS::TransformComponent, ECS::PointLightComponent>();
+    for (auto entity : pointLightView)
+    {
+        const auto& transform = pointLightView.get<ECS::TransformComponent>(entity);
+        const auto& light = pointLightView.get<ECS::PointLightComponent>(entity);
+
+        if (!light.Enable)
+            continue;
+
+        // 检查是否选中
+        bool isSelected = false;
+        if (auto* idComp = registry.try_get<ECS::IDComponent>(entity))
+        {
+            isSelected = selectedGuids.count(idComp->guid) > 0;
+        }
+
+        drawPointLightGizmo(drawList, transform, light, isSelected);
+    }
+
+    // 绘制聚光灯 Gizmo
+    auto spotLightView = registry.view<ECS::TransformComponent, ECS::SpotLightComponent>();
+    for (auto entity : spotLightView)
+    {
+        const auto& transform = spotLightView.get<ECS::TransformComponent>(entity);
+        const auto& light = spotLightView.get<ECS::SpotLightComponent>(entity);
+
+        if (!light.Enable)
+            continue;
+
+        // 检查是否选中
+        bool isSelected = false;
+        if (auto* idComp = registry.try_get<ECS::IDComponent>(entity))
+        {
+            isSelected = selectedGuids.count(idComp->guid) > 0;
+        }
+
+        drawSpotLightGizmo(drawList, transform, light, isSelected);
+    }
+
+    // 绘制方向光 Gizmo
+    auto dirLightView = registry.view<ECS::TransformComponent, ECS::DirectionalLightComponent>();
+    for (auto entity : dirLightView)
+    {
+        const auto& transform = dirLightView.get<ECS::TransformComponent>(entity);
+        const auto& light = dirLightView.get<ECS::DirectionalLightComponent>(entity);
+
+        if (!light.Enable)
+            continue;
+
+        // 检查是否选中
+        bool isSelected = false;
+        if (auto* idComp = registry.try_get<ECS::IDComponent>(entity))
+        {
+            isSelected = selectedGuids.count(idComp->guid) > 0;
+        }
+
+        drawDirectionalLightGizmo(drawList, transform, light, isSelected);
+    }
+
+    // 绘制面光源 Gizmo (Requirements: 13.1)
+    auto areaLightView = registry.view<ECS::TransformComponent, ECS::AreaLightComponent>();
+    for (auto entity : areaLightView)
+    {
+        const auto& transform = areaLightView.get<ECS::TransformComponent>(entity);
+        const auto& light = areaLightView.get<ECS::AreaLightComponent>(entity);
+
+        if (!light.Enable)
+            continue;
+
+        // 检查是否选中
+        bool isSelected = false;
+        if (auto* idComp = registry.try_get<ECS::IDComponent>(entity))
+        {
+            isSelected = selectedGuids.count(idComp->guid) > 0;
+        }
+
+        drawAreaLightGizmo(drawList, transform, light, isSelected);
+    }
+
+    // 绘制环境光区域 Gizmo (Requirements: 13.2)
+    auto ambientZoneView = registry.view<ECS::TransformComponent, ECS::AmbientZoneComponent>();
+    for (auto entity : ambientZoneView)
+    {
+        const auto& transform = ambientZoneView.get<ECS::TransformComponent>(entity);
+        const auto& zone = ambientZoneView.get<ECS::AmbientZoneComponent>(entity);
+
+        if (!zone.Enable)
+            continue;
+
+        // 检查是否选中
+        bool isSelected = false;
+        if (auto* idComp = registry.try_get<ECS::IDComponent>(entity))
+        {
+            isSelected = selectedGuids.count(idComp->guid) > 0;
+        }
+
+        drawAmbientZoneGizmo(drawList, transform, zone, isSelected);
+    }
+
+    // 绘制光照探针 Gizmo (Requirements: 13.3)
+    auto lightProbeView = registry.view<ECS::TransformComponent, ECS::LightProbeComponent>();
+    for (auto entity : lightProbeView)
+    {
+        const auto& transform = lightProbeView.get<ECS::TransformComponent>(entity);
+        const auto& probe = lightProbeView.get<ECS::LightProbeComponent>(entity);
+
+        if (!probe.Enable)
+            continue;
+
+        // 检查是否选中
+        bool isSelected = false;
+        if (auto* idComp = registry.try_get<ECS::IDComponent>(entity))
+        {
+            isSelected = selectedGuids.count(idComp->guid) > 0;
+        }
+
+        drawLightProbeGizmo(drawList, transform, probe, isSelected);
+    }
+}
+
+void SceneViewPanel::drawPointLightGizmo(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                          const ECS::PointLightComponent& light, bool isSelected)
+{
+    // 将光源颜色转换为 ImGui 颜色
+    ImU32 lightColor = IM_COL32(
+        static_cast<int>(light.color.r * 255),
+        static_cast<int>(light.color.g * 255),
+        static_cast<int>(light.color.b * 255),
+        isSelected ? 255 : 180
+    );
+    ImU32 fillColor = IM_COL32(
+        static_cast<int>(light.color.r * 255),
+        static_cast<int>(light.color.g * 255),
+        static_cast<int>(light.color.b * 255),
+        isSelected ? 60 : 30
+    );
+
+    // 获取屏幕坐标
+    ImVec2 centerScreen = worldToScreenWith(m_editorCameraProperties, transform.position);
+
+    // 计算屏幕空间的半径
+    float screenRadius = light.radius * m_editorCameraProperties.zoom.x();
+
+    // 绘制光照范围圆形（填充）
+    drawList->AddCircleFilled(centerScreen, screenRadius, fillColor, 64);
+
+    // 绘制光照范围圆形（轮廓）
+    float thickness = isSelected ? 2.5f : 1.5f;
+    drawList->AddCircle(centerScreen, screenRadius, lightColor, 64, thickness);
+
+    // 绘制中心点（光源图标）
+    float iconRadius = isSelected ? 8.0f : 6.0f;
+    drawList->AddCircleFilled(centerScreen, iconRadius, lightColor);
+
+    // 绘制光芒线条（8条射线）
+    const int numRays = 8;
+    float innerRayRadius = iconRadius + 2.0f;
+    float outerRayRadius = iconRadius + 8.0f;
+    for (int i = 0; i < numRays; ++i)
+    {
+        float angle = (float)i * (2.0f * 3.14159265f / numRays);
+        float cosA = cosf(angle);
+        float sinA = sinf(angle);
+        ImVec2 innerPoint(centerScreen.x + cosA * innerRayRadius, centerScreen.y + sinA * innerRayRadius);
+        ImVec2 outerPoint(centerScreen.x + cosA * outerRayRadius, centerScreen.y + sinA * outerRayRadius);
+        drawList->AddLine(innerPoint, outerPoint, lightColor, thickness);
+    }
+}
+
+void SceneViewPanel::drawSpotLightGizmo(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                         const ECS::SpotLightComponent& light, bool isSelected)
+{
+    // 将光源颜色转换为 ImGui 颜色
+    ImU32 lightColor = IM_COL32(
+        static_cast<int>(light.color.r * 255),
+        static_cast<int>(light.color.g * 255),
+        static_cast<int>(light.color.b * 255),
+        isSelected ? 255 : 180
+    );
+    ImU32 fillColor = IM_COL32(
+        static_cast<int>(light.color.r * 255),
+        static_cast<int>(light.color.g * 255),
+        static_cast<int>(light.color.b * 255),
+        isSelected ? 40 : 20
+    );
+    ImU32 innerColor = IM_COL32(
+        static_cast<int>(light.color.r * 255),
+        static_cast<int>(light.color.g * 255),
+        static_cast<int>(light.color.b * 255),
+        isSelected ? 80 : 40
+    );
+
+    // 获取屏幕坐标
+    ImVec2 centerScreen = worldToScreenWith(m_editorCameraProperties, transform.position);
+
+    // 计算光照方向（使用 transform 的旋转）
+    float dirAngle = transform.rotation - 3.14159265f / 2.0f; // 默认向下，调整为向前
+    ECS::Vector2f direction(cosf(dirAngle), sinf(dirAngle));
+
+    // 计算屏幕空间的半径
+    float screenRadius = light.radius * m_editorCameraProperties.zoom.x();
+
+    // 将角度从度转换为弧度
+    float innerAngleRad = light.innerAngle * 3.14159265f / 180.0f;
+    float outerAngleRad = light.outerAngle * 3.14159265f / 180.0f;
+
+    // 计算锥形的边界点
+    float outerLeftAngle = dirAngle - outerAngleRad;
+    float outerRightAngle = dirAngle + outerAngleRad;
+    float innerLeftAngle = dirAngle - innerAngleRad;
+    float innerRightAngle = dirAngle + innerAngleRad;
+
+    // 外锥边界点
+    ImVec2 outerLeft(
+        centerScreen.x + cosf(outerLeftAngle) * screenRadius,
+        centerScreen.y + sinf(outerLeftAngle) * screenRadius
+    );
+    ImVec2 outerRight(
+        centerScreen.x + cosf(outerRightAngle) * screenRadius,
+        centerScreen.y + sinf(outerRightAngle) * screenRadius
+    );
+
+    // 内锥边界点
+    ImVec2 innerLeft(
+        centerScreen.x + cosf(innerLeftAngle) * screenRadius,
+        centerScreen.y + sinf(innerLeftAngle) * screenRadius
+    );
+    ImVec2 innerRight(
+        centerScreen.x + cosf(innerRightAngle) * screenRadius,
+        centerScreen.y + sinf(innerRightAngle) * screenRadius
+    );
+
+    // 绘制外锥形（填充）
+    const int arcSegments = 32;
+    std::vector<ImVec2> outerArcPoints;
+    outerArcPoints.push_back(centerScreen);
+    for (int i = 0; i <= arcSegments; ++i)
+    {
+        float t = (float)i / arcSegments;
+        float angle = outerLeftAngle + t * (outerRightAngle - outerLeftAngle);
+        outerArcPoints.push_back(ImVec2(
+            centerScreen.x + cosf(angle) * screenRadius,
+            centerScreen.y + sinf(angle) * screenRadius
+        ));
+    }
+    drawList->AddConvexPolyFilled(outerArcPoints.data(), (int)outerArcPoints.size(), fillColor);
+
+    // 绘制内锥形（更亮的填充）
+    std::vector<ImVec2> innerArcPoints;
+    innerArcPoints.push_back(centerScreen);
+    for (int i = 0; i <= arcSegments; ++i)
+    {
+        float t = (float)i / arcSegments;
+        float angle = innerLeftAngle + t * (innerRightAngle - innerLeftAngle);
+        innerArcPoints.push_back(ImVec2(
+            centerScreen.x + cosf(angle) * screenRadius,
+            centerScreen.y + sinf(angle) * screenRadius
+        ));
+    }
+    drawList->AddConvexPolyFilled(innerArcPoints.data(), (int)innerArcPoints.size(), innerColor);
+
+    // 绘制外锥边界线
+    float thickness = isSelected ? 2.5f : 1.5f;
+    drawList->AddLine(centerScreen, outerLeft, lightColor, thickness);
+    drawList->AddLine(centerScreen, outerRight, lightColor, thickness);
+
+    // 绘制外锥弧线
+    for (int i = 0; i < arcSegments; ++i)
+    {
+        float t1 = (float)i / arcSegments;
+        float t2 = (float)(i + 1) / arcSegments;
+        float angle1 = outerLeftAngle + t1 * (outerRightAngle - outerLeftAngle);
+        float angle2 = outerLeftAngle + t2 * (outerRightAngle - outerLeftAngle);
+        ImVec2 p1(centerScreen.x + cosf(angle1) * screenRadius, centerScreen.y + sinf(angle1) * screenRadius);
+        ImVec2 p2(centerScreen.x + cosf(angle2) * screenRadius, centerScreen.y + sinf(angle2) * screenRadius);
+        drawList->AddLine(p1, p2, lightColor, thickness);
+    }
+
+    // 绘制内锥边界线（虚线效果，用较细的线）
+    float innerThickness = isSelected ? 1.5f : 1.0f;
+    drawList->AddLine(centerScreen, innerLeft, lightColor, innerThickness);
+    drawList->AddLine(centerScreen, innerRight, lightColor, innerThickness);
+
+    // 绘制中心点（光源图标）
+    float iconRadius = isSelected ? 8.0f : 6.0f;
+    drawList->AddCircleFilled(centerScreen, iconRadius, lightColor);
+
+    // 绘制方向指示箭头
+    float arrowLength = 20.0f;
+    ImVec2 arrowEnd(
+        centerScreen.x + direction.x * arrowLength,
+        centerScreen.y + direction.y * arrowLength
+    );
+    drawList->AddLine(centerScreen, arrowEnd, lightColor, thickness + 1.0f);
+
+    // 箭头头部
+    float arrowHeadSize = 6.0f;
+    float arrowHeadAngle = 2.5f; // 约 143 度
+    ImVec2 arrowHead1(
+        arrowEnd.x - cosf(dirAngle - 0.5f) * arrowHeadSize,
+        arrowEnd.y - sinf(dirAngle - 0.5f) * arrowHeadSize
+    );
+    ImVec2 arrowHead2(
+        arrowEnd.x - cosf(dirAngle + 0.5f) * arrowHeadSize,
+        arrowEnd.y - sinf(dirAngle + 0.5f) * arrowHeadSize
+    );
+    drawList->AddTriangleFilled(arrowEnd, arrowHead1, arrowHead2, lightColor);
+}
+
+void SceneViewPanel::drawDirectionalLightGizmo(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                                const ECS::DirectionalLightComponent& light, bool isSelected)
+{
+    // 将光源颜色转换为 ImGui 颜色
+    ImU32 lightColor = IM_COL32(
+        static_cast<int>(light.color.r * 255),
+        static_cast<int>(light.color.g * 255),
+        static_cast<int>(light.color.b * 255),
+        isSelected ? 255 : 180
+    );
+
+    // 获取屏幕坐标
+    ImVec2 centerScreen = worldToScreenWith(m_editorCameraProperties, transform.position);
+
+    // 获取光照方向
+    ECS::Vector2f direction = light.direction.Normalize();
+
+    // 绘制太阳图标（圆形 + 射线）
+    float iconRadius = isSelected ? 12.0f : 10.0f;
+    drawList->AddCircleFilled(centerScreen, iconRadius, lightColor);
+
+    // 绘制光芒射线（8条）
+    const int numRays = 8;
+    float innerRayRadius = iconRadius + 3.0f;
+    float outerRayRadius = iconRadius + 12.0f;
+    float thickness = isSelected ? 2.5f : 1.5f;
+
+    for (int i = 0; i < numRays; ++i)
+    {
+        float angle = (float)i * (2.0f * 3.14159265f / numRays);
+        float cosA = cosf(angle);
+        float sinA = sinf(angle);
+        ImVec2 innerPoint(centerScreen.x + cosA * innerRayRadius, centerScreen.y + sinA * innerRayRadius);
+        ImVec2 outerPoint(centerScreen.x + cosA * outerRayRadius, centerScreen.y + sinA * outerRayRadius);
+        drawList->AddLine(innerPoint, outerPoint, lightColor, thickness);
+    }
+
+    // 绘制方向箭头（多条平行箭头表示平行光）
+    float arrowStartOffset = outerRayRadius + 5.0f;
+    float arrowLength = 30.0f;
+    float arrowSpacing = 15.0f;
+
+    // 计算垂直于光照方向的向量
+    ECS::Vector2f perpendicular(-direction.y, direction.x);
+
+    // 绘制3条平行箭头
+    for (int i = -1; i <= 1; ++i)
+    {
+        // 箭头起点（沿垂直方向偏移）
+        ImVec2 arrowStart(
+            centerScreen.x + direction.x * arrowStartOffset + perpendicular.x * (i * arrowSpacing),
+            centerScreen.y + direction.y * arrowStartOffset + perpendicular.y * (i * arrowSpacing)
+        );
+
+        // 箭头终点
+        ImVec2 arrowEnd(
+            arrowStart.x + direction.x * arrowLength,
+            arrowStart.y + direction.y * arrowLength
+        );
+
+        // 绘制箭头线
+        drawList->AddLine(arrowStart, arrowEnd, lightColor, thickness);
+
+        // 绘制箭头头部
+        float arrowHeadSize = 6.0f;
+        float dirAngle = atan2f(direction.y, direction.x);
+        ImVec2 arrowHead1(
+            arrowEnd.x - cosf(dirAngle - 0.5f) * arrowHeadSize,
+            arrowEnd.y - sinf(dirAngle - 0.5f) * arrowHeadSize
+        );
+        ImVec2 arrowHead2(
+            arrowEnd.x - cosf(dirAngle + 0.5f) * arrowHeadSize,
+            arrowEnd.y - sinf(dirAngle + 0.5f) * arrowHeadSize
+        );
+        drawList->AddTriangleFilled(arrowEnd, arrowHead1, arrowHead2, lightColor);
+    }
+}
+
+// ============================================================================
+// 增强光照组件 Gizmo 绘制 (Requirements: 13.1, 13.2, 13.3)
+// ============================================================================
+
+void SceneViewPanel::drawAreaLightGizmo(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                         const ECS::AreaLightComponent& light, bool isSelected)
+{
+    // 将光源颜色转换为 ImGui 颜色
+    ImU32 lightColor = IM_COL32(
+        static_cast<int>(light.color.r * 255),
+        static_cast<int>(light.color.g * 255),
+        static_cast<int>(light.color.b * 255),
+        isSelected ? 255 : 180
+    );
+    ImU32 fillColor = IM_COL32(
+        static_cast<int>(light.color.r * 255),
+        static_cast<int>(light.color.g * 255),
+        static_cast<int>(light.color.b * 255),
+        isSelected ? 60 : 30
+    );
+    ImU32 rangeColor = IM_COL32(
+        static_cast<int>(light.color.r * 255),
+        static_cast<int>(light.color.g * 255),
+        static_cast<int>(light.color.b * 255),
+        isSelected ? 100 : 50
+    );
+
+    // 获取屏幕坐标
+    ImVec2 centerScreen = worldToScreenWith(m_editorCameraProperties, transform.position);
+
+    // 计算屏幕空间的尺寸
+    float screenWidth = light.width * m_editorCameraProperties.zoom.x();
+    float screenHeight = light.height * m_editorCameraProperties.zoom.x();
+    float screenRadius = light.radius * m_editorCameraProperties.zoom.x();
+
+    float thickness = isSelected ? 2.5f : 1.5f;
+
+    if (light.shape == ECS::AreaLightShape::Rectangle)
+    {
+        // 绘制矩形面光源
+        float halfWidth = screenWidth * 0.5f;
+        float halfHeight = screenHeight * 0.5f;
+
+        // 计算旋转后的四个角点
+        float sinR = sinf(transform.rotation);
+        float cosR = cosf(transform.rotation);
+
+        auto rotatePoint = [&](float x, float y) -> ImVec2 {
+            float rx = x * cosR - y * sinR;
+            float ry = x * sinR + y * cosR;
+            return ImVec2(centerScreen.x + rx, centerScreen.y + ry);
+        };
+
+        ImVec2 corners[4] = {
+            rotatePoint(-halfWidth, -halfHeight),
+            rotatePoint(halfWidth, -halfHeight),
+            rotatePoint(halfWidth, halfHeight),
+            rotatePoint(-halfWidth, halfHeight)
+        };
+
+        // 绘制矩形填充
+        drawList->AddConvexPolyFilled(corners, 4, fillColor);
+
+        // 绘制矩形轮廓
+        drawList->AddPolyline(corners, 4, lightColor, ImDrawFlags_Closed, thickness);
+
+        // 绘制影响范围圆形
+        drawList->AddCircle(centerScreen, screenRadius, rangeColor, 64, thickness * 0.5f);
+
+        // 绘制从矩形边缘到影响范围的虚线
+        const int numRays = 8;
+        for (int i = 0; i < numRays; ++i)
+        {
+            float angle = (float)i * (2.0f * 3.14159265f / numRays);
+            float cosA = cosf(angle);
+            float sinA = sinf(angle);
+
+            // 从矩形边缘开始
+            float edgeDist = std::min(halfWidth / std::max(std::abs(cosA), 0.001f),
+                                      halfHeight / std::max(std::abs(sinA), 0.001f));
+            edgeDist = std::min(edgeDist, std::max(halfWidth, halfHeight));
+
+            ImVec2 innerPoint = rotatePoint(cosA * edgeDist, sinA * edgeDist);
+            ImVec2 outerPoint(centerScreen.x + cosA * screenRadius, centerScreen.y + sinA * screenRadius);
+
+            // 绘制虚线
+            drawDashedLine(drawList, innerPoint, outerPoint, rangeColor, thickness * 0.5f, 5.0f);
+        }
+    }
+    else // Circle
+    {
+        // 绘制圆形面光源
+        float lightRadius = screenWidth * 0.5f; // 使用 width 作为直径
+
+        // 绘制光源圆形（填充）
+        drawList->AddCircleFilled(centerScreen, lightRadius, fillColor, 64);
+
+        // 绘制光源圆形（轮廓）
+        drawList->AddCircle(centerScreen, lightRadius, lightColor, 64, thickness);
+
+        // 绘制影响范围圆形
+        drawList->AddCircle(centerScreen, screenRadius, rangeColor, 64, thickness * 0.5f);
+
+        // 绘制从光源边缘到影响范围的虚线
+        const int numRays = 8;
+        for (int i = 0; i < numRays; ++i)
+        {
+            float angle = (float)i * (2.0f * 3.14159265f / numRays);
+            float cosA = cosf(angle);
+            float sinA = sinf(angle);
+
+            ImVec2 innerPoint(centerScreen.x + cosA * lightRadius, centerScreen.y + sinA * lightRadius);
+            ImVec2 outerPoint(centerScreen.x + cosA * screenRadius, centerScreen.y + sinA * screenRadius);
+
+            drawDashedLine(drawList, innerPoint, outerPoint, rangeColor, thickness * 0.5f, 5.0f);
+        }
+    }
+
+    // 绘制中心点图标（面光源图标：带边框的方形）
+    float iconSize = isSelected ? 10.0f : 8.0f;
+    ImVec2 iconMin(centerScreen.x - iconSize, centerScreen.y - iconSize);
+    ImVec2 iconMax(centerScreen.x + iconSize, centerScreen.y + iconSize);
+    drawList->AddRectFilled(iconMin, iconMax, lightColor);
+    drawList->AddRect(iconMin, iconMax, IM_COL32(255, 255, 255, 255), 0.0f, 0, 2.0f);
+
+    // 绘制光芒线条（4条对角线）
+    float rayInner = iconSize + 2.0f;
+    float rayOuter = iconSize + 8.0f;
+    const float angles[] = {0.785f, 2.356f, 3.927f, 5.498f}; // 45, 135, 225, 315 度
+    for (float angle : angles)
+    {
+        float cosA = cosf(angle);
+        float sinA = sinf(angle);
+        ImVec2 innerPoint(centerScreen.x + cosA * rayInner, centerScreen.y + sinA * rayInner);
+        ImVec2 outerPoint(centerScreen.x + cosA * rayOuter, centerScreen.y + sinA * rayOuter);
+        drawList->AddLine(innerPoint, outerPoint, lightColor, thickness);
+    }
+}
+
+void SceneViewPanel::drawAmbientZoneGizmo(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                           const ECS::AmbientZoneComponent& zone, bool isSelected)
+{
+    // 使用主颜色作为 Gizmo 颜色
+    ImU32 primaryColor = IM_COL32(
+        static_cast<int>(zone.primaryColor.r * 255),
+        static_cast<int>(zone.primaryColor.g * 255),
+        static_cast<int>(zone.primaryColor.b * 255),
+        isSelected ? 200 : 120
+    );
+    ImU32 secondaryColor = IM_COL32(
+        static_cast<int>(zone.secondaryColor.r * 255),
+        static_cast<int>(zone.secondaryColor.g * 255),
+        static_cast<int>(zone.secondaryColor.b * 255),
+        isSelected ? 200 : 120
+    );
+    ImU32 fillColor = IM_COL32(
+        static_cast<int>((zone.primaryColor.r + zone.secondaryColor.r) * 0.5f * 255),
+        static_cast<int>((zone.primaryColor.g + zone.secondaryColor.g) * 0.5f * 255),
+        static_cast<int>((zone.primaryColor.b + zone.secondaryColor.b) * 0.5f * 255),
+        isSelected ? 40 : 20
+    );
+    ImU32 outlineColor = IM_COL32(100, 200, 255, isSelected ? 255 : 180);
+
+    // 获取屏幕坐标
+    ImVec2 centerScreen = worldToScreenWith(m_editorCameraProperties, transform.position);
+
+    // 计算屏幕空间的尺寸
+    float screenWidth = zone.width * m_editorCameraProperties.zoom.x();
+    float screenHeight = zone.height * m_editorCameraProperties.zoom.x();
+
+    float thickness = isSelected ? 2.5f : 1.5f;
+
+    if (zone.shape == ECS::AmbientZoneShape::Rectangle)
+    {
+        float halfWidth = screenWidth * 0.5f;
+        float halfHeight = screenHeight * 0.5f;
+
+        // 计算旋转后的四个角点
+        float sinR = sinf(transform.rotation);
+        float cosR = cosf(transform.rotation);
+
+        auto rotatePoint = [&](float x, float y) -> ImVec2 {
+            float rx = x * cosR - y * sinR;
+            float ry = x * sinR + y * cosR;
+            return ImVec2(centerScreen.x + rx, centerScreen.y + ry);
+        };
+
+        ImVec2 corners[4] = {
+            rotatePoint(-halfWidth, -halfHeight),
+            rotatePoint(halfWidth, -halfHeight),
+            rotatePoint(halfWidth, halfHeight),
+            rotatePoint(-halfWidth, halfHeight)
+        };
+
+        // 绘制区域填充
+        drawList->AddConvexPolyFilled(corners, 4, fillColor);
+
+        // 绘制区域轮廓
+        drawList->AddPolyline(corners, 4, outlineColor, ImDrawFlags_Closed, thickness);
+
+        // 根据渐变模式绘制颜色预览
+        if (zone.gradientMode == ECS::AmbientGradientMode::Vertical)
+        {
+            // 垂直渐变：顶部主颜色，底部次颜色
+            ImVec2 topMid = ImVec2((corners[0].x + corners[1].x) * 0.5f, (corners[0].y + corners[1].y) * 0.5f);
+            ImVec2 bottomMid = ImVec2((corners[2].x + corners[3].x) * 0.5f, (corners[2].y + corners[3].y) * 0.5f);
+
+            // 绘制颜色指示条
+            float barWidth = 8.0f;
+            ImVec2 barTop(topMid.x - barWidth, topMid.y);
+            ImVec2 barBottom(bottomMid.x + barWidth, bottomMid.y);
+            drawList->AddRectFilledMultiColor(barTop, barBottom, primaryColor, primaryColor, secondaryColor, secondaryColor);
+        }
+        else if (zone.gradientMode == ECS::AmbientGradientMode::Horizontal)
+        {
+            // 水平渐变：左侧主颜色，右侧次颜色
+            ImVec2 leftMid = ImVec2((corners[0].x + corners[3].x) * 0.5f, (corners[0].y + corners[3].y) * 0.5f);
+            ImVec2 rightMid = ImVec2((corners[1].x + corners[2].x) * 0.5f, (corners[1].y + corners[2].y) * 0.5f);
+
+            // 绘制颜色指示条
+            float barHeight = 8.0f;
+            ImVec2 barLeft(leftMid.x, leftMid.y - barHeight);
+            ImVec2 barRight(rightMid.x, rightMid.y + barHeight);
+            drawList->AddRectFilledMultiColor(barLeft, barRight, primaryColor, secondaryColor, secondaryColor, primaryColor);
+        }
+        else
+        {
+            // 纯色模式：在中心显示颜色方块
+            float colorBoxSize = 12.0f;
+            ImVec2 boxMin(centerScreen.x - colorBoxSize, centerScreen.y - colorBoxSize);
+            ImVec2 boxMax(centerScreen.x + colorBoxSize, centerScreen.y + colorBoxSize);
+            drawList->AddRectFilled(boxMin, boxMax, primaryColor);
+            drawList->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 200), 0.0f, 0, 1.0f);
+        }
+
+        // 绘制边缘柔和度指示（内部虚线边框）
+        if (zone.edgeSoftness > 0.0f)
+        {
+            float softnessOffset = std::min(zone.edgeSoftness * m_editorCameraProperties.zoom.x(), 
+                                           std::min(halfWidth, halfHeight) * 0.5f);
+            ImVec2 innerCorners[4] = {
+                rotatePoint(-halfWidth + softnessOffset, -halfHeight + softnessOffset),
+                rotatePoint(halfWidth - softnessOffset, -halfHeight + softnessOffset),
+                rotatePoint(halfWidth - softnessOffset, halfHeight - softnessOffset),
+                rotatePoint(-halfWidth + softnessOffset, halfHeight - softnessOffset)
+            };
+
+            // 绘制虚线内边框
+            for (int i = 0; i < 4; ++i)
+            {
+                int next = (i + 1) % 4;
+                drawDashedLine(drawList, innerCorners[i], innerCorners[next], outlineColor, thickness * 0.5f, 4.0f);
+            }
+        }
+    }
+    else // Circle
+    {
+        float radius = screenWidth * 0.5f;
+
+        // 绘制区域填充
+        drawList->AddCircleFilled(centerScreen, radius, fillColor, 64);
+
+        // 绘制区域轮廓
+        drawList->AddCircle(centerScreen, radius, outlineColor, 64, thickness);
+
+        // 在中心显示颜色方块
+        float colorBoxSize = 12.0f;
+        ImVec2 boxMin(centerScreen.x - colorBoxSize, centerScreen.y - colorBoxSize);
+        ImVec2 boxMax(centerScreen.x + colorBoxSize, centerScreen.y + colorBoxSize);
+        drawList->AddRectFilled(boxMin, boxMax, primaryColor);
+        drawList->AddRect(boxMin, boxMax, IM_COL32(255, 255, 255, 200), 0.0f, 0, 1.0f);
+
+        // 绘制边缘柔和度指示
+        if (zone.edgeSoftness > 0.0f)
+        {
+            float softnessOffset = std::min(zone.edgeSoftness * m_editorCameraProperties.zoom.x(), radius * 0.5f);
+            drawList->AddCircle(centerScreen, radius - softnessOffset, outlineColor, 64, thickness * 0.5f);
+        }
+    }
+
+    // 绘制环境光区域图标（云朵形状简化为波浪线）
+    float iconRadius = isSelected ? 6.0f : 5.0f;
+    drawList->AddCircleFilled(centerScreen, iconRadius, outlineColor);
+
+    // 显示优先级数字
+    if (zone.priority != 0)
+    {
+        char priorityText[8];
+        snprintf(priorityText, sizeof(priorityText), "P%d", zone.priority);
+        ImVec2 textSize = ImGui::CalcTextSize(priorityText);
+        ImVec2 textPos(centerScreen.x - textSize.x * 0.5f, centerScreen.y + iconRadius + 2.0f);
+        drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), priorityText);
+    }
+}
+
+void SceneViewPanel::drawLightProbeGizmo(ImDrawList* drawList, const ECS::TransformComponent& transform,
+                                          const ECS::LightProbeComponent& probe, bool isSelected)
+{
+    // 使用采样颜色作为 Gizmo 颜色
+    ImU32 probeColor = IM_COL32(
+        static_cast<int>(probe.sampledColor.r * 255),
+        static_cast<int>(probe.sampledColor.g * 255),
+        static_cast<int>(probe.sampledColor.b * 255),
+        isSelected ? 255 : 200
+    );
+
+    // 如果采样颜色太暗，使用默认颜色
+    float brightness = probe.sampledColor.r + probe.sampledColor.g + probe.sampledColor.b;
+    if (brightness < 0.1f)
+    {
+        probeColor = IM_COL32(150, 150, 150, isSelected ? 255 : 200);
+    }
+
+    ImU32 outlineColor = probe.isBaked ? IM_COL32(0, 255, 100, isSelected ? 255 : 180) 
+                                       : IM_COL32(255, 200, 0, isSelected ? 255 : 180);
+    ImU32 rangeColor = IM_COL32(150, 150, 150, isSelected ? 80 : 40);
+
+    // 获取屏幕坐标
+    ImVec2 centerScreen = worldToScreenWith(m_editorCameraProperties, transform.position);
+
+    // 计算屏幕空间的影响半径
+    float screenRadius = probe.influenceRadius * m_editorCameraProperties.zoom.x();
+
+    float thickness = isSelected ? 2.5f : 1.5f;
+
+    // 绘制影响范围圆形
+    drawList->AddCircle(centerScreen, screenRadius, rangeColor, 64, thickness * 0.5f);
+
+    // 绘制探针球体（使用采样颜色填充）
+    float probeRadius = isSelected ? 12.0f : 10.0f;
+    drawList->AddCircleFilled(centerScreen, probeRadius, probeColor, 32);
+
+    // 绘制探针轮廓（烘焙状态用绿色，实时状态用黄色）
+    drawList->AddCircle(centerScreen, probeRadius, outlineColor, 32, thickness);
+
+    // 绘制十字标记
+    float crossSize = probeRadius * 0.6f;
+    drawList->AddLine(
+        ImVec2(centerScreen.x - crossSize, centerScreen.y),
+        ImVec2(centerScreen.x + crossSize, centerScreen.y),
+        IM_COL32(255, 255, 255, 200), 1.5f
+    );
+    drawList->AddLine(
+        ImVec2(centerScreen.x, centerScreen.y - crossSize),
+        ImVec2(centerScreen.x, centerScreen.y + crossSize),
+        IM_COL32(255, 255, 255, 200), 1.5f
+    );
+
+    // 绘制状态指示器
+    float indicatorRadius = 4.0f;
+    ImVec2 indicatorPos(centerScreen.x + probeRadius + 3.0f, centerScreen.y - probeRadius - 3.0f);
+    if (probe.isBaked)
+    {
+        // 烘焙状态：绿色圆点
+        drawList->AddCircleFilled(indicatorPos, indicatorRadius, IM_COL32(0, 255, 100, 255));
+    }
+    else
+    {
+        // 实时状态：黄色圆点
+        drawList->AddCircleFilled(indicatorPos, indicatorRadius, IM_COL32(255, 200, 0, 255));
+    }
+
+    // 显示采样强度
+    if (isSelected && probe.sampledIntensity > 0.0f)
+    {
+        char intensityText[16];
+        snprintf(intensityText, sizeof(intensityText), "I:%.2f", probe.sampledIntensity);
+        ImVec2 textSize = ImGui::CalcTextSize(intensityText);
+        ImVec2 textPos(centerScreen.x - textSize.x * 0.5f, centerScreen.y + probeRadius + 4.0f);
+        drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), intensityText);
+    }
+}
+
+
+// ============================================================================
+// 光照调试视图
+// ============================================================================
+
+void SceneViewPanel::drawLightingDebugUI()
+{
+    // 在场景视图窗口的右上角绘制调试选项
+    ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - 200, 30));
+    
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(30, 30, 30, 200));
+    ImGui::BeginChild("##LightingDebugPanel", ImVec2(190, 0), true, ImGuiWindowFlags_AlwaysAutoResize);
+    
+    ImGui::Text("光照调试");
+    ImGui::Separator();
+    
+    // 调试模式选择 (Requirements: 12.5)
+    const char* debugModeNames[] = { 
+        "正常", "仅光照", "光照层",
+        "光照缓冲区", "阴影缓冲区", "自发光缓冲区", "法线缓冲区", "G-Buffer"
+    };
+    int currentMode = static_cast<int>(m_lightingDebugMode);
+    
+    ImGui::Text("调试模式:");
+    if (ImGui::Combo("##DebugMode", &currentMode, debugModeNames, IM_ARRAYSIZE(debugModeNames)))
+    {
+        m_lightingDebugMode = static_cast<LightingDebugMode>(currentMode);
+    }
+    
+    // 光照层掩码选择（仅在光照层模式下显示）
+    if (m_lightingDebugMode == LightingDebugMode::LightLayers)
+    {
+        ImGui::Separator();
+        ImGui::Text("显示光照层:");
+        
+        // 显示前8个光照层的复选框
+        for (int i = 0; i < 8; ++i)
+        {
+            char label[32];
+            snprintf(label, sizeof(label), "层 %d", i);
+            bool layerEnabled = (m_debugLayerMask & (1u << i)) != 0;
+            if (ImGui::Checkbox(label, &layerEnabled))
+            {
+                if (layerEnabled)
+                    m_debugLayerMask |= (1u << i);
+                else
+                    m_debugLayerMask &= ~(1u << i);
+            }
+            
+            // 每行显示4个
+            if ((i + 1) % 4 != 0)
+                ImGui::SameLine();
+        }
+        
+        // 全选/全不选按钮
+        if (ImGui::Button("全选"))
+            m_debugLayerMask = 0xFFFFFFFF;
+        ImGui::SameLine();
+        if (ImGui::Button("全不选"))
+            m_debugLayerMask = 0;
+    }
+    
+    // 缓冲区调试信息（仅在缓冲区模式下显示）
+    if (m_lightingDebugMode >= LightingDebugMode::LightBuffer)
+    {
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "缓冲区预览模式");
+        
+        switch (m_lightingDebugMode)
+        {
+            case LightingDebugMode::LightBuffer:
+                ImGui::Text("显示: 光照缓冲区");
+                ImGui::TextWrapped("RGB: 光照颜色");
+                break;
+            case LightingDebugMode::ShadowBuffer:
+                ImGui::Text("显示: 阴影缓冲区");
+                ImGui::TextWrapped("R: 阴影强度");
+                break;
+            case LightingDebugMode::EmissionBuffer:
+                ImGui::Text("显示: 自发光缓冲区");
+                ImGui::TextWrapped("RGB: 自发光颜色");
+                break;
+            case LightingDebugMode::NormalBuffer:
+                ImGui::Text("显示: 法线缓冲区");
+                ImGui::TextWrapped("RG: 法线 XY");
+                break;
+            case LightingDebugMode::GBuffer:
+                ImGui::Text("显示: G-Buffer");
+                ImGui::TextWrapped("位置/法线/颜色/材质");
+                break;
+            default:
+                break;
+        }
+    }
+    
+    // 显示当前光源统计信息
+    if (m_context->activeScene)
+    {
+        ImGui::Separator();
+        ImGui::Text("光源统计:");
+        
+        auto& registry = m_context->activeScene->GetRegistry();
+        
+        int pointLightCount = 0;
+        int spotLightCount = 0;
+        int dirLightCount = 0;
+        int areaLightCount = 0;
+        int ambientZoneCount = 0;
+        int lightProbeCount = 0;
+        
+        auto pointLightView = registry.view<ECS::PointLightComponent>();
+        for (auto entity : pointLightView)
+        {
+            const auto& light = pointLightView.get<ECS::PointLightComponent>(entity);
+            if (light.Enable) ++pointLightCount;
+        }
+        
+        auto spotLightView = registry.view<ECS::SpotLightComponent>();
+        for (auto entity : spotLightView)
+        {
+            const auto& light = spotLightView.get<ECS::SpotLightComponent>(entity);
+            if (light.Enable) ++spotLightCount;
+        }
+        
+        auto dirLightView = registry.view<ECS::DirectionalLightComponent>();
+        for (auto entity : dirLightView)
+        {
+            const auto& light = dirLightView.get<ECS::DirectionalLightComponent>(entity);
+            if (light.Enable) ++dirLightCount;
+        }
+        
+        // 统计增强光照组件
+        auto areaLightView = registry.view<ECS::AreaLightComponent>();
+        for (auto entity : areaLightView)
+        {
+            const auto& light = areaLightView.get<ECS::AreaLightComponent>(entity);
+            if (light.Enable) ++areaLightCount;
+        }
+        
+        auto ambientZoneView = registry.view<ECS::AmbientZoneComponent>();
+        for (auto entity : ambientZoneView)
+        {
+            const auto& zone = ambientZoneView.get<ECS::AmbientZoneComponent>(entity);
+            if (zone.Enable) ++ambientZoneCount;
+        }
+        
+        auto lightProbeView = registry.view<ECS::LightProbeComponent>();
+        for (auto entity : lightProbeView)
+        {
+            const auto& probe = lightProbeView.get<ECS::LightProbeComponent>(entity);
+            if (probe.Enable) ++lightProbeCount;
+        }
+        
+        ImGui::Text("  点光源: %d", pointLightCount);
+        ImGui::Text("  聚光灯: %d", spotLightCount);
+        ImGui::Text("  方向光: %d", dirLightCount);
+        ImGui::Text("  面光源: %d", areaLightCount);
+        ImGui::Text("  环境区域: %d", ambientZoneCount);
+        ImGui::Text("  光照探针: %d", lightProbeCount);
+        int totalLights = pointLightCount + spotLightCount + dirLightCount + areaLightCount;
+        ImGui::Text("  光源总计: %d", totalLights);
+    }
+    
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+}
+
+void SceneViewPanel::drawLightingDebugOverlay(ImDrawList* drawList, const ImVec2& viewportScreenPos, const ImVec2& viewportSize)
+{
+    if (m_lightingDebugMode == LightingDebugMode::None)
+        return;
+    
+    if (!m_context->activeScene)
+        return;
+    
+    auto& registry = m_context->activeScene->GetRegistry();
+    
+    if (m_lightingDebugMode == LightingDebugMode::LightingOnly)
+    {
+        // 仅光照模式：绘制半透明黑色背景，然后叠加光照效果
+        ImU32 darkOverlay = IM_COL32(0, 0, 0, 180);
+        drawList->AddRectFilled(viewportScreenPos, 
+                                ImVec2(viewportScreenPos.x + viewportSize.x, viewportScreenPos.y + viewportSize.y),
+                                darkOverlay);
+        
+        // 绘制点光源的光照贡献
+        auto pointLightView = registry.view<ECS::TransformComponent, ECS::PointLightComponent>();
+        for (auto entity : pointLightView)
+        {
+            const auto& transform = pointLightView.get<ECS::TransformComponent>(entity);
+            const auto& light = pointLightView.get<ECS::PointLightComponent>(entity);
+            
+            if (!light.Enable)
+                continue;
+            
+            ImVec2 centerScreen = worldToScreenWith(m_editorCameraProperties, transform.position);
+            float screenRadius = light.radius * m_editorCameraProperties.zoom.x();
+            
+            // 使用渐变圆形表示光照贡献
+            ImU32 lightColor = IM_COL32(
+                static_cast<int>(light.color.r * 255 * light.intensity),
+                static_cast<int>(light.color.g * 255 * light.intensity),
+                static_cast<int>(light.color.b * 255 * light.intensity),
+                150
+            );
+            
+            // 绘制多层渐变圆形模拟光照衰减
+            const int gradientLayers = 8;
+            for (int i = gradientLayers; i >= 1; --i)
+            {
+                float layerRadius = screenRadius * (float)i / gradientLayers;
+                int alpha = 150 * (gradientLayers - i + 1) / (gradientLayers + 1);
+                ImU32 layerColor = IM_COL32(
+                    static_cast<int>(light.color.r * 255 * light.intensity),
+                    static_cast<int>(light.color.g * 255 * light.intensity),
+                    static_cast<int>(light.color.b * 255 * light.intensity),
+                    alpha
+                );
+                drawList->AddCircleFilled(centerScreen, layerRadius, layerColor, 64);
+            }
+        }
+        
+        // 绘制聚光灯的光照贡献
+        auto spotLightView = registry.view<ECS::TransformComponent, ECS::SpotLightComponent>();
+        for (auto entity : spotLightView)
+        {
+            const auto& transform = spotLightView.get<ECS::TransformComponent>(entity);
+            const auto& light = spotLightView.get<ECS::SpotLightComponent>(entity);
+            
+            if (!light.Enable)
+                continue;
+            
+            ImVec2 centerScreen = worldToScreenWith(m_editorCameraProperties, transform.position);
+            float screenRadius = light.radius * m_editorCameraProperties.zoom.x();
+            
+            // 计算光照方向
+            float dirAngle = transform.rotation - 3.14159265f / 2.0f;
+            float outerAngleRad = light.outerAngle * 3.14159265f / 180.0f;
+            
+            // 绘制锥形光照区域
+            ImU32 lightColor = IM_COL32(
+                static_cast<int>(light.color.r * 255 * light.intensity),
+                static_cast<int>(light.color.g * 255 * light.intensity),
+                static_cast<int>(light.color.b * 255 * light.intensity),
+                100
+            );
+            
+            const int arcSegments = 32;
+            std::vector<ImVec2> arcPoints;
+            arcPoints.push_back(centerScreen);
+            
+            float leftAngle = dirAngle - outerAngleRad;
+            float rightAngle = dirAngle + outerAngleRad;
+            
+            for (int i = 0; i <= arcSegments; ++i)
+            {
+                float t = (float)i / arcSegments;
+                float angle = leftAngle + t * (rightAngle - leftAngle);
+                arcPoints.push_back(ImVec2(
+                    centerScreen.x + cosf(angle) * screenRadius,
+                    centerScreen.y + sinf(angle) * screenRadius
+                ));
+            }
+            
+            drawList->AddConvexPolyFilled(arcPoints.data(), (int)arcPoints.size(), lightColor);
+        }
+        
+        // 绘制方向光的光照贡献（全屏淡色覆盖）
+        auto dirLightView = registry.view<ECS::TransformComponent, ECS::DirectionalLightComponent>();
+        for (auto entity : dirLightView)
+        {
+            const auto& light = dirLightView.get<ECS::DirectionalLightComponent>(entity);
+            
+            if (!light.Enable)
+                continue;
+            
+            ImU32 lightColor = IM_COL32(
+                static_cast<int>(light.color.r * 255 * light.intensity * 0.3f),
+                static_cast<int>(light.color.g * 255 * light.intensity * 0.3f),
+                static_cast<int>(light.color.b * 255 * light.intensity * 0.3f),
+                50
+            );
+            
+            drawList->AddRectFilled(viewportScreenPos,
+                                    ImVec2(viewportScreenPos.x + viewportSize.x, viewportScreenPos.y + viewportSize.y),
+                                    lightColor);
+        }
+    }
+    else if (m_lightingDebugMode == LightingDebugMode::LightLayers)
+    {
+        // 光照层模式：用不同颜色显示不同光照层的光源
+        
+        // 为每个光照层定义一个颜色
+        const ImU32 layerColors[] = {
+            IM_COL32(255, 0, 0, 100),     // 层 0 - 红色
+            IM_COL32(0, 255, 0, 100),     // 层 1 - 绿色
+            IM_COL32(0, 0, 255, 100),     // 层 2 - 蓝色
+            IM_COL32(255, 255, 0, 100),   // 层 3 - 黄色
+            IM_COL32(255, 0, 255, 100),   // 层 4 - 品红
+            IM_COL32(0, 255, 255, 100),   // 层 5 - 青色
+            IM_COL32(255, 128, 0, 100),   // 层 6 - 橙色
+            IM_COL32(128, 0, 255, 100),   // 层 7 - 紫色
+        };
+        
+        // 绘制点光源
+        auto pointLightView = registry.view<ECS::TransformComponent, ECS::PointLightComponent>();
+        for (auto entity : pointLightView)
+        {
+            const auto& transform = pointLightView.get<ECS::TransformComponent>(entity);
+            const auto& light = pointLightView.get<ECS::PointLightComponent>(entity);
+            
+            if (!light.Enable)
+                continue;
+            
+            // 检查是否在调试掩码中
+            if ((light.layerMask & m_debugLayerMask) == 0)
+                continue;
+            
+            ImVec2 centerScreen = worldToScreenWith(m_editorCameraProperties, transform.position);
+            float screenRadius = light.radius * m_editorCameraProperties.zoom.x();
+            
+            // 为每个激活的层绘制一个圆环
+            for (int layer = 0; layer < 8; ++layer)
+            {
+                if ((light.layerMask & (1u << layer)) && (m_debugLayerMask & (1u << layer)))
+                {
+                    float layerRadius = screenRadius * (1.0f - layer * 0.05f);
+                    drawList->AddCircle(centerScreen, layerRadius, layerColors[layer], 64, 3.0f);
+                }
+            }
+            
+            // 在中心显示层掩码
+            char maskText[16];
+            snprintf(maskText, sizeof(maskText), "%X", light.layerMask & 0xFF);
+            ImVec2 textSize = ImGui::CalcTextSize(maskText);
+            drawList->AddText(ImVec2(centerScreen.x - textSize.x * 0.5f, centerScreen.y - textSize.y * 0.5f),
+                             IM_COL32(255, 255, 255, 255), maskText);
+        }
+        
+        // 绘制聚光灯
+        auto spotLightView = registry.view<ECS::TransformComponent, ECS::SpotLightComponent>();
+        for (auto entity : spotLightView)
+        {
+            const auto& transform = spotLightView.get<ECS::TransformComponent>(entity);
+            const auto& light = spotLightView.get<ECS::SpotLightComponent>(entity);
+            
+            if (!light.Enable)
+                continue;
+            
+            if ((light.layerMask & m_debugLayerMask) == 0)
+                continue;
+            
+            ImVec2 centerScreen = worldToScreenWith(m_editorCameraProperties, transform.position);
+            
+            // 在中心显示层掩码
+            char maskText[16];
+            snprintf(maskText, sizeof(maskText), "%X", light.layerMask & 0xFF);
+            ImVec2 textSize = ImGui::CalcTextSize(maskText);
+            drawList->AddText(ImVec2(centerScreen.x - textSize.x * 0.5f, centerScreen.y - textSize.y * 0.5f),
+                             IM_COL32(255, 255, 255, 255), maskText);
+        }
+        
+        // 绘制方向光
+        auto dirLightView = registry.view<ECS::TransformComponent, ECS::DirectionalLightComponent>();
+        for (auto entity : dirLightView)
+        {
+            const auto& transform = dirLightView.get<ECS::TransformComponent>(entity);
+            const auto& light = dirLightView.get<ECS::DirectionalLightComponent>(entity);
+            
+            if (!light.Enable)
+                continue;
+            
+            if ((light.layerMask & m_debugLayerMask) == 0)
+                continue;
+            
+            ImVec2 centerScreen = worldToScreenWith(m_editorCameraProperties, transform.position);
+            
+            // 在中心显示层掩码
+            char maskText[16];
+            snprintf(maskText, sizeof(maskText), "%X", light.layerMask & 0xFF);
+            ImVec2 textSize = ImGui::CalcTextSize(maskText);
+            drawList->AddText(ImVec2(centerScreen.x - textSize.x * 0.5f, centerScreen.y - textSize.y * 0.5f),
+                             IM_COL32(255, 255, 255, 255), maskText);
+        }
+        
+        // 绘制图例
+        ImVec2 legendPos = ImVec2(viewportScreenPos.x + 10, viewportScreenPos.y + viewportSize.y - 100);
+        drawList->AddRectFilled(legendPos, ImVec2(legendPos.x + 120, legendPos.y + 90), IM_COL32(0, 0, 0, 180));
+        drawList->AddText(ImVec2(legendPos.x + 5, legendPos.y + 5), IM_COL32(255, 255, 255, 255), "光照层图例:");
+        
+        for (int i = 0; i < 8; ++i)
+        {
+            if (m_debugLayerMask & (1u << i))
+            {
+                float y = legendPos.y + 20 + (i / 4) * 15;
+                float x = legendPos.x + 5 + (i % 4) * 28;
+                drawList->AddRectFilled(ImVec2(x, y), ImVec2(x + 10, y + 10), layerColors[i] | 0xFF000000);
+                char layerNum[4];
+                snprintf(layerNum, sizeof(layerNum), "%d", i);
+                drawList->AddText(ImVec2(x + 12, y - 2), IM_COL32(255, 255, 255, 255), layerNum);
+            }
+        }
+    }
+    // 缓冲区调试可视化 (Requirements: 12.5)
+    else if (m_lightingDebugMode >= LightingDebugMode::LightBuffer)
+    {
+        // 绘制缓冲区调试信息覆盖层
+        const char* bufferName = nullptr;
+        ImU32 overlayColor = IM_COL32(0, 0, 0, 0);
+        
+        switch (m_lightingDebugMode)
+        {
+            case LightingDebugMode::LightBuffer:
+                bufferName = "光照缓冲区";
+                overlayColor = IM_COL32(255, 200, 100, 30);
+                break;
+            case LightingDebugMode::ShadowBuffer:
+                bufferName = "阴影缓冲区";
+                overlayColor = IM_COL32(50, 50, 50, 100);
+                break;
+            case LightingDebugMode::EmissionBuffer:
+                bufferName = "自发光缓冲区";
+                overlayColor = IM_COL32(255, 100, 255, 30);
+                break;
+            case LightingDebugMode::NormalBuffer:
+                bufferName = "法线缓冲区";
+                overlayColor = IM_COL32(100, 100, 255, 30);
+                break;
+            case LightingDebugMode::GBuffer:
+                bufferName = "G-Buffer";
+                overlayColor = IM_COL32(100, 255, 100, 30);
+                break;
+            default:
+                break;
+        }
+        
+        // 绘制半透明覆盖层表示当前查看的缓冲区
+        drawList->AddRectFilled(viewportScreenPos,
+                                ImVec2(viewportScreenPos.x + viewportSize.x, viewportScreenPos.y + viewportSize.y),
+                                overlayColor);
+        
+        // 绘制缓冲区名称标签
+        if (bufferName)
+        {
+            ImVec2 labelPos = ImVec2(viewportScreenPos.x + 10, viewportScreenPos.y + 10);
+            ImVec2 textSize = ImGui::CalcTextSize(bufferName);
+            
+            // 绘制标签背景
+            drawList->AddRectFilled(
+                ImVec2(labelPos.x - 5, labelPos.y - 3),
+                ImVec2(labelPos.x + textSize.x + 5, labelPos.y + textSize.y + 3),
+                IM_COL32(0, 0, 0, 200)
+            );
+            
+            // 绘制标签文字
+            drawList->AddText(labelPos, IM_COL32(255, 255, 0, 255), bufferName);
+            
+            // 绘制说明文字
+            const char* description = nullptr;
+            switch (m_lightingDebugMode)
+            {
+                case LightingDebugMode::LightBuffer:
+                    description = "显示场景光照计算结果";
+                    break;
+                case LightingDebugMode::ShadowBuffer:
+                    description = "白色=无阴影, 黑色=完全阴影";
+                    break;
+                case LightingDebugMode::EmissionBuffer:
+                    description = "显示物体自发光颜色";
+                    break;
+                case LightingDebugMode::NormalBuffer:
+                    description = "R=法线X, G=法线Y";
+                    break;
+                case LightingDebugMode::GBuffer:
+                    description = "延迟渲染几何缓冲区";
+                    break;
+                default:
+                    break;
+            }
+            
+            if (description)
+            {
+                ImVec2 descPos = ImVec2(labelPos.x, labelPos.y + textSize.y + 8);
+                ImVec2 descSize = ImGui::CalcTextSize(description);
+                
+                drawList->AddRectFilled(
+                    ImVec2(descPos.x - 5, descPos.y - 3),
+                    ImVec2(descPos.x + descSize.x + 5, descPos.y + descSize.y + 3),
+                    IM_COL32(0, 0, 0, 180)
+                );
+                drawList->AddText(descPos, IM_COL32(200, 200, 200, 255), description);
+            }
+        }
+        
+        // 绘制边框指示当前处于调试模式
+        drawList->AddRect(
+            viewportScreenPos,
+            ImVec2(viewportScreenPos.x + viewportSize.x, viewportScreenPos.y + viewportSize.y),
+            IM_COL32(255, 255, 0, 200),
+            0.0f, 0, 3.0f
+        );
+    }
 }

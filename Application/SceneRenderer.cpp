@@ -2,6 +2,7 @@
 #include "../Renderer/RenderComponent.h"
 #include "../Components/Transform.h"
 #include "../Components/Sprite.h"
+#include "../Components/LayerComponent.h"
 #include "TextComponent.h"
 #include "UIComponents.h"
 #include "../Components/RelationshipComponent.h"
@@ -157,7 +158,14 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                     .filterQuality = static_cast<int>(sprite.image->getImportSettings().filterQuality),
                     .wrapMode = static_cast<int>(sprite.image->getImportSettings().wrapMode),
                     .ppuScaleFactor = ppuScaleFactor,
-                    .isUISprite = sprite.image->getNutTexture() ? false : true
+                    .isUISprite = sprite.image->getNutTexture() ? false : true,
+                    // 优先使用 LayerComponent，否则使用 Sprite 的 lightLayer
+                    .lightLayer = registry.any_of<ECS::LayerComponent>(entity) 
+                        ? registry.get<ECS::LayerComponent>(entity).GetLayerMask()
+                        : sprite.lightLayer.value,
+                    // 自发光数据 (Feature: 2d-lighting-enhancement)
+                    .emissionColor = sprite.emissionColor,
+                    .emissionIntensity = sprite.emissionIntensity
                 }
             });
         }
@@ -224,7 +232,8 @@ void SceneRenderer::ExtractToRenderableManager(entt::registry& registry)
                                 .filterQuality = static_cast<int>(hydratedTile.filterQuality),
                                 .wrapMode = static_cast<int>(hydratedTile.wrapMode),
                                 .ppuScaleFactor = ppuScaleFactor,
-                                .isUISprite = false 
+                                .isUISprite = false,
+                                .lightLayer = 0xFFFFFFFF // Tilemaps use default light layer
                             }
                         });
                     }
