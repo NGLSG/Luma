@@ -709,4 +709,403 @@ void BlueprintNodeRegistry::RegisterSDKNodes()
         .InputPins = {{"目标", animControllerType}, {"", "Exec"}, {"name", "System.String"}, {"value", "System.Int32"}},
         .OutputPins = {{"然后", "Exec"}}
     });
+
+    // ==================== 光照组件 ====================
+    const std::string directionalLightType = "Luma.SDK.Components.DirectionalLight";
+    const std::string pointLightType = "Luma.SDK.Components.PointLight";
+    const std::string spotLightType = "Luma.SDK.Components.SpotLight";
+    const std::string areaLightType = "Luma.SDK.Components.AreaLight";
+    const std::string lightProbeType = "Luma.SDK.Components.LightProbe";
+
+    // 方向光组件
+    RegisterNode({
+        .FullName = "Luma.SDK.DirectionalLight.SetColor", .DisplayName = "方向光.设置颜色",
+        .Category = "SDK|光照|方向光",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", directionalLightType}, {"", "Exec"}, {"color", "Luma.SDK.Color"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.DirectionalLight.SetIntensity", .DisplayName = "方向光.设置强度",
+        .Category = "SDK|光照|方向光",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", directionalLightType}, {"", "Exec"}, {"intensity", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.DirectionalLight.SetDirection", .DisplayName = "方向光.设置方向",
+        .Category = "SDK|光照|方向光",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", directionalLightType}, {"", "Exec"}, {"direction", "Luma.SDK.Vector2"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.DirectionalLight.SetCastShadows", .DisplayName = "方向光.设置投射阴影",
+        .Category = "SDK|光照|方向光",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", directionalLightType}, {"", "Exec"}, {"castShadows", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+
+    // 点光源组件
+    RegisterNode({
+        .FullName = "Luma.SDK.PointLight.SetColor", .DisplayName = "点光源.设置颜色",
+        .Category = "SDK|光照|点光源",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", pointLightType}, {"", "Exec"}, {"color", "Luma.SDK.Color"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.PointLight.SetIntensity", .DisplayName = "点光源.设置强度",
+        .Category = "SDK|光照|点光源",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", pointLightType}, {"", "Exec"}, {"intensity", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.PointLight.SetRadius", .DisplayName = "点光源.设置半径",
+        .Category = "SDK|光照|点光源",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", pointLightType}, {"", "Exec"}, {"radius", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.PointLight.SetCastShadows", .DisplayName = "点光源.设置投射阴影",
+        .Category = "SDK|光照|点光源",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", pointLightType}, {"", "Exec"}, {"castShadows", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+
+    // 聚光灯组件
+    RegisterNode({
+        .FullName = "Luma.SDK.SpotLight.SetColor", .DisplayName = "聚光灯.设置颜色",
+        .Category = "SDK|光照|聚光灯",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", spotLightType}, {"", "Exec"}, {"color", "Luma.SDK.Color"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.SpotLight.SetIntensity", .DisplayName = "聚光灯.设置强度",
+        .Category = "SDK|光照|聚光灯",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", spotLightType}, {"", "Exec"}, {"intensity", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.SpotLight.SetRadius", .DisplayName = "聚光灯.设置半径",
+        .Category = "SDK|光照|聚光灯",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", spotLightType}, {"", "Exec"}, {"radius", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.SpotLight.SetInnerAngle", .DisplayName = "聚光灯.设置内角",
+        .Category = "SDK|光照|聚光灯",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", spotLightType}, {"", "Exec"}, {"innerAngle", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.SpotLight.SetOuterAngle", .DisplayName = "聚光灯.设置外角",
+        .Category = "SDK|光照|聚光灯",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", spotLightType}, {"", "Exec"}, {"outerAngle", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.SpotLight.SetCastShadows", .DisplayName = "聚光灯.设置投射阴影",
+        .Category = "SDK|光照|聚光灯",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", spotLightType}, {"", "Exec"}, {"castShadows", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+
+    // 面光源组件
+    RegisterNode({
+        .FullName = "Luma.SDK.AreaLight.SetColor", .DisplayName = "面光源.设置颜色",
+        .Category = "SDK|光照|面光源",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", areaLightType}, {"", "Exec"}, {"color", "Luma.SDK.Color"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AreaLight.SetIntensity", .DisplayName = "面光源.设置强度",
+        .Category = "SDK|光照|面光源",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", areaLightType}, {"", "Exec"}, {"intensity", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AreaLight.SetSize", .DisplayName = "面光源.设置尺寸",
+        .Category = "SDK|光照|面光源",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", areaLightType}, {"", "Exec"}, {"width", "System.Single"}, {"height", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AreaLight.SetRadius", .DisplayName = "面光源.设置半径",
+        .Category = "SDK|光照|面光源",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", areaLightType}, {"", "Exec"}, {"radius", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AreaLight.SetCastShadows", .DisplayName = "面光源.设置投射阴影",
+        .Category = "SDK|光照|面光源",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", areaLightType}, {"", "Exec"}, {"castShadows", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AreaLight.SetShadowSoftness", .DisplayName = "面光源.设置阴影柔和度",
+        .Category = "SDK|光照|面光源",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", areaLightType}, {"", "Exec"}, {"shadowSoftness", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+
+    // 光照探针组件
+    RegisterNode({
+        .FullName = "Luma.SDK.LightProbe.SetInfluenceRadius", .DisplayName = "光照探针.设置影响半径",
+        .Category = "SDK|光照|光照探针",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", lightProbeType}, {"", "Exec"}, {"influenceRadius", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.LightProbe.GetSampledColor", .DisplayName = "光照探针.获取采样颜色",
+        .Category = "SDK|光照|光照探针",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", lightProbeType}, {"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "Luma.SDK.Color"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.LightProbe.GetSampledIntensity", .DisplayName = "光照探针.获取采样强度",
+        .Category = "SDK|光照|光照探针",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", lightProbeType}, {"", "Exec"}},
+        .OutputPins = {{"然后", "Exec"}, {"返回值", "System.Single"}}
+    });
+
+    // ==================== 后处理组件 ====================
+    const std::string postProcessType = "Luma.SDK.Components.PostProcessSettings";
+    const std::string qualitySettingsType = "Luma.SDK.Components.QualitySettings";
+    const std::string lightingSettingsType = "Luma.SDK.Components.LightingSettings";
+    const std::string ambientZoneType = "Luma.SDK.Components.AmbientZone";
+
+    // 后处理设置
+    RegisterNode({
+        .FullName = "Luma.SDK.PostProcessSettings.SetEnableBloom", .DisplayName = "后处理.启用Bloom",
+        .Category = "SDK|后处理",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", postProcessType}, {"", "Exec"}, {"enable", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.PostProcessSettings.SetBloomIntensity", .DisplayName = "后处理.设置Bloom强度",
+        .Category = "SDK|后处理",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", postProcessType}, {"", "Exec"}, {"intensity", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.PostProcessSettings.SetEnableFog", .DisplayName = "后处理.启用雾效",
+        .Category = "SDK|后处理",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", postProcessType}, {"", "Exec"}, {"enable", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.PostProcessSettings.SetFogColor", .DisplayName = "后处理.设置雾效颜色",
+        .Category = "SDK|后处理",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", postProcessType}, {"", "Exec"}, {"color", "Luma.SDK.Color"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.PostProcessSettings.SetFogDensity", .DisplayName = "后处理.设置雾效密度",
+        .Category = "SDK|后处理",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", postProcessType}, {"", "Exec"}, {"density", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.PostProcessSettings.SetExposure", .DisplayName = "后处理.设置曝光",
+        .Category = "SDK|后处理",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", postProcessType}, {"", "Exec"}, {"exposure", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.PostProcessSettings.SetContrast", .DisplayName = "后处理.设置对比度",
+        .Category = "SDK|后处理",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", postProcessType}, {"", "Exec"}, {"contrast", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.PostProcessSettings.SetSaturation", .DisplayName = "后处理.设置饱和度",
+        .Category = "SDK|后处理",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", postProcessType}, {"", "Exec"}, {"saturation", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+
+    // 质量设置
+    RegisterNode({
+        .FullName = "Luma.SDK.QualitySettings.SetRenderScale", .DisplayName = "质量设置.设置渲染缩放",
+        .Category = "SDK|质量设置",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", qualitySettingsType}, {"", "Exec"}, {"scale", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.QualitySettings.SetShadowMapResolution", .DisplayName = "质量设置.设置阴影贴图分辨率",
+        .Category = "SDK|质量设置",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", qualitySettingsType}, {"", "Exec"}, {"resolution", "System.Int32"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.QualitySettings.SetMaxLightsPerFrame", .DisplayName = "质量设置.设置每帧最大光源数",
+        .Category = "SDK|质量设置",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", qualitySettingsType}, {"", "Exec"}, {"maxLights", "System.Int32"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+
+    // 光照设置
+    RegisterNode({
+        .FullName = "Luma.SDK.LightingSettings.SetAmbientColor", .DisplayName = "光照设置.设置环境光颜色",
+        .Category = "SDK|光照设置",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", lightingSettingsType}, {"", "Exec"}, {"color", "Luma.SDK.Color"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.LightingSettings.SetAmbientIntensity", .DisplayName = "光照设置.设置环境光强度",
+        .Category = "SDK|光照设置",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", lightingSettingsType}, {"", "Exec"}, {"intensity", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.LightingSettings.SetEnableShadows", .DisplayName = "光照设置.启用阴影",
+        .Category = "SDK|光照设置",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", lightingSettingsType}, {"", "Exec"}, {"enable", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.LightingSettings.SetShadowSoftness", .DisplayName = "光照设置.设置阴影柔和度",
+        .Category = "SDK|光照设置",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", lightingSettingsType}, {"", "Exec"}, {"softness", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.LightingSettings.SetEnableIndirectLighting", .DisplayName = "光照设置.启用间接光照",
+        .Category = "SDK|光照设置",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", lightingSettingsType}, {"", "Exec"}, {"enable", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+
+    // 环境区域
+    RegisterNode({
+        .FullName = "Luma.SDK.AmbientZone.SetPrimaryColor", .DisplayName = "环境区域.设置主颜色",
+        .Category = "SDK|环境区域",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", ambientZoneType}, {"", "Exec"}, {"color", "Luma.SDK.Color"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AmbientZone.SetSecondaryColor", .DisplayName = "环境区域.设置次颜色",
+        .Category = "SDK|环境区域",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", ambientZoneType}, {"", "Exec"}, {"color", "Luma.SDK.Color"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AmbientZone.SetIntensity", .DisplayName = "环境区域.设置强度",
+        .Category = "SDK|环境区域",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", ambientZoneType}, {"", "Exec"}, {"intensity", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AmbientZone.SetSize", .DisplayName = "环境区域.设置尺寸",
+        .Category = "SDK|环境区域",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", ambientZoneType}, {"", "Exec"}, {"width", "System.Single"}, {"height", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AmbientZone.SetEdgeSoftness", .DisplayName = "环境区域.设置边缘柔和度",
+        .Category = "SDK|环境区域",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", ambientZoneType}, {"", "Exec"}, {"softness", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.AmbientZone.SetPriority", .DisplayName = "环境区域.设置优先级",
+        .Category = "SDK|环境区域",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", ambientZoneType}, {"", "Exec"}, {"priority", "System.Int32"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+
+    // ==================== 阴影投射器组件 ====================
+    const std::string shadowCasterType = "Luma.SDK.Components.ShadowCaster";
+
+    RegisterNode({
+        .FullName = "Luma.SDK.ShadowCaster.SetOpacity", .DisplayName = "阴影投射器.设置不透明度",
+        .Category = "SDK|阴影",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", shadowCasterType}, {"", "Exec"}, {"opacity", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.ShadowCaster.SetSelfShadow", .DisplayName = "阴影投射器.设置自阴影",
+        .Category = "SDK|阴影",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", shadowCasterType}, {"", "Exec"}, {"selfShadow", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.ShadowCaster.SetCircleRadius", .DisplayName = "阴影投射器.设置圆形半径",
+        .Category = "SDK|阴影",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", shadowCasterType}, {"", "Exec"}, {"radius", "System.Single"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.ShadowCaster.SetRectangleSize", .DisplayName = "阴影投射器.设置矩形尺寸",
+        .Category = "SDK|阴影",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", shadowCasterType}, {"", "Exec"}, {"size", "Luma.SDK.Vector2"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.ShadowCaster.SetOffset", .DisplayName = "阴影投射器.设置偏移",
+        .Category = "SDK|阴影",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", shadowCasterType}, {"", "Exec"}, {"offset", "Luma.SDK.Vector2"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.ShadowCaster.SetEnableSDF", .DisplayName = "阴影投射器.启用SDF阴影",
+        .Category = "SDK|阴影",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", shadowCasterType}, {"", "Exec"}, {"enable", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
+    RegisterNode({
+        .FullName = "Luma.SDK.ShadowCaster.SetIsStatic", .DisplayName = "阴影投射器.设置静态",
+        .Category = "SDK|阴影",
+        .NodeType = BlueprintNodeType::FunctionCall,
+        .InputPins = {{"目标", shadowCasterType}, {"", "Exec"}, {"isStatic", "System.Boolean"}},
+        .OutputPins = {{"然后", "Exec"}}
+    });
 }
