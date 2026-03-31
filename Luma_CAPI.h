@@ -2750,6 +2750,18 @@ LUMA_API void Luma_LogDebug(const char* message);
 LUMA_API int Luma_GetSelectedEntityCount();
 LUMA_API Guid_CAPI Luma_GetSelectedEntityGuid(int index);
 LUMA_API void Luma_GetSelectedEntityName(int index, char* buffer, int bufferSize);
+
+// =============================================================================
+// NavAgent API
+// =============================================================================
+
+LUMA_API void NavAgent_SetDestination(LumaSceneHandle scene, LumaEntityHandle entity, float x, float y);
+LUMA_API void NavAgent_GetDestination(LumaSceneHandle scene, LumaEntityHandle entity, float* outX, float* outY);
+LUMA_API void NavAgent_SetSpeed(LumaSceneHandle scene, LumaEntityHandle entity, float speed);
+LUMA_API float NavAgent_GetSpeed(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool NavAgent_HasArrived(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void NavAgent_Stop(LumaSceneHandle scene, LumaEntityHandle entity);
+
 #ifdef __cplusplus
 }
 

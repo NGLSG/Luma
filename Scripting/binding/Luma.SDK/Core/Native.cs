@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 
 namespace Luma.SDK;
@@ -731,6 +731,29 @@ internal static class Native
     [DllImport(DllName)]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static extern bool GpuBuffer_Write(IntPtr buffer, IntPtr data, uint size, uint offset);
+
+    #endregion
+
+    #region NavAgent
+
+    [DllImport(DllName)]
+    internal static extern void NavAgent_SetDestination(IntPtr scene, uint entity, float x, float y);
+
+    [DllImport(DllName)]
+    internal static extern void NavAgent_GetDestination(IntPtr scene, uint entity, out float outX, out float outY);
+
+    [DllImport(DllName)]
+    internal static extern void NavAgent_SetSpeed(IntPtr scene, uint entity, float speed);
+
+    [DllImport(DllName)]
+    internal static extern float NavAgent_GetSpeed(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool NavAgent_HasArrived(IntPtr scene, uint entity);
+
+    [DllImport(DllName)]
+    internal static extern void NavAgent_Stop(IntPtr scene, uint entity);
 
     #endregion
 

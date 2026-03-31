@@ -3303,3 +3303,65 @@ LUMA_API bool Luma_AssetExists(const char* path)
     if (!path) return false;
     return AssetManager::GetInstance().GetMetadata(path) != nullptr;
 }
+
+// =============================================================================
+// NavAgent API
+// =============================================================================
+
+#include "NavAgentComponent.h"
+
+LUMA_API void NavAgent_SetDestination(LumaSceneHandle scene, LumaEntityHandle entity, float x, float y)
+{
+    if (auto* comp = TryGetComponent<ECS::NavAgentComponent>(AsScene(scene), entity))
+    {
+        comp->destination = {x, y};
+        comp->hasArrived = false;
+        comp->isPathRequested = true;
+    }
+}
+
+LUMA_API void NavAgent_GetDestination(LumaSceneHandle scene, LumaEntityHandle entity, float* outX, float* outY)
+{
+    if (auto* comp = TryGetComponent<ECS::NavAgentComponent>(AsScene(scene), entity))
+    {
+        if (outX) *outX = comp->destination.x;
+        if (outY) *outY = comp->destination.y;
+    }
+}
+
+LUMA_API void NavAgent_SetSpeed(LumaSceneHandle scene, LumaEntityHandle entity, float speed)
+{
+    if (auto* comp = TryGetComponent<ECS::NavAgentComponent>(AsScene(scene), entity))
+    {
+        comp->speed = speed;
+    }
+}
+
+LUMA_API float NavAgent_GetSpeed(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    if (auto* comp = TryGetComponent<ECS::NavAgentComponent>(AsScene(scene), entity))
+    {
+        return comp->speed;
+    }
+    return 0.0f;
+}
+
+LUMA_API bool NavAgent_HasArrived(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    if (auto* comp = TryGetComponent<ECS::NavAgentComponent>(AsScene(scene), entity))
+    {
+        return comp->hasArrived;
+    }
+    return true;
+}
+
+LUMA_API void NavAgent_Stop(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    if (auto* comp = TryGetComponent<ECS::NavAgentComponent>(AsScene(scene), entity))
+    {
+        comp->hasArrived = true;
+        comp->isPathRequested = false;
+        comp->path.clear();
+        comp->currentWaypointIndex = 0;
+    }
+}

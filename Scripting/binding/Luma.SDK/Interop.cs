@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using System.Reflection;
@@ -16,6 +16,7 @@ public static class Interop
 {
     private static readonly Dictionary<IntPtr, Script> s_liveInstances = new();
     private static readonly object s_instanceLock = new object();
+    private static int s_lastUpdateFrame = -1;
     private static IDeserializer? s_yamlDeserializer;
 
     private static IDeserializer YamlDeserializer =>
@@ -452,6 +453,11 @@ public static class Interop
 
         try
         {
+            if (s_lastUpdateFrame != Time.FrameCount + 1)
+            {
+                Time.Update(deltaTime);
+                s_lastUpdateFrame = Time.FrameCount;
+            }
             instance?.OnUpdate(deltaTime);
         }
         catch (Exception e)
