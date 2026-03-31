@@ -47,9 +47,9 @@ public:
     uint32_t GetWidth() const { return m_width; }
     uint32_t GetHeight() const { return m_height; }
     void UploadDirtyPixels();
+    static uint32_t DefaultColor(PixelType::Value type);
 
 private:
-    static uint32_t DefaultColor(PixelType::Value type);
 
     uint32_t m_width, m_height;
     std::shared_ptr<Nut::NutContext> m_ctx;
