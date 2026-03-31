@@ -3365,3 +3365,43 @@ LUMA_API void NavAgent_Stop(LumaSceneHandle scene, LumaEntityHandle entity)
         comp->currentWaypointIndex = 0;
     }
 }
+
+// =============================================================================
+// SubScene API
+// =============================================================================
+
+#include "SubSceneComponent.h"
+#include "Systems/SubSceneSystem.h"
+
+LUMA_API void SubScene_Load(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto runtimeScene = AsScene(scene);
+    if (auto* comp = TryGetComponent<ECS::SubSceneComponent>(runtimeScene, entity))
+    {
+        if (auto* system = runtimeScene->GetSystem<Systems::SubSceneSystem>())
+        {
+            system->LoadSubScene(runtimeScene, static_cast<entt::entity>(entity), *comp);
+        }
+    }
+}
+
+LUMA_API void SubScene_Unload(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    auto runtimeScene = AsScene(scene);
+    if (auto* comp = TryGetComponent<ECS::SubSceneComponent>(runtimeScene, entity))
+    {
+        if (auto* system = runtimeScene->GetSystem<Systems::SubSceneSystem>())
+        {
+            system->UnloadSubScene(runtimeScene, static_cast<entt::entity>(entity), *comp);
+        }
+    }
+}
+
+LUMA_API bool SubScene_IsLoaded(LumaSceneHandle scene, LumaEntityHandle entity)
+{
+    if (auto* comp = TryGetComponent<ECS::SubSceneComponent>(AsScene(scene), entity))
+    {
+        return comp->isLoaded;
+    }
+    return false;
+}

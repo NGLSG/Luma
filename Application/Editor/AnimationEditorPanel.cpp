@@ -547,6 +547,7 @@ void AnimationEditorPanel::drawTimeline()
                 const auto* compInfo = ComponentRegistry::GetInstance().Get("SpriteComponent");
                 if (compInfo)
                 {
+                    SceneManager::GetInstance().PushUndoState(scene);
                     if (!targetObject.HasComponent<ECS::SpriteComponent>())
                     {
                         targetObject.AddComponent<ECS::SpriteComponent>();
@@ -581,6 +582,7 @@ void AnimationEditorPanel::drawTimeline()
                 if (hasValidTargetObject() && m_currentClip)
                 {
                     auto scene = SceneManager::GetInstance().GetCurrentScene();
+                    SceneManager::GetInstance().PushUndoState(scene);
                     auto targetObject = scene->FindGameObjectByGuid(m_targetObjectGuid);
                     if (!targetObject.HasComponent<ECS::SpriteComponent>())
                     {

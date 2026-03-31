@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "IAssetManager.h"
+#include "AssetBundle.h"
 #include "../Utils/LazySingleton.h"
 #include "../Utils/FileWatcher.h"
 #include <memory>
@@ -193,6 +194,11 @@ public:
      */
     bool IsPreWarmingRunning() const;
 
+    void PackAssets(const std::filesystem::path& outputBundle);
+    bool LoadBundle(const std::filesystem::path& bundlePath);
+    bool HasBundle() const { return m_bundleReader != nullptr; }
+    std::vector<uint8_t> ReadBundleFile(const std::string& path) const;
+
 private:
     /**
      * @brief 私有默认构造函数。
@@ -205,6 +211,7 @@ private:
 
     std::unique_ptr<IAssetManager> m_implementation; ///< 资产管理器接口的实现。
     std::unique_ptr<FileWatcher> m_fileWatcher;      ///< 资源文件监控器（仅Editor模式）。
+    std::unique_ptr<AssetBundleReader> m_bundleReader; ///< Bundle 读取器（Runtime模式）。
     ApplicationMode m_appMode; ///< 应用程序的运行模式。
 };
 #endif

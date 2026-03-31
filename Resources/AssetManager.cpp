@@ -1,4 +1,5 @@
 #include "AssetManager.h"
+#include "AssetBundle.h"
 #include "EditorAssetManager.h"
 #include "RuntimeAssetManager.h"
 #include "../Utils/Logger.h"
@@ -245,4 +246,36 @@ bool AssetManager::IsPreWarmingRunning() const
         return m_implementation->IsPreWarmingRunning();
     }
     return false;
+}
+
+void AssetManager::PackAssets(const std::filesystem::path& outputBundle)
+{
+    if (!m_implementation) return;
+    auto root = m_implementation->GetAssetsRootPath();
+    AssetBundleWriter writer;
+    writer.AddDirectory(root);
+    if (writer.Write(outputBundle))
+        LogInfo("AssetManager: Bundle written to {}", outputBundle.string());
+    else
+        LogInfo("AssetManager: Failed to write bundle to {}", outputBundle.string());
+}
+
+bool AssetManager::LoadBundle(const std::filesystem::path& bundlePath)
+{
+    m_bundleReader = std::make_unique<AssetBundleReader>();
+    if (m_bundleReader->Open(bundlePath))
+    {
+        LogInfo("AssetManager: Bundle loaded from {}", bundlePath.string());
+        return true;
+    }
+    m_bundleReader.reset();
+    LogInfo("AssetManager: Failed to load bundle from {}", bundlePath.string());
+    return false;
+}
+
+std::vector<uint8_t> AssetManager::ReadBundleFile(const std::string& path) const
+{
+    if (m_bundleReader && m_bundleReader->Contains(path))
+        return m_bundleReader->ReadFile(path);
+    return {};
 }

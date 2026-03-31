@@ -406,6 +406,7 @@ void InspectorPanel::drawSceneCameraInspector()
                     }
                     if (!isDefaultCamera && !isActive && ImGui::MenuItem("删除此相机"))
                     {
+                        m_context->uiCallbacks->onValueChanged.Invoke();
                         camManager.DestroyCamera(id);
                         ImGui::EndPopup();
                         ImGui::PopID();
@@ -432,6 +433,7 @@ void InspectorPanel::drawSceneCameraInspector()
                     {
                         if (ImGui::Button("删除"))
                         {
+                            m_context->uiCallbacks->onValueChanged.Invoke();
                             camManager.DestroyCamera(id);
                             ImGui::Unindent();
                             ImGui::PopID();
@@ -937,7 +939,8 @@ void InspectorPanel::drawBatchTransformComponent(const std::vector<RuntimeGameOb
     if (!m_context->activeScene) return;
     auto& registry = m_context->activeScene->GetRegistry();
     bool allHaveParent = m_cachedBatchTransform.allHaveParent;
-    std::string headerName = allHaveParent ? "Transform (Local)" : "Transform (混合)";
+    std::string headerName = allHaveParent ? "Transform (Local)" : "Transform";
+    headerName += "  (" + std::to_string(selectedObjects.size()) + " 个对象)";
     if (isSelectionLocked())
     {
         headerName += " [固定]";
@@ -946,23 +949,6 @@ void InspectorPanel::drawBatchTransformComponent(const std::vector<RuntimeGameOb
     if (isHeadOpen)
     {
         displayBatchTransformValues(selectedObjects, allHaveParent);
-        ImGui::Separator();
-        ImGui::Text("批量设置:");
-        static ECS::Vector2f batchPosition = {0.0f, 0.0f};
-        if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("设置位置", batchPosition, *m_context->uiCallbacks))
-        {
-            applyBatchTransformPosition(selectedObjects, batchPosition, allHaveParent);
-        }
-        static float batchRotation = 0.0f;
-        if (CustomDrawing::WidgetDrawer<float>::Draw("设置旋转", batchRotation, *m_context->uiCallbacks))
-        {
-            applyBatchTransformRotation(selectedObjects, batchRotation, allHaveParent);
-        }
-        static ECS::Vector2f batchScale = {1.0f, 1.0f};
-        if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("设置缩放", batchScale, *m_context->uiCallbacks))
-        {
-            applyBatchTransformScale(selectedObjects, batchScale, allHaveParent);
-        }
     }
 }
 void InspectorPanel::displayBatchTransformValues(const std::vector<RuntimeGameObject>& selectedObjects,
@@ -971,30 +957,104 @@ void InspectorPanel::displayBatchTransformValues(const std::vector<RuntimeGameOb
     if (!m_context->activeScene) return;
     if (selectedObjects.empty()) return;
     const auto& s = m_cachedBatchTransform;
-    ImGui::Text("当前值:");
+
+    // Position
     if (s.positionSame)
     {
-        ImGui::Text("位置: (%.3f, %.3f)", s.refPosition.x, s.refPosition.y);
+        ECS::Vector2f pos = s.refPosition;
+        if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("位置", pos, *m_context->uiCallbacks))
+        {
+            applyBatchTransformPosition(selectedObjects, pos, allHaveParent);
+        }
     }
     else
     {
-        ImGui::Text("位置: (不同值...)");
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::Text("位置: --");
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        ImGui::PushID("batch_pos");
+        static ECS::Vector2f overridePos = {0.0f, 0.0f};
+        if (ImGui::SmallButton("统一设置"))
+        {
+            ImGui::OpenPopup("batch_pos_popup");
+        }
+        if (ImGui::BeginPopup("batch_pos_popup"))
+        {
+            if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("新位置", overridePos, *m_context->uiCallbacks))
+            {
+                applyBatchTransformPosition(selectedObjects, overridePos, allHaveParent);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::PopID();
     }
+
+    // Rotation
     if (s.rotationSame)
     {
-        ImGui::Text("旋转: %.3f", s.refRotation);
+        float rot = s.refRotation;
+        if (CustomDrawing::WidgetDrawer<float>::Draw("旋转", rot, *m_context->uiCallbacks))
+        {
+            applyBatchTransformRotation(selectedObjects, rot, allHaveParent);
+        }
     }
     else
     {
-        ImGui::Text("旋转: (不同值...)");
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::Text("旋转: --");
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        ImGui::PushID("batch_rot");
+        static float overrideRot = 0.0f;
+        if (ImGui::SmallButton("统一设置"))
+        {
+            ImGui::OpenPopup("batch_rot_popup");
+        }
+        if (ImGui::BeginPopup("batch_rot_popup"))
+        {
+            if (CustomDrawing::WidgetDrawer<float>::Draw("新旋转", overrideRot, *m_context->uiCallbacks))
+            {
+                applyBatchTransformRotation(selectedObjects, overrideRot, allHaveParent);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::PopID();
     }
+
+    // Scale
     if (s.scaleSame)
     {
-        ImGui::Text("缩放: (%.3f, %.3f)", s.refScale.x, s.refScale.y);
+        ECS::Vector2f sc = s.refScale;
+        if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("缩放", sc, *m_context->uiCallbacks))
+        {
+            applyBatchTransformScale(selectedObjects, sc, allHaveParent);
+        }
     }
     else
     {
-        ImGui::Text("缩放: (不同值...)");
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::Text("缩放: --");
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        ImGui::PushID("batch_scale");
+        static ECS::Vector2f overrideScale = {1.0f, 1.0f};
+        if (ImGui::SmallButton("统一设置"))
+        {
+            ImGui::OpenPopup("batch_scale_popup");
+        }
+        if (ImGui::BeginPopup("batch_scale_popup"))
+        {
+            if (CustomDrawing::WidgetDrawer<ECS::Vector2f>::Draw("新缩放", overrideScale, *m_context->uiCallbacks))
+            {
+                applyBatchTransformScale(selectedObjects, overrideScale, allHaveParent);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::PopID();
     }
 }
 size_t InspectorPanel::computeSelectionFingerprint(SelectionType type, const std::vector<Guid>& guids) const

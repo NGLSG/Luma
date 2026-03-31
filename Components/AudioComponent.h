@@ -7,6 +7,8 @@
 
 namespace ECS
 {
+    enum class RolloffMode : int { Linear = 0, Logarithmic = 1 };
+
     /**
      * @brief 音频组件，用于管理实体上的音频播放属性。
      */
@@ -19,6 +21,8 @@ namespace ECS
         bool spatial = false; ///< 是否启用空间音频效果。
         float minDistance = 1.0f; ///< 空间音频的最小距离，在此距离内音量保持最大。
         float maxDistance = 30.0f; ///< 空间音频的最大距离，在此距离外音量逐渐衰减至无声。
+        float rolloffFactor = 1.0f; ///< 衰减系数，影响衰减速度。
+        RolloffMode rolloffMode = RolloffMode::Linear; ///< 衰减模式。
         float pitch = 1.0f; ///< 音频的音高，1.0为正常音高。
 
         uint32_t voiceId = 0; ///< 内部使用的语音ID，用于管理播放实例。
@@ -56,6 +60,8 @@ namespace YAML
             n["spatial"] = c.spatial;
             n["minDistance"] = c.minDistance;
             n["maxDistance"] = c.maxDistance;
+            n["rolloffFactor"] = c.rolloffFactor;
+            n["rolloffMode"] = static_cast<int>(c.rolloffMode);
             n["pitch"] = c.pitch;
             return n;
         }
@@ -82,6 +88,9 @@ namespace YAML
             c.spatial = n["spatial"].as<bool>(false);
             c.minDistance = n["minDistance"].as<float>(1.0f);
             c.maxDistance = n["maxDistance"].as<float>(30.0f);
+            c.rolloffFactor = n["rolloffFactor"].as<float>(1.0f);
+            if (n["rolloffMode"])
+                c.rolloffMode = static_cast<ECS::RolloffMode>(n["rolloffMode"].as<int>(0));
             c.pitch = n["pitch"].as<float>(1.0f);
             c.voiceId = 0;
             c.requestedPlay = false;
@@ -103,6 +112,8 @@ REGISTRY
         .property("spatial", &ECS::AudioComponent::spatial)
         .property("minDistance", &ECS::AudioComponent::minDistance)
         .property("maxDistance", &ECS::AudioComponent::maxDistance)
+        .property("rolloffFactor", &ECS::AudioComponent::rolloffFactor)
+        .property("rolloffMode", &ECS::AudioComponent::rolloffMode)
         .property("pitch", &ECS::AudioComponent::pitch);
 }
 

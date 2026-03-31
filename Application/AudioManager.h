@@ -22,6 +22,8 @@ public:
         float sourceZ = 0.0f;      
         float minDistance = 1.0f;  
         float maxDistance = 30.0f; 
+        float rolloffFactor = 1.0f;
+        int rolloffMode = 0; // 0=Linear, 1=Logarithmic
     };
 public:
     bool Initialize(int sampleRate = 48000, int channels = 2);
@@ -50,6 +52,8 @@ private:
         float x = 0.0f, y = 0.0f, z = 0.0f; 
         float minDistance = 1.0f;    
         float maxDistance = 30.0f;   
+        float rolloffFactor = 1.0f;
+        int rolloffMode = 0;
         bool finished = false;       
     };
     static void SDLAudioCallback(void* userdata, SDL_AudioStream* stream, int additional_amount, int total_amount);

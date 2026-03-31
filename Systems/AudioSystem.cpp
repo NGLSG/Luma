@@ -47,6 +47,8 @@ namespace Systems
 
             desc.minDistance = ac.minDistance;
             desc.maxDistance = ac.maxDistance;
+            desc.rolloffFactor = ac.rolloffFactor;
+            desc.rolloffMode = static_cast<int>(ac.rolloffMode);
 
             ac.voiceId = AudioManager::GetInstance().Play(desc);
         }
@@ -90,6 +92,8 @@ namespace Systems
                     }
                     desc.minDistance = ac.minDistance;
                     desc.maxDistance = ac.maxDistance;
+                    desc.rolloffFactor = ac.rolloffFactor;
+                    desc.rolloffMode = static_cast<int>(ac.rolloffMode);
 
                     ac.voiceId = AudioManager::GetInstance().Play(desc);
                 }

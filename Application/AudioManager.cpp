@@ -61,6 +61,8 @@ uint32_t AudioManager::Play(const PlayDesc& desc)
     v.z = desc.sourceZ;
     v.minDistance = std::max(0.001f, desc.minDistance);
     v.maxDistance = std::max(v.minDistance, desc.maxDistance);
+    v.rolloffFactor = std::max(0.0f, desc.rolloffFactor);
+    v.rolloffMode = desc.rolloffMode;
     v.finished = false;
     voices[v.id] = std::move(v);
     return v.id;
@@ -170,8 +172,19 @@ void AudioManager::Mix(float* out, int frames)
         {
             float dx = v.x - lx, dy = v.y - ly, dz = v.z - lz;
             float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
-            dist = std::max(v.minDistance, std::min(dist, v.maxDistance));
-            float att = 1.0f - (dist - v.minDistance) / std::max(0.001f, (v.maxDistance - v.minDistance));
+            float att;
+            if (v.rolloffMode == 1)
+            {
+                float d = std::max(dist, v.minDistance);
+                att = v.minDistance / (v.minDistance + v.rolloffFactor * (d - v.minDistance));
+                if (dist > v.maxDistance) att = 0.0f;
+            }
+            else
+            {
+                dist = std::max(v.minDistance, std::min(dist, v.maxDistance));
+                float range = v.maxDistance - v.minDistance;
+                att = 1.0f - v.rolloffFactor * (dist - v.minDistance) / std::max(0.001f, range);
+            }
             att = std::clamp(att, 0.0f, 1.0f);
             float dotR = (dx * rx + dy * ry + dz * rz);
             float pan = std::clamp(dist > 0.0f ? (dotR / dist) : 0.0f, -1.0f, 1.0f);

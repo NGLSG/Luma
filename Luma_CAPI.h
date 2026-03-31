@@ -2762,6 +2762,14 @@ LUMA_API float NavAgent_GetSpeed(LumaSceneHandle scene, LumaEntityHandle entity)
 LUMA_API bool NavAgent_HasArrived(LumaSceneHandle scene, LumaEntityHandle entity);
 LUMA_API void NavAgent_Stop(LumaSceneHandle scene, LumaEntityHandle entity);
 
+// =============================================================================
+// SubScene API
+// =============================================================================
+
+LUMA_API void SubScene_Load(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API void SubScene_Unload(LumaSceneHandle scene, LumaEntityHandle entity);
+LUMA_API bool SubScene_IsLoaded(LumaSceneHandle scene, LumaEntityHandle entity);
+
 #ifdef __cplusplus
 }
 
