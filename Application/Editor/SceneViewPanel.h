@@ -202,5 +202,7 @@ private:
     };
     LightingDebugMode m_lightingDebugMode = LightingDebugMode::None;
     uint32_t m_debugLayerMask = 0xFFFFFFFF;  ///< 调试时显示的光照层掩码
+    float m_snapGridSize = 16.0f;
+    bool m_snapEnabled = false;
 };
 #endif

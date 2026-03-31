@@ -394,9 +394,19 @@ void SceneViewPanel::Draw()
         }
     }
     
-    // 绘制光照调试 UI（在窗口内）
     drawLightingDebugUI();
-    
+
+    ImGui::SetCursorPos(ImVec2(ImGui::GetWindowContentRegionMax().x - 200, 4));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 2));
+    ImGui::Checkbox("Snap", &m_snapEnabled);
+    if (m_snapEnabled)
+    {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(60);
+        ImGui::DragFloat("##grid", &m_snapGridSize, 1.0f, 1.0f, 256.0f, "%.0f");
+    }
+    ImGui::PopStyleVar();
+
     ImGui::End();
     ImGui::PopStyleVar();
 }
@@ -1864,6 +1874,11 @@ void SceneViewPanel::handleObjectDragging(const ECS::Vector2f& worldMousePos)
         if (!gameObject.IsValid()) continue;
         auto& transform = gameObject.GetComponent<ECS::TransformComponent>();
         ECS::Vector2f newWorldPosition = worldMousePos + draggedObj.dragOffset;
+        if ((m_snapEnabled || ImGui::GetIO().KeyCtrl) && m_snapGridSize > 0.0f)
+        {
+            newWorldPosition.x = std::round(newWorldPosition.x / m_snapGridSize) * m_snapGridSize;
+            newWorldPosition.y = std::round(newWorldPosition.y / m_snapGridSize) * m_snapGridSize;
+        }
         if (gameObject.HasComponent<ECS::ParentComponent>())
         {
             auto& parentComponent = gameObject.GetComponent<ECS::ParentComponent>();
