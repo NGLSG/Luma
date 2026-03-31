@@ -97,7 +97,7 @@ struct EditorContext
     float lastUps = 0.0f; 
     float updateLatency = 0.0f; 
     float assetBrowserRefreshTimer = 0.0f; 
-    const float assetBrowserRefreshInterval = 0.0f; 
+    const float assetBrowserRefreshInterval = 2.0f; 
     UIDrawData* uiCallbacks = nullptr; 
     bool wasSceneDirty; 
     Guid currentEditingTilesetGuid; 

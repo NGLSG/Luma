@@ -7,6 +7,7 @@
 #include "SceneManager.h"
 #include "Utils/Logger.h"
 #include "Resources/RuntimeAsset/RuntimeScene.h"
+#include <stdexcept>
 #include "Managers/RuntimeMaterialManager.h"
 #include "Managers/RuntimePrefabManager.h"
 #include "Managers/RuntimeSceneManager.h"
@@ -52,6 +53,7 @@ void Game::InitializeDerived()
     else
     {
         LogError("致命错误：无法加载启动场景，GUID: {}", startupSceneGuid.ToString());
+        throw std::runtime_error("Failed to load startup scene");
     }
 }
 
@@ -147,7 +149,7 @@ void Game::Render()
     }
     if (auto activeScene = SceneManager::GetInstance().GetCurrentScene())
     {
-        RenderableManager::GetInstance().SetExternalAlpha(m_context.interpolationAlpha);
+        RenderableManager::GetInstance().SetExternalAlpha(m_context.interpolationAlpha.load(std::memory_order_relaxed));
         std::vector<RenderPacket> renderQueue = RenderableManager::GetInstance().GetInterpolationData();
         for (const auto& packet : renderQueue)
         {

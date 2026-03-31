@@ -393,7 +393,7 @@ void Editor::Render()
         }
         PluginManager::GetInstance().UpdateEditorPlugins(1.f / m_context.currentFps);
     }
-    RenderableManager::GetInstance().SetExternalAlpha(m_context.interpolationAlpha);
+    RenderableManager::GetInstance().SetExternalAlpha(m_context.interpolationAlpha.load(std::memory_order_relaxed));
     m_editorContext.renderQueue = RenderableManager::GetInstance().GetInterpolationData();
     auto currentTime = std::chrono::steady_clock::now();
     float deltaTime = std::chrono::duration<float>(currentTime - m_editorContext.lastFrameTime).count();

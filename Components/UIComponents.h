@@ -40,6 +40,36 @@ namespace ECS
     };
 
     /**
+     * @brief 自动布局方向。
+     */
+    enum class LayoutDirection { Horizontal, Vertical };
+
+    /**
+     * @brief 自动布局对齐方式。
+     */
+    enum class LayoutAlign { Start, Center, End, SpaceBetween, SpaceAround };
+
+    /**
+     * @brief 自动布局换行模式。
+     */
+    enum class LayoutWrap { NoWrap, Wrap };
+
+    /**
+     * @brief 自动布局组件，类似 Flexbox 的 UI 布局系统。
+     * @details 支持垂直/水平排列、间距、对齐、自动换行，根据子实体的 IUIComponent::rect 计算布局。
+     */
+    struct UILayoutComponent : public IUIComponent
+    {
+        LayoutDirection direction = LayoutDirection::Vertical;
+        LayoutAlign mainAlign = LayoutAlign::Start;
+        LayoutAlign crossAlign = LayoutAlign::Start;
+        LayoutWrap wrap = LayoutWrap::NoWrap;
+        float spacing = 0.0f;
+        RectF padding = {0, 0, 0, 0}; // left, top, right, bottom
+        bool autoSize = false;
+    };
+
+    /**
      * @brief 列表布局模式。
      */
     enum class ListBoxLayout
@@ -425,6 +455,48 @@ namespace ECS
 
 namespace YAML
 {
+    template <>
+    struct convert<ECS::UILayoutComponent>
+    {
+        static Node encode(const ECS::UILayoutComponent& rhs)
+        {
+            Node node;
+            node["rect"] = rhs.rect;
+            node["isVisible"] = rhs.isVisible;
+            node["zIndex"] = rhs.zIndex;
+            node["Enable"] = rhs.Enable;
+            node["direction"] = static_cast<int>(rhs.direction);
+            node["mainAlign"] = static_cast<int>(rhs.mainAlign);
+            node["crossAlign"] = static_cast<int>(rhs.crossAlign);
+            node["wrap"] = static_cast<int>(rhs.wrap);
+            node["spacing"] = rhs.spacing;
+            node["padding"] = rhs.padding;
+            node["autoSize"] = rhs.autoSize;
+            return node;
+        }
+
+        static bool decode(const Node& node, ECS::UILayoutComponent& rhs)
+        {
+            if (!node.IsMap()) return false;
+            rhs.rect = node["rect"].as<ECS::RectF>(rhs.rect);
+            rhs.isVisible = node["isVisible"].as<bool>(rhs.isVisible);
+            rhs.zIndex = node["zIndex"].as<int>(rhs.zIndex);
+            rhs.Enable = node["Enable"].as<bool>(rhs.Enable);
+            if (node["direction"])
+                rhs.direction = static_cast<ECS::LayoutDirection>(node["direction"].as<int>(0));
+            if (node["mainAlign"])
+                rhs.mainAlign = static_cast<ECS::LayoutAlign>(node["mainAlign"].as<int>(0));
+            if (node["crossAlign"])
+                rhs.crossAlign = static_cast<ECS::LayoutAlign>(node["crossAlign"].as<int>(0));
+            if (node["wrap"])
+                rhs.wrap = static_cast<ECS::LayoutWrap>(node["wrap"].as<int>(0));
+            rhs.spacing = node["spacing"].as<float>(rhs.spacing);
+            rhs.padding = node["padding"].as<ECS::RectF>(rhs.padding);
+            rhs.autoSize = node["autoSize"].as<bool>(rhs.autoSize);
+            return true;
+        }
+    };
+
     /**
      * @brief YAML 转换器，用于序列化和反序列化 ECS::ButtonComponent。
      */
@@ -1148,6 +1220,57 @@ namespace YAML
 namespace CustomDrawing
 {
     template <>
+    struct WidgetDrawer<ECS::LayoutDirection>
+    {
+        static bool Draw(const std::string& label, ECS::LayoutDirection& value, const UIDrawData& callbacks)
+        {
+            const char* items[] = {"Horizontal", "Vertical"};
+            int current = static_cast<int>(value);
+            if (ImGui::Combo(label.c_str(), &current, items, IM_ARRAYSIZE(items)))
+            {
+                value = static_cast<ECS::LayoutDirection>(current);
+                if (callbacks.onValueChanged) callbacks.onValueChanged();
+                return true;
+            }
+            return false;
+        }
+    };
+
+    template <>
+    struct WidgetDrawer<ECS::LayoutAlign>
+    {
+        static bool Draw(const std::string& label, ECS::LayoutAlign& value, const UIDrawData& callbacks)
+        {
+            const char* items[] = {"Start", "Center", "End", "SpaceBetween", "SpaceAround"};
+            int current = static_cast<int>(value);
+            if (ImGui::Combo(label.c_str(), &current, items, IM_ARRAYSIZE(items)))
+            {
+                value = static_cast<ECS::LayoutAlign>(current);
+                if (callbacks.onValueChanged) callbacks.onValueChanged();
+                return true;
+            }
+            return false;
+        }
+    };
+
+    template <>
+    struct WidgetDrawer<ECS::LayoutWrap>
+    {
+        static bool Draw(const std::string& label, ECS::LayoutWrap& value, const UIDrawData& callbacks)
+        {
+            const char* items[] = {"NoWrap", "Wrap"};
+            int current = static_cast<int>(value);
+            if (ImGui::Combo(label.c_str(), &current, items, IM_ARRAYSIZE(items)))
+            {
+                value = static_cast<ECS::LayoutWrap>(current);
+                if (callbacks.onValueChanged) callbacks.onValueChanged();
+                return true;
+            }
+            return false;
+        }
+    };
+
+    template <>
     struct WidgetDrawer<ECS::ListBoxLayout>
     {
         static bool Draw(const std::string& label, ECS::ListBoxLayout& value, const UIDrawData& callbacks)
@@ -1181,6 +1304,17 @@ namespace CustomDrawing
 
 REGISTRY
 {
+    Registry_<ECS::UILayoutComponent>("UILayoutComponent")
+        .property("rect", &ECS::UILayoutComponent::rect)
+        .property("isVisible", &ECS::UILayoutComponent::isVisible)
+        .property("direction", &ECS::UILayoutComponent::direction)
+        .property("mainAlign", &ECS::UILayoutComponent::mainAlign)
+        .property("crossAlign", &ECS::UILayoutComponent::crossAlign)
+        .property("wrap", &ECS::UILayoutComponent::wrap)
+        .property("spacing", &ECS::UILayoutComponent::spacing)
+        .property("padding", &ECS::UILayoutComponent::padding)
+        .property("autoSize", &ECS::UILayoutComponent::autoSize);
+
     Registry_<ECS::ButtonComponent>("ButtonComponent")
         .property("rect", &ECS::ButtonComponent::rect)
         .property("isVisible", &ECS::ButtonComponent::isVisible)

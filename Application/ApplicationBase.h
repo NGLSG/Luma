@@ -42,5 +42,8 @@ protected:
     EngineContext m_context; 
     std::string m_title; 
     ApplicationConfig m_config; 
+    double m_accumulator = 0.0;
+    ListenerHandle m_anyEventListener;
+    ListenerHandle m_resizeListener;
 };
 #endif 

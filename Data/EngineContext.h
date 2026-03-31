@@ -6,6 +6,7 @@
 #include "SDL3/SDL_events.h"
 #include <vector> // 确保包含 <vector>
 #include <mutex>  // 确保包含 <mutex>
+#include <atomic>
 
 class SceneRenderer;
 class RuntimeTextureManager;
@@ -53,7 +54,7 @@ struct EngineContext
     ECS::RectF sceneViewRect; ///< 场景视图的矩形区域。
     bool isSceneViewFocused = false; ///< 场景视图是否获得焦点。
     ApplicationMode *appMode; ///< 应用程序当前运行模式。
-    float interpolationAlpha = 1.0f; /// < 用于插值计算的alpha值。
+    std::atomic<float> interpolationAlpha{1.0f}; /// < 用于插值计算的alpha值。
     CommandQueue commandsForSim; ///< 延迟命令队列，用于线程安全的命令执行。
     CommandQueue commandsForRender;
 

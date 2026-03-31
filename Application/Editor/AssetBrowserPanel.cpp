@@ -85,10 +85,12 @@ void AssetBrowserPanel::Update(float deltaTime)
             currentRelativePath = m_context->currentAssetDirectory->path;
         }
         buildAssetTree();
+        m_itemsCacheDirty = true;
         DirectoryNode* newNode = findNodeByPath(currentRelativePath);
         if (newNode)
         {
             m_context->currentAssetDirectory = newNode;
+            m_pathToExpand = currentRelativePath;
         }
         else
         {
@@ -159,6 +161,10 @@ void AssetBrowserPanel::drawDirectoryTree()
         if (!m_pathToExpand.empty())
         {
             ensurePathLoaded(m_pathToExpand);
+        }
+        if (m_context->currentAssetDirectory && !m_context->currentAssetDirectory->path.empty())
+        {
+            ensurePathLoaded(m_context->currentAssetDirectory->path);
         }
         drawDirectoryNode(*m_context->assetTreeRoot);
     }
@@ -337,23 +343,29 @@ void AssetBrowserPanel::drawAssetContentView()
     static AssetHandle s_draggedAssetHandle;
     static std::vector<AssetHandle> s_draggedAssetHandlesMulti;
     bool contentItemClicked = false;
-    std::vector<Item> items;
-    for (const auto& [name, subNode] : m_context->currentAssetDirectory->subdirectories)
+    if (m_lastRenderedDirectory != m_context->currentAssetDirectory || m_itemsCacheDirty)
     {
-        items.push_back({name, subNode->path, Guid(), AssetType::Unknown, true});
-    }
-    for (const auto& assetMeta : m_context->currentAssetDirectory->assets)
-    {
-        items.push_back({
-            assetMeta.assetPath.filename().string(), assetMeta.assetPath, assetMeta.guid, assetMeta.type, false
+        m_cachedItems.clear();
+        for (const auto& [name, subNode] : m_context->currentAssetDirectory->subdirectories)
+        {
+            m_cachedItems.push_back({name, subNode->path, Guid(), AssetType::Unknown, true});
+        }
+        for (const auto& assetMeta : m_context->currentAssetDirectory->assets)
+        {
+            m_cachedItems.push_back({
+                assetMeta.assetPath.filename().string(), assetMeta.assetPath, assetMeta.guid, assetMeta.type, false
+            });
+        }
+        std::ranges::sort(m_cachedItems, [&](const Item& a, const Item& b)
+        {
+            if (a.isDirectory != b.isDirectory)
+                return a.isDirectory;
+            return m_context->assetBrowserSortAscending ? (a.name < b.name) : (a.name > b.name);
         });
+        m_lastRenderedDirectory = m_context->currentAssetDirectory;
+        m_itemsCacheDirty = false;
     }
-    std::ranges::sort(items, [&](const Item& a, const Item& b)
-    {
-        if (a.isDirectory != b.isDirectory)
-            return a.isDirectory;
-        return m_context->assetBrowserSortAscending ? (a.name < b.name) : (a.name > b.name);
-    });
+    auto& items = m_cachedItems;
     auto handleDragSource = [&](const Item& item)
     {
         if (ImGui::BeginDragDropSource())
@@ -504,6 +516,7 @@ void AssetBrowserPanel::drawAssetContentView()
                         m_context->currentAssetDirectory = m_context->currentAssetDirectory->subdirectories.at(
                             item.name).get();
                         m_pathToExpand = item.path;
+                        m_itemsCacheDirty = true;
                         ImGui::PopID();
                         break;
                     }
@@ -613,6 +626,7 @@ void AssetBrowserPanel::drawAssetContentView()
                         m_context->currentAssetDirectory = m_context->currentAssetDirectory->subdirectories.at(
                             item.name).get();
                         m_pathToExpand = item.path;
+                        m_itemsCacheDirty = true;
                         ImGui::EndGroup();
                         ImGui::PopID();
                         break;
@@ -867,13 +881,28 @@ void AssetBrowserPanel::drawDirectoryNode(DirectoryNode& node)
     {
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
     }
+    if (m_context->currentAssetDirectory)
+    {
+        std::string currentPathStr = m_context->currentAssetDirectory->path.generic_string();
+        std::string nodePathStr = node.path.generic_string();
+        bool isOnCurrentPath = (currentPathStr == nodePathStr) ||
+            (nodePathStr.empty() && !currentPathStr.empty()) ||
+            (!nodePathStr.empty() && !currentPathStr.empty() && currentPathStr.starts_with(nodePathStr + "/"));
+        if (isOnCurrentPath && !m_pathToExpand.empty())
+        {
+            ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+        }
+    }
     if (!m_pathToExpand.empty())
     {
         std::string targetPathStr = m_pathToExpand.generic_string();
         std::string nodePathStr = node.path.generic_string();
-        if (targetPathStr == nodePathStr || targetPathStr.starts_with(nodePathStr + "/"))
+        bool shouldExpand = (targetPathStr == nodePathStr) ||
+            (nodePathStr.empty() && !targetPathStr.empty()) ||
+            (!nodePathStr.empty() && targetPathStr.starts_with(nodePathStr + "/"));
+        if (shouldExpand)
         {
-            ImGui::SetNextItemOpen(true);
+            ImGui::SetNextItemOpen(true, ImGuiCond_Always);
         }
     }
     ImGui::PushID(node.path.generic_string().c_str());

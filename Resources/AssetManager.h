@@ -14,6 +14,7 @@
 
 #include "IAssetManager.h"
 #include "../Utils/LazySingleton.h"
+#include "../Utils/FileWatcher.h"
 #include <memory>
 #include "../Data/EngineContext.h"
 
@@ -200,7 +201,10 @@ private:
      */
     AssetManager() = default;
 
+    void OnFileChanged(const FileChangeEvent& event);
+
     std::unique_ptr<IAssetManager> m_implementation; ///< 资产管理器接口的实现。
+    std::unique_ptr<FileWatcher> m_fileWatcher;      ///< 资源文件监控器（仅Editor模式）。
     ApplicationMode m_appMode; ///< 应用程序的运行模式。
 };
 #endif

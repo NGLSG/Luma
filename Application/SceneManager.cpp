@@ -17,6 +17,7 @@
 #include "ScriptingSystem.h"
 #endif
 #include "TransformSystem.h"
+#include "UILayoutSystem.h"
 #include "../Systems/ParticleSystem.h"
 #include "../Resources/AssetManager.h"
 #include "../Resources/Managers/RuntimeSceneManager.h"
@@ -222,6 +223,7 @@ void SceneManager::setupRuntimeSystems(sk_sp<RuntimeScene> scene, EngineContext*
         scene->AddSystem<Systems::ButtonSystem>();
         scene->AddSystemToMainThread<Systems::InputTextSystem>();
         scene->AddSystem<Systems::CommonUIControlSystem>();
+        scene->AddSystem<Systems::UILayoutSystem>();
 #if !defined(LUMA_DISABLE_SCRIPTING)
         scene->AddSystem<Systems::ScriptingSystem>();
 #endif

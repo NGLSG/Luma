@@ -314,3 +314,60 @@ graph TD
     C --> H
     C --> I
 ```
+
+### 资源热重载
+
+```mermaid
+graph TD
+    A[FileWatcher 线程] -->|轮询文件变更| B{检测到变化?}
+    B -->|Created| C[新资源导入]
+    B -->|Modified| D[重新导入资源]
+    B -->|Deleted| E[记录删除日志]
+    C --> F[AssetManager.ReImport]
+    D --> F
+    F --> G[运行时资源更新]
+```
+
+### 2D 寻路系统
+
+```mermaid
+graph TD
+    subgraph "寻路请求"
+        A[NavAgentComponent] -->|设置 destination| B[isPathRequested = true]
+    end
+    subgraph "路径计算"
+        B --> C[NavigationSystem.OnUpdate]
+        C --> D[Pathfinder.FindPath]
+        D --> E[A* 搜索 NavGrid]
+        E --> F[生成 waypoints]
+    end
+    subgraph "移动执行"
+        F --> G[沿路径点移动]
+        G --> H[更新 TransformComponent]
+        H --> I{到达终点?}
+        I -->|否| G
+        I -->|是| J[hasArrived = true]
+    end
+```
+
+### UI 自动布局
+
+```mermaid
+graph TD
+    subgraph "UILayoutComponent"
+        A[direction: H/V]
+        B[mainAlign: Start/Center/End/SpaceBetween]
+        C[spacing + padding]
+        D[wrap: NoWrap/Wrap]
+    end
+    subgraph "UILayoutSystem"
+        E[遍历 UILayoutComponent 实体]
+        F[获取子实体 IUIComponent]
+        G[按 direction 排列]
+        H[应用 spacing/padding/align]
+        I[autoSize 调整容器]
+    end
+    A --> E
+    B --> E
+    E --> F --> G --> H --> I
+```

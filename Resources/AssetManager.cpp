@@ -3,13 +3,23 @@
 #include "RuntimeAssetManager.h"
 #include "../Utils/Logger.h"
 
-AssetManager::~AssetManager() = default;
+AssetManager::~AssetManager()
+{
+    if (m_fileWatcher)
+        m_fileWatcher->Stop();
+}
 
 void AssetManager::Initialize(ApplicationMode mode, const std::filesystem::path& path)
 {
+    m_appMode = mode;
+
     if (mode == ApplicationMode::Editor)
     {
         m_implementation = std::make_unique<EditorAssetManager>(path);
+
+        m_fileWatcher = std::make_unique<FileWatcher>(path);
+        m_fileWatcher->SetCallback([this](const FileChangeEvent& event) { OnFileChanged(event); });
+        m_fileWatcher->Start();
     }
     else
     {
@@ -91,10 +101,43 @@ void AssetManager::Update(float deltaTime)
 
 void AssetManager::Shutdown()
 {
+    if (m_fileWatcher)
+    {
+        m_fileWatcher->Stop();
+        m_fileWatcher.reset();
+    }
+
     if (m_implementation)
     {
         m_implementation.reset();
         LogInfo("AssetManager: Shutdown complete.");
+    }
+}
+
+void AssetManager::OnFileChanged(const FileChangeEvent& event)
+{
+    if (!m_implementation)
+        return;
+
+    if (event.path.extension() == ".meta")
+        return;
+
+    auto ext = event.path.extension().string();
+    if (event.type == FileChangeType::Deleted)
+    {
+        LogInfo("AssetManager: File deleted: {}", event.path.string());
+        return;
+    }
+
+    const auto* metadata = m_implementation->GetMetadata(event.path);
+    if (metadata)
+    {
+        LogInfo("AssetManager: Hot-reloading {}", event.path.string());
+        m_implementation->ReImport(*metadata);
+    }
+    else if (event.type == FileChangeType::Created)
+    {
+        LogInfo("AssetManager: New file detected: {}", event.path.string());
     }
 }
 

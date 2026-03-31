@@ -70,5 +70,8 @@ private:
     std::filesystem::path m_pathToExpand; 
     float m_gridCellSize = 90.0f; 
     size_t m_lastSelectionCount; 
+    std::vector<Item> m_cachedItems;
+    DirectoryNode* m_lastRenderedDirectory = nullptr;
+    bool m_itemsCacheDirty = true;
 };
 #endif

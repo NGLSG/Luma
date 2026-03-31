@@ -1,5 +1,6 @@
 #include "PhysicsSystem.h"
 
+#include <numbers>
 
 #include "TagComponent.h"
 #include "../Resources/RuntimeAsset/RuntimePhysicsMaterial.h"
@@ -20,7 +21,6 @@ namespace Systems
 {
     static constexpr float PIXELS_PER_METER = 32.0f;
     static constexpr float METER_PER_PIXEL = 1.0f / PIXELS_PER_METER;
-    static constexpr float PI = 3.14159265358979323846f;
 
     namespace
     {
@@ -798,7 +798,7 @@ namespace Systems
         {
             auto& cc = registry.get<ECS::CircleColliderComponent>(entity);
             float minScale = std::min(scale.x, scale.y);
-            totalArea += PI * (cc.radius * minScale * METER_PER_PIXEL) * (cc.radius * minScale * METER_PER_PIXEL);
+            totalArea += std::numbers::pi_v<float> * (cc.radius * minScale * METER_PER_PIXEL) * (cc.radius * minScale * METER_PER_PIXEL);
         }
         if (registry.all_of<ECS::CapsuleColliderComponent>(entity))
         {
@@ -810,7 +810,7 @@ namespace Systems
             rectHeight = std::max(0.0f, rectHeight - radius);
             radius /= 2.0f;
 
-            float circleArea = PI * (radius * METER_PER_PIXEL) * (radius * METER_PER_PIXEL);
+            float circleArea = std::numbers::pi_v<float> * (radius * METER_PER_PIXEL) * (radius * METER_PER_PIXEL);
             float rectArea = (rectHeight * METER_PER_PIXEL) * (2.0f * radius * METER_PER_PIXEL);
             totalArea += circleArea + rectArea;
         }

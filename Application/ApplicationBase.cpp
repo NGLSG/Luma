@@ -24,7 +24,7 @@ void ApplicationBase::Run()
 {
     InitializeCoreSystems();
     InitializeDerived();
-    m_window->OnAnyEvent.AddListener([&](const SDL_Event& event)
+    m_anyEventListener = m_window->OnAnyEvent.AddListener([&](const SDL_Event& event)
     {
         Keyboard::GetInstance().ProcessEvent(event);
         LumaCursor::GetInstance().ProcessEvent(event);
@@ -58,13 +58,12 @@ void ApplicationBase::Run()
                 eventsThisFrame.end()
             );
         });
-        static double accumulator = 0.0;
         const float fixedDeltaTime = 1.0f / static_cast<float>(m_config.SimulationFPS);
-        accumulator += frameTime;
-        m_context.interpolationAlpha = static_cast<float>(std::clamp(accumulator / fixedDeltaTime, 0.0, 1.0));
-        if (accumulator >= fixedDeltaTime)
+        m_accumulator += frameTime;
+        m_context.interpolationAlpha.store(static_cast<float>(std::clamp(m_accumulator / fixedDeltaTime, 0.0, 1.0)), std::memory_order_relaxed);
+        if (m_accumulator >= fixedDeltaTime)
         {
-            accumulator = fmod(accumulator, fixedDeltaTime);
+            m_accumulator = fmod(m_accumulator, fixedDeltaTime);
         }
         Render();
         Profiler::GetInstance().Update();
@@ -116,7 +115,7 @@ void ApplicationBase::InitializeCoreSystems()
     {
         throw std::runtime_error("Failed to create GraphicsBackend.");
     }
-    m_window->OnResize.AddListener([&](int width, int height)
+    m_resizeListener = m_window->OnResize.AddListener([&](int width, int height)
     {
         if (m_graphicsBackend)
         {
