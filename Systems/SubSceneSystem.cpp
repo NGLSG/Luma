@@ -55,7 +55,7 @@ namespace Systems
 
     void SubSceneSystem::LoadSubScene(RuntimeScene* scene, entt::entity entity, ECS::SubSceneComponent& sub)
     {
-        if (sub.isLoaded || !sub.sceneGuid.IsValid()) return;
+        if (sub.isLoaded || !sub.sceneGuid.Valid()) return;
 
         auto loadedScene = SceneManager::GetInstance().LoadScene(sub.sceneGuid);
         if (!loadedScene)
