@@ -1,0 +1,6 @@
+id: com.luma.dialogue
+name: 对话系统
+version: 1.0.0
+author: Luma Engine
+description: 可视化对话树编辑器与运行时对话管理
+dll: DialogueSystem.dll

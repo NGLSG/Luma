@@ -148,6 +148,7 @@ namespace Systems
         m_frameUpdateStartIndex = 0;
         m_frameUpdateComplete = true;
         m_pendingLightUpdates.clear();
+        m_lastAreaLightHash = 0;
         m_isDirty = true;
 
         LogInfo("LightingSystem destroyed");
@@ -589,22 +590,16 @@ namespace Systems
             m_globalBuffer->WriteBuffer(&globalData, sizeof(ECS::LightingGlobalData));
         }
 
-        // 分帧更新光源数据
+        // 分帧更新光源数据——按偏移量写入当前批次
         if (m_lightBuffer)
         {
-            // 计算偏移量和数据大小
             size_t offset = m_frameUpdateStartIndex * sizeof(ECS::LightData);
             size_t dataSize = lightsToUpdate * sizeof(ECS::LightData);
-            
-            // 写入部分数据
-            // 注意：这里假设 Buffer 支持带偏移的写入，如果不支持则需要完整更新
-            // 为了简化，我们在第一帧写入所有数据
-            if (m_frameUpdateStartIndex == 0)
-            {
-                // 第一帧：写入完整数据
-                size_t totalDataSize = m_pendingLightUpdates.size() * sizeof(ECS::LightData);
-                m_lightBuffer->WriteBuffer(m_pendingLightUpdates.data(), static_cast<uint32_t>(totalDataSize));
-            }
+
+            m_lightBuffer->WriteBuffer(
+                m_pendingLightUpdates.data() + m_frameUpdateStartIndex,
+                static_cast<uint32_t>(dataSize),
+                static_cast<uint32_t>(offset));
         }
 
         // 更新索引
@@ -658,14 +653,27 @@ namespace Systems
         const auto& areaLights = m_areaLightSystem->GetVisibleAreaLights();
         uint32_t areaLightCount = static_cast<uint32_t>(areaLights.size());
 
-        // 更新面光源全局数据
+        // Dirty-check: hash count + data to skip redundant GPU writes
+        size_t areaHash = std::hash<uint32_t>{}(areaLightCount);
+        for (const auto& al : areaLights)
+        {
+            areaHash ^= std::hash<float>{}(al.position.x) + 0x9e3779b9 + (areaHash << 6) + (areaHash >> 2);
+            areaHash ^= std::hash<float>{}(al.position.y) + 0x9e3779b9 + (areaHash << 6) + (areaHash >> 2);
+            areaHash ^= std::hash<float>{}(al.intensity)  + 0x9e3779b9 + (areaHash << 6) + (areaHash >> 2);
+            areaHash ^= std::hash<float>{}(al.size.x)      + 0x9e3779b9 + (areaHash << 6) + (areaHash >> 2);
+            areaHash ^= std::hash<float>{}(al.size.y)     + 0x9e3779b9 + (areaHash << 6) + (areaHash >> 2);
+        }
+
+        if (areaHash == m_lastAreaLightHash)
+            return;
+        m_lastAreaLightHash = areaHash;
+
         if (m_areaLightGlobalBuffer)
         {
             uint32_t globalData[4] = {areaLightCount, 0, 0, 0};
             m_areaLightGlobalBuffer->WriteBuffer(globalData, sizeof(globalData));
         }
 
-        // 更新面光源数据
         if (m_areaLightBuffer && !areaLights.empty())
         {
             size_t dataSize = areaLights.size() * sizeof(ECS::AreaLightData);

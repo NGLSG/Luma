@@ -1,0 +1,6 @@
+id: com.luma.inputmapper
+name: 输入映射
+version: 1.0.0
+author: Luma Engine
+description: 可重绑定的输入动作映射系统
+dll: InputMapper.dll

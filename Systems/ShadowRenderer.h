@@ -111,7 +111,7 @@ namespace Systems
     {
     public:
         /// 默认阴影贴图分辨率
-        static constexpr uint32_t DEFAULT_SHADOW_MAP_RESOLUTION = 1024;
+        static constexpr uint32_t DEFAULT_SHADOW_MAP_RESOLUTION = 512;
         /// 最大阴影投射器数量
         static constexpr uint32_t MAX_SHADOW_CASTERS = 64;
         /// 阴影射线数量（用于软阴影）
@@ -543,6 +543,7 @@ namespace Systems
         std::vector<entt::entity> m_entitiesToInvalidate;       ///< 待失效的实体列表
 
         EngineContext* m_engineCtx = nullptr;                   ///< 引擎上下文缓存
+        size_t m_sdfBufferCapacity = 0;                         ///< 当前 SDF 缓冲区容量（字节）
         
         static ShadowRenderer* s_instance;                      ///< 单例实例
 

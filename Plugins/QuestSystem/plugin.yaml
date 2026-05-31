@@ -1,0 +1,6 @@
+id: com.luma.quest
+name: 任务系统
+version: 1.0.0
+author: Luma Engine
+description: RPG任务线与成就系统，支持多目标、分支、奖励
+dll: QuestSystem.dll

@@ -5,6 +5,8 @@ namespace Systems
     struct TaskGroup
     {
         std::atomic<int> outstandingTasks = 0;
+        std::mutex mutex;
+        std::condition_variable cv;
     };
 
     TaskSystem::TaskSystem(int threadCount)
@@ -62,7 +64,11 @@ namespace Systems
                 m_taskQueue.emplace([task, startIndex, endIndex,i, taskContext, group](int workerIndex)
                 {
                     task(startIndex, endIndex, workerIndex, taskContext);
-                    group->outstandingTasks--;
+                    if (group->outstandingTasks.fetch_sub(1) == 1)
+                    {
+                        std::lock_guard<std::mutex> g(group->mutex);
+                        group->cv.notify_all();
+                    }
                 });
             }
 
@@ -77,9 +83,9 @@ namespace Systems
     {
         if (!userTask) return;
         TaskGroup* group = static_cast<TaskGroup*>(userTask);
-        while (group->outstandingTasks > 0)
         {
-            std::this_thread::yield();
+            std::unique_lock<std::mutex> lock(group->mutex);
+            group->cv.wait(lock, [group] { return group->outstandingTasks.load() <= 0; });
         }
         delete group;
     }

@@ -1,0 +1,6 @@
+id: com.luma.cutscene
+name: 过场动画
+version: 1.0.0
+author: Luma Engine
+description: 时间线式过场动画编辑器与播放器
+dll: CutsceneSystem.dll

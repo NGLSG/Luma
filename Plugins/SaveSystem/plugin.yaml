@@ -1,0 +1,6 @@
+id: com.luma.savesystem
+name: 存档系统
+version: 1.0.0
+author: Luma Engine
+description: 游戏存档管理，支持多槽位、自动存档、存档截图
+dll: SaveSystem.dll

@@ -1,0 +1,6 @@
+id: com.luma.behaviortree
+name: 行为树
+version: 1.0.0
+author: Luma Engine
+description: AI行为树编辑器与运行时，用于游戏 AI 决策逻辑
+dll: BehaviorTree.dll

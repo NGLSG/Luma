@@ -1,0 +1,6 @@
+id: com.luma.sceneinspector
+name: 场景检查器
+version: 1.0.0
+author: Luma Engine
+description: 场景检查器插件，提供场景概览、实体详情、项目信息和实体搜索功能。
+dll: SceneInspector.dll

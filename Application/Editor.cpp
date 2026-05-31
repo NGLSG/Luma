@@ -359,6 +359,16 @@ void Editor::Update(float fixedDeltaTime)
         }
         m_editorContext.activeScene->UpdateSimulation(fixedDeltaTime, *m_editorContext.engineContext,
                                                       m_editorContext.editorState == EditorState::Paused);
+        {
+            auto& activeCamera = CameraManager::GetInstance().GetActiveCamera();
+            auto cp = activeCamera.GetProperties();
+            auto ez = cp.GetEffectiveZoom();
+            float avgZoom = (ez.fX + ez.fY) * 0.5f;
+            if (avgZoom <= 0) avgZoom = 1.0f;
+            RenderableManager::GetInstance().SetViewport(
+                cp.position.fX, cp.position.fY,
+                cp.viewport.width(), cp.viewport.height(), avgZoom);
+        }
         SceneRenderer::ExtractToRenderableManager(m_editorContext.activeScene->GetRegistry());
     }
 }

@@ -176,13 +176,15 @@ namespace
         bool shouldInterpolate;
         bool isRuntimeMode;
         ThreadLocalBatchResult* result;
+        RenderableManager::ViewportBounds viewport;
         InterpolationAndBatchJob() = default;
         InterpolationAndBatchJob(const Renderable* pStart, const Renderable* pEnd,
                                  const Renderable* cStart, const Renderable* cEnd,
-                                 float a, bool interpolate, bool runtime, ThreadLocalBatchResult* res)
+                                 float a, bool interpolate, bool runtime, ThreadLocalBatchResult* res,
+                                 RenderableManager::ViewportBounds vp = {})
             : prevFrameStart(pStart), prevFrameEnd(pEnd),
               currFrameStart(cStart), currFrameEnd(cEnd),
-              alpha(a), shouldInterpolate(interpolate), isRuntimeMode(runtime), result(res)
+              alpha(a), shouldInterpolate(interpolate), isRuntimeMode(runtime), result(res), viewport(vp)
         {
         }
         void Execute() override
@@ -246,6 +248,14 @@ namespace
                 ++currIt;
             }
         }
+        bool isInViewport(const ECS::TransformComponent& transform) const
+        {
+            if (!viewport.valid) return true;
+            return transform.position.x >= viewport.minX &&
+                   transform.position.x <= viewport.maxX &&
+                   transform.position.y >= viewport.minY &&
+                   transform.position.y <= viewport.maxY;
+        }
         void processRenderable(const Renderable* currIt, const ECS::TransformComponent& transform)
         {
             std::visit([&, this](auto&& arg)
@@ -253,10 +263,12 @@ namespace
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, SpriteRenderData>)
                 {
+                    if (!arg.isUISprite && !isInViewport(transform)) return;
                     processSpriteData(currIt, transform, arg);
                 }
                 else if constexpr (std::is_same_v<T, TextRenderData>)
                 {
+                    if (!isInViewport(transform)) return;
                     processTextData(currIt, transform, arg);
                 }
                 else if constexpr (std::is_same_v<T, RawButtonRenderData>)
@@ -2091,6 +2103,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         segments.emplace_back(pos, end);
         pos = end;
     }
+    auto currentViewport = GetViewport();
     jobs.reserve(segments.size());
     for (size_t si = 0; si < segments.size(); ++si)
     {
@@ -2121,7 +2134,7 @@ const std::vector<RenderPacket>& RenderableManager::GetInterpolationData()
         jobs.emplace_back(
             prevStart, prevEnd, currStart, currEnd,
             alpha, shouldInterpolate, (ApplicationBase::CURRENT_MODE != ApplicationMode::Editor),
-            &tr
+            &tr, currentViewport
         );
         jobHandles.push_back(jobSystem.Schedule(&jobs.back()));
     }

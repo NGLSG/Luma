@@ -1,0 +1,5 @@
+id: com.luma.perfmonitor
+name: 性能监控
+version: 1.0.0
+author: Luma Engine
+dll: PerformanceMonitor.dll

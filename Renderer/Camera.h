@@ -49,9 +49,14 @@ public:
     Camera(const Camera&) = delete;
     Camera& operator=(const Camera&) = delete;
 
-    // 允许移动
-    Camera(Camera&&) = default;
-    Camera& operator=(Camera&&) = default;
+    // Move: transfer properties, construct a fresh mutex
+    Camera(Camera&& other) noexcept : m_properties(std::move(other.m_properties)) {}
+    Camera& operator=(Camera&& other) noexcept {
+        if (this != &other) {
+            m_properties = std::move(other.m_properties);
+        }
+        return *this;
+    }
 
     /**
      * @brief 将摄像机的变换应用到给定的SkCanvas。

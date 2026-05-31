@@ -190,7 +190,9 @@ void RenderBufferManager::ApplyDefaultConfigs()
     m_buffers[static_cast<size_t>(RenderBufferType::Composite)].config = 
         BufferConfig(wgpu::TextureFormat::RGBA16Float, 1.0f, true, true, "CompositeBuffer");
 
-    // G-Buffer Position - 高精度位置
+    // G-Buffer Position - stores worldPos.xy (z=0 for 2D) + depth in .w
+    // NOTE: Could save 50% bandwidth with RG16Float if depth is sourced from depth buffer instead,
+    // but that requires DeferredLighting.wgsl shader changes (DecodeDepth reads .w from this buffer).
     m_buffers[static_cast<size_t>(RenderBufferType::GBufferPosition)].config = 
         BufferConfig(wgpu::TextureFormat::RGBA16Float, 1.0f, true, true, "GBufferPosition");
 

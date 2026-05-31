@@ -678,3 +678,46 @@ else ()
     message(STATUS "轻量化构建: 未启用 (使用 -DENABLE_LIGHTWEIGHT_BUILD=ON 启用)")
 endif ()
 message(STATUS "========================================")
+
+# =============================================================================
+# SDK Export / Install Configuration
+# 仅在显式设置 LUMA_INSTALL_SDK=ON 时激活
+# =============================================================================
+option(LUMA_INSTALL_SDK "Install LumaEngine SDK for embedding" OFF)
+
+if(LUMA_INSTALL_SDK)
+    include(GNUInstallDirs)
+    include(CMakePackageConfigHelpers)
+
+    install(TARGETS LumaEngine
+        EXPORT LumaEngineTargets
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    )
+
+    install(FILES
+        Luma_CAPI.h
+        EngineEntry.h
+        Utils/Platform.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/LumaEngine
+    )
+
+    install(EXPORT LumaEngineTargets
+        FILE LumaEngineTargets.cmake
+        NAMESPACE LumaEngine::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LumaEngine
+    )
+
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/LumaEngineConfigVersion.cmake"
+        VERSION 1.0.0
+        COMPATIBILITY SameMajorVersion
+    )
+
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/LumaEngineConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/LumaEngineConfigVersion.cmake"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LumaEngine
+    )
+endif()

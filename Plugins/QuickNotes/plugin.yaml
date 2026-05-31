@@ -1,0 +1,6 @@
+id: com.luma.quicknotes
+name: 快速笔记
+version: 1.0.0
+author: Luma Engine
+description: 开发待办与场景/实体笔记管理插件
+dll: QuickNotes.dll

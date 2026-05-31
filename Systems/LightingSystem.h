@@ -389,6 +389,9 @@ namespace Systems
         /// 分帧更新是否完成
         bool m_frameUpdateComplete = true;
 
+        /// 面光源数据哈希（脏标记）
+        size_t m_lastAreaLightHash = 0;
+
         // ==================== 私有辅助函数 ====================
         
         /**

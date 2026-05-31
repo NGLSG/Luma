@@ -26,6 +26,7 @@ namespace Systems
         , m_cacheHits(0)
         , m_cacheMisses(0)
         , m_engineCtx(nullptr)
+        , m_sdfBufferCapacity(0)
     {
     }
 
@@ -875,7 +876,34 @@ namespace Systems
 
         auto& registry = scene->GetRegistry();
 
-        // 更新需要 SDF 的阴影投射器
+        // Grow SDF buffer on demand based on actual SDF caster count
+        if (m_engineCtx && m_sdfBuffer)
+        {
+            uint32_t sdfCasterCount = 0;
+            auto countView = registry.view<ECS::ShadowCasterComponent>();
+            for (auto entity : countView)
+            {
+                auto& c = countView.get<ECS::ShadowCasterComponent>(entity);
+                if (c.Enable && c.enableSDF) sdfCasterCount++;
+            }
+
+            size_t requiredSize = static_cast<size_t>(sdfCasterCount) * 256 * 256 * sizeof(float);
+            if (requiredSize > m_sdfBufferCapacity && requiredSize > 0)
+            {
+                auto nutContext = m_engineCtx->graphicsBackend->GetNutContext();
+                if (nutContext)
+                {
+                    Nut::BufferLayout sdfLayout;
+                    sdfLayout.usage = Nut::BufferBuilder::GetCommonStorageUsage();
+                    sdfLayout.size = requiredSize;
+                    sdfLayout.mapped = false;
+                    m_sdfBuffer = std::make_shared<Nut::Buffer>(sdfLayout, nutContext);
+                    m_sdfBufferCapacity = requiredSize;
+                    LogInfo("SDF buffer grown to {}B for {} casters", requiredSize, sdfCasterCount);
+                }
+            }
+        }
+
         auto view = registry.view<ECS::ShadowCasterComponent, ECS::TransformComponent>();
         for (auto entity : view)
         {
@@ -983,17 +1011,18 @@ namespace Systems
         if (!nutContext)
             return;
 
-        // 创建 SDF 数据缓冲区
-        // 预分配足够的空间存储多个 SDF 纹理的数据
-        const size_t maxSDFSize = 256 * 256 * sizeof(float) * MAX_SHADOW_CASTERS;
+        // On-demand SDF buffer: start with a minimal allocation (1 caster worth).
+        // The buffer will be re-created in UpdateSDFData if more space is needed.
+        const size_t initialSDFSize = 64 * 64 * sizeof(float);
 
         Nut::BufferLayout sdfLayout;
         sdfLayout.usage = Nut::BufferBuilder::GetCommonStorageUsage();
-        sdfLayout.size = maxSDFSize;
+        sdfLayout.size = initialSDFSize;
         sdfLayout.mapped = false;
 
         m_sdfBuffer = std::make_shared<Nut::Buffer>(sdfLayout, nutContext);
+        m_sdfBufferCapacity = initialSDFSize;
 
-        LogInfo("SDF buffer created");
+        LogInfo("SDF buffer created (on-demand, initial {}B)", initialSDFSize);
     }
 }

@@ -1139,7 +1139,10 @@ namespace Systems
         if (!device)
             return;
 
-        // 从 Bloom 缓冲区开始，逐级降采样到 mip chain
+        wgpu::CommandEncoderDescriptor encoderDesc{};
+        encoderDesc.label = "BloomDownsampleEncoder";
+        wgpu::CommandEncoder encoder = device.CreateCommandEncoder(&encoderDesc);
+
         std::shared_ptr<Nut::RenderTarget> source = m_bloomBuffer;
 
         for (int i = 0; i < iterations && i < static_cast<int>(m_bloomMipChain.size()); ++i)
@@ -1148,12 +1151,6 @@ namespace Systems
             if (!dest)
                 continue;
 
-            // 创建命令编码器
-            wgpu::CommandEncoderDescriptor encoderDesc{};
-            encoderDesc.label = "BloomDownsampleEncoder";
-            wgpu::CommandEncoder encoder = device.CreateCommandEncoder(&encoderDesc);
-
-            // 设置渲染 Pass
             wgpu::RenderPassColorAttachment colorAttachment{};
             colorAttachment.view = dest->GetView();
             colorAttachment.loadOp = wgpu::LoadOp::Clear;
@@ -1166,22 +1163,13 @@ namespace Systems
             passDesc.colorAttachments = &colorAttachment;
 
             wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&passDesc);
-
-            // 注意：实际的管线绑定和绘制需要在管线创建后实现
-            // 1. 绑定降采样管线
-            // 2. 绑定源纹理
-            // 3. 更新 texelSize uniform
-            // 4. 绘制全屏三角形
-
             pass.End();
 
-            // 提交命令
-            wgpu::CommandBuffer commands = encoder.Finish();
-            m_nutContext->GetWGPUQueue().Submit(1, &commands);
-
-            // 下一级的源是当前级的目标
             source = dest;
         }
+
+        wgpu::CommandBuffer commands = encoder.Finish();
+        m_nutContext->GetWGPUQueue().Submit(1, &commands);
 
         if (m_debugMode)
         {
@@ -1198,7 +1186,10 @@ namespace Systems
         if (!device)
             return;
 
-        // 从最小的 mip 开始，逐级升采样并累加
+        wgpu::CommandEncoderDescriptor encoderDesc{};
+        encoderDesc.label = "BloomUpsampleEncoder";
+        wgpu::CommandEncoder encoder = device.CreateCommandEncoder(&encoderDesc);
+
         int startLevel = std::min(iterations - 1, static_cast<int>(m_bloomMipChain.size()) - 1);
         
         for (int i = startLevel; i >= 0; --i)
@@ -1209,15 +1200,8 @@ namespace Systems
             if (!source || !dest)
                 continue;
 
-            // 创建命令编码器
-            wgpu::CommandEncoderDescriptor encoderDesc{};
-            encoderDesc.label = "BloomUpsampleEncoder";
-            wgpu::CommandEncoder encoder = device.CreateCommandEncoder(&encoderDesc);
-
-            // 设置渲染 Pass（使用加法混合）
             wgpu::RenderPassColorAttachment colorAttachment{};
             colorAttachment.view = dest->GetView();
-            // 使用 Load 而不是 Clear，以便累加
             colorAttachment.loadOp = (i == startLevel) ? wgpu::LoadOp::Clear : wgpu::LoadOp::Load;
             colorAttachment.storeOp = wgpu::StoreOp::Store;
             colorAttachment.clearValue = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -1228,19 +1212,11 @@ namespace Systems
             passDesc.colorAttachments = &colorAttachment;
 
             wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&passDesc);
-
-            // 注意：实际的管线绑定和绘制需要在管线创建后实现
-            // 1. 绑定升采样管线（带加法混合）
-            // 2. 绑定源纹理
-            // 3. 更新 texelSize uniform
-            // 4. 绘制全屏三角形
-
             pass.End();
-
-            // 提交命令
-            wgpu::CommandBuffer commands = encoder.Finish();
-            m_nutContext->GetWGPUQueue().Submit(1, &commands);
         }
+
+        wgpu::CommandBuffer commands = encoder.Finish();
+        m_nutContext->GetWGPUQueue().Submit(1, &commands);
 
         if (m_debugMode)
         {

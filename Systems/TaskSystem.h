@@ -4,7 +4,8 @@
 #include <vector>
 #include <future>
 #include <queue>
-#include <box2d/box2d.h> // 假设 b2TaskCallback 在此头文件中定义或被引用
+#include <condition_variable>
+#include <box2d/box2d.h>
 
 namespace Systems
 {
@@ -62,6 +63,7 @@ namespace Systems
 
         std::mutex m_queueMutex; ///< 保护任务队列的互斥锁。
         std::condition_variable m_condition; ///< 用于线程间通信的条件变量，通知工作线程有新任务或系统停止。
+        std::condition_variable m_finishCondition; ///< 用于 Finish 等待 TaskGroup 完成。
         bool m_stop = false; ///< 指示系统是否停止的标志。
     };
 }

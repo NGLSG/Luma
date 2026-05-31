@@ -1,0 +1,6 @@
+id: com.luma.inventory
+name: 背包系统
+version: 1.0.0
+author: Luma Engine
+description: RPG/生存游戏背包与物品管理系统
+dll: InventorySystem.dll

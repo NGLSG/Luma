@@ -1,0 +1,6 @@
+id: com.luma.localization
+name: 本地化
+version: 1.0.0
+author: Luma Engine
+description: 多语言本地化管理，支持翻译表编辑和运行时语言切换
+dll: Localization.dll
