@@ -59,3 +59,7 @@ External/*
 Android
 wiki/
 .kiro
+
+# Local editor and API request scratch files
+.cursor/
+*.http
